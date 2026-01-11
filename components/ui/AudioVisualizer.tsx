@@ -8,7 +8,7 @@ interface AudioVisualizerProps {
     compact?: boolean;
 }
 
-export function AudioVisualizer({ audio Element, isPlaying, compact = false }: AudioVisualizerProps) {
+export function AudioVisualizer({ audioElement, isPlaying, compact = false }: AudioVisualizerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationRef = useRef<number>();
     const analyzerRef = useRef<AnalyserNode>();
@@ -49,7 +49,7 @@ export function AudioVisualizer({ audio Element, isPlaying, compact = false }: A
                 return;
             }
 
-            analyzer.getByteFreencyData(dataArray);
+            analyzer.getByteFrequencyData(dataArray);
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 

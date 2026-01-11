@@ -92,27 +92,48 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
             if (!AudioContext) return;
 
             const ctx = new AudioContext();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-
-            osc.connect(gain);
-            gain.connect(ctx.destination);
 
             if (type === 'tick') {
-                // Crisp mechanical click - Optimized for realism
-                osc.type = 'square'; // Square wave sounds more "clicky" than triangle
-                osc.frequency.setValueAtTime(150, ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.005);
-                gain.gain.setValueAtTime(0.05, ctx.currentTime); // Lower volume to prevent ear fatigue
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.008);
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.01);
+                // Synthesize a mechanical "Click" (Piezo style)
+                // 1. Short burst of White Noise (Impact)
+                const bufferSize = ctx.sampleRate * 0.005; // 5ms click
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                // Filter to make it "plastic/mechanical"
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1000, ctx.currentTime);
+
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.004); // Fast decay
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                noise.start();
+
             } else {
-                // Thud / Select sound
+                // Thud / Select sound (Deeper, Sine-based)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(400, ctx.currentTime);
-                gain.gain.setValueAtTime(0.2, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(250, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.08); // Pitch drop
+
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 0.1);
             }

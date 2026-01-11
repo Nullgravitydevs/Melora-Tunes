@@ -1,13 +1,13 @@
 import { motion } from "framer-motion";
 import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { CinemaModeMobile as CinemaMode } from "@/components/scene/cinema-mode-mobile";
 import { CoverFlowMobile as CoverFlow } from "@/components/scene/cover-flow-mobile";
 
 interface IpodScreenProps {
-    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow';
+    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game';
     title: string;
     menuItems: string[]; // List of labels to display
     itemsData?: any[]; // Optional rich data for items (images etc)
@@ -21,12 +21,17 @@ interface IpodScreenProps {
     searchQuery?: string;
     onSearchChange?: (query: string) => void;
     onSearchSubmit?: (query: string) => void;
-    inputRef?: React.RefObject<HTMLInputElement>;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
     onItemSelect?: (index: number) => void;
     onPlayPause?: () => void;
     onBack?: () => void;
     isFlipped?: boolean;
     trackIndex?: number;
+    layout?: 'split' | 'full';
+    customHeader?: React.ReactNode;
+    controlMode?: 'volume' | 'seek'; // New prop for visual feedback
+    shuffle?: boolean;
+    repeat?: 'off' | 'one' | 'all';
 }
 
 export function IpodScreen({
@@ -49,7 +54,12 @@ export function IpodScreen({
     onSearchSubmit,
     inputRef,
     isFlipped,
-    trackIndex
+    trackIndex,
+    layout = 'split',
+    customHeader,
+    controlMode,
+    shuffle,
+    repeat
 }: IpodScreenProps) {
 
     // Format helper
@@ -70,37 +80,99 @@ export function IpodScreen({
         return null;
     };
 
-    // Auto-scroll logic for Search
+    // Live Clock & Battery
+    const [time, setTime] = useState("");
+    const [batteryLevel, setBatteryLevel] = useState(100);
+    const [isCharging, setIsCharging] = useState(false);
+
     useEffect(() => {
-        if (variant === 'search' && selectedIndex >= 0) {
-            const el = document.getElementById(`search-item-${selectedIndex}`);
-            el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        // Clock
+        const updateTime = () => {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = now.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            setTime(`${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`);
+        };
+        updateTime();
+        const interval = setInterval(updateTime, 1000 * 60); // Every minute
+
+        // Battery
+        let batteryRemoveListener: (() => void) | null = null;
+
+        if (typeof navigator !== 'undefined' && (navigator as any).getBattery) {
+            (navigator as any).getBattery().then((battery: any) => {
+                const updateBattery = () => {
+                    setBatteryLevel(Math.floor(battery.level * 100));
+                    setIsCharging(battery.charging);
+                };
+                updateBattery();
+
+                battery.addEventListener('levelchange', updateBattery);
+                battery.addEventListener('chargingchange', updateBattery);
+
+                batteryRemoveListener = () => {
+                    battery.removeEventListener('levelchange', updateBattery);
+                    battery.removeEventListener('chargingchange', updateBattery);
+                };
+            });
         }
-    }, [selectedIndex, variant]);
+
+        return () => {
+            clearInterval(interval);
+            if (batteryRemoveListener) batteryRemoveListener();
+        };
+    }, []);
 
     return (
         <div className="w-full h-full bg-black flex flex-col font-sans text-xs overflow-hidden text-white">
             {/* Top Bar - Dark Glass */}
-            <div className="h-6 bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 flex items-center justify-between px-2 shrink-0 z-20 shadow-sm">
-                <div className="flex items-center gap-1.5" onClick={onBack}> {/* Touch Back */}
-                    <ChevronRight size={12} className="rotate-180 text-zinc-400" /> {/* Explicit Back Icon */}
-                    {variant === 'player' && (
-                        <div onClick={(e) => { e.stopPropagation(); onPlayPause?.(); }}> {/* Touch Play/Pause */}
-                            {isPlaying ? <Play size={10} className="fill-blue-400 text-blue-400" /> : <Pause size={10} className="fill-zinc-400 text-zinc-400" />}
-                        </div>
+            <div className="h-6 bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 flex items-center justify-between px-2 shrink-0 z-20 shadow-sm relative">
+
+                {/* Left: Play Status / Back */}
+                <div className="flex items-center gap-1.5 min-w-[30%]" onClick={onBack}>
+                    <ChevronRight size={12} className="rotate-180 text-zinc-400" />
+                    {variant === 'player' && isPlaying ? (
+                        <Play size={10} className="fill-blue-400 text-blue-400 animate-pulse" />
+                    ) : variant === 'player' ? (
+                        <Pause size={10} className="fill-zinc-400 text-zinc-400" />
+                    ) : (
+                        <span className="font-semibold text-zinc-100 text-[11px] tracking-tight drop-shadow-md truncate">{title}</span>
                     )}
-                    <span className="font-semibold text-zinc-100 text-[11px] ml-0.5 tracking-tight drop-shadow-md">{title}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+
+                {/* Center: Clock (The classic iPod header look) */}
+                <div className="absolute left-1/2 -translate-x-1/2 font-bold text-[10px] text-zinc-300 flex items-center gap-2">
                     {/* Status Icons */}
-                    <div className="flex gap-0.5 items-end h-2">
+                    {shuffle && <span className="text-[9px] text-blue-400">🔀</span>}
+                    {repeat === 'one' && <span className="text-[9px] text-blue-400">🔂</span>}
+                    {repeat === 'all' && <span className="text-[9px] text-blue-400">🔁</span>}
+                    <span>{time}</span>
+                </div>
+
+                {/* Right: Battery */}
+                <div className="flex items-center justify-end min-w-[30%] gap-1.5">
+                    {/* Signal Bars (Just visual decoration like original) */}
+                    <div className="flex gap-0.5 items-end h-2 opacity-50">
                         <div className="w-0.5 h-1 bg-zinc-400 rounded-[0.5px]"></div>
                         <div className="w-0.5 h-1.5 bg-zinc-400 rounded-[0.5px]"></div>
                         <div className="w-0.5 h-2 bg-zinc-400 rounded-[0.5px]"></div>
-                        <div className="w-0.5 h-2.5 bg-zinc-600 rounded-[0.5px]"></div>
                     </div>
-                    <span className="text-[9px] font-bold text-zinc-400">5G</span>
-                    <Battery size={14} className="text-zinc-300 fill-zinc-300 ml-0.5" />
+
+                    {/* Battery Body */}
+                    <div className="relative">
+                        {isCharging && <div className="absolute -left-3 top-[-1px] text-[10px] text-green-400">⚡</div>}
+                        <div className="w-5 h-2.5 border border-zinc-400 rounded-[1px] p-[1px] relative flex shadow-inner">
+                            <div
+                                className={`h-full transition-all duration-500 ${batteryLevel < 20 ? 'bg-red-500' : 'bg-green-500'}`}
+                                style={{ width: `${batteryLevel}%` }}
+                            />
+                        </div>
+                        {/* Battery Tip */}
+                        <div className="absolute -right-[2px] top-0.5 w-[2px] h-1.5 bg-zinc-400 rounded-r-[1px]"></div>
+                    </div>
                 </div>
             </div>
 
@@ -217,10 +289,11 @@ export function IpodScreen({
                         <span className="text-[10px] text-zinc-500 font-medium animate-pulse">Loading...</span>
                     </div>
                 ) : variant === 'menu' ? (
-                    // --- MENU VIEW (Split) ---
+                    // --- MENU VIEW (Split or Full) ---
                     <div className="flex h-full bg-black">
-                        {/* Left: Menu List (Virtual Window) */}
-                        <div className="w-1/2 flex flex-col bg-black border-r border-zinc-800 relative overflow-hidden">
+                        {/* Menu List */}
+                        <div className={`${layout === 'full' ? 'w-full' : 'w-1/2'} flex flex-col bg-black ${layout === 'split' ? 'border-r border-zinc-800' : ''} relative overflow-hidden`}>
+                            {customHeader}
                             {(() => {
                                 const VISIBLE_COUNT = 6;
                                 const half = Math.floor(VISIBLE_COUNT / 2);
@@ -241,58 +314,48 @@ export function IpodScreen({
                                         <div
                                             key={realIndex} // Use realIndex for stability
                                             onClick={() => onItemSelect?.(realIndex)}
-                                            className={`h-7 flex items-center justify-between px-2 font-medium text-[11px] cursor-pointer active:brightness-110 ${isSelected
+                                            className={`h-9 flex items-center justify-between px-3 font-medium text-[11px] cursor-pointer active:brightness-110 ${isSelected
                                                 ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md sticky top-0 z-10"
-                                                : "bg-black text-zinc-300 border-b border-zinc-900"
+                                                : "bg-black text-white border-b border-zinc-900"
                                                 }`}
                                         >
-                                            <span className="truncate">{item}</span>
-                                            <ChevronRight size={10} className={isSelected ? "text-white" : "text-zinc-800"} />
+                                            <span className="truncate font-semibold">{item}</span>
+                                            <ChevronRight size={12} className={isSelected ? "text-white" : "text-zinc-600"} />
                                         </div>
                                     );
                                 });
                             })()}
-                            {/* Scroll Indicator (if needed) */}
-                            {menuItems.length > 6 && (
-                                <div className="absolute right-0 top-0 bottom-0 w-1 bg-zinc-900">
-                                    <div
-                                        className="w-full bg-zinc-600 rounded-full transition-all duration-75"
-                                        style={{
-                                            height: `${Math.max(10, (6 / menuItems.length) * 100)}%`,
-                                            top: `${(selectedIndex / menuItems.length) * 100}%`,
-                                            position: 'absolute'
-                                        }}
-                                    />
-                                </div>
-                            )}
+                            {/* Scroll Indicator removed per user request */}
                         </div>
-                        {/* Right: Preview / Album Art Placeholder */}
-                        <div className="w-1/2 bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center p-3 relative z-10 overflow-hidden">
-                            {/* If we had "focused item" metadata, we could show it here. For now static or current song art */}
-                            {/* Reflection Effect */}
-                            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                        {/* Right: Preview / Album Art Placeholder (Only in Split Mode) */}
+                        {layout === 'split' && (
+                            <div className="w-1/2 bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center p-3 relative z-10 overflow-hidden">
+                                {/* If we had "focused item" metadata, we could show it here. For now static or current song art */}
+                                {/* Reflection Effect */}
+                                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
 
-                            {currentSong?.image ? (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    key={currentSong.id} // Animate on change
-                                    className="relative w-full aspect-square shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
-                                >
-                                    <img
-                                        src={Array.isArray(currentSong.image) ? currentSong.image[0]?.link : currentSong.image as string}
-                                        alt="Art"
-                                        className="w-full h-full object-cover rounded-md border border-white/10"
-                                    />
-                                    {/* Glass sheen on art */}
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md pointer-events-none" />
-                                </motion.div>
-                            ) : (
-                                <div className="w-3/4 aspect-square bg-zinc-800 rounded-lg shadow-inner flex items-center justify-center text-zinc-600 border border-zinc-700">
-                                    <span className="text-2xl">♪</span>
-                                </div>
-                            )}
-                        </div>
+                                {currentSong?.image ? (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        key={currentSong.id} // Animate on change
+                                        className="relative w-full aspect-square shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
+                                    >
+                                        <img
+                                            src={Array.isArray(currentSong.image) ? currentSong.image[0]?.link : currentSong.image as string}
+                                            alt="Art"
+                                            className="w-full h-full object-cover rounded-md border border-white/10"
+                                        />
+                                        {/* Glass sheen on art */}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md pointer-events-none" />
+                                    </motion.div>
+                                ) : (
+                                    <div className="w-3/4 aspect-square bg-zinc-800 rounded-lg shadow-inner flex items-center justify-center text-zinc-600 border border-zinc-700">
+                                        <span className="text-2xl">♪</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 ) : variant === 'cinema' ? (
                     <div className="w-full h-full relative z-[20]">
@@ -350,13 +413,21 @@ export function IpodScreen({
                                         <span>{formatTime(progress * duration)}</span>
                                         <span>-{formatTime(duration - (progress * duration))}</span>
                                     </div>
-                                    <div className="w-full h-1.5 bg-zinc-800/80 rounded-full border border-zinc-700 overflow-hidden relative backdrop-blur-sm">
+                                    <div className="w-full h-1.5 bg-zinc-800/80 rounded-full border border-zinc-700 relative backdrop-blur-sm">
                                         <div
-                                            className="h-full bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500"
+                                            className={`h-full transition-colors duration-200 ${controlMode === 'seek' ? 'bg-gradient-to-r from-yellow-300 via-yellow-200 to-yellow-400' : 'bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500'}`}
                                             style={{ width: `${progress * 100}%` }}
                                         >
                                             <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-white/50 shadow-[0_0_5px_white]" />
                                         </div>
+
+                                        {/* Diamond Scrubber Handle */}
+                                        {controlMode === 'seek' && (
+                                            <div
+                                                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white shadow-lg border border-zinc-300 rotate-45 z-10"
+                                                style={{ left: `calc(${progress * 100}% - 6px)` }}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -364,6 +435,6 @@ export function IpodScreen({
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

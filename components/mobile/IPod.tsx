@@ -18,13 +18,15 @@ interface MenuItem {
 interface ViewState {
     id: string; // Unique ID for the view context (e.g., 'main', 'playlists', 'mix-123')
     title: string;
-    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow';
+    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game';
     data?: any; // Context data (e.g., mixId)
     selectedIndex: number;
     staticItems?: MenuItem[]; // For purely static menus
     searchQuery?: string;
     isFlipped?: boolean; // For Cover Flow flip state
     trackIndex?: number; // For Cover Flow track selection when flipped
+    layout?: 'split' | 'full';
+    customHeader?: React.ReactNode;
 }
 
 const MAIN_MENU: MenuItem[] = [
@@ -73,16 +75,20 @@ export function IPod() {
     const {
         play, pause, togglePlay, next, prev,
         volume, setVolume,
-        currentSong, isPlaying, progress, duration,
+        currentSong, isPlaying, progress, duration, seek,
         activeMixId, loadMix, updateMix, activeMix,
-        mixes, addMix, deleteMix
+        mixes, addMix, deleteMix,
+        shuffle, setShuffle, repeat, setRepeat
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [gameScroll, setGameScroll] = useState(0);
+    const [viewStack, setViewStack] = useState<ViewState[]>([
+        { id: 'main', title: "TFI Stereo", viewType: 'menu', selectedIndex: 0, staticItems: MAIN_MENU }
+    ]);
     const [clickSounds, setClickSounds] = useState(true);
     const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark'>('classic');
+    const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume'); // Toggle for Player view
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Load settings on mount
@@ -94,9 +100,7 @@ export function IPod() {
     }, [setVolume]);
 
     // Initial State
-    const [viewStack, setViewStack] = useState<ViewState[]>([
-        { id: 'main', title: "TFI Stereo", viewType: 'menu', selectedIndex: 0, staticItems: MAIN_MENU }
-    ]);
+
 
     // Derived state for current view
     const currentView = viewStack[viewStack.length - 1];
@@ -106,7 +110,7 @@ export function IPod() {
     // This prevents stale state issues where actions use old versions of 'mixes'.
     // Compute Menu Items Dynamically based on Current View ID & Context
     // Memoized to prevent heavy recalculation on scroll (selectedIndex change)
-    const currentMenuItems = useMemo(() => {
+    const currentMenuItems: MenuItem[] = useMemo(() => {
         if (currentView.staticItems) return currentView.staticItems;
 
         switch (currentView.id) {
@@ -135,7 +139,17 @@ export function IPod() {
                     {
                         label: `iPod Theme`,
                         type: 'navigation',
-                        target: 'ipod-theme'
+                        target: 'theme-settings'
+                    },
+                    {
+                        label: `Shuffle: ${shuffle ? 'On' : 'Off'}`,
+                        type: 'action',
+                        action: () => setShuffle(!shuffle)
+                    } as any,
+                    {
+                        label: `Repeat: ${repeat === 'one' ? 'One' : repeat === 'all' ? 'All' : 'Off'}`,
+                        type: 'action',
+                        action: () => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')
                     },
                     {
                         label: "Backup Playlists",
@@ -172,11 +186,30 @@ export function IPod() {
                             setViewStack(prev => [...prev, {
                                 id: 'about',
                                 title: 'About',
-                                viewType: 'message',
+                                viewType: 'menu',
+                                layout: 'full',
                                 selectedIndex: 0,
-                                data: {
-                                    message: '━━━━━━━━━━━━━━━━\n\nTFI Stereo\n\n━━━━━━━━━━━━━━━━\n\nVersion 2.0.0\n\n━━━━━━━━━━━━━━━━\n\nCrafted with ♥\nby TFIverse\n\n@TFI_verse\n\n━━━━━━━━━━━━━━━━'
-                                }
+                                customHeader: (
+                                    <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center bg-white text-black border-b border-zinc-200">
+                                        <div className="w-16 h-16 bg-gradient-to-br from-zinc-800 to-black rounded-xl shadow-lg mb-3 flex items-center justify-center text-white">
+                                            <span className="font-bold text-xl">TFI</span>
+                                        </div>
+                                        <h3 className="text-lg font-bold tracking-tight">TFI Stereo</h3>
+                                        <p className="text-[11px] text-zinc-500 font-medium mt-1">Version 2.0.0</p>
+                                        <div className="flex items-center gap-1 mt-3">
+                                            <span className="text-[10px] text-zinc-400">Made with </span>
+                                            <span className="text-[10px] text-red-500">❤️</span>
+                                            <span className="text-[10px] text-zinc-400"> by TFIverse</span>
+                                        </div>
+                                    </div>
+                                ),
+                                staticItems: [
+                                    {
+                                        label: "Twitter (@TFI_verse)",
+                                        type: 'action',
+                                        action: () => window.open('https://x.com/TFI_verse', '_blank')
+                                    }
+                                ]
                             }]);
                         }
                     },
@@ -200,7 +233,7 @@ export function IPod() {
                             }
                         }
                     }
-                ];
+                ] as MenuItem[];
 
             case 'ipod-theme':
                 // iPod Theme Selection
@@ -309,9 +342,14 @@ export function IPod() {
                         data: a
                     }));
 
-                // If user has music, show it. Otherwise show Premium Demo.
+                // If user has music, show it. Otherwise show message.
                 if (userAlbums.length > 0) return userAlbums;
-                return COVER_FLOW_ITEMS;
+
+                return [{
+                    label: "No Music Added",
+                    type: 'action',
+                    action: () => alert("Use Search to add music first!")
+                }];
             }
 
             case 'albums': {
@@ -571,20 +609,19 @@ export function IPod() {
         }
 
         if (currentView.viewType === 'player' || currentView.viewType === 'cinema') {
-            // Volume Control (when volume screen / player is active)
-            if (currentView.viewType === 'player') {
-                const delta = direction; // Assuming 'direction' is the delta for volume
-                const newVol = Math.max(0, Math.min(1, volume + delta * 0.05));
-                setVolume(newVol);
-                saveSettings({ volume: newVol }); // Persist volume
-                if (currentView.id === 'volume') {
-                    // If we are on the dedicated volume screen, we might want to update its display or prevent other actions.
-                    // For now, just let the setVolume trigger re-render.
+            // Volume vs Scrub Control
+            if (controlMode === 'seek') {
+                // Scrubbing (Seek)
+                if (duration > 0) {
+                    const seekAmount = 5; // Seconds per scroll tick
+                    const newTime = Math.max(0, Math.min(duration, (progress * duration) + (direction * seekAmount)));
+                    seek(newTime);
                 }
-            } else { // currentView.viewType === 'cinema'
-                // Original cinema volume control
+            } else {
+                // Volume Control (Default)
                 const newVol = Math.max(0, Math.min(1, volume + (direction * 0.05)));
                 setVolume(newVol);
+                saveSettings({ volume: newVol });
             }
         } else if (currentView.viewType === 'cover-flow') {
             // Cover Flow has two scroll modes:
@@ -748,65 +785,62 @@ export function IPod() {
         goToNowPlaying();
     };
 
-    const handleSelect = () => {
-        console.log('🔍 handleSelect called, viewType:', currentView.viewType, 'selectedIndex:', currentView.selectedIndex);
 
-        if (currentView.viewType === 'cinema') {
-            console.log('✅ Cinema mode - calling togglePlay');
-            togglePlay();
+    const handleSelect = () => {
+        // Special handling for Player View: Toggle Scrub/Volume
+        if (currentView.viewType === 'player' || currentView.viewType === 'cinema') {
+            if (controlMode === 'volume') {
+                setControlMode('seek');
+            } else {
+                setControlMode('volume');
+            }
             return;
         }
+
+
 
         // Special handling for Cover Flow
         if (currentView.viewType === 'cover-flow') {
             if (currentView.isFlipped) {
                 // Play selected track from the flipped album
                 const activeAlbum = currentMenuItems[currentView.selectedIndex]?.data;
-                if (!activeAlbum?.songs) return;
-
-                const selectedTrack = activeAlbum.songs[currentView.trackIndex || 0];
-                console.log('🎵 Playing track from Cover Flow:', selectedTrack.name);
-                playSongNow(selectedTrack);
-                goToNowPlaying();
+                const trackIndex = currentView.trackIndex || 0;
+                if (activeAlbum?.songs && activeAlbum.songs[trackIndex]) {
+                    // Play whole album starting from track
+                    // Need to construct a Mix object or just play list
+                    // For now simplicity: just play song
+                    // Ideally we should play context.
+                    // Let's create a temporary mix for this album
+                    const albumMixId = `album-${activeAlbum.title}`;
+                    // Check if exists or create
+                    // Simplified: Just play song
+                    playSongNow(activeAlbum.songs[trackIndex]);
+                }
             } else {
-                // Flip album to show tracklist
-                console.log('✅ Cover Flow mode - toggling flip, current isFlipped:', currentView.isFlipped);
+                // Flip the album
                 setViewStack(prev => {
                     const newStack = [...prev];
                     const active = newStack[newStack.length - 1];
-                    newStack[newStack.length - 1] = { ...active, isFlipped: !active.isFlipped, trackIndex: 0 }; // Reset to first track
+                    newStack[newStack.length - 1] = { ...active, isFlipped: !active.isFlipped, trackIndex: 0 };
                     return newStack;
                 });
             }
             return;
         }
 
+        // Default Menu Selection
         const selectedItem = currentMenuItems[currentView.selectedIndex];
-        console.log('📋 Selected item:', selectedItem);
-
-        if (!selectedItem && currentView.viewType !== 'player') return;
-
-        if (currentView.viewType === 'search') {
-            if (selectedItem?.type === 'navigation' && selectedItem.target) {
-                handleNavigation(selectedItem.target, selectedItem.data, selectedItem.label);
-            }
-        } else if (selectedItem) {
-            // Check for special menu items FIRST (before checking if action exists)
-            if (selectedItem.data?.id === 'cinema') {
-                setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
-            } else if (selectedItem.data?.id === 'cover-flow') {
-                setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: 0 }]);
-            } else if (selectedItem.data?.id === 'now-playing') {
-                goToNowPlaying();
-            } else if (selectedItem.action) {
-                // Regular action items
+        if (selectedItem) {
+            if (selectedItem.action) {
                 selectedItem.action();
-            }
-            else if (selectedItem.type === 'navigation' && selectedItem.target) {
-                handleNavigation(selectedItem.target, selectedItem.data, selectedItem.label); // Pass data/title
+            } else if (selectedItem.type === 'navigation' && selectedItem.target) {
+                handleNavigation(selectedItem.target, selectedItem.data, selectedItem.label);
             }
         }
     };
+
+
+
 
     const handleBack = () => {
         // If in cover-flow and flipped, unflip first before going back
@@ -829,14 +863,19 @@ export function IPod() {
     const getThemeClasses = () => {
         switch (ipodTheme) {
             case 'black':
-                return 'bg-gradient-to-br from-[#1a1a1a] via-[#2a2a2a] to-[#1a1a1a] border-[#111]';
+                // Glossy Black (U2 Edition / Video style)
+                // Using a top-down gradient to mimic light hitting the top
+                return 'bg-gradient-to-b from-[#3a3a3a] via-[#1a1a1a] to-[#050505] border-[#111] shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)]';
             case 'silver':
-                return 'bg-gradient-to-br from-[#c0c0c0] via-[#d8d8d8] to-[#b0b0b0] border-[#aaa]';
+                // Anodized Aluminum (Classic 6G/7G style)
+                return 'bg-gradient-to-b from-[#e8e8e8] via-[#d4d4d4] to-[#b0b0b0] border-[#a0a0a0] shadow-[inset_0_1px_2px_rgba(255,255,255,0.8)]';
             case 'dark':
-                return 'bg-gradient-to-br from-[#2c2c2c] via-[#3a3a3a] to-[#2c2c2c] border-[#222]';
+                // Modern Matte Dark
+                return 'bg-gradient-to-b from-[#333] to-[#181818] border-[#222] shadow-inner';
             case 'classic':
             default:
-                return 'bg-gradient-to-br from-[#e0e0e0] via-[#f2f2f2] to-[#d0d0d0] border-[#d4d4d4]';
+                // Classic Polycarbonate White (Glossy)
+                return 'bg-gradient-to-b from-[#ffffff] via-[#f7f7f7] to-[#e0e0e0] border-[#d1d1d1] shadow-[inset_0_2px_4px_rgba(255,255,255,1)]';
         }
     };
 
@@ -875,6 +914,8 @@ export function IPod() {
                         message={currentView.data?.message || ''}
                         isFlipped={currentView.isFlipped}
                         trackIndex={currentView.trackIndex}
+                        layout={currentView.layout}
+                        customHeader={currentView.customHeader}
                         searchQuery={currentView.viewType === 'search' ? currentView.searchQuery : undefined}
                         // Pass handlers for real input
                         onSearchChange={(val) => {
@@ -925,6 +966,9 @@ export function IPod() {
                             }, 0);
                         }}
                         onPlayPause={togglePlay}
+                        controlMode={controlMode} // Pass seek/volume state
+                        shuffle={shuffle}
+                        repeat={repeat}
                         onBack={handleBack}
                     />
                 </div>

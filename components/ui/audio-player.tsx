@@ -21,6 +21,7 @@ interface AudioPlayerProps {
 
 export interface AudioPlayerRef {
     seekTo: (amount: number) => void;
+    getCurrentTime: () => number;
 }
 
 export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
@@ -44,9 +45,16 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
     useImperativeHandle(ref, () => ({
         seekTo: (amount: number) => {
-            if (audioRef.current && audioRef.current.duration) {
-                audioRef.current.currentTime = amount * audioRef.current.duration;
+            if (audioRef.current) {
+                if (audioRef.current.duration) {
+                    audioRef.current.currentTime = amount * audioRef.current.duration;
+                } else if (amount === 0) {
+                    audioRef.current.currentTime = 0;
+                }
             }
+        },
+        getCurrentTime: () => {
+            return audioRef.current?.currentTime || 0;
         }
     }));
 

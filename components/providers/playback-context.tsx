@@ -23,6 +23,8 @@ interface PlaybackContextType {
     volume: number;
     progress: number;
     duration: number;
+    shuffle: boolean;
+    repeat: 'off' | 'one' | 'all';
 
     // Actions
     setMixes: (mixes: Mix[]) => void;
@@ -34,6 +36,8 @@ interface PlaybackContextType {
     prev: () => void;
     seek: (amount: number) => void; // 0 to 1
     setVolume: (vol: number) => void;
+    setShuffle: (val: boolean) => void;
+    setRepeat: (val: 'off' | 'one' | 'all') => void;
 
     // Mix Management
     addMix: (mix: Mix) => void;
@@ -55,6 +59,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [duration, setDuration] = useState(0);
     const [currentSongUrl, setCurrentSongUrl] = useState<string | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [shuffle, setShuffle] = useState(false);
+    const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
 
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
@@ -95,15 +101,27 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // --- Actions ---
 
+    // Helpers defined first (hoisted manually) to be available for next/prev
+    const addMix = (mix: Mix) => setMixes(prev => [...prev, mix]);
+
+    const updateMix = useCallback((mixId: string, updates: Partial<Mix>) => {
+        setMixes(prev => prev.map(m => m.id === mixId ? { ...m, ...updates } : m));
+    }, []);
+
+    const deleteMix = (mixId: string) => {
+        setMixes(prev => prev.filter(m => m.id !== mixId));
+        if (activeMixId === mixId) {
+            setActiveMixId(null);
+            setIsPlaying(false);
+            playEject();
+        }
+    };
+
     const loadMix = useCallback((mixId: string) => {
         if (activeMixId === mixId) return; // Already loaded
         playInsert();
         setActiveMixId(mixId);
-        setIsPlaying(true); // Auto-play on load? Or wait for user? Let's say yes for now or maybe false to mimic inserting tape
-        // Actually, physically inserting a tape doesn't auto play usually, but for UX it might be nice.
-        // Let's stick to simple: Insert -> Ready. User hits play.
-        // But for "Swap" logic in current app, it usually keeps playing if replacing?
-        // Let's just set active.
+        setIsPlaying(true);
     }, [activeMixId, playInsert]);
 
     const play = useCallback(() => {
@@ -145,48 +163,113 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (!activeMix) return;
         playClick();
 
-        let nextIndex = activeMix.currentSongIndex + 1;
-        if (nextIndex >= activeMix.songs.length) nextIndex = 0; // Loop or stop? Loop for now.
+        console.log("NEXT called", {
+            current: activeMix.currentSongIndex,
+            len: activeMix.songs.length,
+            shuffle,
+            repeat
+        });
 
+        // 1. Repeat One Logic
+        if (repeat === 'one') {
+            audioPlayerRef.current?.seekTo(0);
+            return;
+        }
+
+        const len = activeMix.songs.length;
+        if (len === 0) return;
+
+        // 1.5 Handle Single Song Case (Reset to 0 if 1 song)
+        if (len === 1) {
+            audioPlayerRef.current?.seekTo(0);
+            if (!isPlaying) setIsPlaying(true);
+            return;
+        }
+
+        let nextIndex = activeMix.currentSongIndex;
+
+        // 2. Shuffle Logic
+        if (shuffle) {
+            // Pick random index different from current
+            let randomIndex = Math.floor(Math.random() * len);
+            // Simple protection against same song if len > 1
+            if (randomIndex === nextIndex && len > 1) {
+                randomIndex = (randomIndex + 1) % len;
+            }
+            nextIndex = randomIndex;
+        } else {
+            // 3. Normal Logic
+            nextIndex = nextIndex + 1;
+
+            // 4. Repeat All / Off Logic
+            if (nextIndex >= len) {
+                if (repeat === 'off') {
+                    // Stop playback at end
+                    console.log("End of playlist (Repeat Off). Stopping.");
+                    setIsPlaying(false);
+                    nextIndex = 0; // Reset to start but don't play? Or just stay at end?
+                    // Typically iPod goes to menu or resets to 0. 
+                    // Let's reset to 0 and stop.
+                    updateMix(activeMix.id, { currentSongIndex: 0 });
+                    return;
+                } else {
+                    // Repeat All -> Loop
+                    nextIndex = 0;
+                }
+            }
+        }
+
+        console.log("Going to index:", nextIndex);
         updateMix(activeMix.id, { currentSongIndex: nextIndex });
-    }, [activeMix]); // removed updateMix from dependency as it's stable usually, activeMix changes
+        if (!isPlaying) setIsPlaying(true); // Ensure play continues
+    }, [activeMix, repeat, shuffle, isPlaying, updateMix]);  // Dependencies updated
 
     const prev = useCallback(() => {
         if (!activeMix) return;
         playClick();
 
-        let prevIndex = activeMix.currentSongIndex - 1;
-        if (prevIndex < 0) prevIndex = activeMix.songs.length - 1;
+        // If played > 3s, restart song
+        if (audioPlayerRef.current && (audioPlayerRef.current.getCurrentTime() || 0) > 3) {
+            audioPlayerRef.current.seekTo(0);
+            return;
+        }
+
+        // Shuffle Previous: For now, just go to random or previous order. 
+        // True iPod shuffle history is complex. 
+        // Simple approach: if shuffle, pick random.
+        let prevIndex = activeMix.currentSongIndex;
+        const len = activeMix.songs.length;
+
+        if (len <= 1) {
+            audioPlayerRef.current?.seekTo(0);
+            return;
+        }
+
+        if (shuffle) {
+            let randomIndex = Math.floor(Math.random() * len);
+            if (randomIndex === prevIndex) randomIndex = (randomIndex - 1 + len) % len;
+            prevIndex = randomIndex;
+        } else {
+            prevIndex = prevIndex - 1;
+            if (prevIndex < 0) prevIndex = len - 1;
+        }
 
         updateMix(activeMix.id, { currentSongIndex: prevIndex });
-    }, [activeMix]);
+        setIsPlaying(true);
+    }, [activeMix, shuffle, updateMix]);
 
     const seek = useCallback((amount: number) => {
         audioPlayerRef.current?.seekTo(amount);
     }, []);
 
-    // --- Helpers ---
 
-    const addMix = (mix: Mix) => setMixes(prev => [...prev, mix]);
-
-    const updateMix = (mixId: string, updates: Partial<Mix>) => {
-        setMixes(prev => prev.map(m => m.id === mixId ? { ...m, ...updates } : m));
-    };
-
-    const deleteMix = (mixId: string) => {
-        setMixes(prev => prev.filter(m => m.id !== mixId));
-        if (activeMixId === mixId) {
-            setActiveMixId(null);
-            setIsPlaying(false);
-            playEject();
-        }
-    };
 
     return (
         <PlaybackContext.Provider value={{
             mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
             setMixes, loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-            addMix, updateMix, deleteMix, isLoaded, activeMix
+            addMix, updateMix, deleteMix, isLoaded, activeMix,
+            shuffle, setShuffle, repeat, setRepeat
         }}>
             {children}
 
@@ -197,7 +280,6 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 playing={isPlaying}
                 volume={volume}
                 onEnded={next}
-                onProgress={({ played }) => setProgress(played)}
                 onProgress={({ played }) => setProgress(played)}
                 onDuration={setDuration}
                 title={decodeHtml(currentSong?.name || "")}
@@ -216,3 +298,4 @@ export function usePlayback() {
     }
     return context;
 }
+
