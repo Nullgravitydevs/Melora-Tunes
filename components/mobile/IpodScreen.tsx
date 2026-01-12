@@ -32,6 +32,7 @@ interface IpodScreenProps {
     controlMode?: 'volume' | 'seek'; // New prop for visual feedback
     shuffle?: boolean;
     repeat?: 'off' | 'one' | 'all';
+    isLocked?: boolean;
 }
 
 export function IpodScreen({
@@ -59,7 +60,8 @@ export function IpodScreen({
     customHeader,
     controlMode,
     shuffle,
-    repeat
+    repeat,
+    isLocked
 }: IpodScreenProps) {
 
     // Format helper
@@ -97,7 +99,7 @@ export function IpodScreen({
             setTime(`${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`);
         };
         updateTime();
-        const interval = setInterval(updateTime, 1000 * 60); // Every minute
+        const interval = setInterval(updateTime, 1000); // Every second
 
         // Battery
         let batteryRemoveListener: (() => void) | null = null;
@@ -126,6 +128,16 @@ export function IpodScreen({
         };
     }, []);
 
+    // Scroll to selected item in Search view
+    useEffect(() => {
+        if (variant === 'search' && selectedIndex >= 0) {
+            const el = document.getElementById(`search-item-${selectedIndex}`);
+            if (el) {
+                el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+    }, [selectedIndex, variant]);
+
     return (
         <div className="w-full h-full bg-black flex flex-col font-sans text-xs overflow-hidden text-white">
             {/* Top Bar - Dark Glass */}
@@ -146,6 +158,7 @@ export function IpodScreen({
                 {/* Center: Clock (The classic iPod header look) */}
                 <div className="absolute left-1/2 -translate-x-1/2 font-bold text-[10px] text-zinc-300 flex items-center gap-2">
                     {/* Status Icons */}
+                    {isLocked && <span className="text-[9px] text-orange-500">🔒</span>}
                     {shuffle && <span className="text-[9px] text-blue-400">🔀</span>}
                     {repeat === 'one' && <span className="text-[9px] text-blue-400">🔂</span>}
                     {repeat === 'all' && <span className="text-[9px] text-blue-400">🔁</span>}
@@ -295,7 +308,7 @@ export function IpodScreen({
                         <div className={`${layout === 'full' ? 'w-full' : 'w-1/2'} flex flex-col bg-black ${layout === 'split' ? 'border-r border-zinc-800' : ''} relative overflow-hidden`}>
                             {customHeader}
                             {(() => {
-                                const VISIBLE_COUNT = 6;
+                                const VISIBLE_COUNT = 9;
                                 const half = Math.floor(VISIBLE_COUNT / 2);
                                 let start = selectedIndex - half;
                                 if (start < 0) start = 0;
@@ -356,14 +369,6 @@ export function IpodScreen({
                                 )}
                             </div>
                         )}
-                    </div>
-                ) : variant === 'cinema' ? (
-                    <div className="w-full h-full relative z-[20]">
-                        <CinemaMode
-                            isOpen={true}
-                            onClose={onBack || (() => { })}
-                            currentSong={currentSong || null}
-                        />
                     </div>
                 ) : (
                     // --- PLAYER VIEW ---
