@@ -13,9 +13,10 @@ interface ClickWheelProps {
     onPlayPause: () => void;
     onNext: () => void;
     onPrev: () => void;
+    children?: React.ReactNode;
 }
 
-export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, onSelect, onMenu, onPlayPause, onNext, onPrev }: ClickWheelProps) {
+export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, onSelect, onMenu, onPlayPause, onNext, onPrev, children }: ClickWheelProps) {
     const wheelRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const lastAngle = useRef<number | null>(null);
@@ -186,28 +187,28 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
         switch (theme) {
             case 'black':
                 return {
-                    wheel: 'bg-[#2a2a2a]',
-                    button: 'from-[#3a3a3a] to-[#2a2a2a]',
-                    text: 'text-gray-500'
+                    wheel: 'bg-[#1a1a1a] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]',
+                    button: 'from-[#2a2a2a] to-[#111] shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.5)]',
+                    text: 'text-zinc-600'
                 };
             case 'silver':
                 return {
-                    wheel: 'bg-[#d0d0d0]',
-                    button: 'from-[#f0f0f0] to-[#d0d0d0]',
-                    text: 'text-gray-500'
+                    wheel: 'bg-[#e0e0e0] shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)]',
+                    button: 'from-[#f5f5f5] to-[#dcdcdc] shadow-[inset_0_1px_2px_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.1)]',
+                    text: 'text-zinc-500'
                 };
             case 'dark':
                 return {
-                    wheel: 'bg-[#3a3a3a]',
-                    button: 'from-[#4a4a4a] to-[#3a3a3a]',
-                    text: 'text-gray-400'
+                    wheel: 'bg-[#222] shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]',
+                    button: 'from-[#333] to-[#222] shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.3)]',
+                    text: 'text-zinc-500'
                 };
             case 'classic':
             default:
                 return {
-                    wheel: 'bg-[#f2f2f2]',
-                    button: 'from-[#fff] to-[#e0e0e0]',
-                    text: 'text-gray-400'
+                    wheel: 'bg-[#f5f5f5] shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)]',
+                    button: 'from-[#fff] to-[#e8e8e8] shadow-[inset_0_1px_2px_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.1)]',
+                    text: 'text-zinc-400'
                 };
         }
     };
@@ -226,11 +227,13 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
         <div
             ref={wheelRef}
             className={`relative size-64 ${colors.wheel} rounded-full shadow-[inset_0_5px_10px_rgba(0,0,0,0.05),0_10px_20px_rgba(0,0,0,0.4)] flex items-center justify-center cursor-pointer active:brightness-95 transition-all select-none touch-none pointer-events-auto`}
+            style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
         >
+            {children}
             {/* Visual Labels (Pointer Events None to let Wheel capture) */}
             <div className={`absolute top-4 font-bold ${colors.text} font-sans tracking-wide text-[11px] pointer-events-none`}>MENU</div>
             <div className={`absolute left-4 ${colors.text} pointer-events-none`}><Rewind size={18} fill="currentColor" /></div>
@@ -242,7 +245,8 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
 
             {/* Center Button (Distinct) */}
             <motion.div
-                className={`size-24 bg-gradient-to-b ${colors.button} rounded-full shadow-[inset_0_2px_5px_rgba(255,255,255,1),0_2px_5px_rgba(0,0,0,0.1)] active:scale-95 transition-all z-20 relative`}
+                className={`size-24 bg-gradient-to-b ${colors.button} rounded-full shadow-[inset_0_2px_5px_rgba(255,255,255,1),0_2px_5px_rgba(0,0,0,0.1)] active:scale-95 transition-all z-20 relative will-change-transform outline-none focus:outline-none`}
+                style={{ contain: 'layout', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
                 whileTap={{ scale: 0.95 }}
                 onPointerDown={(e) => {
                     e.stopPropagation(); // Stop propagation to wheel
