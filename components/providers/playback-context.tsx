@@ -45,6 +45,23 @@ interface PlaybackContextType {
     deleteMix: (mixId: string) => void;
     isLoaded: boolean;
     activeMix: Mix | undefined;
+
+    // Queue
+    queue: JioSaavnSong[];
+    currentIndex: number;
+
+    // Sleep Timer
+    sleepTimer: { endTime: number; duration: number } | null;
+    setSleepTimer: (timer: { endTime: number; duration: number } | null) => void;
+
+    // Crossfade
+    // Crossfade
+    crossfadeDuration: number;
+    setCrossfadeDuration: (duration: number) => void;
+
+    // End of Song Timer
+    stopAtEndOfSong: boolean;
+    setStopAtEndOfSong: (val: boolean) => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -61,6 +78,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [shuffle, setShuffle] = useState(false);
     const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
+    const [sleepTimer, setSleepTimer] = useState<{ endTime: number; duration: number } | null>(null);
+    const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
+    const [stopAtEndOfSong, setStopAtEndOfSong] = useState(false);
 
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
@@ -75,7 +95,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         const saved = localStorage.getItem('tfi-mixes');
         if (saved) {
             try {
-                setMixes(JSON.parse(saved));
+                const parsed = JSON.parse(saved);
+                // Sanitize: Remove mock songs from persistence
+                const sanitized = parsed.map((m: Mix) => ({
+                    ...m,
+                    songs: m.songs.filter(s => !s.id.startsWith('mock-') && !s.name.startsWith('Track '))
+                }));
+                setMixes(sanitized);
             } catch (e) {
                 console.error("Failed to parse mixes", e);
                 setDefaults();
@@ -141,12 +167,25 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [isPlaying, pause, play]);
 
     const loadSongUrl = useCallback(async (song: JioSaavnSong) => {
+        // Validate song has encrypted URL before attempting to play
+        if (!song?.encryptedMediaUrl) {
+            console.warn('Song missing encryptedMediaUrl, skipping:', song?.name || 'Unknown');
+            // Don't set URL, player will stay paused
+            setCurrentSongUrl(null);
+            return;
+        }
+
         try {
             const url = await getHighQualityUrl(song);
-            if (url) setCurrentSongUrl(url);
-            else console.error("No URL found for song", song.name);
+            if (url) {
+                setCurrentSongUrl(url);
+            } else {
+                console.warn("No URL found for song", song.name);
+                setCurrentSongUrl(null);
+            }
         } catch (err) {
-            console.error("Failed to load song URL", err);
+            console.warn("Failed to load song URL", err);
+            setCurrentSongUrl(null);
         }
     }, []);
 
@@ -159,7 +198,55 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
     }, [currentSong, loadSongUrl]);
 
+    // Sleep Timer Countdown
+    useEffect(() => {
+        if (!sleepTimer) return;
+
+        const interval = setInterval(() => {
+            const remaining = sleepTimer.endTime - Date.now();
+
+            if (remaining <= 0) {
+                pause();
+                setSleepTimer(null);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [sleepTimer, pause]);
+
+    // Crossfade Logic
+    useEffect(() => {
+        if (!audioPlayerRef.current || crossfadeDuration === 0 || !isPlaying) return;
+
+        // Ensure we have valid numbers
+        if (!duration || !progress) return;
+
+        const remaining = duration - progress;
+
+        // Fade Out at end
+        if (remaining <= crossfadeDuration) {
+            const fadeVol = volume * (remaining / crossfadeDuration);
+            audioPlayerRef.current.setVolume(Math.max(0, fadeVol));
+        }
+        // Fade In at start
+        else if (progress <= crossfadeDuration) {
+            const fadeVol = volume * (progress / crossfadeDuration);
+            audioPlayerRef.current.setVolume(Math.min(volume, fadeVol));
+        }
+        else {
+            // Normal volume check (simple throttle could be added but this is OK for 5Hz)
+            audioPlayerRef.current.setVolume(volume);
+        }
+    }, [progress, duration, crossfadeDuration, volume, isPlaying]);
+
     const next = useCallback(() => {
+        // End of Song Check
+        if (stopAtEndOfSong) {
+            pause();
+            setStopAtEndOfSong(false); // Reset flag
+            return;
+        }
+
         if (!activeMix) return;
         playClick();
 
@@ -173,6 +260,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // 1. Repeat One Logic
         if (repeat === 'one') {
             audioPlayerRef.current?.seekTo(0);
+            audioPlayerRef.current?.play(); // Force play restart
             return;
         }
 
@@ -269,7 +357,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
             setMixes, loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
             addMix, updateMix, deleteMix, isLoaded, activeMix,
-            shuffle, setShuffle, repeat, setRepeat
+            shuffle, setShuffle, repeat, setRepeat,
+            queue: activeMix?.songs || [],
+            currentIndex: activeMix?.currentSongIndex || 0,
+            sleepTimer, setSleepTimer,
+            crossfadeDuration, setCrossfadeDuration,
+            stopAtEndOfSong, setStopAtEndOfSong
         }}>
             {children}
 

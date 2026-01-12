@@ -1,4 +1,14 @@
+import { lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Lazy load games for better performance
+const BrickGame = lazy(() => import("./games/BrickGame").then(m => ({ default: m.BrickGame })));
+const MusicQuiz = lazy(() => import("./games/MusicQuiz").then(m => ({ default: m.MusicQuiz })));
+
+const GAMES_MENU: MenuItem[] = [
+    { label: "Brick", type: 'action', data: { id: 'brick-game', name: 'Brick' }, action: () => { } },
+    { label: "Music Quiz", type: 'action', data: { id: 'music-quiz', name: 'Music Quiz' }, action: () => { } }
+];
 import { ClickWheel } from "./ClickWheel";
 import { IpodScreen } from "./IpodScreen";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -6,6 +16,7 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong, searchSongs } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface MenuItem {
     label: string;
@@ -33,9 +44,9 @@ const MAIN_MENU: MenuItem[] = [
     { label: "Music", type: 'navigation', target: 'music' },
     { label: 'Cover Flow', type: 'action', data: { id: 'cover-flow', name: 'Cover Flow' } },
     { label: 'Cinema Mode', type: 'action', data: { id: 'cinema', name: 'Cinema Mode' } },
-    { label: 'Search', type: 'navigation', target: 'search' },
-    { label: 'Now Playing', type: 'action', data: { id: 'now-playing', name: 'Now Playing' } },
-    { label: "Settings", type: 'navigation', target: 'settings' }
+    { label: "Games", type: 'navigation', target: 'games' },
+    { label: "Settings", type: 'navigation', target: 'settings' },
+    { label: 'Now Playing', type: 'action', data: { id: 'now-playing', name: 'Now Playing' } }
 ];
 
 const MUSIC_MENU: MenuItem[] = [
@@ -44,32 +55,10 @@ const MUSIC_MENU: MenuItem[] = [
     { label: "Artists", type: 'navigation', target: 'artists' },
     { label: "Albums", type: 'navigation', target: 'albums' },
     { label: "Songs", type: 'navigation', target: 'songs' },
-    { label: "Music Quiz", type: 'action', action: () => alert("Starting Music Quiz...") },
+    { label: "Current Queue", type: 'navigation', target: 'queue' },
 ];
 
-const COVER_FLOW_LIBRARY = [
-    { title: "TFI Stereo", artist: "TFI Team", image: "https://c.saavncdn.com/284/TFI-Stereo-Hindi-2024-20241203054523-500x500.jpg" },
-    { title: "Pushpa The Rise", artist: "Devi Sri Prasad", image: "https://c.saavncdn.com/177/Pushpa-The-Rise-Part-1-Telugu-2021-20221010155029-500x500.jpg" },
-    { title: "Animal", artist: "Manan Bhardwaj", image: "https://c.saavncdn.com/023/Animal-Hindi-2023-20231124191036-500x500.jpg" },
-    { title: "Jawan", artist: "Anirudh Ravichander", image: "https://c.saavncdn.com/214/Jawan-Hindi-2023-20230906161947-500x500.jpg" },
-    { title: "Vikram", artist: "Anirudh Ravichander", image: "https://c.saavncdn.com/434/Vikram-Tamil-2022-20220515124001-500x500.jpg" },
-    { title: "Kabir Singh", artist: "Sachet-Parampara", image: "https://c.saavncdn.com/807/Kabir-Singh-Hindi-2019-20190614075009-500x500.jpg" },
-    { title: "Rockstar", artist: "A.R. Rahman", image: "https://c.saavncdn.com/989/Rockstar-Hindi-2011-20110926115915-500x500.jpg" },
-    { title: "Yeh Jawaani Hai Deewani", artist: "Pritam", image: "https://c.saavncdn.com/712/Yeh-Jawaani-Hai-Deewani-Hindi-2013-20221204123547-500x500.jpg" },
-];
 
-const COVER_FLOW_ITEMS: MenuItem[] = COVER_FLOW_LIBRARY.map(album => ({
-    label: album.title,
-    type: 'action',
-    data: {
-        ...album,
-        songs: Array(12).fill(null).map((_, i) => ({
-            id: `mock-${i}`,
-            name: `Track ${i + 1}`,
-            duration: 240
-        }))
-    }
-}));
 
 export function IPod() {
     const {
@@ -78,7 +67,11 @@ export function IPod() {
         currentSong, isPlaying, progress, duration, seek,
         activeMixId, loadMix, updateMix, activeMix,
         mixes, addMix, deleteMix,
-        shuffle, setShuffle, repeat, setRepeat
+        shuffle, setShuffle, repeat, setRepeat,
+        queue, currentIndex,
+        sleepTimer, setSleepTimer,
+        crossfadeDuration, setCrossfadeDuration,
+        stopAtEndOfSong, setStopAtEndOfSong
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
@@ -105,6 +98,43 @@ export function IPod() {
     // Derived state for current view
     const currentView = viewStack[viewStack.length - 1];
 
+    // Helper to get albums from Library (Shared logic)
+    const getLibraryAlbums = (currentMixes: typeof mixes) => {
+        const albumMap = new Map<string, any>();
+        currentMixes
+            .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
+            .forEach(m => m.songs.forEach(s => {
+                if (!s.album?.id) return;
+
+                if (!albumMap.has(s.album.id)) {
+                    // Create Album Entry
+                    const albumImage = s.image?.find((img: any) => img.quality === '500x500')?.link ||
+                        s.image?.[0]?.link || '';
+                    albumMap.set(s.album.id, {
+                        id: s.album.id,
+                        title: decodeHtml(s.album.name),
+                        artist: decodeHtml(s.primaryArtists),
+                        image: albumImage,
+                        songs: []
+                    });
+                }
+                // Add Song to Album
+                const album = albumMap.get(s.album.id);
+                if (!album.songs.some((existing: any) => existing.id === s.id)) {
+                    album.songs.push({
+                        id: s.id,
+                        name: decodeHtml(s.name),
+                        duration: s.duration,
+                        image: s.image?.find((img: any) => img.quality === '500x500')?.link || s.image?.[0]?.link || '',
+                        primaryArtists: s.primaryArtists
+                    });
+                }
+            }));
+
+        return Array.from(albumMap.values())
+            .sort((a, b) => a.title.localeCompare(b.title));
+    };
+
     // Compute Menu Items Dynamically based on Current View ID & Context
     // Removed useMemo to ensure closures (like playSongNow) are always fresh. 
     // This prevents stale state issues where actions use old versions of 'mixes'.
@@ -116,8 +146,7 @@ export function IPod() {
         switch (currentView.id) {
             case 'music': return MUSIC_MENU;
             case 'games':
-                // Inject logic for Brick Game navigation
-                return []; // GAMES_MENU removed
+                return GAMES_MENU as any;
 
             case 'settings':
                 // Dynamic Settings Menu
@@ -137,19 +166,21 @@ export function IPod() {
                         }
                     },
                     {
+                        label: sleepTimer
+                            ? `Sleep Timer: ${Math.ceil((sleepTimer.endTime - Date.now()) / 60000)}min`
+                            : "Sleep Timer: Off",
+                        type: 'navigation',
+                        target: 'sleep-timer'
+                    },
+                    {
+                        label: `Crossfade: ${crossfadeDuration === 0 ? 'Off' : crossfadeDuration + 's'}`,
+                        type: 'navigation',
+                        target: 'crossfade'
+                    },
+                    {
                         label: `iPod Theme`,
                         type: 'navigation',
                         target: 'theme-settings'
-                    },
-                    {
-                        label: `Shuffle: ${shuffle ? 'On' : 'Off'}`,
-                        type: 'action',
-                        action: () => setShuffle(!shuffle)
-                    } as any,
-                    {
-                        label: `Repeat: ${repeat === 'one' ? 'One' : repeat === 'all' ? 'All' : 'Off'}`,
-                        type: 'action',
-                        action: () => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')
                     },
                     {
                         label: "Backup Playlists",
@@ -180,40 +211,6 @@ export function IPod() {
                         }
                     },
                     {
-                        label: "About",
-                        type: 'action',
-                        action: () => {
-                            setViewStack(prev => [...prev, {
-                                id: 'about',
-                                title: 'About',
-                                viewType: 'menu',
-                                layout: 'full',
-                                selectedIndex: 0,
-                                customHeader: (
-                                    <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center bg-white text-black border-b border-zinc-200">
-                                        <div className="w-16 h-16 bg-gradient-to-br from-zinc-800 to-black rounded-xl shadow-lg mb-3 flex items-center justify-center text-white">
-                                            <span className="font-bold text-xl">TFI</span>
-                                        </div>
-                                        <h3 className="text-lg font-bold tracking-tight">TFI Stereo</h3>
-                                        <p className="text-[11px] text-zinc-500 font-medium mt-1">Version 2.0.0</p>
-                                        <div className="flex items-center gap-1 mt-3">
-                                            <span className="text-[10px] text-zinc-400">Made with </span>
-                                            <span className="text-[10px] text-red-500">❤️</span>
-                                            <span className="text-[10px] text-zinc-400"> by TFIverse</span>
-                                        </div>
-                                    </div>
-                                ),
-                                staticItems: [
-                                    {
-                                        label: "Twitter (@TFI_verse)",
-                                        type: 'action',
-                                        action: () => window.open('https://x.com/TFI_verse', '_blank')
-                                    }
-                                ]
-                            }]);
-                        }
-                    },
-                    {
                         label: "Clear Cache",
                         type: 'action',
                         action: () => {
@@ -235,7 +232,7 @@ export function IPod() {
                     }
                 ] as MenuItem[];
 
-            case 'ipod-theme':
+            case 'theme-settings':
                 // iPod Theme Selection
                 const themeNames = {
                     'classic': 'Classic (White)',
@@ -260,6 +257,60 @@ export function IPod() {
                     action: () => { } // Use scroll wheel to adjust
                 }];
 
+            case 'sleep-timer':
+                return [
+                    {
+                        label: stopAtEndOfSong ? "✓ End of Song" : (sleepTimer ? "✓ Timer Active" : "Off"),
+                        type: 'action',
+                        action: () => {
+                            setSleepTimer(null);
+                            setStopAtEndOfSong(false);
+                        }
+                    },
+                    {
+                        label: "15 minutes",
+                        type: 'action',
+                        action: () => setSleepTimer({ endTime: Date.now() + 15 * 60 * 1000, duration: 15 })
+                    },
+                    {
+                        label: "30 minutes",
+                        type: 'action',
+                        action: () => setSleepTimer({ endTime: Date.now() + 30 * 60 * 1000, duration: 30 })
+                    },
+                    {
+                        label: "1 hour",
+                        type: 'action',
+                        action: () => setSleepTimer({ endTime: Date.now() + 60 * 60 * 1000, duration: 60 })
+                    },
+                    {
+                        label: "End of Song",
+                        type: 'action',
+                        action: () => {
+                            setSleepTimer(null);
+                            setStopAtEndOfSong(true);
+                        }
+                    }
+                ];
+
+            case 'crossfade':
+                return [
+                    {
+                        label: crossfadeDuration === 0 ? "✓ Off" : "Off",
+                        type: 'action',
+                        action: () => setCrossfadeDuration(0)
+                    },
+                    {
+                        label: crossfadeDuration === 3 ? "✓ 3 seconds" : "3 seconds",
+                        type: 'action',
+                        action: () => setCrossfadeDuration(3)
+                    },
+                    {
+                        label: crossfadeDuration === 5 ? "✓ 5 seconds" : "5 seconds",
+                        type: 'action',
+                        action: () => setCrossfadeDuration(5)
+                    }
+                ];
+
             case 'playlists':
                 // Dynamic Playlists List
                 // Filter out "On-the-Go" from the visible list
@@ -283,10 +334,12 @@ export function IPod() {
 
             case 'artists': {
                 const artists = new Set<string>();
-                mixes.forEach(m => m.songs.forEach(s => {
-                    // Split multiple artists and clean up
-                    s.primaryArtists.split(',').forEach(a => artists.add(a.trim()));
-                }));
+                mixes
+                    .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
+                    .forEach(m => m.songs.forEach(s => {
+                        // Split multiple artists and clean up
+                        s.primaryArtists.split(',').forEach(a => artists.add(a.trim()));
+                    }));
                 const sortedArtists = Array.from(artists).sort();
 
                 if (sortedArtists.length === 0) return [{ label: "(No Artists Found)", type: 'action', action: () => handleBack() }];
@@ -301,46 +354,11 @@ export function IPod() {
 
 
             case 'cover-flow': {
-                // Aggregate Albums from User Library (Mixes)
-                const albumMap = new Map<string, any>();
-
-                mixes.forEach(m => m.songs.forEach(s => {
-                    if (!s.album?.id) return;
-
-                    if (!albumMap.has(s.album.id)) {
-                        // Create Album Entry with proper image from song's image array
-                        const albumImage = s.image?.find(img => img.quality === '500x500')?.link ||
-                            s.image?.[0]?.link ||
-                            '';
-                        albumMap.set(s.album.id, {
-                            title: decodeHtml(s.album.name),
-                            artist: decodeHtml(s.primaryArtists),
-                            image: albumImage,
-                            songs: []
-                        });
-                    }
-                    // Add Song to Album (with duplicate check)
-                    const album = albumMap.get(s.album.id);
-                    const songExists = album.songs.some((existingSong: any) => existingSong.id === s.id);
-
-                    if (!songExists) {
-                        album.songs.push({
-                            id: s.id,
-                            name: decodeHtml(s.name),
-                            duration: s.duration,
-                            image: s.image?.find(img => img.quality === '500x500')?.link || s.image?.[0]?.link || '',
-                            primaryArtists: s.primaryArtists
-                        });
-                    }
+                const userAlbums = getLibraryAlbums(mixes).map(a => ({
+                    label: a.title,
+                    type: 'action',
+                    data: a
                 }));
-
-                const userAlbums = Array.from(albumMap.values())
-                    .sort((a, b) => a.title.localeCompare(b.title))
-                    .map(a => ({
-                        label: a.title,
-                        type: 'action',
-                        data: a
-                    }));
 
                 // If user has music, show it. Otherwise show message.
                 if (userAlbums.length > 0) return userAlbums;
@@ -354,11 +372,13 @@ export function IPod() {
 
             case 'albums': {
                 const albums = new Map<string, { id: string, name: string }>();
-                mixes.forEach(m => m.songs.forEach(s => {
-                    if (s.album?.id) {
-                        albums.set(s.album.id, { id: s.album.id, name: s.album.name });
-                    }
-                }));
+                mixes
+                    .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
+                    .forEach(m => m.songs.forEach(s => {
+                        if (s.album?.id) {
+                            albums.set(s.album.id, { id: s.album.id, name: s.album.name });
+                        }
+                    }));
                 const sortedAlbums = Array.from(albums.values()).sort((a, b) => a.name.localeCompare(b.name));
 
                 if (sortedAlbums.length === 0) return [{ label: "(No Albums Found)", type: 'action', action: () => handleBack() }];
@@ -372,7 +392,11 @@ export function IPod() {
             }
 
             case 'songs': {
-                const allSongs = mixes.flatMap(m => m.songs);
+                // Songs View - Flat list of all songs from all mixes (EXCEPT On-the-Go/Queue)
+                const allSongs = mixes
+                    .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
+                    .flatMap(m => m.songs);
+
                 // Unique by ID
                 const uniqueSongs = Array.from(new Map(allSongs.map(s => [s.id, s])).values())
                     .sort((a, b) => a.name.localeCompare(b.name));
@@ -393,7 +417,7 @@ export function IPod() {
                     action: () => playSongNow(s)
                 }));
 
-                items.unshift({ label: "Shuffle Songs", type: 'action', action: shuffleAll });
+                items.unshift({ label: "Shuffle All Songs", type: 'action', action: shuffleAll });
 
                 if (items.length === 1) return [{ label: "(No Songs Found)", type: 'action', action: () => handleBack() }];
 
@@ -402,6 +426,30 @@ export function IPod() {
 
             case 'rename':
                 return [{ label: "Cancel", type: 'action', action: () => handleBack() }];
+
+            case 'queue':
+                // Current Queue View
+                if (!queue || queue.length === 0) {
+                    return [{ label: "(Queue Empty)", type: 'action', action: () => handleBack() }];
+                }
+
+                return queue.map((s, index) => ({
+                    label: `${index === currentIndex ? '▶ ' : ''}${decodeHtml(s.name)}`,
+                    type: 'action',
+                    action: () => {
+                        // If clicking current song, go to Now Playing
+                        if (index === currentIndex) {
+                            goToNowPlaying();
+                        } else {
+                            // Jump to that song in queue
+                            // We need a way to skip to index. 
+                            // Since updateMix handles index update:
+                            if (activeMixId) {
+                                updateMix(activeMixId, { currentSongIndex: index });
+                            }
+                        }
+                    }
+                }));
 
             default:
                 // Handle dynamic IDs
@@ -455,10 +503,13 @@ export function IPod() {
                 if (currentView.id.startsWith('artist-') && !currentView.id.includes('album-')) {
                     const artistName = currentView.id.replace('artist-', '');
 
-                    // Find all songs by this artist
-                    const artistSongs = mixes.flatMap(m => m.songs).filter(s =>
-                        s.primaryArtists.toLowerCase().includes(artistName.toLowerCase())
-                    );
+                    // Find all songs by this artist (Excluding OTG)
+                    const artistSongs = mixes
+                        .filter(m => m.title !== "On-the-Go")
+                        .flatMap(m => m.songs)
+                        .filter(s =>
+                            s.primaryArtists.toLowerCase().includes(artistName.toLowerCase())
+                        );
 
                     // Group by Album
                     const albums = new Map<string, { id: string, name: string }>();
@@ -515,8 +566,8 @@ export function IPod() {
                 if (currentView.id.startsWith('song-')) {
                     const song = currentView.data as JioSaavnSong;
                     return [
-                        { label: "Play Now", type: 'action', action: () => playSongNow(song) },
-                        { label: "Add to Playlist...", type: 'navigation', target: `add-to-${song.id}`, data: song },
+                        { label: "Play", type: 'action', action: () => playSongNow(song) },
+                        { label: "Add to Playlist", type: 'navigation', target: `add-to-${song.id}`, data: song },
                         { label: "Cancel", type: 'action', action: () => handleBack() }
                     ];
                 }
@@ -524,29 +575,31 @@ export function IPod() {
                 // Add to Playlist Menu
                 if (currentView.id.startsWith('add-to-')) {
                     const song = currentView.data as JioSaavnSong;
-                    return mixes.map(mix => ({
-                        label: mix.title,
-                        type: 'action',
-                        action: () => {
-                            // Prevent Duplicates
-                            if (mix.songs.some(s => s.id === song.id)) {
-                                handleBack();
-                                handleBack();
-                                return;
-                            }
+                    return mixes
+                        .filter(m => m.title !== "On-the-Go") // Don't allow adding to temporary queue
+                        .map(mix => ({
+                            label: mix.title,
+                            type: 'action',
+                            action: () => {
+                                // Prevent Duplicates
+                                if (mix.songs.some(s => s.id === song.id)) {
+                                    handleBack();
+                                    handleBack();
+                                    return;
+                                }
 
-                            const newSongs = [...mix.songs, song];
-                            updateMix(mix.id, { songs: newSongs });
-                            // Go back twice
-                            handleBack();
-                            handleBack();
-                        }
-                    }));
+                                const newSongs = [...mix.songs, song];
+                                updateMix(mix.id, { songs: newSongs });
+                                // Go back twice
+                                handleBack();
+                                handleBack();
+                            }
+                        }));
                 }
 
                 return [];
         }
-    }, [currentView.id, currentView.data, currentView.staticItems, mixes, volume, clickSounds, ipodTheme]); // Added volume, clickSounds, ipodTheme for real-time updates
+    }, [currentView.id, currentView.data, currentView.staticItems, mixes, volume, clickSounds, ipodTheme, shuffle, repeat, sleepTimer, crossfadeDuration]);
 
     // Actions
     const createNewPlaylist = () => {
@@ -831,7 +884,35 @@ export function IPod() {
         // Default Menu Selection
         const selectedItem = currentMenuItems[currentView.selectedIndex];
         if (selectedItem) {
-            if (selectedItem.action) {
+            // Special handling for Cinema Mode, Cover Flow and Now Playing from MAIN_MENU
+            if (selectedItem.data?.id === 'cinema') {
+                setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
+            } else if (selectedItem.data?.id === 'cover-flow') {
+                const albums = getLibraryAlbums(mixes);
+                // Find index of current song's album
+                const index = currentSong?.album?.id ? albums.findIndex(a => a.id === currentSong.album.id) : 0;
+                setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: index >= 0 ? index : 0 }]);
+            } else if (selectedItem.data?.id === 'now-playing') {
+                goToNowPlaying();
+            } else if (selectedItem.data?.id === 'brick-game') {
+                // Navigate to Brick Game
+                setViewStack(prev => [...prev, {
+                    id: 'brick-game',
+                    title: 'Brick',
+                    viewType: 'game',
+                    selectedIndex: 0,
+                    data: { id: 'brick-game' }
+                }]);
+            } else if (selectedItem.data?.id === 'music-quiz') {
+                // Navigate to Music Quiz
+                setViewStack(prev => [...prev, {
+                    id: 'music-quiz',
+                    title: 'Music Quiz',
+                    viewType: 'game',
+                    selectedIndex: 0,
+                    data: { id: 'music-quiz' }
+                }]);
+            } else if (selectedItem.action) {
                 selectedItem.action();
             } else if (selectedItem.type === 'navigation' && selectedItem.target) {
                 handleNavigation(selectedItem.target, selectedItem.data, selectedItem.label);
@@ -863,19 +944,18 @@ export function IPod() {
     const getThemeClasses = () => {
         switch (ipodTheme) {
             case 'black':
-                // Glossy Black (U2 Edition / Video style)
-                // Using a top-down gradient to mimic light hitting the top
-                return 'bg-gradient-to-b from-[#3a3a3a] via-[#1a1a1a] to-[#050505] border-[#111] shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)]';
+                // Glossy Black (U2 Edition / Video style) - Removed harsh white insets
+                return 'bg-gradient-to-b from-[#2a2a2a] via-[#111] to-[#050505] border-[#1a1a1a] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]';
             case 'silver':
-                // Anodized Aluminum (Classic 6G/7G style)
-                return 'bg-gradient-to-b from-[#e8e8e8] via-[#d4d4d4] to-[#b0b0b0] border-[#a0a0a0] shadow-[inset_0_1px_2px_rgba(255,255,255,0.8)]';
+                // Anodized Aluminum (Classic 6G/7G style) - Smoother metal look
+                return 'bg-gradient-to-b from-[#f0f0f0] via-[#dca] to-[#b0b0b0] border-[#b0b0b0] shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)]';
             case 'dark':
-                // Modern Matte Dark
-                return 'bg-gradient-to-b from-[#333] to-[#181818] border-[#222] shadow-inner';
+                // Modern Matte Dark - Deep and flat
+                return 'bg-[#181818] border-[#222] shadow-[inset_0_1px_2px_rgba(255,255,255,0.03)]';
             case 'classic':
             default:
-                // Classic Polycarbonate White (Glossy)
-                return 'bg-gradient-to-b from-[#ffffff] via-[#f7f7f7] to-[#e0e0e0] border-[#d1d1d1] shadow-[inset_0_2px_4px_rgba(255,255,255,1)]';
+                // Classic Polycarbonate White (Glossy) - Clean ceramic look
+                return 'bg-gradient-to-b from-[#ffffff] via-[#f5f5f5] to-[#e8e8e8] border-[#dcdcdc] shadow-[inset_0_2px_4px_rgba(255,255,255,0.9)]';
         }
     };
 
@@ -884,7 +964,8 @@ export function IPod() {
 
             {/* iPod Case */}
             <motion.div
-                className={`relative w-full max-w-[450px] aspect-[1/1.65] ${getThemeClasses()} rounded-[3.5rem] shadow-2xl flex flex-col items-center p-6 border-[6px] ring-1 ring-black/5 will-change-transform contain-layout pointer-events-auto`}
+                className={`relative w-full max-w-[450px] aspect-[1/1.65] ${getThemeClasses()} rounded-[3.5rem] shadow-2xl flex flex-col items-center p-6 border-[6px] ring-1 ring-black/5 will-change-transform contain-layout pointer-events-auto select-none touch-manipulation`}
+                style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 120, damping: 20 }}
@@ -913,8 +994,6 @@ export function IPod() {
                         isLoading={isLoading}
                         message={currentView.data?.message || ''}
                         isFlipped={currentView.isFlipped}
-                        trackIndex={currentView.trackIndex}
-                        layout={currentView.layout}
                         customHeader={currentView.customHeader}
                         searchQuery={currentView.viewType === 'search' ? currentView.searchQuery : undefined}
                         // Pass handlers for real input
@@ -971,11 +1050,26 @@ export function IPod() {
                         repeat={repeat}
                         onBack={handleBack}
                     />
+
+
+                    {/* Render Game View if Active - Lazy loaded for performance */}
+                    {currentView.viewType === 'game' && (
+                        <Suspense fallback={
+                            <div className="absolute inset-0 z-50 bg-black flex items-center justify-center">
+                                <div className="text-white text-xs animate-pulse">Loading Game...</div>
+                            </div>
+                        }>
+                            <div className="absolute inset-0 z-50 bg-black">
+                                {currentView.data?.id === 'brick-game' && <BrickGame onBack={handleBack} />}
+                                {currentView.data?.id === 'music-quiz' && <MusicQuiz onBack={handleBack} />}
+                            </div>
+                        </Suspense>
+                    )}
                 </div>
 
                 {/* Branding */}
                 <div className="w-full flex justify-center items-center mb-6 relative z-10">
-                    <span className="text-zinc-500/80 text-[10px] font-bold tracking-[0.2em] font-sans">TFI STEREO</span>
+                    <span className={`text-[10px] font-bold tracking-[0.2em] font-sans ${ipodTheme === 'black' || ipodTheme === 'dark' ? 'text-white/20' : 'text-zinc-500/80'}`}>TFI STEREO</span>
                 </div>
                 {/* Glass Reflection */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-50 pointer-events-none" />
@@ -995,12 +1089,30 @@ export function IPod() {
                                 handleScroll(direction);
                             }
                         }}
-                        onSelect={handleSelect}
-                        onMenu={handleBack}
+                        onSelect={() => {
+                            if (currentView.viewType === 'game') {
+                                // Music Quiz needs select events, dispatch for it
+                                if (currentView.data?.id === 'music-quiz') {
+                                    window.dispatchEvent(new CustomEvent('ipod-select'));
+                                }
+                                // Other games handle their own select (Parachute uses it for shooting)
+                                return;
+                            }
+                            handleSelect();
+                        }}
+                        onMenu={() => {
+                            if (currentView.viewType === 'game') {
+                                // Let game handle it OR just force back
+                                handleBack();
+                            } else {
+                                handleBack();
+                            }
+                        }}
                         onPlayPause={togglePlay}
                         onNext={next}
                         onPrev={prev}
-                    />
+                    >
+                    </ClickWheel>
                 </div>
             </motion.div>
         </div>
