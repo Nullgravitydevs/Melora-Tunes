@@ -119,7 +119,7 @@ export function CoverFlowMobile({
 
                                 {/* BACK FACE (Tracklist) */}
                                 <div
-                                    className="absolute inset-0 w-full h-full bg-white rounded-sm backface-visible rotate-y-180 overflow-hidden border border-zinc-400 shadow-xl"
+                                    className="absolute inset-0 w-full h-full bg-white rounded-sm backface-hidden rotate-y-180 overflow-hidden border border-zinc-400 shadow-xl"
                                     style={{
                                         transform: 'rotateY(180deg)',
                                         backfaceVisibility: 'hidden' // Wait, if I rotateY(180) on parent, this face at 180 will be front? 
