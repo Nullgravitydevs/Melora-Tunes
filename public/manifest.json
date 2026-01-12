@@ -1,12 +1,15 @@
 {
-    "name": "TFI Music",
+    "name": "TFI Music - iPod Simulator",
     "short_name": "TFI Music",
-    "description": "Retro Telugu Film Industry Music Player - Create mixtapes on virtual cassettes",
+    "description": "iPod Classic simulator for Telugu Film Industry Music - Stream music with authentic iPod experience",
     "start_url": "/",
-    "display": "standalone",
+    "display": "fullscreen",
     "background_color": "#000000",
     "theme_color": "#000000",
     "orientation": "portrait",
+    "scope": "/",
+    "lang": "en-US",
+    "dir": "ltr",
     "icons": [
         {
             "src": "/app-icon-192.png",
@@ -25,5 +28,11 @@
         "music",
         "entertainment"
     ],
-    "screenshots": []
+    "screenshots": [],
+    "features": [
+        "Cross Platform",
+        "Offline Playback",
+        "Music Queue",
+        "Games"
+    ]
 }

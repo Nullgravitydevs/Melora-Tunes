@@ -118,7 +118,7 @@ export function decryptUrl(encryptedUrl: string): string {
 
 export function getHighQualityUrl(song: JioSaavnSong): string {
     if (!song.encryptedMediaUrl) {
-        console.error("No encrypted media URL found for song:", song.name);
+        console.warn("No encrypted media URL found for song:", song.name);
         return '';
     }
 
@@ -127,7 +127,7 @@ export function getHighQualityUrl(song: JioSaavnSong): string {
         // Force 320kbps by replacing various quality suffixes
         return decryptedUrl.replace(/_(160|96|48|12)\./g, '_320.');
     } catch (e) {
-        console.error('Failed to decrypt URL for song:', song.name, e);
+        console.warn('Failed to decrypt URL for song:', song.name, e);
         return '';
     }
 }
