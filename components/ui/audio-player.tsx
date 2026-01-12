@@ -22,6 +22,9 @@ interface AudioPlayerProps {
 export interface AudioPlayerRef {
     seekTo: (amount: number) => void;
     getCurrentTime: () => number;
+    play: () => void;
+    pause: () => void;
+    setVolume: (vol: number) => void;
 }
 
 export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
@@ -55,6 +58,15 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         },
         getCurrentTime: () => {
             return audioRef.current?.currentTime || 0;
+        },
+        play: () => {
+            audioRef.current?.play().catch(() => { });
+        },
+        pause: () => {
+            audioRef.current?.pause();
+        },
+        setVolume: (vol: number) => {
+            if (audioRef.current) audioRef.current.volume = vol;
         }
     }));
 
@@ -78,6 +90,9 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
         if (playing) {
             audioRef.current.play().catch(error => {
+                // Ignore AbortError which happens on rapid skipping
+                if (error.name === 'AbortError') return;
+
                 console.error("Playback failed:", error);
                 onError?.(`Playback failed: ${error.message}`);
             });
@@ -115,7 +130,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                         : 0
                 });
             }
-        }, 1000);
+        }, 200);
 
         return () => {
             if (progressIntervalRef.current) {
