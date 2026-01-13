@@ -741,6 +741,5 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                 )}
             </div>
         </div>
-        </div >
     );
 }
