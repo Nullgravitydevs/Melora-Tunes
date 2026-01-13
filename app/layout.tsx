@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Press_Start_2P, Courier_Prime, Share_Tech_Mono } from "next/font/google";
+import { Inter, Press_Start_2P } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -8,28 +8,17 @@ const pressStart2P = Press_Start_2P({
   subsets: ["latin"],
   variable: "--font-press-start",
 });
-const courierPrime = Courier_Prime({
-  weight: ["400", "700"],
-  style: ["normal", "italic"],
-  subsets: ["latin"],
-  variable: "--font-courier-prime",
-});
-const shareTechMono = Share_Tech_Mono({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-share-tech-mono",
-});
 
 export const metadata: Metadata = {
-  title: "TFI Stereo - Premium Audio Experience",
-  description: "High-fidelity retro cassette player and music mixer.",
+  title: "Melora - Premium Audio Experience",
+  description: "High-fidelity retro cassette player and iPod simulator.",
   generator: 'Next.js',
   manifest: '/manifest.json',
   themeColor: "#000000",
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: "TFI Stereo",
+    title: "Melora",
   },
   icons: {
     icon: [
@@ -58,7 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${pressStart2P.variable} ${courierPrime.variable} ${shareTechMono.variable} font-sans bg-black text-white`}
+        className={`${inter.variable} ${pressStart2P.variable} font-sans bg-black text-white`}
       >
         <PlaybackProvider>
           <PwaRegister />
