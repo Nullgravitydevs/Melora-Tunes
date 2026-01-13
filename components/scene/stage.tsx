@@ -41,15 +41,7 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchTargetMixId, setSearchTargetMixId] = useState<string | null>(null);
     const [newMixTitle, setNewMixTitle] = useState("");
-    const [currentTheme, setCurrentTheme] = useState<ThemeKey>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('melora-theme');
-            if (saved && saved in THEMES) {
-                return saved as ThemeKey;
-            }
-        }
-        return 'METAL';
-    });
+    const [currentTheme, setCurrentTheme] = useState<ThemeKey>('METAL');
     const [isCinemaMode, setIsCinemaMode] = useState(false);
     const [editingMix, setEditingMix] = useState<Mix | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -447,6 +439,10 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                 <StudioStage
                     currentTheme={currentTheme}
                     onThemeChange={handleThemeChange}
+                    onSelectTheme={(theme: ThemeKey) => {
+                        setCurrentTheme(theme);
+                        localStorage.setItem('melora-theme', theme);
+                    }}
                     onSwitchToMobile={onSwitchToMobile}
                     onOpenSettings={() => setIsSettingsOpen(true)}
                     onEditMix={(mix) => setEditingMix(mix)}

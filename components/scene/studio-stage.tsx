@@ -12,6 +12,7 @@ import { Mix } from "@/components/providers/playback-context";
 interface StudioStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
+    onSelectTheme?: (theme: ThemeKey) => void;
     onSwitchToMobile?: () => void;
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
@@ -21,7 +22,8 @@ interface StudioStageProps {
 }
 
 
-export function StudioStage({ currentTheme, onThemeChange, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode }: StudioStageProps) {
+export function StudioStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode }: StudioStageProps) {
+    const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const {
@@ -118,13 +120,38 @@ export function StudioStage({ currentTheme, onThemeChange, onSwitchToMobile, onO
                         </button>
                     )}
 
-                    <button
-                        onClick={() => { playClick(); onThemeChange(); }}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-                        title="Change Theme"
-                    >
-                        <Palette size={20} />
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => { playClick(); setIsThemeMenuOpen(!isThemeMenuOpen); }}
+                            className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                            title="Change Theme"
+                        >
+                            <Palette size={20} />
+                        </button>
+
+                        {/* Theme Dropdown */}
+                        {isThemeMenuOpen && (
+                            <div className="absolute right-0 top-full mt-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-2 min-w-[180px] z-50">
+                                {Object.entries(THEMES).map(([key, theme]) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => {
+                                            playClick();
+                                            onSelectTheme?.(key as ThemeKey);
+                                            setIsThemeMenuOpen(false);
+                                        }}
+                                        className={clsx(
+                                            "w-full px-4 py-2 text-left text-sm hover:bg-zinc-800 transition-colors flex items-center gap-2",
+                                            currentTheme === key ? "text-purple-400 bg-zinc-800" : "text-gray-300"
+                                        )}
+                                    >
+                                        {currentTheme === key && <span className="text-purple-400">✓</span>}
+                                        {theme.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <button
                         onClick={() => { playClick(); onCinemaMode?.(); }}
@@ -303,53 +330,61 @@ export function StudioStage({ currentTheme, onThemeChange, onSwitchToMobile, onO
 
                             {hasCassette && activeMix ? (
                                 <div
-                                    className="rounded-lg p-3 text-center shadow-[0_2px_4px_rgba(0,0,0,0.5)] relative z-10 ring-1 ring-black/20 w-[85%]"
+                                    className="w-[90%] aspect-[3/2] rounded-md shadow-lg border-t border-l border-white/20 border-b border-r border-black/30 p-1.5 flex flex-col justify-between relative z-10"
                                     style={{
                                         backgroundColor: activeMix.color === 'purple' ? '#9333ea' :
                                             activeMix.color === 'orange' ? '#f97316' :
                                                 activeMix.color === 'green' ? '#16a34a' :
-                                                    activeMix.color === 'red' ? '#dc2626' : '#9ca3af'
+                                                    activeMix.color === 'red' ? '#dc2626' : '#e5e7eb',
+                                        backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px, transparent 2px, transparent 4px)'
                                     }}
                                 >
+                                    {/* Screws */}
+                                    <div className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full bg-gray-300 shadow-sm flex items-center justify-center"><div className="w-full h-[0.5px] bg-gray-500 rotate-45"></div></div>
+                                    <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-gray-300 shadow-sm flex items-center justify-center"><div className="w-full h-[0.5px] bg-gray-500 rotate-45"></div></div>
+                                    <div className="absolute bottom-1 left-1 w-1.5 h-1.5 rounded-full bg-gray-300 shadow-sm flex items-center justify-center"><div className="w-full h-[0.5px] bg-gray-500 rotate-45"></div></div>
+                                    <div className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-gray-300 shadow-sm flex items-center justify-center"><div className="w-full h-[0.5px] bg-gray-500 rotate-45"></div></div>
+
                                     {/* Label */}
-                                    <div className="bg-[#f0f0f0] p-2 border border-gray-300 shadow-sm relative mx-1 mb-2">
-                                        <p className="text-black text-xs font-black truncate font-mono uppercase">
+                                    <div className="relative bg-amber-50 mx-1 mt-0.5 h-16 rounded-sm shadow-sm p-1 flex flex-col justify-center items-center">
+                                        <div className="absolute top-0 left-0 w-full h-2 opacity-20 bg-black/10"></div>
+                                        <div className="absolute top-1 left-1 font-mono font-bold text-gray-800 text-[10px] opacity-60">A</div>
+                                        <h3 className="font-hand font-bold text-xs text-gray-900 tracking-tight text-center line-clamp-1">
                                             {currentSong ? decodeHtml(currentSong.name) : activeMix.title}
-                                        </p>
-                                        <p className="text-gray-500 text-[9px] font-bold truncate font-mono tracking-widest pt-0.5">
-                                            {currentSong ? decodeHtml(currentSong.primaryArtists || '') : 'MELORA'}
-                                        </p>
+                                        </h3>
+                                        <p className="font-mono text-[8px] text-gray-400 absolute bottom-0.5 uppercase tracking-widest">Melora High Bias</p>
                                     </div>
 
                                     {/* Reels */}
-                                    <div className="flex justify-around items-center px-3 relative">
+                                    <div className="mx-3 mb-0.5 h-6 bg-black/20 rounded-full flex items-center justify-between px-2 relative backdrop-blur-sm">
+                                        {/* Left Reel */}
                                         <motion.div
-                                            className="size-10 rounded-full bg-black flex items-center justify-center relative shadow-[inset_0_0_10px_rgba(0,0,0,0.8)]"
+                                            className="w-6 h-6 bg-white rounded-full border-2 border-gray-800 flex items-center justify-center relative"
                                             animate={isPlaying ? { rotate: 360 } : {}}
                                             transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
                                         >
-                                            <div className="absolute w-[65%] h-[65%] rounded-full bg-[#f0f0f0] flex items-center justify-center z-30">
-                                                <div className="absolute w-1 h-full bg-[#333]"></div>
-                                                <div className="absolute w-full h-1 bg-[#333]"></div>
-                                                <div className="absolute size-2 bg-[#111] rounded-full"></div>
-                                            </div>
+                                            <div className="w-4 h-4 rounded-full border-2 border-dashed border-gray-400"></div>
+                                            <div className="absolute w-1 h-1 bg-gray-800 rounded-full"></div>
                                         </motion.div>
 
-                                        <div className="h-6 flex-1 mx-2 bg-[#1a1a1a] rounded flex items-center justify-center overflow-hidden relative shadow-inner">
-                                            <div className="w-full h-3 bg-[#2a1d1d] opacity-90"></div>
+                                        <div className="flex-grow h-3 mx-1 flex items-center justify-center">
+                                            <span className="text-[5px] text-white/50 font-mono">TYPE I</span>
                                         </div>
 
+                                        {/* Right Reel */}
                                         <motion.div
-                                            className="size-10 rounded-full bg-black flex items-center justify-center relative shadow-[inset_0_0_10px_rgba(0,0,0,0.8)]"
+                                            className="w-6 h-6 bg-white rounded-full border-2 border-gray-800 flex items-center justify-center relative"
                                             animate={isPlaying ? { rotate: 360 } : {}}
                                             transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
                                         >
-                                            <div className="absolute w-[65%] h-[65%] rounded-full bg-[#f0f0f0] flex items-center justify-center z-30">
-                                                <div className="absolute w-1 h-full bg-[#333]"></div>
-                                                <div className="absolute w-full h-1 bg-[#333]"></div>
-                                                <div className="absolute size-2 bg-[#111] rounded-full"></div>
-                                            </div>
+                                            <div className="w-4 h-4 rounded-full border-2 border-dashed border-gray-400"></div>
+                                            <div className="absolute w-1 h-1 bg-gray-800 rounded-full"></div>
                                         </motion.div>
+                                    </div>
+
+                                    {/* Song Count Badge */}
+                                    <div className="absolute -right-1 top-2/3 bg-black text-white text-[8px] font-bold py-0 px-1.5 rounded shadow-md border border-gray-700">
+                                        {activeMix.songs.length} SONGS
                                     </div>
                                 </div>
                             ) : (

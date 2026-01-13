@@ -1,0 +1,5 @@
+fix: Update player cassette UI to match realistic design
+
+- Replaced simplified css cassette in player with detailed vector design
+- Added screws, Melora High Bias label, and texture to player cassette
+- Matched spinning reels animation
