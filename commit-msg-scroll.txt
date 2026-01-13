@@ -1,0 +1,5 @@
+fix: Remove window scroll and custom list scroll for Zen theme
+
+- Locked main window scroll (h-screen overflow-hidden).
+- Made "Your Collection" list scrollable internally with hidden scrollbar (modern feel).
+- Adjusted layout to flex/grid with overflow protection.

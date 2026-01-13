@@ -50,7 +50,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchT
     };
 
     return (
-        <div ref={containerRef} className="bg-[#fcfbf9] text-stone-800 min-h-screen flex flex-col font-sans overflow-x-hidden selection:bg-orange-500 selection:text-white relative">
+        <div ref={containerRef} className="bg-[#fcfbf9] text-stone-800 h-screen overflow-hidden flex flex-col font-sans selection:bg-orange-500 selection:text-white relative">
             {/* Paper Grain Overlay */}
             <div className="fixed inset-0 pointer-events-none z-0 opacity-40 mix-blend-multiply"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")` }}
@@ -117,9 +117,9 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchT
                     </nav>
                 </header>
 
-                <main className="grid lg:grid-cols-12 gap-12 lg:gap-24 flex-grow items-start pt-8">
+                <main className="grid lg:grid-cols-12 gap-12 lg:gap-24 flex-grow items-start pt-8 overflow-hidden h-full pb-8">
                     {/* Left Column: Now Playing & Up Next */}
-                    <section className="lg:col-span-7 flex flex-col justify-center items-center lg:items-start perspective-1000">
+                    <section className="lg:col-span-7 flex flex-col justify-start items-center lg:items-start perspective-1000 h-full overflow-hidden">
                         <div className="mb-8 opacity-60">
                             <h2 className="font-mono text-xs tracking-[0.2em] uppercase text-stone-500">Now Playing</h2>
                         </div>
@@ -214,7 +214,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchT
                         )}
 
                         {/* Up Next List */}
-                        <div className="mt-12 hidden lg:block w-full max-w-lg pl-4">
+                        <div className="mt-8 hidden lg:flex flex-col w-full max-w-lg pl-4 flex-grow overflow-y-auto [&::-webkit-scrollbar]:hidden -mr-4 pr-4">
                             <h4 className="font-mono text-xs text-stone-400 uppercase tracking-widest mb-4">Your Collection</h4>
                             <ul className="space-y-3">
                                 {mixes.map((mix) => (
