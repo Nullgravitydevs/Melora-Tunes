@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Cassette } from "@/components/ui/cassette";
 import { DesktopPlayer } from "@/components/ui/desktop-player";
 import { SearchModal } from "@/components/ui/search-modal";
+import { QueueModal } from "@/components/ui/queue-modal";
+import { LyricsModal } from "@/components/ui/lyrics-modal";
 import { Plus, Maximize2, Pencil, Camera, Download, Upload, MoreHorizontal, Settings, Smartphone } from "lucide-react";
 import { useAudio } from "@/hooks/use-audio";
 import { JioSaavnSong, getSongDetails } from "@/lib/jiosaavn";
@@ -40,6 +42,8 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const [isCinemaMode, setIsCinemaMode] = useState(false);
     const [editingMix, setEditingMix] = useState<Mix | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isQueueOpen, setIsQueueOpen] = useState(false);
+    const [isLyricsOpen, setIsLyricsOpen] = useState(false);
     const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'error' }[]>([]);
 
     const playerRef = useRef<HTMLDivElement>(null);
@@ -529,6 +533,19 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                 onClose={() => setIsSettingsOpen(false)}
             />
 
+            <QueueModal
+                isOpen={isQueueOpen}
+                onClose={() => setIsQueueOpen(false)}
+                queue={activeMix?.songs || []}
+                currentIndex={activeMix?.currentSongIndex || 0}
+            />
+
+            <LyricsModal
+                isOpen={isLyricsOpen}
+                onClose={() => setIsLyricsOpen(false)}
+                song={currentSong || null}
+            />
+
             {
                 isSearchOpen && (
                     <SearchModal
@@ -762,6 +779,8 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                                         const nextRepeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off';
                                         setRepeat(nextRepeat);
                                     }}
+                                    onOpenQueue={() => setIsQueueOpen(true)}
+                                    onOpenLyrics={() => setIsLyricsOpen(true)}
                                     className="scale-90 md:scale-100 origin-center"
                                     drag={false} // Disable internal drag, wrapper handles it
                                     onEject={() => {

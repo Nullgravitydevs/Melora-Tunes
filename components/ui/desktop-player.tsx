@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Palette, Volume2, LogOut, Shuffle, Repeat, Repeat1 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Palette, Volume2, LogOut, Shuffle, Repeat, Repeat1, ListMusic, Music2 } from "lucide-react";
 import { Visualizer } from "./visualizer";
 import { useState } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
@@ -28,6 +28,8 @@ interface PlayerProps {
     onShuffleToggle?: () => void;
     repeat?: 'off' | 'one' | 'all';
     onRepeatToggle?: () => void;
+    onOpenQueue?: () => void;
+    onOpenLyrics?: () => void;
 
     className?: string;
     dragConstraints?: React.RefObject<Element>;
@@ -78,6 +80,8 @@ export function DesktopPlayer({
     onShuffleToggle,
     repeat = 'off',
     onRepeatToggle,
+    onOpenQueue,
+    onOpenLyrics,
     className,
     dragConstraints,
     drag = true,
@@ -311,6 +315,22 @@ export function DesktopPlayer({
                             aria-label="Toggle Repeat"
                         >
                             {repeat === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
+                        </button>
+                        <button
+                            onClick={() => { playClick(); onOpenQueue?.(); }}
+                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all bg-gray-700 text-gray-400 hover:bg-gray-600"
+                            title="View Queue"
+                            aria-label="View Queue"
+                        >
+                            <ListMusic className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => { playClick(); onOpenLyrics?.(); }}
+                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all bg-gray-700 text-gray-400 hover:bg-gray-600"
+                            title="Show Lyrics"
+                            aria-label="Show Lyrics"
+                        >
+                            <Music2 className="w-4 h-4" />
                         </button>
                     </div>
 
