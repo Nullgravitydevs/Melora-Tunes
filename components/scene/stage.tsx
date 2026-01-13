@@ -2,14 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
 import { usePlayback } from '@/components/providers/playback-context';
 import { DesktopPlayer } from '@/components/ui/desktop-player';
 import { Cassette } from '@/components/ui/cassette';
 import { DesktopSettingsModal } from '@/components/ui/desktop-settings-modal';
 import { SearchModal } from '@/components/ui/search-modal';
 import { QueueModal } from "@/components/ui/queue-modal";
-import { LyricsModal } from "@/components/ui/lyrics-modal"; // Import Lyrics Modal
+import { LyricsModal } from "@/components/ui/lyrics-modal";
 import { Settings, Search } from 'lucide-react';
 
 export function Stage() {
@@ -18,20 +17,20 @@ export function Stage() {
         isPlaying,
         play,
         pause,
-        nextSong,
-        prevSong,
+        next,     // Corrected from nextSong
+        prev,     // Corrected from prevSong
         volume,
         setVolume,
         seek,
         mixes,
-        setMixes,
         activeMixId,
-        setActiveMixId,
-        playMix,
+        loadMix,  // Corrected from playMix
         shuffle,
         setShuffle,
         repeat,
         setRepeat,
+        queue,
+        currentIndex,
     } = usePlayback();
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -59,7 +58,7 @@ export function Stage() {
 
     // Handle Eject
     const handleEject = () => {
-        setActiveMixId(null);
+        // Just pause for now, as we don't have explicit eject-to-null in context interface
         pause();
     };
 
@@ -95,12 +94,11 @@ export function Stage() {
                     <h2 className="text-stone-400 text-xs font-bold tracking-widest uppercase mb-2 sticky top-0 bg-stone-900/50 backdrop-blur pb-2">Your Mixtapes</h2>
                     {mixes.map((mix) => (
                         <div key={mix.id} className="relative group hover:scale-[1.02] transition-transform duration-200">
-                            {/* If active, show indicator? */}
                             <Cassette
                                 title={mix.title}
                                 color={mix.color}
                                 songCount={mix.songs.length}
-                                onPlay={() => playMix(mix.id)}
+                                onPlay={() => loadMix(mix.id)} // Corrected
                                 className={activeMixId === mix.id ? "ring-2 ring-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : ""}
                             />
                         </div>
@@ -120,8 +118,8 @@ export function Stage() {
                         cassetteColor={activeMixId ? mixes.find(m => m.id === activeMixId)?.color : undefined}
                         currentSong={currentSong || undefined}
                         onPlayToggle={isPlaying ? pause : play}
-                        onNext={nextSong}
-                        onPrev={prevSong}
+                        onNext={next}   // Corrected
+                        onPrev={prev}   // Corrected
                         volume={volume}
                         onVolumeChange={setVolume}
                         progress={progress}
@@ -133,12 +131,9 @@ export function Stage() {
                         onOpenQueue={() => setShowQueue(!showQueue)}
                         onOpenLyrics={() => setShowLyrics(!showLyrics)}
                         onEject={handleEject}
-                        className="scale-110" // Slightly larger for emphasis
+                        className="scale-110"
                     />
                 </div>
-
-                {/* Right: Info / Visualizer Placeholder (Future) */}
-                {/* Currently empty or could show Upcoming */}
             </div>
 
             {/* Modals */}
@@ -157,28 +152,19 @@ export function Stage() {
                     <QueueModal
                         isOpen={showQueue}
                         onClose={() => setShowQueue(false)}
+                        queue={queue || []}
+                        currentIndex={currentIndex || 0}
                     />
                 )}
                 {showLyrics && (
                     <LyricsModal
                         isOpen={showLyrics}
                         onClose={() => setShowLyrics(false)}
+                        song={currentSong || null}
                     />
                 )}
             </AnimatePresence>
 
         </div>
     );
-}
-
-// Helper Types
-interface Theme {
-    name: string;
-    colors: {
-        primary: string;
-        secondary: string;
-        text: string;
-        accent: string;
-        background: string;
-    };
 }
