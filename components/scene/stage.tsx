@@ -721,24 +721,24 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                         />
                     </section>
                 </main>
-            </div>
 
-            <div id="snapshot-studio-node" className="absolute top-[-9999px] left-[-9999px] w-[800px] h-[600px] bg-gradient-to-br from-retro-black to-zinc-900 flex items-center justify-center p-12">
-                {snapshotTarget && (
-                    <div className="transform scale-150">
-                        <Cassette
-                            id={snapshotTarget.id}
-                            title={snapshotTarget.title}
-                            color={snapshotTarget.color}
-                            songCount={snapshotTarget.songs.length}
-                            className="shadow-2xl"
-                        />
-                        <div className="mt-8 text-center">
-                            <h2 className="text-4xl font-retro text-retro-white mb-2">{snapshotTarget.title}</h2>
-                            <p className="text-retro-gray font-mono">TFI STEREO • {snapshotTarget.songs.length} SONGS</p>
+                <div id="snapshot-studio-node" className="absolute top-[-9999px] left-[-9999px] w-[800px] h-[600px] bg-gradient-to-br from-retro-black to-zinc-900 flex items-center justify-center p-12">
+                    {snapshotTarget && (
+                        <div className="transform scale-150">
+                            <Cassette
+                                id={snapshotTarget.id}
+                                title={snapshotTarget.title}
+                                color={snapshotTarget.color}
+                                songCount={snapshotTarget.songs.length}
+                                className="shadow-2xl"
+                            />
+                            <div className="mt-8 text-center">
+                                <h2 className="text-4xl font-retro text-retro-white mb-2">{snapshotTarget.title}</h2>
+                                <p className="text-retro-gray font-mono">TFI STEREO • {snapshotTarget.songs.length} SONGS</p>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );
