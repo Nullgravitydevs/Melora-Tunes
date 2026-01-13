@@ -42,7 +42,7 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchTargetMixId, setSearchTargetMixId] = useState<string | null>(null);
     const [newMixTitle, setNewMixTitle] = useState("");
-    const [currentTheme, setCurrentTheme] = useState<ThemeKey>('METAL');
+    const [currentTheme, setCurrentTheme] = useState<ThemeKey>('ZEN');
     const [isCinemaMode, setIsCinemaMode] = useState(false);
     const [editingMix, setEditingMix] = useState<Mix | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);

@@ -1,0 +1,4 @@
+chore: Set default theme to ZEN for development
+
+- Changed default theme in stage.tsx to 'ZEN'.
+- Verified theme selector dropdown in ZenStage automatically includes new themes from THEMES object.
