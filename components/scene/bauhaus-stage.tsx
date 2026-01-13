@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1, Pencil } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
@@ -66,7 +66,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
             <div className="max-w-[1600px] mx-auto px-6 py-6 md:py-8 relative z-10 flex flex-col h-full w-full">
 
                 {/* Header */}
-                <header className="w-full p-6 flex flex-col md:flex-row justify-between items-center bg-white border-b-4 border-[#1a1a1a] relative z-20 gap-4 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] mb-8">
+                <header className="w-full p-4 flex flex-col md:flex-row justify-between items-center bg-white border-b-4 border-[#1a1a1a] relative z-20 gap-4 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] mb-4">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-[#ff3333] flex items-center justify-center transform hover:rotate-12 transition-transform shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] border-2 border-[#1a1a1a]">
                             <div className="w-6 h-4 bg-transparent border-2 border-white rounded-sm flex items-center justify-center gap-1">
@@ -74,14 +74,14 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                 <div className="w-1 h-1 bg-white rounded-full"></div>
                             </div>
                         </div>
-                        <h1 className="text-4xl font-black uppercase tracking-tighter">TFI Stereo</h1>
+                        <h1 className="text-2xl font-black uppercase tracking-tighter">TFI Stereo</h1>
                     </div>
 
                     <div className="flex items-center gap-4 flex-wrap justify-center font-bold">
-                        <button onClick={onCinemaMode} className="hidden md:flex items-center gap-2 bg-[#0052cc] text-white px-6 py-3 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a]">
+                        <button onClick={onCinemaMode} className="hidden md:flex items-center gap-2 bg-[#0052cc] text-white px-4 py-2 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a]">
                             <Maximize2 size={16} /> Cinema Mode
                         </button>
-                        <button onClick={onCreateMix} className="flex items-center gap-2 bg-[#ffcc00] text-[#1a1a1a] border-2 border-[#1a1a1a] px-6 py-3 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all">
+                        <button onClick={onCreateMix} className="flex items-center gap-2 bg-[#ffcc00] text-[#1a1a1a] border-2 border-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all">
                             <Plus size={16} /> Create Mix
                         </button>
 
@@ -126,7 +126,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                     {/* Left Column: Mixtapes Grid */}
                     <section className="w-full h-full p-4 lg:p-8 overflow-y-auto [&::-webkit-scrollbar]:hidden pb-32">
                         <div className="flex items-end gap-4 mb-8">
-                            <h2 className="text-5xl md:text-6xl font-black uppercase leading-none tracking-tighter">Your<br />Mixtapes</h2>
+                            <h2 className="text-4xl md:text-5xl font-black uppercase leading-none tracking-tighter">Your<br />Mixtapes</h2>
                             <div className="h-4 w-24 bg-[#ff3333] mb-2 hidden md:block"></div>
                             <div className="h-4 w-4 bg-[#0052cc] mb-2 rounded-full hidden md:block"></div>
                         </div>
@@ -154,9 +154,19 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                     >
                                         <div className="absolute inset-0 bg-[#1a1a1a] translate-x-3 translate-y-3"></div>
                                         <div className={clsx(
-                                            "relative p-6 border-2 border-[#1a1a1a] transition-transform transform group-hover:-translate-y-1 group-hover:-translate-x-1 h-72 flex flex-col justify-between",
+                                            "relative p-4 border-2 border-[#1a1a1a] transition-transform transform group-hover:-translate-y-1 group-hover:-translate-x-1 h-60 flex flex-col justify-between",
                                             color.bg
                                         )}>
+                                            {/* Action Buttons */}
+                                            <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }}
+                                                    className="p-2 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
+                                                    title="Edit Mix"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                            </div>
                                             <div className={clsx("flex justify-between items-start", index % 3 === 2 ? "text-[#1a1a1a]" : "text-white/90")}>
                                                 <span className="text-4xl font-black">A</span>
                                                 <div className="flex gap-1">
@@ -206,7 +216,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         dragMomentum={false}
                         dragConstraints={containerRef}
                         whileDrag={{ scale: 1.02 }}
-                        className="fixed right-8 top-28 w-[400px] bg-white border-4 border-[#1a1a1a] p-6 flex flex-col gap-6 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-140px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
+                        className="fixed right-8 top-24 w-[320px] bg-white border-4 border-[#1a1a1a] p-4 flex flex-col gap-4 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-100px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
                     >
                         {/* Decorative Screws */}
                         <div className="absolute top-4 left-4 text-gray-300 font-mono text-xl">+</div>
@@ -221,12 +231,12 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         </div>
 
                         {/* Player Screen / Window */}
-                        <div className="bg-[#1a1a1a] p-4 rounded-sm border-4 border-gray-200 h-64 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group select-none">
+                        <div className="bg-[#1a1a1a] p-2 rounded-sm border-4 border-gray-200 h-48 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group select-none">
                             {/* Carbon Texture */}
                             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
 
                             {isLoaded && activeMix ? (
-                                <div className="transform scale-[0.65] origin-center w-full flex justify-center items-center pointer-events-none">
+                                <div className="transform scale-[0.50] origin-center w-full flex justify-center items-center pointer-events-none">
                                     {/* Render the Mini Card */}
                                     <div className="relative w-[300px] bg-[#0052cc] p-6 border-2 border-[#1a1a1a] flex flex-col justify-between shadow-lg h-72">
                                         <div className="flex justify-between items-start text-white/90">
