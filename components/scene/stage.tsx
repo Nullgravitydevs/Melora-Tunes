@@ -10,6 +10,7 @@ import { SearchModal } from '@/components/ui/search-modal';
 import { QueueModal } from "@/components/ui/queue-modal";
 import { LyricsModal } from "@/components/ui/lyrics-modal";
 import { Settings, Search } from 'lucide-react';
+import { JioSaavnSong } from "@/lib/jiosaavn";
 
 interface StageProps {
     onSwitchToMobile?: () => void;
@@ -35,6 +36,7 @@ export function Stage({ onSwitchToMobile }: StageProps) {
         setRepeat,
         queue,
         currentIndex,
+        updateMix
     } = usePlayback();
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -64,6 +66,15 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const handleEject = () => {
         pause();
         onSwitchToMobile?.();
+    };
+
+    const handleAddSong = (song: JioSaavnSong) => {
+        if (activeMixId) {
+            const mix = mixes.find(m => m.id === activeMixId);
+            if (mix) {
+                updateMix(activeMixId, { songs: [...mix.songs, song] });
+            }
+        }
     };
 
     return (
@@ -148,6 +159,9 @@ export function Stage({ onSwitchToMobile }: StageProps) {
             <SearchModal
                 isOpen={isSearchOpen}
                 onClose={() => setIsSearchOpen(false)}
+                onAddSong={handleAddSong}
+                favorites={[]}
+                onToggleFavorite={() => { }}
             />
 
             {/* Queue & Lyrics Side Modals / Overlays */}
