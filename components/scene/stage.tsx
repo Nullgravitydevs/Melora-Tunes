@@ -647,7 +647,7 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                 </header>
 
                 {/* Main Grid Layout */}
-                <main className="flex-grow w-full max-w-7xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start relative">
+                <main className="flex-grow w-full max-w-7xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start relative metal-bg">
 
                     {/* Left Column: Mixtapes */}
                     <section className="lg:col-span-7 flex flex-col gap-8">
@@ -721,25 +721,26 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                         />
                     </section>
                 </main>
+            </div>
 
-                <div id="snapshot-studio-node" className="absolute top-[-9999px] left-[-9999px] w-[800px] h-[600px] bg-gradient-to-br from-retro-black to-zinc-900 flex items-center justify-center p-12">
-                    {snapshotTarget && (
-                        <div className="transform scale-150">
-                            <Cassette
-                                id={snapshotTarget.id}
-                                title={snapshotTarget.title}
-                                color={snapshotTarget.color}
-                                songCount={snapshotTarget.songs.length}
-                                className="shadow-2xl"
-                            />
-                            <div className="mt-8 text-center">
-                                <h2 className="text-4xl font-retro text-retro-white mb-2">{snapshotTarget.title}</h2>
-                                <p className="text-retro-gray font-mono">MELORA • {snapshotTarget.songs.length} SONGS</p>
-                            </div>
+            <div id="snapshot-studio-node" className="absolute top-[-9999px] left-[-9999px] w-[800px] h-[600px] bg-gradient-to-br from-retro-black to-zinc-900 flex items-center justify-center p-12">
+                {snapshotTarget && (
+                    <div className="transform scale-150">
+                        <Cassette
+                            id={snapshotTarget.id}
+                            title={snapshotTarget.title}
+                            color={snapshotTarget.color}
+                            songCount={snapshotTarget.songs.length}
+                            className="shadow-2xl"
+                        />
+                        <div className="mt-8 text-center">
+                            <h2 className="text-4xl font-retro text-retro-white mb-2">{snapshotTarget.title}</h2>
+                            <p className="text-retro-gray font-mono">TFI STEREO • {snapshotTarget.songs.length} SONGS</p>
                         </div>
-                    )}
-                </div>
-            </div >
+                    </div>
+                )}
+            </div>
+        </div>
         </div >
     );
 }
