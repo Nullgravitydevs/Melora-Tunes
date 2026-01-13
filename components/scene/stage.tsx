@@ -9,6 +9,7 @@ import { Plus, Maximize2, Pencil, Camera, Download, Upload, MoreHorizontal, Sett
 import { useAudio } from "@/hooks/use-audio";
 import { JioSaavnSong, getSongDetails } from "@/lib/jiosaavn";
 import { StudioStage } from "./studio-stage";
+import { ZenStage } from "./zen-stage";
 import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
@@ -432,11 +433,13 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     };
 
 
-    // --- RENDER REALISTIC METAL STAGE ---
-    if (THEMES[currentTheme].layout === 'studio') {
+    // --- RENDER CUSTOM LAYOUT STAGES (Studio, Zen) ---
+    const layout = THEMES[currentTheme].layout;
+    if (layout === 'studio' || layout === 'zen') {
+        const StageComponent = layout === 'zen' ? ZenStage : StudioStage;
         return (
             <>
-                <StudioStage
+                <StageComponent
                     currentTheme={currentTheme}
                     onThemeChange={handleThemeChange}
                     onSelectTheme={(theme: ThemeKey) => {

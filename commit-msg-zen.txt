@@ -1,0 +1,7 @@
+feat: Add Zen Minimalist Edition theme
+
+- Implemented 'ZEN' theme with 'zen' layout type.
+- Created ZenStage component (zen-stage.tsx) utilizing provided HTML/CSS design.
+  - Features paper grain background, large single cassette display, "Up Next" list, and minimal white player controls.
+- Updated stage.tsx to support 'zen' layout and share modals with Studio layout.
+- Added theme configuration to desktop-player.tsx.

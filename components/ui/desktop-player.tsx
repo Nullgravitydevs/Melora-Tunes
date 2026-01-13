@@ -37,7 +37,7 @@ export interface PlayerProps {
     currentTheme?: ThemeKey;
 }
 
-export type LayoutType = 'cassette' | 'studio';
+export type LayoutType = 'cassette' | 'studio' | 'zen';
 
 export interface ThemeConfig {
     name: string;
@@ -73,6 +73,17 @@ export const THEMES: Record<string, ThemeConfig> = {
         lcdBg: "bg-orange-500",
         buttonBg: "bg-zinc-800",
         playButtonBg: "bg-orange-600"
+    },
+    ZEN: {
+        name: "Zen Minimalist Edition",
+        layout: 'zen',
+        bodyGradient: "bg-[#fcfbf9]",
+        screenBg: "bg-[#fcfbf9]",
+        cassetteBg: "bg-white",
+        labelBg: "bg-[#F0EFEB]",
+        lcdBg: "bg-white",
+        buttonBg: "bg-white",
+        playButtonBg: "bg-stone-900"
     }
 };
 
