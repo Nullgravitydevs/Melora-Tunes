@@ -12,7 +12,7 @@ import { QueueModal } from "@/components/ui/queue-modal";
 import { LyricsModal } from "@/components/ui/lyrics-modal"; // Import Lyrics Modal
 import { Settings, Search } from 'lucide-react';
 
-export default function Stage() {
+export function Stage() {
     const {
         currentSong,
         isPlaying,
