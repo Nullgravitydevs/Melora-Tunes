@@ -19,7 +19,7 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
         sleepTimer, setSleepTimer,
         stopAtEndOfSong, setStopAtEndOfSong,
         volume, setVolume,
-        mixes
+        mixes, setMixes
     } = usePlayback();
 
     const [activeTab, setActiveTab] = useState<'playback' | 'audio' | 'data'>('playback');
@@ -59,8 +59,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                             <button
                                 onClick={() => setActiveTab('playback')}
                                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${activeTab === 'playback'
-                                        ? 'bg-white text-black'
-                                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                                    ? 'bg-white text-black'
+                                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                                     }`}
                             >
                                 <Music size={16} className="inline mr-2" />
@@ -69,8 +69,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                             <button
                                 onClick={() => setActiveTab('audio')}
                                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${activeTab === 'audio'
-                                        ? 'bg-white text-black'
-                                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                                    ? 'bg-white text-black'
+                                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                                     }`}
                             >
                                 <Volume2 size={16} className="inline mr-2" />
@@ -79,8 +79,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                             <button
                                 onClick={() => setActiveTab('data')}
                                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${activeTab === 'data'
-                                        ? 'bg-white text-black'
-                                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                                    ? 'bg-white text-black'
+                                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                                     }`}
                             >
                                 <Database size={16} className="inline mr-2" />
@@ -106,8 +106,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                 <button
                                                     onClick={() => setShuffle(!shuffle)}
                                                     className={`p-4 rounded-xl border-2 transition-all ${shuffle
-                                                            ? 'border-orange-500 bg-orange-500/10'
-                                                            : 'border-zinc-700 hover:border-zinc-600'
+                                                        ? 'border-orange-500 bg-orange-500/10'
+                                                        : 'border-zinc-700 hover:border-zinc-600'
                                                         }`}
                                                 >
                                                     <div className="text-left">
@@ -125,8 +125,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                         setRepeat(nextRepeat);
                                                     }}
                                                     className={`p-4 rounded-xl border-2 transition-all ${repeat !== 'off'
-                                                            ? 'border-orange-500 bg-orange-500/10'
-                                                            : 'border-zinc-700 hover:border-zinc-600'
+                                                        ? 'border-orange-500 bg-orange-500/10'
+                                                        : 'border-zinc-700 hover:border-zinc-600'
                                                         }`}
                                                 >
                                                     <div className="text-left">
@@ -176,8 +176,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                         setStopAtEndOfSong(false);
                                                     }}
                                                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${!sleepTimer && !stopAtEndOfSong
-                                                            ? 'bg-white text-black'
-                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                        ? 'bg-white text-black'
+                                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                                         }`}
                                                 >
                                                     Off
@@ -185,8 +185,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                 <button
                                                     onClick={() => setSleepTimer({ endTime: Date.now() + 15 * 60 * 1000, duration: 15 })}
                                                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${sleepTimer?.duration === 15
-                                                            ? 'bg-white text-black'
-                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                        ? 'bg-white text-black'
+                                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                                         }`}
                                                 >
                                                     15m
@@ -194,8 +194,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                 <button
                                                     onClick={() => setSleepTimer({ endTime: Date.now() + 30 * 60 * 1000, duration: 30 })}
                                                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${sleepTimer?.duration === 30
-                                                            ? 'bg-white text-black'
-                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                        ? 'bg-white text-black'
+                                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                                         }`}
                                                 >
                                                     30m
@@ -203,8 +203,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                 <button
                                                     onClick={() => setSleepTimer({ endTime: Date.now() + 60 * 60 * 1000, duration: 60 })}
                                                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${sleepTimer?.duration === 60
-                                                            ? 'bg-white text-black'
-                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                        ? 'bg-white text-black'
+                                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                                         }`}
                                                 >
                                                     1h
@@ -215,8 +215,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                         setStopAtEndOfSong(true);
                                                     }}
                                                     className={`col-span-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${stopAtEndOfSong
-                                                            ? 'bg-white text-black'
-                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                        ? 'bg-white text-black'
+                                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                                         }`}
                                                 >
                                                     End of Song
@@ -254,8 +254,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                         key={q.value}
                                                         onClick={() => setBitrate(q.value as any)}
                                                         className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${bitrate === q.value
-                                                                ? 'bg-white text-black'
-                                                                : 'bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800'
+                                                            ? 'bg-white text-black'
+                                                            : 'bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800'
                                                             }`}
                                                     >
                                                         <span className="font-medium">{q.label}</span>
@@ -276,8 +276,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                         key={sec}
                                                         onClick={() => setCrossfadeDuration(sec)}
                                                         className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${crossfadeDuration === sec
-                                                                ? 'bg-white text-black'
-                                                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                            ? 'bg-white text-black'
+                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                                             }`}
                                                     >
                                                         {sec === 0 ? 'Off' : `${sec}s`}
@@ -331,6 +331,52 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                                 </div>
                                             </div>
                                         </button>
+
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                accept=".json"
+                                                className="hidden"
+                                                id="restore-upload"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
+
+                                                    const reader = new FileReader();
+                                                    reader.onload = (event) => {
+                                                        try {
+                                                            const json = JSON.parse(event.target?.result as string);
+                                                            if (json.playlists && Array.isArray(json.playlists)) {
+                                                                if (confirm(`Found ${json.playlists.length} playlists. Restore and overwrite current library?`)) {
+                                                                    setMixes(json.playlists);
+                                                                    alert('Library restored successfully!');
+                                                                    window.location.reload();
+                                                                }
+                                                            } else {
+                                                                alert('Invalid file format. Please upload a Melora backup file.');
+                                                            }
+                                                        } catch (err) {
+                                                            alert('Failed to parse file.');
+                                                            console.error(err);
+                                                        }
+                                                    };
+                                                    reader.readAsText(file);
+                                                    e.target.value = ''; // Reset
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => document.getElementById('restore-upload')?.click()}
+                                                className="w-full p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-all text-left"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-2xl">📥</div>
+                                                    <div>
+                                                        <div className="font-medium">Restore Library</div>
+                                                        <div className="text-xs text-green-400/60 mt-0.5">Import from JSON</div>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        </div>
 
                                         <button
                                             onClick={() => {
