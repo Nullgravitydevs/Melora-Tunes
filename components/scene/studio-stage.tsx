@@ -330,7 +330,7 @@ export function StudioStage({ currentTheme, onThemeChange, onSelectTheme, onSwit
 
                             {hasCassette && activeMix ? (
                                 <div
-                                    className="w-[90%] aspect-[3/2] rounded-md shadow-lg border-t border-l border-white/20 border-b border-r border-black/30 p-1.5 flex flex-col justify-between relative z-10"
+                                    className="w-[82%] aspect-[3/2] rounded-md shadow-lg border-t border-l border-white/20 border-b border-r border-black/30 p-1.5 flex flex-col justify-between relative z-10"
                                     style={{
                                         backgroundColor: activeMix.color === 'purple' ? '#9333ea' :
                                             activeMix.color === 'orange' ? '#f97316' :

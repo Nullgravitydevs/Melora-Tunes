@@ -1,0 +1,4 @@
+fix: Resize player cassette to fit perfectly in screen 
+
+- Reduced cassette width from 90% to 82% to prevent cutting off at edges
+- Maintained detailed cassette design inside player
