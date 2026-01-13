@@ -63,26 +63,24 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                 }}
             />
 
-            <div className="max-w-[1600px] mx-auto px-6 py-6 md:py-8 relative z-10 flex flex-col h-full w-full">
+            <div className="w-full h-full mx-auto p-0 relative z-10 flex flex-col">
 
                 {/* Header */}
                 <header className="w-full p-4 flex flex-col md:flex-row justify-between items-center bg-white border-b-4 border-[#1a1a1a] relative z-20 gap-4 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] mb-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-[#ff3333] flex items-center justify-center transform hover:rotate-12 transition-transform shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] border-2 border-[#1a1a1a]">
-                            <div className="w-6 h-4 bg-transparent border-2 border-white rounded-sm flex items-center justify-center gap-1">
-                                <div className="w-1 h-1 bg-white rounded-full"></div>
-                                <div className="w-1 h-1 bg-white rounded-full"></div>
-                            </div>
-                        </div>
-                        <h1 className="text-2xl font-black uppercase tracking-tighter">TFI Stereo</h1>
+                    <div className="flex items-center gap-4 select-none">
+                        <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
+                        <h1 className="text-3xl font-black uppercase tracking-tighter">Melora</h1>
                     </div>
 
                     <div className="flex items-center gap-4 flex-wrap justify-center font-bold">
-                        <button onClick={onCinemaMode} className="hidden md:flex items-center gap-2 bg-[#0052cc] text-white px-4 py-2 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a]">
-                            <Maximize2 size={16} /> Cinema Mode
+                        <button onClick={onCinemaMode} className="hidden md:flex items-center gap-2 bg-[#0052cc] text-white px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a] text-sm">
+                            <Maximize2 size={14} /> Cinema Mode
                         </button>
-                        <button onClick={onCreateMix} className="flex items-center gap-2 bg-[#ffcc00] text-[#1a1a1a] border-2 border-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all">
-                            <Plus size={16} /> Create Mix
+                        <button onClick={onSwitchToMobile} className="hidden md:flex items-center gap-2 bg-white text-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a] text-sm">
+                            <Smartphone size={14} /> Mobile
+                        </button>
+                        <button onClick={onCreateMix} className="flex items-center gap-2 bg-[#ffcc00] text-[#1a1a1a] border-2 border-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all text-sm">
+                            <Plus size={14} /> Create Mix
                         </button>
 
                         {/* Theme Dropdown */}
@@ -131,7 +129,8 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             <div className="h-4 w-4 bg-[#0052cc] mb-2 rounded-full hidden md:block"></div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl pb-20">
+
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4 max-w-full pb-32 pr-[400px]">
                             {mixes.map((mix, index) => {
                                 // Assign colors cyclically
                                 const mixColors = [
@@ -142,44 +141,72 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                 const color = mixColors[index % mixColors.length];
 
                                 return (
-                                    <div
+                                    <motion.div
                                         key={mix.id}
+                                        drag
+                                        dragConstraints={containerRef}
+                                        whileDrag={{ scale: 1.05, zIndex: 100, rotate: 2 }}
+                                        dragMomentum={false}
+                                        onDragEnd={(e, info) => {
+                                            const player = document.getElementById('stereo-player');
+                                            if (player) {
+                                                const rect = player.getBoundingClientRect();
+                                                const { x, y } = info.point;
+                                                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                                                    playClick();
+                                                    loadMix(mix.id);
+                                                }
+                                            }
+                                        }}
                                         onClick={() => {
                                             if (mix.id !== activeMixId) {
                                                 playClick();
                                                 loadMix(mix.id);
                                             }
                                         }}
-                                        className="relative group cursor-pointer hover:z-10"
+                                        className={clsx("relative group cursor-grab active:cursor-grabbing hover:z-50", mix.id === activeMixId && "invisible pointer-events-none")}
                                     >
-                                        <div className="absolute inset-0 bg-[#1a1a1a] translate-x-3 translate-y-3"></div>
                                         <div className={clsx(
-                                            "relative p-4 border-2 border-[#1a1a1a] transition-transform transform group-hover:-translate-y-1 group-hover:-translate-x-1 h-60 flex flex-col justify-between",
+                                            "relative p-3 border-2 border-[#1a1a1a] transition-transform transform group-hover:scale-[1.02] h-42 flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
                                             color.bg
                                         )}>
-                                            {/* Action Buttons */}
-                                            <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                            {/* Action Buttons - Always Visible now */}
+                                            <div className="absolute top-2 right-2 flex flex-row gap-1 z-20">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }}
-                                                    className="p-2 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
+                                                    className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
                                                     title="Edit Mix"
                                                 >
-                                                    <Pencil size={14} />
+                                                    <Pencil size={10} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); }}
+                                                    className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
+                                                    title="Share Mix"
+                                                >
+                                                    <Share2 size={10} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }}
+                                                    className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
+                                                    title="Add Songs"
+                                                >
+                                                    <Plus size={10} />
                                                 </button>
                                             </div>
                                             <div className={clsx("flex justify-between items-start", index % 3 === 2 ? "text-[#1a1a1a]" : "text-white/90")}>
-                                                <span className="text-4xl font-black">A</span>
+                                                <span className="text-2xl font-black">A</span>
                                                 <div className="flex gap-1">
-                                                    {mix.id === activeMixId && <div className="animate-pulse w-3 h-3 bg-white rounded-full"></div>}
+                                                    {mix.id === activeMixId && <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>}
                                                 </div>
                                             </div>
 
                                             {/* Tape Label */}
-                                            <div className={clsx("bg-white relative p-6 border-2 border-[#1a1a1a] shadow-sm mx-2", index % 2 === 0 ? "transform -rotate-1" : "transform rotate-1")}>
-                                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-2 bg-black opacity-10 rounded-b"></div>
-                                                <p className="font-mono text-center text-xl font-bold text-[#1a1a1a] tracking-tight truncate uppercase">{mix.title}</p>
-                                                <div className="w-full h-0.5 bg-[#1a1a1a]/20 my-3"></div>
-                                                <p className="text-[10px] text-center text-[#1a1a1a]/60 uppercase tracking-[0.2em]">TFI High Fidelity</p>
+                                            <div className={clsx("bg-white relative p-2 border-2 border-[#1a1a1a] shadow-sm mx-1", index % 2 === 0 ? "transform -rotate-1" : "transform rotate-1")}>
+                                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-1.5 bg-black opacity-10 rounded-b"></div>
+                                                <p className="font-mono text-center text-sm font-bold text-[#1a1a1a] tracking-tight truncate uppercase">{mix.title}</p>
+                                                <div className="w-full h-0.5 bg-[#1a1a1a]/20 my-1"></div>
+                                                <p className="text-[8px] text-center text-[#1a1a1a]/60 uppercase tracking-[0.2em]">TFI High Fidelity</p>
                                             </div>
 
                                             <div className="flex justify-between items-center mt-4 px-2">
@@ -195,34 +222,29 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                 <span className="bg-[#1a1a1a] text-white px-3 py-1 text-xs font-bold border-2 border-white">{mix.songs.length} SONGS</span>
                                             </div>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 );
                             })}
 
                             {/* Create New Mix Card */}
-                            <div onClick={onCreateMix} className="relative group cursor-pointer h-72 flex items-center justify-center">
-                                <div className="absolute inset-0 bg-transparent border-4 border-dashed border-[#1a1a1a]/20"></div>
-                                <div className="flex flex-col items-center gap-4 text-[#1a1a1a]/40 group-hover:text-[#0052cc] transition-colors">
-                                    <Plus size={48} />
-                                    <span className="font-black uppercase tracking-widest">Create New</span>
-                                </div>
-                            </div>
+
                         </div>
                     </section>
 
                     {/* Right Column: Player */}
                     <motion.section
+                        id="stereo-player"
                         drag
                         dragMomentum={false}
                         dragConstraints={containerRef}
                         whileDrag={{ scale: 1.02 }}
-                        className="fixed right-8 top-24 w-[320px] bg-white border-4 border-[#1a1a1a] p-4 flex flex-col gap-4 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-100px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
+                        className="fixed right-6 top-24 w-[380px] bg-white border-4 border-[#1a1a1a] p-4 flex flex-col gap-4 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-80px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
                     >
                         {/* Decorative Screws */}
-                        <div className="absolute top-4 left-4 text-gray-300 font-mono text-xl">+</div>
-                        <div className="absolute top-4 right-4 text-gray-300 font-mono text-xl">+</div>
-                        <div className="absolute bottom-4 left-4 text-gray-300 font-mono text-xl">+</div>
-                        <div className="absolute bottom-4 right-4 text-gray-300 font-mono text-xl">+</div>
+                        <div className="absolute top-2 left-2 text-gray-300 font-mono text-xl">+</div>
+                        <div className="absolute top-2 right-2 text-gray-300 font-mono text-xl">+</div>
+                        <div className="absolute bottom-2 left-2 text-gray-300 font-mono text-xl">+</div>
+                        <div className="absolute bottom-2 right-2 text-gray-300 font-mono text-xl">+</div>
 
                         <div className="text-center space-y-2 mt-2">
                             <h3 className="text-3xl font-black uppercase tracking-tighter text-[#1a1a1a]">Stereo Player</h3>
@@ -231,48 +253,69 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         </div>
 
                         {/* Player Screen / Window */}
-                        <div className="bg-[#1a1a1a] p-2 rounded-sm border-4 border-gray-200 h-48 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group select-none">
+                        <div className="bg-[#1a1a1a] p-2 rounded-sm border-4 border-gray-200 h-40 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group select-none">
                             {/* Carbon Texture */}
                             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
 
                             {isLoaded && activeMix ? (
-                                <div className="transform scale-[0.50] origin-center w-full flex justify-center items-center pointer-events-none">
-                                    {/* Render the Mini Card */}
-                                    <div className="relative w-[300px] bg-[#0052cc] p-6 border-2 border-[#1a1a1a] flex flex-col justify-between shadow-lg h-72">
-                                        <div className="flex justify-between items-start text-white/90">
-                                            <span className="text-4xl font-black">A</span>
-                                            <div className="flex gap-1">
-                                                <div className="animate-pulse w-3 h-3 bg-white rounded-full"></div>
-                                            </div>
-                                        </div>
+                                <div className="transform scale-[0.75] origin-center w-full flex justify-center items-center pointer-events-none">
+                                    {/* Render the Exact Card Design */}
+                                    {(() => {
+                                        const mixColors = [
+                                            { bg: "bg-[#0052cc]", text: "text-white" }, // Blue
+                                            { bg: "bg-[#ff3333]", text: "text-white" }, // Red
+                                            { bg: "bg-[#ffcc00]", text: "text-[#1a1a1a]" }, // Yellow
+                                        ];
+                                        const activeIndex = mixes.findIndex(m => m.id === activeMix.id);
+                                        const color = activeIndex >= 0 ? mixColors[activeIndex % mixColors.length] : mixColors[0];
 
-                                        <div className="bg-white relative p-6 border-2 border-[#1a1a1a] shadow-sm mx-2 transform rotate-1">
-                                            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-2 bg-black opacity-10 rounded-b"></div>
-                                            <p className="font-mono text-center text-xl font-bold text-[#1a1a1a] tracking-tight truncate uppercase">{activeMix.title}</p>
-                                            <div className="w-full h-0.5 bg-[#1a1a1a]/20 my-3"></div>
-                                            <p className="text-[10px] text-center text-[#1a1a1a]/60 uppercase tracking-[0.2em]">TFI High Fidelity</p>
-                                        </div>
+                                        return (
+                                            <div className="relative w-[280px]">
+                                                <div className={clsx(
+                                                    "relative p-3 border-2 border-[#1a1a1a] h-42 flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
+                                                    color.bg
+                                                )}>
+                                                    <div className={clsx("flex justify-between items-start", activeIndex % 3 === 2 ? "text-[#1a1a1a]" : "text-white/90")}>
+                                                        <span className="text-2xl font-black">A</span>
+                                                        <div className="flex gap-1">
+                                                            <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>
+                                                        </div>
+                                                    </div>
 
-                                        <div className="flex justify-between items-center mt-4 px-2">
-                                            <div className="flex gap-6 items-center">
-                                                <motion.div
-                                                    animate={isPlaying ? { rotate: 360 } : {}}
-                                                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                                                    className="w-10 h-10 rounded-full border-4 border-white flex items-center justify-center"
-                                                >
-                                                    <div className="w-full h-0.5 bg-white"></div>
-                                                </motion.div>
-                                                <motion.div
-                                                    animate={isPlaying ? { rotate: 360 } : {}}
-                                                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                                                    className="w-10 h-10 rounded-full border-4 border-white flex items-center justify-center"
-                                                >
-                                                    <div className="w-full h-0.5 bg-white"></div>
-                                                </motion.div>
+                                                    {/* Tape Label */}
+                                                    <div className={clsx("bg-white relative p-2 border-2 border-[#1a1a1a] shadow-sm mx-1", activeIndex % 2 === 0 ? "transform -rotate-1" : "transform rotate-1")}>
+                                                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-1.5 bg-black opacity-10 rounded-b"></div>
+                                                        <p className="font-mono text-center text-sm font-bold text-[#1a1a1a] tracking-tight truncate uppercase">{activeMix.title}</p>
+                                                        <div className="w-full h-0.5 bg-[#1a1a1a]/20 my-1"></div>
+                                                        <p className="text-[8px] text-center text-[#1a1a1a]/60 uppercase tracking-[0.2em]">TFI High Fidelity</p>
+                                                    </div>
+
+                                                    <div className="flex justify-between items-center mt-4 px-2">
+                                                        {/* Reels Visual (Static representation) */}
+                                                        <div className="flex gap-6 items-center">
+                                                            <motion.div
+                                                                animate={isPlaying ? { rotate: 360 } : {}}
+                                                                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                                                className={clsx("w-10 h-10 rounded-full border-4 flex items-center justify-center", activeIndex % 3 === 2 ? "border-[#1a1a1a]" : "border-white")}
+                                                            >
+                                                                <div className={clsx("w-full h-0.5", activeIndex % 3 === 2 ? "bg-[#1a1a1a]" : "bg-white")}></div>
+                                                            </motion.div>
+                                                            <motion.div
+                                                                animate={isPlaying ? { rotate: 360 } : {}}
+                                                                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                                                className={clsx("w-10 h-10 rounded-full border-4 flex items-center justify-center", activeIndex % 3 === 2 ? "border-[#1a1a1a]" : "border-white")}
+                                                            >
+                                                                <div className={clsx("w-full h-0.5", activeIndex % 3 === 2 ? "bg-[#1a1a1a]" : "bg-white")}></div>
+                                                            </motion.div>
+                                                        </div>
+                                                        <span className="bg-[#1a1a1a] text-white px-3 py-1 text-xs font-bold border-2 border-white">{activeMix.songs.length} SONGS</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
+
                             ) : (
                                 <div className="absolute text-gray-400 font-mono text-sm tracking-widest bg-black px-2 py-1 animate-pulse">NO CASSETTE</div>
                             )}
@@ -300,6 +343,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             </div>
                             <div
                                 className="h-6 bg-gray-100 w-full border-2 border-[#1a1a1a] relative group cursor-pointer"
+                                onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                     if (duration && isLoaded) {
                                         const rect = e.currentTarget.getBoundingClientRect();
@@ -374,7 +418,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             </div>
 
                             <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                <div className="w-3 h-20 bg-gray-100 border-2 border-[#1a1a1a] relative overflow-hidden flex items-end cursor-pointer rounded-full">
+                                <div className="w-3 h-20 bg-gray-100 border-2 border-[#1a1a1a] relative overflow-hidden flex items-end cursor-pointer rounded-full" onPointerDown={(e) => e.stopPropagation()}>
                                     <motion.div
                                         className="w-full bg-[#ffcc00] group-hover:bg-yellow-400"
                                         style={{ height: `${volume * 100}%` }}
@@ -388,9 +432,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                 <Volume2 size={16} className="text-gray-400" />
                             </div>
                         </div>
-                    </motion.section>
-                </main>
-            </div>
-        </div>
+                    </motion.section >
+                </main >
+            </div >
+        </div >
     );
 }
