@@ -261,7 +261,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
 
                             {isLoaded && activeMix ? (
-                                <div className="transform scale-[0.85] origin-center w-full flex justify-center items-center pointer-events-none">
+                                <div className="transform scale-[0.9] origin-center w-full flex justify-center items-center pointer-events-none">
                                     {/* Render the Exact Card Design */}
                                     {(() => {
                                         const mixColors = [
@@ -273,7 +273,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                         const color = activeIndex >= 0 ? mixColors[activeIndex % mixColors.length] : mixColors[0];
 
                                         return (
-                                            <div className="relative w-[280px]">
+                                            <div className="relative w-[350px]">
                                                 <div className={clsx(
                                                     "relative p-3 border-2 border-[#1a1a1a] h-42 flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
                                                     color.bg
