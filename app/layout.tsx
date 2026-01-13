@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Press_Start_2P } from "next/font/google";
+import { Inter, Press_Start_2P, Courier_Prime, Share_Tech_Mono } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -7,6 +7,17 @@ const pressStart2P = Press_Start_2P({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-press-start",
+});
+const courierPrime = Courier_Prime({
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  variable: "--font-courier-prime",
+});
+const shareTechMono = Share_Tech_Mono({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-share-tech-mono",
 });
 
 export const metadata: Metadata = {
@@ -47,7 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${pressStart2P.variable} font-sans bg-black text-white`}
+        className={`${inter.variable} ${pressStart2P.variable} ${courierPrime.variable} ${shareTechMono.variable} font-sans bg-black text-white`}
       >
         <PlaybackProvider>
           <PwaRegister />
