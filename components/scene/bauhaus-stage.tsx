@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
 import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1, Pencil } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
@@ -165,12 +166,15 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                         }}
                                         className={clsx("relative group cursor-grab active:cursor-grabbing hover:z-50", mix.id === activeMixId && "invisible pointer-events-none")}
                                     >
-                                        <div className={clsx(
-                                            "relative p-3 border-2 border-[#1a1a1a] transition-transform transform group-hover:scale-[1.02] h-42 flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
-                                            color.bg
-                                        )}>
+                                        <div
+                                            id={`mix-card-${mix.id}`}
+                                            className={clsx(
+                                                "relative p-3 border-2 border-[#1a1a1a] transition-transform transform group-hover:scale-[1.02] h-42 flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
+                                                color.bg
+                                            )}
+                                        >
                                             {/* Action Buttons - Always Visible now */}
-                                            <div className="absolute top-2 right-2 flex flex-row gap-1 z-20">
+                                            <div className="absolute top-2 right-2 flex flex-row gap-1 z-20 no-snapshot">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }}
                                                     className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
@@ -181,12 +185,23 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        const url = `${window.location.origin}?mix=${mix.id}`;
-                                                        navigator.clipboard.writeText(url);
-                                                        alert("Mix Link Copied to Clipboard!");
+                                                        const node = document.getElementById(`mix-card-${mix.id}`);
+                                                        if (node) {
+                                                            toPng(node, { filter: (n) => !n.classList?.contains('no-snapshot') })
+                                                                .then((dataUrl) => {
+                                                                    const link = document.createElement('a');
+                                                                    link.download = `melora-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
+                                                                    link.href = dataUrl;
+                                                                    link.click();
+                                                                })
+                                                                .catch((err) => {
+                                                                    console.error('Snapshot failed', err);
+                                                                    alert('Failed to generate snapshot.');
+                                                                });
+                                                        }
                                                     }}
                                                     className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
-                                                    title="Share Mix"
+                                                    title="Share Snapshot"
                                                 >
                                                     <Share2 size={10} />
                                                 </button>
