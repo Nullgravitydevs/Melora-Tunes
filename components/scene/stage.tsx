@@ -11,20 +11,24 @@ import { QueueModal } from "@/components/ui/queue-modal";
 import { LyricsModal } from "@/components/ui/lyrics-modal";
 import { Settings, Search } from 'lucide-react';
 
-export function Stage() {
+interface StageProps {
+    onSwitchToMobile?: () => void;
+}
+
+export function Stage({ onSwitchToMobile }: StageProps) {
     const {
         currentSong,
         isPlaying,
         play,
         pause,
-        next,     // Corrected from nextSong
-        prev,     // Corrected from prevSong
+        next,
+        prev,
         volume,
         setVolume,
         seek,
         mixes,
         activeMixId,
-        loadMix,  // Corrected from playMix
+        loadMix,
         shuffle,
         setShuffle,
         repeat,
@@ -58,8 +62,8 @@ export function Stage() {
 
     // Handle Eject
     const handleEject = () => {
-        // Just pause for now, as we don't have explicit eject-to-null in context interface
         pause();
+        onSwitchToMobile?.();
     };
 
     return (
@@ -98,7 +102,7 @@ export function Stage() {
                                 title={mix.title}
                                 color={mix.color}
                                 songCount={mix.songs.length}
-                                onPlay={() => loadMix(mix.id)} // Corrected
+                                onPlay={() => loadMix(mix.id)}
                                 className={activeMixId === mix.id ? "ring-2 ring-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : ""}
                             />
                         </div>
@@ -118,8 +122,8 @@ export function Stage() {
                         cassetteColor={activeMixId ? mixes.find(m => m.id === activeMixId)?.color : undefined}
                         currentSong={currentSong || undefined}
                         onPlayToggle={isPlaying ? pause : play}
-                        onNext={next}   // Corrected
-                        onPrev={prev}   // Corrected
+                        onNext={next}
+                        onPrev={prev}
                         volume={volume}
                         onVolumeChange={setVolume}
                         progress={progress}
