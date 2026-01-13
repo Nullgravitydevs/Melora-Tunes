@@ -190,6 +190,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                             toPng(node, {
                                                                 filter: (n) => !n.classList?.contains('no-snapshot'),
                                                                 cacheBust: true,
+                                                                fontEmbedCSS: ''
                                                             })
                                                                 .then((dataUrl) => {
                                                                     const link = document.createElement('a');

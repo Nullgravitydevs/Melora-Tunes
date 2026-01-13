@@ -276,6 +276,7 @@ export function StudioStage({ currentTheme, onThemeChange, onSelectTheme, onSwit
                                                         filter: (n) => !n.classList?.contains('no-snapshot'),
                                                         pixelRatio: 2,
                                                         cacheBust: true,
+                                                        fontEmbedCSS: ''
                                                     })
                                                         .then((dataUrl) => {
                                                             const link = document.createElement('a');
