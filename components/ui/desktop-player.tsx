@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Palette, Volume2, LogOut } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Palette, Volume2, LogOut, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { Visualizer } from "./visualizer";
 import { useState } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
@@ -22,6 +22,12 @@ interface PlayerProps {
     onVolumeChange: (vol: number) => void;
     progress?: number;
     onSeek?: (val: number) => void;
+
+    // Playback state
+    shuffle?: boolean;
+    onShuffleToggle?: () => void;
+    repeat?: 'off' | 'one' | 'all';
+    onRepeatToggle?: () => void;
 
     className?: string;
     dragConstraints?: React.RefObject<Element>;
@@ -68,6 +74,10 @@ export function DesktopPlayer({
     onVolumeChange,
     progress = 0,
     onSeek,
+    shuffle = false,
+    onShuffleToggle,
+    repeat = 'off',
+    onRepeatToggle,
     className,
     dragConstraints,
     drag = true,
@@ -272,6 +282,36 @@ export function DesktopPlayer({
                         >
                             <div className="h-full bg-gradient-to-r from-red-500 to-amber-500 relative transition-all shadow-[0_0_10px_rgba(255,100,0,0.5)]" style={{ width: `${progress * 100}%` }}></div>
                         </div>
+                    </div>
+
+                    {/* Shuffle & Repeat Controls */}
+                    <div className="flex items-center justify-center gap-2 px-2" onPointerDown={(e) => e.stopPropagation()}>
+                        <button
+                            onClick={() => { playClick(); onShuffleToggle?.(); }}
+                            className={clsx(
+                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all",
+                                shuffle
+                                    ? "bg-cyan-500 text-white shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                            )}
+                            title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
+                            aria-label="Toggle Shuffle"
+                        >
+                            <Shuffle className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => { playClick(); onRepeatToggle?.(); }}
+                            className={clsx(
+                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all",
+                                repeat !== 'off'
+                                    ? "bg-cyan-500 text-white shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                            )}
+                            title={repeat === 'off' ? 'Repeat: Off' : repeat === 'all' ? 'Repeat: All' : 'Repeat: One'}
+                            aria-label="Toggle Repeat"
+                        >
+                            {repeat === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
+                        </button>
                     </div>
 
                     {/* Control Buttons */}

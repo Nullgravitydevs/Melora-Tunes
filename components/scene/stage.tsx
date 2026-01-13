@@ -28,7 +28,8 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         setMixes, loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        addMix, updateMix, deleteMix, isLoaded
+        addMix, updateMix, deleteMix, isLoaded,
+        shuffle, setShuffle, repeat, setRepeat
     } = usePlayback();
 
     // UI State (Local)
@@ -754,6 +755,13 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                                     onVolumeChange={setVolume}
                                     progress={progress}
                                     onSeek={handleSeek}
+                                    shuffle={shuffle}
+                                    onShuffleToggle={() => setShuffle(!shuffle)}
+                                    repeat={repeat}
+                                    onRepeatToggle={() => {
+                                        const nextRepeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off';
+                                        setRepeat(nextRepeat);
+                                    }}
                                     className="scale-90 md:scale-100 origin-center"
                                     drag={false} // Disable internal drag, wrapper handles it
                                     onEject={() => {
