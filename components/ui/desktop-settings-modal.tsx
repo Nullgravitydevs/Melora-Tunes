@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, Settings as SettingsIcon } from 'lucide-react';
 import { usePlayback } from '@/components/providers/playback-context';
+import { saveSettings } from '@/lib/settings';
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -10,7 +11,15 @@ interface DesktopSettingsModalProps {
 }
 
 export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalProps) {
-    const { bitrate, setBitrate, crossfadeDuration, setCrossfadeDuration } = usePlayback();
+    const {
+        bitrate, setBitrate,
+        crossfadeDuration, setCrossfadeDuration,
+        shuffle, setShuffle,
+        repeat, setRepeat,
+        sleepTimer, setSleepTimer,
+        stopAtEndOfSong, setStopAtEndOfSong,
+        volume, setVolume
+    } = usePlayback();
 
 
     const qualities = [
@@ -86,6 +95,117 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                 <p className="text-xs text-retro-gray/50 mt-2 font-mono text-center">
                                     Overlap songs for smooth transitions.
                                 </p>
+                            </div>
+
+                            {/* Playback Controls */}
+                            <div>
+                                <h3 className="text-sm font-mono text-retro-gray mb-3 uppercase tracking-wider">Playback</h3>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setShuffle(!shuffle)}
+                                        className={`flex-1 p-3 rounded border-2 font-mono text-sm transition-all ${shuffle
+                                            ? 'border-retro-white bg-retro-white/20 text-retro-white'
+                                            : 'border-retro-gray/30 text-retro-gray hover:border-retro-gray hover:bg-white/5'
+                                            }`}
+                                    >
+                                        Shuffle {shuffle && '✓'}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const nextRepeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off';
+                                            setRepeat(nextRepeat);
+                                        }}
+                                        className={`flex-1 p-3 rounded border-2 font-mono text-sm transition-all ${repeat !== 'off'
+                                            ? 'border-retro-white bg-retro-white/20 text-retro-white'
+                                            : 'border-retro-gray/30 text-retro-gray hover:border-retro-gray hover:bg-white/5'
+                                            }`}
+                                    >
+                                        Repeat: {repeat === 'off' ? 'OFF' : repeat === 'all' ? 'ALL' : 'ONE'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Volume Control */}
+                            <div>
+                                <h3 className="text-sm font-mono text-retro-gray mb-3 uppercase tracking-wider">Volume</h3>
+                                <div className="space-y-2">
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        value={Math.round(volume * 100)}
+                                        onChange={(e) => {
+                                            const newVol = parseInt(e.target.value) / 100;
+                                            setVolume(newVol);
+                                            saveSettings({ volume: newVol });
+                                        }}
+                                        className="w-full h-2 bg-retro-gray/30 rounded-lg appearance-none cursor-pointer accent-retro-white"
+                                    />
+                                    <p className="text-center font-mono text-retro-white">{Math.round(volume * 100)}%</p>
+                                </div>
+                            </div>
+
+                            {/* Sleep Timer */}
+                            <div>
+                                <h3 className="text-sm font-mono text-retro-gray mb-3 uppercase tracking-wider">Sleep Timer</h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setSleepTimer(null);
+                                            setStopAtEndOfSong(false);
+                                        }}
+                                        className={`p-2 rounded border-2 font-mono text-sm transition-all ${!sleepTimer && !stopAtEndOfSong
+                                            ? 'border-retro-white bg-retro-white/20 text-retro-white'
+                                            : 'border-retro-gray/30 text-retro-gray hover:border-retro-gray hover:bg-white/5'
+                                            }`}
+                                    >
+                                        OFF
+                                    </button>
+                                    <button
+                                        onClick={() => setSleepTimer({ endTime: Date.now() + 15 * 60 * 1000, duration: 15 })}
+                                        className={`p-2 rounded border-2 font-mono text-sm transition-all ${sleepTimer?.duration === 15
+                                            ? 'border-retro-white bg-retro-white/20 text-retro-white'
+                                            : 'border-retro-gray/30 text-retro-gray hover:border-retro-gray hover:bg-white/5'
+                                            }`}
+                                    >
+                                        15m
+                                    </button>
+                                    <button
+                                        onClick={() => setSleepTimer({ endTime: Date.now() + 30 * 60 * 1000, duration: 30 })}
+                                        className={`p-2 rounded border-2 font-mono text-sm transition-all ${sleepTimer?.duration === 30
+                                            ? 'border-retro-white bg-retro-white/20 text-retro-white'
+                                            : 'border-retro-gray/30 text-retro-gray hover:border-retro-gray hover:bg-white/5'
+                                            }`}
+                                    >
+                                        30m
+                                    </button>
+                                    <button
+                                        onClick={() => setSleepTimer({ endTime: Date.now() + 60 * 60 * 1000, duration: 60 })}
+                                        className={`p-2 rounded border-2 font-mono text-sm transition-all ${sleepTimer?.duration === 60
+                                            ? 'border-retro-white bg-retro-white/20 text-retro-white'
+                                            : 'border-retro-gray/30 text-retro-gray hover:border-retro-gray hover:bg-white/5'
+                                            }`}
+                                    >
+                                        1h
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSleepTimer(null);
+                                            setStopAtEndOfSong(true);
+                                        }}
+                                        className={`col-span-2 p-2 rounded border-2 font-mono text-sm transition-all ${stopAtEndOfSong
+                                            ? 'border-retro-white bg-retro-white/20 text-retro-white'
+                                            : 'border-retro-gray/30 text-retro-gray hover:border-retro-gray hover:bg-white/5'
+                                            }`}
+                                    >
+                                        End of Song
+                                    </button>
+                                </div>
+                                {sleepTimer && (
+                                    <p className="text-xs text-retro-gray/70 mt-2 font-mono text-center">
+                                        {Math.ceil((sleepTimer.endTime - Date.now()) / 60000)} minutes remaining
+                                    </p>
+                                )}
                             </div>
                         </div>
 
