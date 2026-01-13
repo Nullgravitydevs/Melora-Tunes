@@ -3,20 +3,22 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cassette } from "@/components/ui/cassette";
-import { DesktopPlayer } from "@/components/ui/desktop-player";
-import { SearchModal } from "@/components/ui/search-modal";
-import { QueueModal } from "@/components/ui/queue-modal";
-import { LyricsModal } from "@/components/ui/lyrics-modal";
-import { Plus, Maximize2, Pencil, Camera, Download, Upload, MoreHorizontal, Settings, Smartphone } from "lucide-react";
+import { SearchModal } from "../ui/search-modal";
+import { Button } from "../ui/button";
+import { Plus, Maximize2, Pencil, Camera, Download, Upload, MoreHorizontal, Settings, Smartphone, Palette } from "lucide-react";
 import { useAudio } from "@/hooks/use-audio";
 import { JioSaavnSong, getSongDetails } from "@/lib/jiosaavn";
-import { CinemaModeDesktop } from "./cinema-mode-desktop";
+import { StudioStage } from "./studio-stage";
+import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
+import { useSearchParams, useRouter } from "next/navigation";
+import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { EditMixModal } from "@/components/ui/edit-mix-modal";
 import { InstallPrompt } from "@/components/ui/install-prompt";
-import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
-import { useSearchParams, useRouter } from "next/navigation";
 import { toPng } from "html-to-image";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { CinemaModeDesktop } from "./cinema-mode-desktop";
+import { QueueModal } from "@/components/ui/queue-modal";
+import { LyricsModal } from "@/components/ui/lyrics-modal";
 
 interface StageProps {
     onSwitchToMobile?: () => void;
@@ -39,6 +41,15 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchTargetMixId, setSearchTargetMixId] = useState<string | null>(null);
     const [newMixTitle, setNewMixTitle] = useState("");
+    const [currentTheme, setCurrentTheme] = useState<ThemeKey>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('melora-theme');
+            if (saved && saved in THEMES) {
+                return saved as ThemeKey;
+            }
+        }
+        return 'METAL';
+    });
     const [isCinemaMode, setIsCinemaMode] = useState(false);
     const [editingMix, setEditingMix] = useState<Mix | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -47,7 +58,21 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'error' }[]>([]);
 
     const playerRef = useRef<HTMLDivElement>(null);
-    const { playClick, playClunk, playInsert } = useAudio(); // Keep for UI sounds not covered by playback actions
+    const { playClick, playClunk, playInsert } = useAudio();
+
+    // THEME SWITCHER LOGIC
+    const handleThemeChange = () => {
+        playClick();
+        const keys = Object.keys(THEMES) as ThemeKey[];
+        const currentIndex = keys.indexOf(currentTheme);
+        const nextIndex = (currentIndex + 1) % keys.length;
+        const newTheme = keys[nextIndex];
+        setCurrentTheme(newTheme);
+        localStorage.setItem('melora-theme', newTheme);
+        // addToast(`Theme: ${THEMES[keys[nextIndex]].name}`); // Optional: Toast usually handled by UI
+    };
+
+
 
     const activeMix = mixes.find(m => m.id === activeMixId);
 
@@ -133,14 +158,18 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    if (duration > 0) {
+                    if (e.ctrlKey || e.metaKey) {
+                        next();
+                    } else if (duration > 0) {
                         const newTime = Math.min(progress + 0.05, 1);
                         seek(newTime);
                     }
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
-                    if (duration > 0) {
+                    if (e.ctrlKey || e.metaKey) {
+                        prev();
+                    } else if (duration > 0) {
                         const newTime = Math.max(progress - 0.05, 0);
                         seek(newTime);
                     }
@@ -411,6 +440,162 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     };
 
 
+    // --- RENDER REALISTIC METAL STAGE ---
+    if (THEMES[currentTheme].layout === 'studio') {
+        return (
+            <>
+                <StudioStage
+                    currentTheme={currentTheme}
+                    onThemeChange={handleThemeChange}
+                    onSwitchToMobile={onSwitchToMobile}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                    onEditMix={(mix) => setEditingMix(mix)}
+                    onOpenSearch={(mixId) => {
+                        setSearchTargetMixId(mixId);
+                        setIsSearchOpen(true);
+                    }}
+                    onCreateMix={() => {
+                        setNewMixTitle(`Mixtape Vol. ${mixes.length + 1}`);
+                        setIsModalOpen(true);
+                    }}
+                    onCinemaMode={() => setIsCinemaMode(true)}
+                />
+
+                {/* Cinema Mode */}
+                <AnimatePresence>
+                    {isCinemaMode && (
+                        <CinemaModeDesktop
+                            isOpen={isCinemaMode}
+                            onClose={() => {
+                                setIsCinemaMode(false);
+                                if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(err));
+                            }}
+                            currentSong={currentSong || null}
+                            isPlaying={isPlaying}
+                            className="fixed inset-0 z-[9999]"
+                            showCloseButton={true}
+                            onPlayPause={togglePlay}
+                            onNext={next}
+                            onPrev={prev}
+                        />
+                    )}
+                </AnimatePresence>
+
+                {/* Create Mix Modal */}
+                <AnimatePresence>
+                    {isModalOpen && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+                            onClick={() => setIsModalOpen(false)}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                className="bg-zinc-900 p-6 rounded-xl shadow-2xl w-full max-w-md border border-zinc-800"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <h3 className="text-xl font-bold mb-4 text-white">New Mixtape</h3>
+                                <input
+                                    type="text"
+                                    value={newMixTitle}
+                                    onChange={(e) => setNewMixTitle(e.target.value)}
+                                    placeholder="Mixtape name..."
+                                    className="w-full px-4 py-3 bg-zinc-800 text-white rounded border border-zinc-700 mb-4"
+                                    autoFocus
+                                />
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        onClick={() => setIsModalOpen(false)}
+                                        className="px-4 py-2 text-gray-400 hover:text-white"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (!newMixTitle.trim()) return;
+                                            const newMix: Mix = {
+                                                id: Date.now().toString(),
+                                                title: newMixTitle,
+                                                color: (['orange', 'purple', 'green', 'red'] as const)[Math.floor(Math.random() * 4)],
+                                                songs: [],
+                                                currentSongIndex: 0
+                                            };
+                                            addMix(newMix);
+                                            setIsModalOpen(false);
+                                            setNewMixTitle("");
+                                            addToast(`Created mixtape "${newMix.title}"`);
+                                        }}
+                                        disabled={!newMixTitle.trim()}
+                                        className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded disabled:opacity-50"
+                                    >
+                                        Create
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Settings Modal */}
+                <DesktopSettingsModal
+                    isOpen={isSettingsOpen}
+                    onClose={() => setIsSettingsOpen(false)}
+                />
+
+                {/* Search Modal */}
+                {isSearchOpen && (
+                    <SearchModal
+                        isOpen={isSearchOpen}
+                        onClose={() => setIsSearchOpen(false)}
+                        onAddSong={handleAddSong}
+                        favorites={new Set((mixes.find(m => m.id === 'favorites')?.songs || []).map(s => s.id))}
+                        onToggleFavorite={handleToggleFavorite}
+                    />
+                )}
+
+                {/* Edit Mix Modal */}
+                {editingMix && (
+                    <EditMixModal
+                        isOpen={!!editingMix}
+                        mix={editingMix}
+                        onClose={() => setEditingMix(null)}
+                        onUpdateMix={(updatedMix: Mix) => {
+                            updateMix(updatedMix.id, updatedMix);
+                            setEditingMix(null);
+                            addToast(`Updated "${updatedMix.title}"`);
+                        }}
+                        onDeleteMix={(mixId: string) => {
+                            deleteMix(mixId);
+                            setEditingMix(null);
+                            addToast("Mixtape deleted");
+                        }}
+                    />
+                )}
+
+                {/* Toast Container */}
+                <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-2 pointer-events-none">
+                    <AnimatePresence>
+                        {toasts.map(toast => (
+                            <motion.div
+                                key={toast.id}
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                                className={`px-4 py-3 rounded shadow-lg text-white font-bold font-mono text-sm border-l-4 ${toast.type === 'success' ? 'bg-green-900 border-green-500' : 'bg-red-900 border-red-500'}`}
+                            >
+                                {toast.message}
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+            </>
+        );
+    }
+
     return (
         <div ref={containerRef} className="min-h-screen w-full bg-retro-black relative overflow-hidden p-2 md:p-8 flex flex-col items-center">
             <AnimatePresence>
@@ -650,6 +835,21 @@ export function Stage({ onSwitchToMobile }: StageProps) {
 
                         <button
                             onClick={() => {
+                                playClick();
+                                const keys = Object.keys(THEMES) as ThemeKey[];
+                                const currentIndex = keys.indexOf(currentTheme);
+                                const nextIndex = (currentIndex + 1) % keys.length;
+                                setCurrentTheme(keys[nextIndex]);
+                                addToast(`Theme: ${THEMES[keys[nextIndex]].name}`);
+                            }}
+                            className="flex items-center gap-2 bg-retro-black border border-retro-gray/50 text-retro-white px-3 py-2 rounded hover:bg-white/10 transition-colors shadow-lg"
+                            title="Switch Theme"
+                        >
+                            <Palette size={20} />
+                        </button>
+
+                        <button
+                            onClick={() => {
                                 setIsCinemaMode(true);
                                 document.documentElement.requestFullscreen().catch(err => console.error("Fullscreen failed:", err));
                             }}
@@ -787,6 +987,7 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                                         playClick();
                                         loadMix(""); // Clear active mix
                                     }}
+                                    currentTheme={currentTheme}
                                 />
                             </motion.div>
                         </motion.div>

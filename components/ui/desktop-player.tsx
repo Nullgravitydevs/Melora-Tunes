@@ -2,14 +2,13 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Palette, Volume2, LogOut, Shuffle, Repeat, Repeat1, ListMusic, Music2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Shuffle, Repeat, Repeat1, ListMusic, Music2 } from "lucide-react";
 import { Visualizer } from "./visualizer";
-import { useState } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { useAudio } from "@/hooks/use-audio";
 
-interface PlayerProps {
+export interface PlayerProps {
     isPlaying: boolean;
     hasCassette: boolean;
     cassetteTitle?: string;
@@ -35,10 +34,14 @@ interface PlayerProps {
     dragConstraints?: React.RefObject<Element>;
     drag?: boolean;
     onEject?: () => void;
+    currentTheme?: ThemeKey;
 }
 
-interface ThemeConfig {
+export type LayoutType = 'cassette' | 'studio';
+
+export interface ThemeConfig {
     name: string;
+    layout: LayoutType;
     bodyGradient: string;
     screenBg: string;
     cassetteBg: string;
@@ -48,9 +51,10 @@ interface ThemeConfig {
     playButtonBg: string;
 }
 
-const THEMES: Record<string, ThemeConfig> = {
+export const THEMES: Record<string, ThemeConfig> = {
     STITCH: {
         name: "Stitch Edition",
+        layout: 'cassette',
         bodyGradient: "bg-white",
         screenBg: "bg-gray-900",
         cassetteBg: "bg-gray-100",
@@ -59,54 +63,37 @@ const THEMES: Record<string, ThemeConfig> = {
         buttonBg: "bg-[#478ECC]", // Stitch Blue
         playButtonBg: "bg-[#2A6BB0]" // Darker Stitch Blue
     },
+    METAL: {
+        name: "Realistic Metal Edition",
+        layout: 'studio',
+        bodyGradient: "bg-zinc-950",
+        screenBg: "bg-zinc-900",
+        cassetteBg: "bg-zinc-800",
+        labelBg: "bg-zinc-900",
+        lcdBg: "bg-orange-500",
+        buttonBg: "bg-zinc-800",
+        playButtonBg: "bg-orange-600"
+    }
 };
 
-type ThemeKey = keyof typeof THEMES;
+export type ThemeKey = keyof typeof THEMES;
 
-export function DesktopPlayer({
-    isPlaying,
-    hasCassette,
-    cassetteTitle,
-    cassetteColor = "orange",
-    currentSong,
-    onPlayToggle,
-    onNext,
-    onPrev,
-    volume,
-    onVolumeChange,
-    progress = 0,
-    onSeek,
-    shuffle = false,
-    onShuffleToggle,
-    repeat = 'off',
-    onRepeatToggle,
-    onOpenQueue,
-    onOpenLyrics,
-    className,
-    dragConstraints,
-    drag = true,
-    onEject
-}: PlayerProps) {
-    const [currentTheme] = useState<ThemeKey>('STITCH');
-    const theme = THEMES[currentTheme];
-    const { playClick, playClunk, playEject } = useAudio(); // Cassette sounds
+// --- Sub-Components ---
+
+function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
+    const {
+        isPlaying, hasCassette, cassetteTitle, cassetteColor = "orange", currentSong,
+        onPlayToggle, onNext, onPrev, volume, onVolumeChange,
+        progress = 0, onSeek, shuffle, onShuffleToggle, repeat = 'off', onRepeatToggle,
+        onOpenQueue, onOpenLyrics, className, dragConstraints, drag = true, onEject
+    } = props;
+
+    const { playClick, playClunk, playEject } = useAudio();
 
     const cassetteColors: Record<string, string> = {
         orange: "#ff6600", purple: "#9933ff", white: "#e0e0e0", green: "#00cc66", red: "#ff0055"
     };
-    // If cassetteColor is a key, use the mapped hex. Otherwise, assume it's a valid hex/string itself.
     const displayColor = cassetteColors[cassetteColor] || cassetteColor || "#ff6600";
-
-    const getCassetteTextColor = (color: string) => {
-        switch (color) {
-            case 'purple':
-            case 'red':
-                return "text-white";
-            default:
-                return "text-gray-800 dark:text-gray-100";
-        }
-    };
-    const cassetteTextColor = getCassetteTextColor(cassetteColor);
 
     const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!onSeek) return;
@@ -127,7 +114,7 @@ export function DesktopPlayer({
         <div className="relative flex items-center justify-center">
             <motion.div
                 className={clsx(
-                    "relative w-[360px] h-[500px] shrink-0 rounded-xl bg-gradient-to-b p-5 shadow-2xl border border-gray-300 dark:border-gray-600",
+                    "relative w-[360px] h-[500px] shrink-0 rounded-xl bg-gradient-to-b p-5 shadow-2xl border border-gray-300 dark:border-gray-600 select-none",
                     theme.bodyGradient,
                     className
                 )}
@@ -184,7 +171,7 @@ export function DesktopPlayer({
 
                                 {/* White Label */}
                                 <div className="bg-[#f0f0f0] p-2 border border-gray-300 shadow-sm transform rotate-180 relative mx-1">
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-red-500/10"></div> {/* Label Pattern */}
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-red-500/10"></div>
                                     <div className="absolute bottom-0 left-0 w-full h-1 bg-red-500/10"></div>
 
                                     <p className="text-black text-xs font-black leading-tight tracking-tighter truncate font-mono transform rotate-180 uppercase scale-y-[0.9]">
@@ -205,16 +192,10 @@ export function DesktopPlayer({
                                         "size-12 rounded-full flex items-center justify-center relative shadow-[inset_0_0_10px_rgba(0,0,0,0.8)] bg-black",
                                         isPlaying && "animate-spin"
                                     )} style={{ animationDuration: '4s', animationTimingFunction: 'linear' }}>
-                                        {/* Tape Pack (Dark Brown) */}
                                         <div className="absolute w-[95%] h-[95%] rounded-full border-[6px] border-[#3a2c2c] box-border"></div>
-
-                                        {/* 4-Notch White Ring Design */}
                                         <div className="absolute w-[65%] h-[65%] rounded-full bg-[#f0f0f0] flex items-center justify-center z-30 shadow-md">
-                                            {/* Notches (Dark Grey Rectangles) */}
                                             <div className="absolute w-1.5 h-full bg-[#333]"></div>
                                             <div className="absolute w-full h-1.5 bg-[#333]"></div>
-
-                                            {/* Center Hole (Hollow) */}
                                             <div className="absolute size-2.5 bg-[#111] rounded-full border border-gray-600 z-40"></div>
                                         </div>
                                     </div>
@@ -222,7 +203,6 @@ export function DesktopPlayer({
                                     {/* Tape Window (Transparent center) */}
                                     <div className="h-8 flex-1 mx-1 bg-[#1a1a1a] rounded border-[0.5px] border-white/20 flex items-center justify-center overflow-hidden relative shadow-inner">
                                         <div className="w-full h-px bg-red-500/50 absolute top-1/2 -translate-y-1/2"></div>
-                                        {/* Tape passing through */}
                                         <div className="w-full h-4 bg-[#2a1d1d] opacity-90"></div>
                                     </div>
 
@@ -231,16 +211,10 @@ export function DesktopPlayer({
                                         "size-12 rounded-full flex items-center justify-center relative shadow-[inset_0_0_10px_rgba(0,0,0,0.8)] bg-black",
                                         isPlaying && "animate-spin"
                                     )} style={{ animationDuration: '4s', animationTimingFunction: 'linear' }}>
-                                        {/* Tape Pack (Dark Brown - Slightly smaller to simulate played side?) - Keeping symmetrical for now */}
                                         <div className="absolute w-[95%] h-[95%] rounded-full border-[6px] border-[#3a2c2c] box-border"></div>
-
-                                        {/* Reel Spoke */}
                                         <div className="absolute w-[65%] h-[65%] rounded-full bg-[#f0f0f0] flex items-center justify-center z-30 shadow-md">
-                                            {/* Notches */}
                                             <div className="absolute w-1.5 h-full bg-[#333]"></div>
                                             <div className="absolute w-full h-1.5 bg-[#333]"></div>
-
-                                            {/* Center Hole */}
                                             <div className="absolute size-2.5 bg-[#111] rounded-full border border-gray-600 z-40"></div>
                                         </div>
                                     </div>
@@ -265,7 +239,7 @@ export function DesktopPlayer({
                         </div>
                     </div>
 
-                    {/* Visualizer - Reduced Size */}
+                    {/* Visualizer */}
                     <div className="px-1 py-1">
                         <Visualizer isPlaying={isPlaying} accentColor="#00d8ff" className="w-full h-8 rounded opacity-80" />
                     </div>
@@ -296,7 +270,6 @@ export function DesktopPlayer({
                                 } : {}}
                                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                             >
-                                {/* Progress knob */}
                                 <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
                             </motion.div>
                         </div>
@@ -437,4 +410,193 @@ export function DesktopPlayer({
             </motion.div>
         </div>
     );
+}
+
+function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
+    const {
+        isPlaying, hasCassette, currentSong,
+        onPlayToggle, onNext, onPrev, volume, onVolumeChange,
+        progress = 0, onSeek, onEject
+    } = props;
+
+    const { playClick, playClunk, playEject } = useAudio();
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const songDuration = currentSong?.duration ? parseInt(currentSong.duration.toString()) : 200;
+    const currentTime = progress * songDuration;
+
+    return (
+        <div className="relative flex items-center justify-center">
+            <motion.div
+                className={clsx(
+                    "relative w-[360px] h-[580px] shrink-0 rounded-[2rem] bg-player-body text-gray-800 p-6 shadow-2xl border-4 border-gray-300 dark:border-gray-600 ring-1 ring-black/5 flex flex-col justify-between overflow-hidden select-none",
+                    props.className
+                )}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                drag={props.drag}
+                dragConstraints={props.dragConstraints}
+            >
+                {/* Screws */}
+                <div className="absolute top-4 left-4 text-gray-400"><span className="material-icons-round text-sm">add</span></div>
+                <div className="absolute top-4 right-4 text-gray-400"><span className="material-icons-round text-sm">add</span></div>
+                <div className="absolute bottom-4 left-4 text-gray-400"><span className="material-icons-round text-sm">add</span></div>
+                <div className="absolute bottom-4 right-4 text-gray-400"><span className="material-icons-round text-sm">add</span></div>
+
+                {/* Header */}
+                <div className="text-center mt-2 mb-4">
+                    <h2 className="font-display text-gray-400 text-lg uppercase tracking-tighter shadow-white drop-shadow-md">Stereo Cassette</h2>
+                    <p className="text-[10px] font-mono text-gray-400 tracking-[0.2em] mt-1">AUTO REVERSE</p>
+                </div>
+
+                {/* Screen / Cassette Window */}
+                <div className="bg-player-screen w-full aspect-[16/10] rounded-xl shadow-inset-deep relative mb-4 border-b-2 border-gray-700 flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0),rgba(255,255,255,0)_50%,rgba(0,0,0,0.1)_50%,rgba(0,0,0,0.1))] bg-[length:100%_4px] opacity-20 pointer-events-none z-10"></div>
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent z-10"></div>
+
+                    {hasCassette ? (
+                        <div className="relative w-full h-full flex flex-col items-center justify-center p-4 z-0">
+                            {/* Simple Cassette Animation for Studio Deck - Abstracted */}
+                            <div className="w-full h-full bg-black/50 rounded flex items-center justify-center gap-4">
+                                <div className={clsx("w-12 h-12 rounded-full border-4 border-gray-700 bg-black flex items-center justify-center", isPlaying && "animate-spin")} style={{ animationDuration: '3s' }}>
+                                    <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center">
+                                        <div className="w-3 h-1 bg-black"></div>
+                                        <div className="w-1 h-3 bg-black absolute"></div>
+                                    </div>
+                                </div>
+                                <div className={clsx("w-12 h-12 rounded-full border-4 border-gray-700 bg-black flex items-center justify-center", isPlaying && "animate-spin")} style={{ animationDuration: '3s' }}>
+                                    <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center">
+                                        <div className="w-3 h-1 bg-black"></div>
+                                        <div className="w-1 h-3 bg-black absolute"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="font-mono text-gray-600 text-sm tracking-widest z-0">NO CASSETTE</p>
+                    )}
+                </div>
+
+                {/* Status Strip */}
+                <div className="bg-gray-400/50 dark:bg-gray-500/50 h-10 w-full rounded-md shadow-inner mb-4 flex items-center px-4 border border-gray-400/30 overflow-hidden">
+                    <span className="font-mono text-gray-800 dark:text-black font-bold tracking-widest text-base truncate">
+                        {currentSong ? decodeHtml(currentSong.name) : "READY"}
+                    </span>
+                </div>
+
+                {/* Visualizer (Simulated LED) */}
+                <div className="bg-gray-800 h-8 w-full rounded mb-4 p-1 flex gap-0.5 items-end shadow-inner opacity-80">
+                    <div className="w-full h-full bg-transparent flex items-end justify-between px-1">
+                        {[40, 60, 30, 80, 50, 90, 70, 40, 60, 30, 50, 80].map((h, i) => (
+                            <motion.div
+                                key={i}
+                                className={clsx("w-1.5 rounded-sm", h > 80 ? "bg-red-500" : h > 60 ? "bg-yellow-500" : "bg-green-500")}
+                                animate={isPlaying ? { height: [`${Math.max(10, h - 20)}%`, `${h}%`, `${Math.max(10, h - 30)}%`] } : { height: '10%' }}
+                                transition={{ repeat: Infinity, duration: 0.5 + Math.random() * 0.5, repeatType: "reverse" }}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Progress */}
+                <div className="mb-6 px-2">
+                    <div className="flex justify-between text-[10px] font-mono text-gray-400 mb-1">
+                        <span>{formatTime(currentTime)}</span>
+                        <span>{formatTime(songDuration)}</span>
+                    </div>
+                    <div
+                        className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner cursor-pointer"
+                        onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const p = (e.clientX - rect.left) / rect.width;
+                            onSeek(p);
+                        }}
+                    >
+                        <motion.div className="h-full bg-gray-800 dark:bg-black" style={{ width: `${progress * 100}%` }} />
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="flex justify-center items-center gap-6 mb-6">
+                    <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => { playClick(); onPrev?.(); }}
+                        className="w-12 h-12 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-metal-button active:shadow-inner flex items-center justify-center group border-2 border-blue-300"
+                    >
+                        <span className="material-icons-round text-2xl drop-shadow-md">skip_previous</span>
+                    </motion.button>
+                    <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => { playClick(); onPlayToggle(); }}
+                        className="w-16 h-16 rounded-full bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-metal-button active:shadow-inner flex items-center justify-center group border-4 border-blue-300 z-10"
+                    >
+                        <span className="material-icons-round text-4xl ml-1 drop-shadow-md">
+                            {isPlaying ? "pause" : "play_arrow"}
+                        </span>
+                    </motion.button>
+                    <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => { playClick(); onNext?.(); }}
+                        className="w-12 h-12 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-metal-button active:shadow-inner flex items-center justify-center group border-2 border-blue-300"
+                    >
+                        <span className="material-icons-round text-2xl drop-shadow-md">skip_next</span>
+                    </motion.button>
+                </div>
+
+                {/* Footer Controls */}
+                <div className="flex items-center justify-between px-2 text-xs font-mono text-gray-500 font-bold">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                            <div className={clsx("w-2 h-2 rounded-full shadow-inner", isPlaying ? "bg-red-500 animate-pulse" : "bg-gray-300")}></div>
+                            <span>REC</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)] animate-pulse"></div>
+                            <span>BATT</span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => { playEject(); onEject?.(); }}
+                        className="flex flex-col items-center cursor-pointer hover:text-blue-600 transition-colors"
+                    >
+                        <span className="material-icons-round text-sm">eject</span>
+                        <span className="mt-0.5 tracking-widest text-[9px]">EJECT</span>
+                    </button>
+
+                    <div className="flex items-center gap-2 w-20">
+                        <span className="material-icons-round text-base text-gray-400">volume_up</span>
+                        <div
+                            className="h-1 flex-grow bg-gray-300 rounded-full relative cursor-pointer"
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const newVol = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+                                onVolumeChange(newVol);
+                            }}
+                        >
+                            <div className="absolute top-0 left-0 bottom-0 bg-blue-500 rounded-full" style={{ width: `${volume * 100}%` }}></div>
+                            <div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-white border border-gray-400 rounded-full shadow-sm" style={{ left: `${volume * 100}%` }}></div>
+                        </div>
+                    </div>
+                </div>
+
+            </motion.div>
+        </div>
+    );
+}
+
+export function DesktopPlayer(props: PlayerProps) {
+    const { currentTheme = 'STITCH' } = props;
+    const theme = THEMES[currentTheme];
+
+    if (theme.layout === 'studio') {
+        return <StudioDeck {...props} theme={theme} />;
+    }
+
+    return <CassetteDeck {...props} theme={theme} />;
 }

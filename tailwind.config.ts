@@ -9,6 +9,12 @@ const config: Config = {
     ],
     theme: {
         extend: {
+            fontFamily: {
+                sans: ["var(--font-sans)", "Inter", "sans-serif"],
+                mono: ["var(--font-mono)", "Share Tech Mono", "monospace"],
+                display: ['"Press Start 2P"', 'cursive'],
+                hand: ['"Courier Prime"', 'monospace'],
+            },
             colors: {
                 background: 'hsl(var(--background))',
                 foreground: 'hsl(var(--foreground))',
@@ -49,6 +55,25 @@ const config: Config = {
                     '3': 'hsl(var(--chart-3))',
                     '4': 'hsl(var(--chart-4))',
                     '5': 'hsl(var(--chart-5))'
+                },
+                retro: {
+                    black: "#1a1a1a",
+                    gray: "#2d2d2d",
+                    white: "#e0e0e0",
+                    blue: "#00d8ff",
+                    purple: "#9933ff",
+                },
+                // Deck Studio Colors
+                player: {
+                    body: "#f8fafc",
+                    screen: "#1e1e1e",
+                    lcd: "#9ca3af",
+                    button: "#2563eb",
+                },
+                tape: {
+                    purple: "#8b5cf6",
+                    orange: "#f97316",
+                    dark: "#1f2937",
                 }
             },
             borderRadius: {
