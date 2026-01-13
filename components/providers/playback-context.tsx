@@ -133,7 +133,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // --- Actions ---
 
     // Helpers defined first (hoisted manually) to be available for next/prev
-    const addMix = (mix: Mix) => setMixes(prev => [...prev, mix]);
+    const addMix = (mix: Mix) => {
+        if (mixes.length >= 8) {
+            alert('Maximum 8 Mixtapes allowed!');
+            return;
+        }
+        setMixes(prev => [...prev, mix]);
+    };
 
     const updateMix = useCallback((mixId: string, updates: Partial<Mix>) => {
         setMixes(prev => prev.map(m => m.id === mixId ? { ...m, ...updates } : m));

@@ -158,11 +158,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                 }
                                             }
                                         }}
-                                        onClick={() => {
-                                            if (mix.id !== activeMixId) {
-                                                playClick();
-                                                loadMix(mix.id);
-                                            }
+                                        onClick={(e) => {
+                                            // Click disabled as per request, drag only
+                                            e.stopPropagation();
                                         }}
                                         className={clsx("relative group cursor-grab active:cursor-grabbing hover:z-50", mix.id === activeMixId && "invisible pointer-events-none")}
                                     >
@@ -180,7 +178,12 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                     <Pencil size={10} />
                                                 </button>
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const url = `${window.location.origin}?mix=${mix.id}`;
+                                                        navigator.clipboard.writeText(url);
+                                                        alert("Mix Link Copied to Clipboard!");
+                                                    }}
                                                     className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
                                                     title="Share Mix"
                                                 >
@@ -258,7 +261,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
 
                             {isLoaded && activeMix ? (
-                                <div className="transform scale-[0.75] origin-center w-full flex justify-center items-center pointer-events-none">
+                                <div className="transform scale-[0.85] origin-center w-full flex justify-center items-center pointer-events-none">
                                     {/* Render the Exact Card Design */}
                                     {(() => {
                                         const mixColors = [
