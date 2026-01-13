@@ -49,18 +49,19 @@ interface ThemeConfig {
 }
 
 const THEMES: Record<string, ThemeConfig> = {
-    "Stitch Edition": {
+    STITCH: {
         name: "Stitch Edition",
-        bodyGradient: "from-blue-600 to-indigo-900",
-        screenBg: "bg-blue-950/80",
-        cassetteBg: "bg-blue-800",
-        labelBg: "bg-gradient-to-r from-blue-400 to-indigo-400",
-        lcdBg: "bg-blue-900/50",
-        buttonBg: "bg-blue-700 hover:bg-blue-600",
-        playButtonBg: "bg-indigo-600 hover:bg-indigo-500",
+        bodyGradient: "bg-white",
+        screenBg: "bg-gray-900",
+        cassetteBg: "bg-gray-100",
+        labelBg: "bg-white",
+        lcdBg: "bg-[#D6F0F9]", // Light cyan/blue LCD
+        buttonBg: "bg-[#478ECC]", // Stitch Blue
+        playButtonBg: "bg-[#2A6BB0]" // Darker Stitch Blue
     },
-    // ... we can add more themes or keep it minimal as in Phase 3
 };
+
+type ThemeKey = keyof typeof THEMES;
 
 export function DesktopPlayer({
     isPlaying,
@@ -86,9 +87,15 @@ export function DesktopPlayer({
     drag = true,
     onEject
 }: PlayerProps) {
-    const { playClick, playClunk, playEject } = useAudio();
-    const [themeName, setThemeName] = useState("Stitch Edition");
-    const theme = THEMES[themeName];
+    const [currentTheme] = useState<ThemeKey>('STITCH');
+    const theme = THEMES[currentTheme];
+    const { playClick, playClunk, playEject } = useAudio(); // Cassette sounds
+
+    const cassetteColors: Record<string, string> = {
+        orange: "#ff6600", purple: "#9933ff", white: "#e0e0e0", green: "#00cc66", red: "#ff0055"
+    };
+    // If cassetteColor is a key, use the mapped hex. Otherwise, assume it's a valid hex/string itself.
+    const displayColor = cassetteColors[cassetteColor] || cassetteColor || "#ff6600";
 
     const getCassetteTextColor = (color: string) => {
         switch (color) {
@@ -129,78 +136,174 @@ export function DesktopPlayer({
                 dragMomentum={false}
                 dragElastic={0.1}
             >
-                {/* Header */}
-                <div className="flex justify-between items-center mb-4 px-1">
-                    <div className="flex flex-col">
-                        <h2 className="text-xs font-bold tracking-widest text-white/80 uppercase">TFI Stereo</h2>
-                        <span className="text-[10px] tracking-wider text-white/50">AUTO REVERSE</span>
-                    </div>
-                    <div className="flex gap-2">
-                        {/* Status Lights */}
-                        <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse"></div>
-                    </div>
+                {/* Corner Screws */}
+                <div className="absolute top-2 left-2 size-2 rounded-full bg-gray-400 dark:bg-gray-500 flex items-center justify-center shadow-sm">
+                    <div className="absolute w-px h-1.5 bg-gray-500 dark:bg-gray-400"></div>
+                    <div className="absolute w-1.5 h-px bg-gray-500 dark:bg-gray-400"></div>
+                </div>
+                <div className="absolute top-2 right-2 size-2 rounded-full bg-gray-400 dark:bg-gray-500 flex items-center justify-center shadow-sm">
+                    <div className="absolute w-px h-1.5 bg-gray-500 dark:bg-gray-400"></div>
+                    <div className="absolute w-1.5 h-px bg-gray-500 dark:bg-gray-400"></div>
+                </div>
+                <div className="absolute bottom-2 left-2 size-2 rounded-full bg-gray-400 dark:bg-gray-500 flex items-center justify-center shadow-sm">
+                    <div className="absolute w-px h-1.5 bg-gray-500 dark:bg-gray-400"></div>
+                    <div className="absolute w-1.5 h-px bg-gray-500 dark:bg-gray-400"></div>
+                </div>
+                <div className="absolute bottom-2 right-2 size-2 rounded-full bg-gray-400 dark:bg-gray-500 flex items-center justify-center shadow-sm">
+                    <div className="absolute w-px h-1.5 bg-gray-500 dark:bg-gray-400"></div>
+                    <div className="absolute w-1.5 h-px bg-gray-500 dark:bg-gray-400"></div>
                 </div>
 
-                {/* Cassette Window (Visualizer Area) */}
-                <div className="relative w-full h-40 bg-black/40 rounded-lg border-2 border-white/10 mb-4 overflow-hidden flex items-center justify-center shadow-inner group">
-                    <div className="absolute inset-0 bg-black/20 z-0"></div>
-
-                    {hasCassette && isPlaying ? (
-                        <Visualizer isPlaying={isPlaying} color={cassetteColor} />
-                    ) : (
-                        <div className="text-white/20 text-sm font-mono tracking-widest z-10">
-                            {hasCassette ? "READY" : "NO CASSETTE"}
-                        </div>
-                    )}
-                </div>
-
-                {/* LCD Display */}
-                <div className={clsx("w-full h-16 rounded mb-4 p-2 flex flex-col justify-between font-mono text-xs shadow-inner", theme.lcdBg)}>
-                    <div className="flex justify-between text-cyan-300/80">
-                        <span>{hasCassette ? "TAPE A" : "EMPTY"}</span>
-                        <span>{themeName}</span>
+                <div className="flex flex-col h-full justify-between text-center">
+                    {/* Title */}
+                    <div>
+                        <h3 className="text-gray-800 dark:text-gray-200 tracking-tight text-xl font-bold leading-tight">
+                            MELORA STEREO PLAYER
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400 text-[10px] font-normal leading-normal">
+                            AUTO REVERSE
+                        </p>
                     </div>
-                    <div className="flex justify-between items-end relative overflow-hidden">
-                        <div className="text-cyan-100 truncate w-3/4 text-sm font-bold">
-                            <AnimatePresence mode="wait">
+
+                    {/* Cassette Window */}
+                    <div className="bg-[#1a1a1a] rounded-lg p-4 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] relative overflow-hidden border-b border-gray-700">
+                        {/* Glass Reflection */}
+                        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none z-20"></div>
+                        <div className="absolute top-0 right-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none z-10 mix-blend-overlay"></div>
+
+                        {hasCassette ? (
+                            <div
+                                className="rounded p-3 text-center shadow-[0_2px_4px_rgba(0,0,0,0.5)] transition-colors duration-500 relative z-10 ring-1 ring-black/20"
+                                style={{ backgroundColor: cassetteColor || displayColor }}
+                            >
+                                {/* Screw / Mechanical details */}
+                                <div className="absolute top-1 left-1 size-1.5 rounded-full bg-black/30"></div>
+                                <div className="absolute top-1 right-1 size-1.5 rounded-full bg-black/30"></div>
+                                <div className="absolute bottom-1 left-1 size-1.5 rounded-full bg-black/30"></div>
+                                <div className="absolute bottom-1 right-1 size-1.5 rounded-full bg-black/30"></div>
+
+                                {/* White Label */}
+                                <div className="bg-[#f0f0f0] p-2 border border-gray-300 shadow-sm transform rotate-180 relative mx-1">
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-red-500/10"></div> {/* Label Pattern */}
+                                    <div className="absolute bottom-0 left-0 w-full h-1 bg-red-500/10"></div>
+
+                                    <p className="text-black text-xs font-black leading-tight tracking-tighter truncate font-mono transform rotate-180 uppercase scale-y-[0.9]">
+                                        {currentSong ? decodeHtml(currentSong.name) : cassetteTitle || "Untitled"}
+                                    </p>
+                                    <p className="text-gray-500 text-[9px] font-bold leading-normal truncate transform rotate-180 font-mono tracking-widest pt-0.5">
+                                        {currentSong ? decodeHtml(currentSong.primaryArtists) : "MELORA"}
+                                    </p>
+                                </div>
+
+                                {/* Tape Reels Area */}
+                                <div className="flex justify-around items-center mt-3 px-3 relative">
+                                    {/* Trapezoid Window Cutout Background */}
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] h-[120%] bg-black/20 rounded-lg blur-sm"></div>
+
+                                    {/* Left Reel */}
+                                    <div className={clsx(
+                                        "size-12 rounded-full flex items-center justify-center relative shadow-[inset_0_0_10px_rgba(0,0,0,0.8)] bg-black",
+                                        isPlaying && "animate-spin"
+                                    )} style={{ animationDuration: '4s', animationTimingFunction: 'linear' }}>
+                                        {/* Tape Pack (Dark Brown) */}
+                                        <div className="absolute w-[95%] h-[95%] rounded-full border-[6px] border-[#3a2c2c] box-border"></div>
+
+                                        {/* 4-Notch White Ring Design */}
+                                        <div className="absolute w-[65%] h-[65%] rounded-full bg-[#f0f0f0] flex items-center justify-center z-30 shadow-md">
+                                            {/* Notches (Dark Grey Rectangles) */}
+                                            <div className="absolute w-1.5 h-full bg-[#333]"></div>
+                                            <div className="absolute w-full h-1.5 bg-[#333]"></div>
+
+                                            {/* Center Hole (Hollow) */}
+                                            <div className="absolute size-2.5 bg-[#111] rounded-full border border-gray-600 z-40"></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Tape Window (Transparent center) */}
+                                    <div className="h-8 flex-1 mx-1 bg-[#1a1a1a] rounded border-[0.5px] border-white/20 flex items-center justify-center overflow-hidden relative shadow-inner">
+                                        <div className="w-full h-px bg-red-500/50 absolute top-1/2 -translate-y-1/2"></div>
+                                        {/* Tape passing through */}
+                                        <div className="w-full h-4 bg-[#2a1d1d] opacity-90"></div>
+                                    </div>
+
+                                    {/* Right Reel */}
+                                    <div className={clsx(
+                                        "size-12 rounded-full flex items-center justify-center relative shadow-[inset_0_0_10px_rgba(0,0,0,0.8)] bg-black",
+                                        isPlaying && "animate-spin"
+                                    )} style={{ animationDuration: '4s', animationTimingFunction: 'linear' }}>
+                                        {/* Tape Pack (Dark Brown - Slightly smaller to simulate played side?) - Keeping symmetrical for now */}
+                                        <div className="absolute w-[95%] h-[95%] rounded-full border-[6px] border-[#3a2c2c] box-border"></div>
+
+                                        {/* Reel Spoke */}
+                                        <div className="absolute w-[65%] h-[65%] rounded-full bg-[#f0f0f0] flex items-center justify-center z-30 shadow-md">
+                                            {/* Notches */}
+                                            <div className="absolute w-1.5 h-full bg-[#333]"></div>
+                                            <div className="absolute w-full h-1.5 bg-[#333]"></div>
+
+                                            {/* Center Hole */}
+                                            <div className="absolute size-2.5 bg-[#111] rounded-full border border-gray-600 z-40"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-[#1a1a1a] rounded p-3 h-32 flex items-center justify-center shadow-inner">
+                                <p className="text-gray-600 font-mono text-xs tracking-widest uppercase">No Cassette</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* LCD Display */}
+                    <div className="bg-[#9da8a3] rounded p-2 shadow-[inset_0_2px_6px_rgba(0,0,0,0.4)] text-left overflow-hidden border border-black/20 relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-transparent pointer-events-none"></div>
+                        <div className="flex items-center gap-2 relative z-10">
+                            <p className="text-black font-bold font-mono text-sm leading-normal whitespace-nowrap opacity-80 tracking-tight">
                                 {currentSong ? (
-                                    <motion.span
-                                        key={currentSong.id}
-                                        initial={{ y: 10, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        exit={{ y: -10, opacity: 0 }}
-                                    >
-                                        {decodeHtml(currentSong.name)}
-                                    </motion.span>
-                                ) : (
-                                    <span>-</span>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                        <div className="text-cyan-300 font-mono">
-                            {formatTime(currentTime)}
+                                    <span className="animate-pulse">▶ {decodeHtml(currentSong.name).substring(0, 20)}</span>
+                                ) : "READY"}
+                            </p>
                         </div>
                     </div>
-                </div>
 
-                {/* Progress Bar */}
-                <div className="relative w-full h-2 bg-gray-700/50 rounded-full mb-6 cursor-pointer group" onClick={handleProgressBarClick}>
-                    <motion.div
-                        className="absolute left-0 top-0 h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
-                        style={{ width: `${progress * 100}%` }}
-                        layoutId="progress"
-                        animate={{
-                            boxShadow: isPlaying ? "0 0 8px rgba(6,182,212,0.6)" : "none"
-                        }}
-                    >
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md scale-0 group-hover:scale-100 transition-transform duration-200"></div>
-                    </motion.div>
-                </div>
+                    {/* Visualizer - Reduced Size */}
+                    <div className="px-1 py-1">
+                        <Visualizer isPlaying={isPlaying} accentColor="#00d8ff" className="w-full h-8 rounded opacity-80" />
+                    </div>
 
-                {/* Controls */}
-                <div className="flex flex-col gap-4">
-                    {/* Playback Modes */}
-                    <div className="flex justify-center gap-4 py-1">
+                    {/* Progress Bar */}
+                    <div className="flex flex-col gap-1 px-2 pt-2">
+                        <div className="flex gap-4 justify-between">
+                            <p className="text-gray-400 text-[10px] font-mono tracking-widest">
+                                {formatTime(currentTime)}
+                            </p>
+                            <p className="text-gray-400 text-[10px] font-mono tracking-widest">
+                                {formatTime(songDuration)}
+                            </p>
+                        </div>
+                        <div
+                            className="rounded-full bg-[#111] border-b border-white/10 h-3 group cursor-pointer relative shadow-inner overflow-hidden"
+                            onClick={handleProgressBarClick}
+                        >
+                            <motion.div
+                                className="h-full bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 relative transition-all duration-300"
+                                style={{ width: `${progress * 100}%` }}
+                                animate={isPlaying ? {
+                                    boxShadow: [
+                                        "0 0 10px rgba(255,100,0,0.4)",
+                                        "0 0 20px rgba(255,100,0,0.8)",
+                                        "0 0 10px rgba(255,100,0,0.4)"
+                                    ]
+                                } : {}}
+                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                            >
+                                {/* Progress knob */}
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </motion.div>
+                        </div>
+                    </div>
+
+                    {/* Shuffle & Repeat Controls */}
+                    <div className="flex items-center justify-center gap-2 px-2" onPointerDown={(e) => e.stopPropagation()}>
                         <motion.button
                             onClick={() => { playClick(); onShuffleToggle?.(); }}
                             whileHover={{ scale: 1.1 }}
@@ -213,6 +316,7 @@ export function DesktopPlayer({
                                     : "bg-gray-700 text-gray-400 hover:bg-gray-600 hover:shadow-lg"
                             )}
                             title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
+                            aria-label="Toggle Shuffle"
                         >
                             <Shuffle className="w-4 h-4" />
                         </motion.button>
@@ -228,6 +332,7 @@ export function DesktopPlayer({
                                     : "bg-gray-700 text-gray-400 hover:bg-gray-600 hover:shadow-lg"
                             )}
                             title={repeat === 'off' ? 'Repeat: Off' : repeat === 'all' ? 'Repeat: All' : 'Repeat: One'}
+                            aria-label="Toggle Repeat"
                         >
                             {repeat === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
                         </motion.button>
@@ -235,8 +340,10 @@ export function DesktopPlayer({
                             onClick={() => { playClick(); onOpenQueue?.(); }}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                             className="flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white hover:shadow-lg"
-                            title="Queue"
+                            title="View Queue"
+                            aria-label="View Queue"
                         >
                             <ListMusic className="w-4 h-4" />
                         </motion.button>
@@ -244,20 +351,24 @@ export function DesktopPlayer({
                             onClick={() => { playClick(); onOpenLyrics?.(); }}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                             className="flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white hover:shadow-lg"
-                            title="Lyrics"
+                            title="Show Lyrics"
+                            aria-label="Show Lyrics"
                         >
                             <Music2 className="w-4 h-4" />
                         </motion.button>
                     </div>
 
-                    {/* Main Transport */}
+                    {/* Control Buttons */}
                     <div className="flex items-center justify-center gap-4 py-2" onPointerDown={(e) => e.stopPropagation()}>
                         <motion.button
                             onClick={() => { playClick(); onPrev?.(); }}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                             className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md hover:shadow-lg active:shadow-inner transition-all duration-200")}
+                            aria-label="Previous"
                         >
                             <SkipBack className="w-5 h-4" />
                         </motion.button>
@@ -265,7 +376,9 @@ export function DesktopPlayer({
                             onClick={() => { playClunk(); onPlayToggle(); }}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.9 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 15 }}
                             className={clsx(theme.playButtonBg, "flex shrink-0 items-center justify-center rounded-full size-16 text-white shadow-lg hover:shadow-xl active:shadow-inner transition-all duration-200")}
+                            aria-label={isPlaying ? "Pause" : "Play"}
                         >
                             {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
                         </motion.button>
@@ -273,13 +386,15 @@ export function DesktopPlayer({
                             onClick={() => { playClick(); onNext?.(); }}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                             className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md hover:shadow-lg active:shadow-inner transition-all duration-200")}
+                            aria-label="Next"
                         >
                             <SkipForward className="w-6 h-6" />
                         </motion.button>
                     </div>
 
-                    {/* Eject */}
+                    {/* Eject Button (Small, discreet) */}
                     <div className="flex justify-center pb-2" onPointerDown={(e) => e.stopPropagation()}>
                         <button
                             onClick={() => { playEject(); onEject?.(); }}
@@ -288,9 +403,10 @@ export function DesktopPlayer({
                             <LogOut size={12} /> EJECT
                         </button>
                     </div>
+
                 </div>
 
-                {/* Footer Volume */}
+                {/* LEDs and Volume */}
                 <div className="flex justify-between items-center gap-2 px-2 py-1">
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1.5">
@@ -299,6 +415,10 @@ export function DesktopPlayer({
                                 isPlaying ? "bg-green-500 shadow-[0_0_4px_1px_rgba(34,197,94,0.5)]" : "bg-gray-400"
                             )}></div>
                             <span className="text-xs font-bold text-gray-600 dark:text-gray-400">REC</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="size-2.5 rounded-full bg-red-500 shadow-[0_0_4px_1px_rgba(239,68,68,0.5)]"></div>
+                            <span className="text-xs font-bold text-gray-600 dark:text-gray-400">BATT</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -314,7 +434,6 @@ export function DesktopPlayer({
                         </div>
                     </div>
                 </div>
-
             </motion.div>
         </div>
     );
