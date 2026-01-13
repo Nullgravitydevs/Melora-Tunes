@@ -187,16 +187,27 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                         e.stopPropagation();
                                                         const node = document.getElementById(`mix-card-${mix.id}`);
                                                         if (node) {
-                                                            toPng(node, { filter: (n) => !n.classList?.contains('no-snapshot') })
+                                                            toPng(node, {
+                                                                filter: (n) => !n.classList?.contains('no-snapshot'),
+                                                                cacheBust: true,
+                                                            })
                                                                 .then((dataUrl) => {
                                                                     const link = document.createElement('a');
                                                                     link.download = `melora-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
                                                                     link.href = dataUrl;
                                                                     link.click();
+
+                                                                    // Also Copy Link
+                                                                    const shareUrl = `${window.location.origin}?mix=${mix.id}`;
+                                                                    navigator.clipboard.writeText(shareUrl);
+                                                                    alert("Snapshot Downloading... Link Copied to Clipboard! 📸 clipboard");
                                                                 })
                                                                 .catch((err) => {
                                                                     console.error('Snapshot failed', err);
-                                                                    alert('Failed to generate snapshot.');
+                                                                    // Fallback
+                                                                    const shareUrl = `${window.location.origin}?mix=${mix.id}`;
+                                                                    navigator.clipboard.writeText(shareUrl);
+                                                                    alert('Snapshot failed. Link Copied!');
                                                                 });
                                                         }
                                                     }}
