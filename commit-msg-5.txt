@@ -1,0 +1,4 @@
+fix: Maximize player cassette fit (non-standard aspect ratio)
+
+- Changed cassette sizing to w-[95%] h-[92%] to fill the player screen.
+- Removed fixed 3:2 aspect ratio to allow wider sticking without distorting fixed-size elements (reels, screws).
