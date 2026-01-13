@@ -284,79 +284,114 @@ export function DesktopPlayer({
                             className="rounded-full bg-[#111] border-b border-white/10 h-3 group cursor-pointer relative shadow-inner overflow-hidden"
                             onClick={handleProgressBarClick}
                         >
-                            <div className="h-full bg-gradient-to-r from-red-500 to-amber-500 relative transition-all shadow-[0_0_10px_rgba(255,100,0,0.5)]" style={{ width: `${progress * 100}%` }}></div>
+                            <motion.div
+                                className="h-full bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 relative transition-all duration-300"
+                                style={{ width: `${progress * 100}%` }}
+                                animate={isPlaying ? {
+                                    boxShadow: [
+                                        "0 0 10px rgba(255,100,0,0.4)",
+                                        "0 0 20px rgba(255,100,0,0.8)",
+                                        "0 0 10px rgba(255,100,0,0.4)"
+                                    ]
+                                } : {}}
+                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                            >
+                                {/* Progress knob */}
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </motion.div>
                         </div>
                     </div>
 
                     {/* Shuffle & Repeat Controls */}
                     <div className="flex items-center justify-center gap-2 px-2" onPointerDown={(e) => e.stopPropagation()}>
-                        <button
+                        <motion.button
                             onClick={() => { playClick(); onShuffleToggle?.(); }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                             className={clsx(
-                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all",
+                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300",
                                 shuffle
-                                    ? "bg-cyan-500 text-white shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                                    ? "bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.6)] hover:shadow-[0_0_16px_rgba(6,182,212,0.8)]"
+                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600 hover:shadow-lg"
                             )}
                             title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
                             aria-label="Toggle Shuffle"
                         >
                             <Shuffle className="w-4 h-4" />
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                             onClick={() => { playClick(); onRepeatToggle?.(); }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                             className={clsx(
-                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all",
+                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300",
                                 repeat !== 'off'
-                                    ? "bg-cyan-500 text-white shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                                    ? "bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.6)] hover:shadow-[0_0_16px_rgba(6,182,212,0.8)]"
+                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600 hover:shadow-lg"
                             )}
                             title={repeat === 'off' ? 'Repeat: Off' : repeat === 'all' ? 'Repeat: All' : 'Repeat: One'}
                             aria-label="Toggle Repeat"
                         >
                             {repeat === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                             onClick={() => { playClick(); onOpenQueue?.(); }}
-                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all bg-gray-700 text-gray-400 hover:bg-gray-600"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white hover:shadow-lg"
                             title="View Queue"
                             aria-label="View Queue"
                         >
                             <ListMusic className="w-4 h-4" />
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                             onClick={() => { playClick(); onOpenLyrics?.(); }}
-                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all bg-gray-700 text-gray-400 hover:bg-gray-600"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white hover:shadow-lg"
                             title="Show Lyrics"
                             aria-label="Show Lyrics"
                         >
                             <Music2 className="w-4 h-4" />
-                        </button>
+                        </motion.button>
                     </div>
 
                     {/* Control Buttons */}
                     <div className="flex items-center justify-center gap-4 py-2" onPointerDown={(e) => e.stopPropagation()}>
-                        <button
+                        <motion.button
                             onClick={() => { playClick(); onPrev?.(); }}
-                            className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md active:shadow-inner hover:bg-gray-600 transition-all")}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                            className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md hover:shadow-lg active:shadow-inner transition-all duration-200")}
                             aria-label="Previous"
                         >
                             <SkipBack className="w-5 h-4" />
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                             onClick={() => { playClunk(); onPlayToggle(); }}
-                            className={clsx(theme.playButtonBg, "flex shrink-0 items-center justify-center rounded-full size-16 text-white shadow-lg active:shadow-inner transform active:scale-95 transition-transform")}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.9 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                            className={clsx(theme.playButtonBg, "flex shrink-0 items-center justify-center rounded-full size-16 text-white shadow-lg hover:shadow-xl active:shadow-inner transition-all duration-200")}
                             aria-label={isPlaying ? "Pause" : "Play"}
                         >
                             {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                             onClick={() => { playClick(); onNext?.(); }}
-                            className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md active:shadow-inner hover:bg-gray-600 transition-all")}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                            className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md hover:shadow-lg active:shadow-inner transition-all duration-200")}
                             aria-label="Next"
                         >
                             <SkipForward className="w-6 h-6" />
-                        </button>
+                        </motion.button>
                     </div>
 
                     {/* Eject Button (Small, discreet) */}
