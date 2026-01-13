@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, Settings as SettingsIcon } from 'lucide-react';
 import { usePlayback } from '@/components/providers/playback-context';
-import { saveSettings } from '@/lib/settings';
+import { saveSettings, clearCache, resetSettings } from '@/lib/settings';
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -18,7 +18,8 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
         repeat, setRepeat,
         sleepTimer, setSleepTimer,
         stopAtEndOfSong, setStopAtEndOfSong,
-        volume, setVolume
+        volume, setVolume,
+        mixes
     } = usePlayback();
 
 
@@ -206,6 +207,66 @@ export function DesktopSettingsModal({ isOpen, onClose }: DesktopSettingsModalPr
                                         {Math.ceil((sleepTimer.endTime - Date.now()) / 60000)} minutes remaining
                                     </p>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Utilities Section */}
+                        <div className="mt-6 pt-6 border-t-2 border-retro-gray/30">
+                            <h3 className="text-sm font-mono text-retro-gray mb-3 uppercase tracking-wider">Data Management</h3>
+                            <div className="space-y-2">
+                                <button
+                                    onClick={() => {
+                                        // Export all playlists as JSON
+                                        const playlistsData = {
+                                            version: '2.0.0',
+                                            exportDate: new Date().toISOString(),
+                                            playlists: mixes.map(mix => ({
+                                                id: mix.id,
+                                                title: mix.title,
+                                                color: mix.color,
+                                                songs: mix.songs
+                                            }))
+                                        };
+
+                                        const dataStr = JSON.stringify(playlistsData, null, 2);
+                                        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                                        const url = URL.createObjectURL(dataBlob);
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.download = `melora-playlists-${new Date().toISOString().split('T')[0]}.json`;
+                                        link.click();
+                                        URL.revokeObjectURL(url);
+
+                                        alert('Playlists exported successfully!');
+                                    }}
+                                    className="w-full p-3 rounded border-2 border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:border-blue-400 transition-all font-mono text-sm"
+                                >
+                                    📦 Backup Playlists
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        if (confirm('Clear all cached data? Settings will be preserved.')) {
+                                            clearCache();
+                                            alert('Cache cleared successfully!');
+                                        }
+                                    }}
+                                    className="w-full p-3 rounded border-2 border-yellow-500/50 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 hover:border-yellow-400 transition-all font-mono text-sm"
+                                >
+                                    🗑️ Clear Cache
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        if (confirm('Reset all settings to defaults? This cannot be undone.')) {
+                                            resetSettings();
+                                            window.location.reload();
+                                        }
+                                    }}
+                                    className="w-full p-3 rounded border-2 border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:border-red-400 transition-all font-mono text-sm"
+                                >
+                                    ⚠️ Reset All Settings
+                                </button>
                             </div>
                         </div>
 
