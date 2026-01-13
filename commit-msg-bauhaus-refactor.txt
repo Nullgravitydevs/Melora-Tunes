@@ -1,0 +1,6 @@
+refactor(bauhaus): draggable player and branded cassette display
+
+- Changed Bauhaus player section to a floating, draggable motion component.
+- Resized player to be more compact (400px width).
+- Replaced the simple carbon-fibre window content with a scaled-down version of the detailed Bauhaus Cassette Card, ensuring branding and styling consistency with the main grid.
+- Updated main layout to full width to accommodate floating player.

@@ -122,9 +122,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                     </div>
                 </header>
 
-                <main className="flex flex-col xl:flex-row h-full overflow-hidden pb-4 gap-8">
+                <main className="h-full overflow-hidden relative">
                     {/* Left Column: Mixtapes Grid */}
-                    <section className="flex-1 p-4 lg:p-8 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+                    <section className="w-full h-full p-4 lg:p-8 overflow-y-auto [&::-webkit-scrollbar]:hidden pb-32">
                         <div className="flex items-end gap-4 mb-8">
                             <h2 className="text-5xl md:text-6xl font-black uppercase leading-none tracking-tighter">Your<br />Mixtapes</h2>
                             <div className="h-4 w-24 bg-[#ff3333] mb-2 hidden md:block"></div>
@@ -201,7 +201,13 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                     </section>
 
                     {/* Right Column: Player */}
-                    <section className="w-full xl:w-[500px] bg-white border-l-4 border-[#1a1a1a] p-8 flex flex-col gap-6 relative shadow-2xl z-20 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+                    <motion.section
+                        drag
+                        dragMomentum={false}
+                        dragConstraints={containerRef}
+                        whileDrag={{ scale: 1.02 }}
+                        className="fixed right-8 top-28 w-[400px] bg-white border-4 border-[#1a1a1a] p-6 flex flex-col gap-6 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-140px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
+                    >
                         {/* Decorative Screws */}
                         <div className="absolute top-4 left-4 text-gray-300 font-mono text-xl">+</div>
                         <div className="absolute top-4 right-4 text-gray-300 font-mono text-xl">+</div>
@@ -215,34 +221,48 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         </div>
 
                         {/* Player Screen / Window */}
-                        <div className="bg-[#1a1a1a] p-1 rounded-sm border-4 border-gray-200 h-56 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group">
+                        <div className="bg-[#1a1a1a] p-4 rounded-sm border-4 border-gray-200 h-64 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group select-none">
                             {/* Carbon Texture */}
                             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
 
-                            {isLoaded ? (
-                                <>
-                                    <div className="w-full px-8 flex justify-between items-center opacity-80 z-10 gap-8">
-                                        <motion.div
-                                            animate={isPlaying ? { rotate: 360 } : {}}
-                                            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                                            className="w-16 h-16 rounded-full border-4 border-white border-dashed"
-                                        />
-                                        {/* Tape Bridge */}
-                                        <div className="flex-grow h-12 bg-gray-800 border-t border-b border-gray-600 relative overflow-hidden flex items-center justify-center">
-                                            <div className="w-full h-8 bg-black relative">
-                                                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-700"></div>
+                            {isLoaded && activeMix ? (
+                                <div className="transform scale-[0.65] origin-center w-full flex justify-center items-center pointer-events-none">
+                                    {/* Render the Mini Card */}
+                                    <div className="relative w-[300px] bg-[#0052cc] p-6 border-2 border-[#1a1a1a] flex flex-col justify-between shadow-lg h-72">
+                                        <div className="flex justify-between items-start text-white/90">
+                                            <span className="text-4xl font-black">A</span>
+                                            <div className="flex gap-1">
+                                                <div className="animate-pulse w-3 h-3 bg-white rounded-full"></div>
                                             </div>
                                         </div>
-                                        <motion.div
-                                            animate={isPlaying ? { rotate: 360 } : {}}
-                                            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                                            className="w-16 h-16 rounded-full border-4 border-white border-dashed"
-                                        />
+
+                                        <div className="bg-white relative p-6 border-2 border-[#1a1a1a] shadow-sm mx-2 transform rotate-1">
+                                            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-2 bg-black opacity-10 rounded-b"></div>
+                                            <p className="font-mono text-center text-xl font-bold text-[#1a1a1a] tracking-tight truncate uppercase">{activeMix.title}</p>
+                                            <div className="w-full h-0.5 bg-[#1a1a1a]/20 my-3"></div>
+                                            <p className="text-[10px] text-center text-[#1a1a1a]/60 uppercase tracking-[0.2em]">TFI High Fidelity</p>
+                                        </div>
+
+                                        <div className="flex justify-between items-center mt-4 px-2">
+                                            <div className="flex gap-6 items-center">
+                                                <motion.div
+                                                    animate={isPlaying ? { rotate: 360 } : {}}
+                                                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                                    className="w-10 h-10 rounded-full border-4 border-white flex items-center justify-center"
+                                                >
+                                                    <div className="w-full h-0.5 bg-white"></div>
+                                                </motion.div>
+                                                <motion.div
+                                                    animate={isPlaying ? { rotate: 360 } : {}}
+                                                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                                    className="w-10 h-10 rounded-full border-4 border-white flex items-center justify-center"
+                                                >
+                                                    <div className="w-full h-0.5 bg-white"></div>
+                                                </motion.div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="absolute bottom-6 font-mono text-sm tracking-widest text-white bg-black px-2 py-1 border border-gray-700 z-20">
-                                        {currentSong ? decodeHtml(currentSong.name).slice(0, 20) : activeMix?.title.slice(0, 20)}
-                                    </div>
-                                </>
+                                </div>
                             ) : (
                                 <div className="absolute text-gray-400 font-mono text-sm tracking-widest bg-black px-2 py-1 animate-pulse">NO CASSETTE</div>
                             )}
@@ -358,7 +378,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                 <Volume2 size={16} className="text-gray-400" />
                             </div>
                         </div>
-                    </section>
+                    </motion.section>
                 </main>
             </div>
         </div>
