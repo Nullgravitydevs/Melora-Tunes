@@ -1,0 +1,366 @@
+"use client";
+
+import { useRef, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { clsx } from "clsx";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1 } from "lucide-react";
+import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
+import { useAudio } from "@/hooks/use-audio";
+import { decodeHtml } from "@/lib/utils";
+import { Mix, usePlayback } from "@/components/providers/playback-context";
+
+interface BauhausStageProps {
+    currentTheme: ThemeKey;
+    onThemeChange: () => void;
+    onSelectTheme?: (theme: ThemeKey) => void;
+    onSwitchToMobile?: () => void;
+    onOpenSettings?: () => void;
+    onEditMix?: (mix: Mix) => void;
+    onOpenSearch?: (mixId: string) => void;
+    onCreateMix?: () => void;
+    onCinemaMode?: () => void;
+}
+
+export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode }: BauhausStageProps) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const {
+        mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
+        loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
+        isLoaded
+    } = usePlayback();
+
+    const { playClick, playClunk, playEject } = useAudio();
+    const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+
+    const activeMix = mixes.find(m => m.id === activeMixId) || null;
+
+    // Bauhaus Colors
+    const colors = {
+        primary: "#0052cc", // Blue
+        secondary: "#ff3333", // Red
+        accent: "#ffcc00", // Yellow
+        neutral: "#1a1a1a",
+        bgLight: "#f4f4f0",
+        surface: "#ffffff"
+    };
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div ref={containerRef} className="bg-[#f4f4f0] text-[#1a1a1a] h-screen flex flex-col font-sans overflow-hidden selection:bg-[#0052cc] selection:text-white relative">
+            {/* Bauhaus Grid Background */}
+            <div className="absolute inset-0 pointer-events-none opacity-40 z-0"
+                style={{
+                    backgroundImage: `
+                        linear-gradient(#e5e5e5 1px, transparent 1px), 
+                        linear-gradient(90deg, #e5e5e5 1px, transparent 1px)
+                    `,
+                    backgroundSize: '40px 40px'
+                }}
+            />
+
+            <div className="max-w-[1600px] mx-auto px-6 py-6 md:py-8 relative z-10 flex flex-col h-full w-full">
+
+                {/* Header */}
+                <header className="w-full p-6 flex flex-col md:flex-row justify-between items-center bg-white border-b-4 border-[#1a1a1a] relative z-20 gap-4 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] mb-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-[#ff3333] flex items-center justify-center transform hover:rotate-12 transition-transform shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] border-2 border-[#1a1a1a]">
+                            <div className="w-6 h-4 bg-transparent border-2 border-white rounded-sm flex items-center justify-center gap-1">
+                                <div className="w-1 h-1 bg-white rounded-full"></div>
+                                <div className="w-1 h-1 bg-white rounded-full"></div>
+                            </div>
+                        </div>
+                        <h1 className="text-4xl font-black uppercase tracking-tighter">TFI Stereo</h1>
+                    </div>
+
+                    <div className="flex items-center gap-4 flex-wrap justify-center font-bold">
+                        <button onClick={onCinemaMode} className="hidden md:flex items-center gap-2 bg-[#0052cc] text-white px-6 py-3 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a]">
+                            <Maximize2 size={16} /> Cinema Mode
+                        </button>
+                        <button onClick={onCreateMix} className="flex items-center gap-2 bg-[#ffcc00] text-[#1a1a1a] border-2 border-[#1a1a1a] px-6 py-3 uppercase tracking-wider shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all">
+                            <Plus size={16} /> Create Mix
+                        </button>
+
+                        {/* Theme Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
+                                className="p-3 bg-white border-2 border-[#1a1a1a] hover:bg-gray-100 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
+                                title="Change Theme"
+                            >
+                                <Palette size={20} />
+                            </button>
+                            {isThemeMenuOpen && (
+                                <div className="absolute right-0 top-full mt-2 bg-white border-2 border-[#1a1a1a] shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] py-2 min-w-[200px] z-50">
+                                    {Object.entries(THEMES).map(([key, theme]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => {
+                                                onSelectTheme?.(key as ThemeKey);
+                                                setIsThemeMenuOpen(false);
+                                            }}
+                                            className={clsx(
+                                                "w-full px-4 py-3 text-left text-sm hover:bg-[#ffcc00] transition-colors flex items-center gap-2 font-bold uppercase tracking-wider border-b border-gray-100 last:border-0",
+                                                currentTheme === key ? "text-[#0052cc] bg-gray-50" : "text-[#1a1a1a]"
+                                            )}
+                                        >
+                                            {currentTheme === key && <div className="w-2 h-2 bg-[#0052cc] rounded-full"></div>}
+                                            {theme.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <button onClick={onOpenSettings} className="p-3 bg-white border-2 border-[#1a1a1a] hover:bg-gray-100 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all">
+                            <Settings size={20} />
+                        </button>
+                    </div>
+                </header>
+
+                <main className="flex flex-col xl:flex-row h-full overflow-hidden pb-4 gap-8">
+                    {/* Left Column: Mixtapes Grid */}
+                    <section className="flex-1 p-4 lg:p-8 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+                        <div className="flex items-end gap-4 mb-8">
+                            <h2 className="text-5xl md:text-6xl font-black uppercase leading-none tracking-tighter">Your<br />Mixtapes</h2>
+                            <div className="h-4 w-24 bg-[#ff3333] mb-2 hidden md:block"></div>
+                            <div className="h-4 w-4 bg-[#0052cc] mb-2 rounded-full hidden md:block"></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl pb-20">
+                            {mixes.map((mix, index) => {
+                                // Assign colors cyclically
+                                const mixColors = [
+                                    { bg: "bg-[#0052cc]", text: "text-[#0052cc]" }, // Blue
+                                    { bg: "bg-[#ff3333]", text: "text-[#ff3333]" }, // Red
+                                    { bg: "bg-[#ffcc00]", text: "text-[#1a1a1a]" }, // Yellow
+                                ];
+                                const color = mixColors[index % mixColors.length];
+
+                                return (
+                                    <div
+                                        key={mix.id}
+                                        onClick={() => {
+                                            if (mix.id !== activeMixId) {
+                                                playClick();
+                                                loadMix(mix.id);
+                                            }
+                                        }}
+                                        className="relative group cursor-pointer hover:z-10"
+                                    >
+                                        <div className="absolute inset-0 bg-[#1a1a1a] translate-x-3 translate-y-3"></div>
+                                        <div className={clsx(
+                                            "relative p-6 border-2 border-[#1a1a1a] transition-transform transform group-hover:-translate-y-1 group-hover:-translate-x-1 h-72 flex flex-col justify-between",
+                                            color.bg
+                                        )}>
+                                            <div className={clsx("flex justify-between items-start", index % 3 === 2 ? "text-[#1a1a1a]" : "text-white/90")}>
+                                                <span className="text-4xl font-black">A</span>
+                                                <div className="flex gap-1">
+                                                    {mix.id === activeMixId && <div className="animate-pulse w-3 h-3 bg-white rounded-full"></div>}
+                                                </div>
+                                            </div>
+
+                                            {/* Tape Label */}
+                                            <div className={clsx("bg-white relative p-6 border-2 border-[#1a1a1a] shadow-sm mx-2", index % 2 === 0 ? "transform -rotate-1" : "transform rotate-1")}>
+                                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-2 bg-black opacity-10 rounded-b"></div>
+                                                <p className="font-mono text-center text-xl font-bold text-[#1a1a1a] tracking-tight truncate uppercase">{mix.title}</p>
+                                                <div className="w-full h-0.5 bg-[#1a1a1a]/20 my-3"></div>
+                                                <p className="text-[10px] text-center text-[#1a1a1a]/60 uppercase tracking-[0.2em]">TFI High Fidelity</p>
+                                            </div>
+
+                                            <div className="flex justify-between items-center mt-4 px-2">
+                                                {/* Reels Visual (Static representation) */}
+                                                <div className="flex gap-6 items-center">
+                                                    <div className={clsx("w-10 h-10 rounded-full border-4 flex items-center justify-center", index % 3 === 2 ? "border-[#1a1a1a]" : "border-white")}>
+                                                        <div className={clsx("w-full h-0.5", index % 3 === 2 ? "bg-[#1a1a1a]" : "bg-white")}></div>
+                                                    </div>
+                                                    <div className={clsx("w-10 h-10 rounded-full border-4 flex items-center justify-center", index % 3 === 2 ? "border-[#1a1a1a]" : "border-white")}>
+                                                        <div className={clsx("w-full h-0.5", index % 3 === 2 ? "bg-[#1a1a1a]" : "bg-white")}></div>
+                                                    </div>
+                                                </div>
+                                                <span className="bg-[#1a1a1a] text-white px-3 py-1 text-xs font-bold border-2 border-white">{mix.songs.length} SONGS</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Create New Mix Card */}
+                            <div onClick={onCreateMix} className="relative group cursor-pointer h-72 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-transparent border-4 border-dashed border-[#1a1a1a]/20"></div>
+                                <div className="flex flex-col items-center gap-4 text-[#1a1a1a]/40 group-hover:text-[#0052cc] transition-colors">
+                                    <Plus size={48} />
+                                    <span className="font-black uppercase tracking-widest">Create New</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Right Column: Player */}
+                    <section className="w-full xl:w-[500px] bg-white border-l-4 border-[#1a1a1a] p-8 flex flex-col gap-6 relative shadow-2xl z-20 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+                        {/* Decorative Screws */}
+                        <div className="absolute top-4 left-4 text-gray-300 font-mono text-xl">+</div>
+                        <div className="absolute top-4 right-4 text-gray-300 font-mono text-xl">+</div>
+                        <div className="absolute bottom-4 left-4 text-gray-300 font-mono text-xl">+</div>
+                        <div className="absolute bottom-4 right-4 text-gray-300 font-mono text-xl">+</div>
+
+                        <div className="text-center space-y-2 mt-2">
+                            <h3 className="text-3xl font-black uppercase tracking-tighter text-[#1a1a1a]">Stereo Player</h3>
+                            <div className="w-16 h-1 bg-[#ff3333] mx-auto"></div>
+                            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.3em]">Auto Reverse System</p>
+                        </div>
+
+                        {/* Player Screen / Window */}
+                        <div className="bg-[#1a1a1a] p-1 rounded-sm border-4 border-gray-200 h-56 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group">
+                            {/* Carbon Texture */}
+                            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
+
+                            {isLoaded ? (
+                                <>
+                                    <div className="w-full px-8 flex justify-between items-center opacity-80 z-10 gap-8">
+                                        <motion.div
+                                            animate={isPlaying ? { rotate: 360 } : {}}
+                                            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                            className="w-16 h-16 rounded-full border-4 border-white border-dashed"
+                                        />
+                                        {/* Tape Bridge */}
+                                        <div className="flex-grow h-12 bg-gray-800 border-t border-b border-gray-600 relative overflow-hidden flex items-center justify-center">
+                                            <div className="w-full h-8 bg-black relative">
+                                                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-700"></div>
+                                            </div>
+                                        </div>
+                                        <motion.div
+                                            animate={isPlaying ? { rotate: 360 } : {}}
+                                            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                            className="w-16 h-16 rounded-full border-4 border-white border-dashed"
+                                        />
+                                    </div>
+                                    <div className="absolute bottom-6 font-mono text-sm tracking-widest text-white bg-black px-2 py-1 border border-gray-700 z-20">
+                                        {currentSong ? decodeHtml(currentSong.name).slice(0, 20) : activeMix?.title.slice(0, 20)}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="absolute text-gray-400 font-mono text-sm tracking-widest bg-black px-2 py-1 animate-pulse">NO CASSETTE</div>
+                            )}
+
+                            {/* Glass Reflection */}
+                            <div className="absolute -top-10 -right-10 w-40 h-80 bg-gradient-to-l from-white/10 to-transparent skew-x-12 rotate-12 pointer-events-none z-30"></div>
+                        </div>
+
+                        {/* Status Bar */}
+                        <div className="flex gap-4">
+                            <div className="flex-1 bg-[#d4d8cc] p-3 border-2 border-[#1a1a1a] shadow-inner font-mono flex justify-between items-center">
+                                <span className="text-[#1a1a1a] font-bold tracking-widest text-sm uppercase">STATUS: {isLoaded ? (isPlaying ? "PLAYING" : "PAUSED") : "EMPTY"}</span>
+                            </div>
+                            <div className="w-16 bg-[#1a1a1a] flex items-center justify-center border-2 border-[#1a1a1a]">
+                                <span className="font-black text-white text-xl">A</span>
+                            </div>
+                        </div>
+
+                        {/* Progress Bar & Visuals */}
+                        <div className="space-y-1">
+                            <div className="flex justify-between font-mono text-[10px] text-gray-400 uppercase tracking-widest">
+                                <span>{formatTime(progress)}</span>
+                                <span>Side A</span>
+                                <span>{formatTime(duration || 0)}</span>
+                            </div>
+                            <div
+                                className="h-6 bg-gray-100 w-full border-2 border-[#1a1a1a] relative group cursor-pointer"
+                                onClick={(e) => {
+                                    if (duration && isLoaded) {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const percent = (e.clientX - rect.left) / rect.width;
+                                        seek(percent * duration);
+                                    }
+                                }}
+                            >
+                                <motion.div
+                                    className="h-full bg-[#0052cc] relative"
+                                    style={{ width: `${(progress / (duration || 1)) * 100}%` }}
+                                >
+                                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-black/20"></div>
+                                </motion.div>
+                            </div>
+                        </div>
+
+                        {/* Audio Meters (Static CSS Effect for visual style) */}
+                        <div className="h-6 w-full flex gap-1 items-end">
+                            <div className="flex-1 h-full flex gap-0.5 items-end opacity-80">
+                                {[30, 60, 100, 50, 75, 40, 80, 100].map((h, i) => (
+                                    <motion.div
+                                        key={i}
+                                        className="w-1 bg-[#ff3333]"
+                                        animate={{ height: isPlaying ? [`${h}%`, `${Math.random() * 100}%`, `${h}%`] : `${h}%` }}
+                                        transition={{ repeat: Infinity, duration: 0.2 }}
+                                    />
+                                ))}
+                            </div>
+                            <div className="flex-1 h-full flex gap-0.5 items-end justify-end opacity-80">
+                                {[30, 60, 100, 50, 75].map((h, i) => (
+                                    <motion.div
+                                        key={i}
+                                        className="w-1 bg-[#0052cc]"
+                                        animate={{ height: isPlaying ? [`${h}%`, `${Math.random() * 100}%`, `${h}%`] : `${h}%` }}
+                                        transition={{ repeat: Infinity, duration: 0.2 }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        <hr className="border-gray-200" />
+
+                        {/* Controls */}
+                        <div className="flex items-end justify-between px-2 pb-4">
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={clsx("w-3 h-3 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]", isLoaded ? "bg-red-500" : "bg-gray-400")}></div>
+                                    <span className="text-[10px] uppercase font-bold text-gray-400">PWR</span>
+                                </div>
+                                <button
+                                    onClick={() => { playEject(); loadMix(null as any); }}
+                                    className="w-10 h-10 bg-gray-200 border-2 border-[#1a1a1a] flex items-center justify-center hover:bg-[#ff3333] hover:text-white transition-colors group" title="Eject"
+                                >
+                                    <LogOut size={20} className="group-hover:-translate-y-0.5 transition-transform" />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => { playClick(); prev(); }} className="w-14 h-14 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none">
+                                    <SkipBack size={24} className="fill-current" />
+                                </button>
+                                <button
+                                    onClick={() => { playClick(); togglePlay(); }}
+                                    className="w-24 h-24 bg-[#0052cc] text-white rounded-full border-4 border-white shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center"
+                                >
+                                    {isPlaying ? <Pause size={48} className="fill-current" /> : <Play size={48} className="fill-current ml-2" />}
+                                </button>
+                                <button onClick={() => { playClick(); next(); }} className="w-14 h-14 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none">
+                                    <SkipForward size={24} className="fill-current" />
+                                </button>
+                            </div>
+
+                            <div className="flex flex-col items-center gap-2 h-full justify-end group">
+                                <div className="w-3 h-20 bg-gray-100 border-2 border-[#1a1a1a] relative overflow-hidden flex items-end cursor-pointer rounded-full">
+                                    <motion.div
+                                        className="w-full bg-[#ffcc00] group-hover:bg-yellow-400"
+                                        style={{ height: `${volume * 100}%` }}
+                                    />
+                                    <input
+                                        type="range" min="0" max="1" step="0.05" value={volume}
+                                        onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                    />
+                                </div>
+                                <Volume2 size={16} className="text-gray-400" />
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+    );
+}

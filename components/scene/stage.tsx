@@ -10,6 +10,7 @@ import { useAudio } from "@/hooks/use-audio";
 import { JioSaavnSong, getSongDetails } from "@/lib/jiosaavn";
 import { StudioStage } from "./studio-stage";
 import { ZenStage } from "./zen-stage";
+import { BauhausStage } from "./bauhaus-stage";
 import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
@@ -42,7 +43,7 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchTargetMixId, setSearchTargetMixId] = useState<string | null>(null);
     const [newMixTitle, setNewMixTitle] = useState("");
-    const [currentTheme, setCurrentTheme] = useState<ThemeKey>('ZEN');
+    const [currentTheme, setCurrentTheme] = useState<ThemeKey>('BAUHAUS');
     const [isCinemaMode, setIsCinemaMode] = useState(false);
     const [editingMix, setEditingMix] = useState<Mix | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -433,10 +434,10 @@ export function Stage({ onSwitchToMobile }: StageProps) {
     };
 
 
-    // --- RENDER CUSTOM LAYOUT STAGES (Studio, Zen) ---
+    // --- RENDER CUSTOM LAYOUT STAGES (Studio, Zen, Bauhaus) ---
     const layout = THEMES[currentTheme].layout;
-    if (layout === 'studio' || layout === 'zen') {
-        const StageComponent = layout === 'zen' ? ZenStage : StudioStage;
+    if (layout === 'studio' || layout === 'zen' || layout === 'bauhaus') {
+        const StageComponent = layout === 'zen' ? ZenStage : (layout === 'bauhaus' ? BauhausStage : StudioStage);
         return (
             <>
                 <StageComponent

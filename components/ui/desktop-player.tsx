@@ -37,7 +37,7 @@ export interface PlayerProps {
     currentTheme?: ThemeKey;
 }
 
-export type LayoutType = 'cassette' | 'studio' | 'zen';
+export type LayoutType = 'cassette' | 'studio' | 'zen' | 'bauhaus';
 
 export interface ThemeConfig {
     name: string;
@@ -84,6 +84,17 @@ export const THEMES: Record<string, ThemeConfig> = {
         lcdBg: "bg-white",
         buttonBg: "bg-white",
         playButtonBg: "bg-stone-900"
+    },
+    BAUHAUS: {
+        name: "Bauhaus Aesthetic Edition",
+        layout: 'bauhaus',
+        bodyGradient: "bg-[#f4f4f0]",
+        screenBg: "bg-[#f4f4f0]",
+        cassetteBg: "bg-white",
+        labelBg: "bg-white",
+        lcdBg: "bg-neutral-900",
+        buttonBg: "bg-white",
+        playButtonBg: "bg-[#0052cc]"
     }
 };
 
