@@ -772,15 +772,6 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                                     onVolumeChange={setVolume}
                                     progress={progress}
                                     onSeek={handleSeek}
-                                    shuffle={shuffle}
-                                    onShuffleToggle={() => setShuffle(!shuffle)}
-                                    repeat={repeat}
-                                    onRepeatToggle={() => {
-                                        const nextRepeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off';
-                                        setRepeat(nextRepeat);
-                                    }}
-                                    onOpenQueue={() => setIsQueueOpen(true)}
-                                    onOpenLyrics={() => setIsLyricsOpen(true)}
                                     className="scale-90 md:scale-100 origin-center"
                                     drag={false} // Disable internal drag, wrapper handles it
                                     onEject={() => {

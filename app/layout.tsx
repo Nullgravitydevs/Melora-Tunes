@@ -10,15 +10,15 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "Melora - Premium Audio Experience",
-  description: "High-fidelity retro cassette player and iPod simulator.",
+  title: "TFI Stereo - Premium Audio Experience",
+  description: "High-fidelity retro cassette player and music mixer.",
   generator: 'Next.js',
   manifest: '/manifest.json',
   themeColor: "#000000",
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: "Melora",
+    title: "TFI Stereo",
   },
   icons: {
     icon: [

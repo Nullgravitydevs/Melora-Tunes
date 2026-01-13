@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Palette, Volume2, LogOut, Shuffle, Repeat, Repeat1, ListMusic, Music2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Palette, Volume2, LogOut } from "lucide-react";
 import { Visualizer } from "./visualizer";
 import { useState } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
@@ -22,14 +22,6 @@ interface PlayerProps {
     onVolumeChange: (vol: number) => void;
     progress?: number;
     onSeek?: (val: number) => void;
-
-    // Playback state
-    shuffle?: boolean;
-    onShuffleToggle?: () => void;
-    repeat?: 'off' | 'one' | 'all';
-    onRepeatToggle?: () => void;
-    onOpenQueue?: () => void;
-    onOpenLyrics?: () => void;
 
     className?: string;
     dragConstraints?: React.RefObject<Element>;
@@ -76,12 +68,6 @@ export function DesktopPlayer({
     onVolumeChange,
     progress = 0,
     onSeek,
-    shuffle = false,
-    onShuffleToggle,
-    repeat = 'off',
-    onRepeatToggle,
-    onOpenQueue,
-    onOpenLyrics,
     className,
     dragConstraints,
     drag = true,
@@ -158,7 +144,7 @@ export function DesktopPlayer({
                     {/* Title */}
                     <div>
                         <h3 className="text-gray-800 dark:text-gray-200 tracking-tight text-xl font-bold leading-tight">
-                            MELORA STEREO PLAYER
+                            TFI STEREO PLAYER
                         </h3>
                         <p className="text-gray-500 dark:text-gray-400 text-[10px] font-normal leading-normal">
                             AUTO REVERSE
@@ -302,66 +288,8 @@ export function DesktopPlayer({
                         </div>
                     </div>
 
-                    {/* Shuffle & Repeat Controls */}
-                    <div className="flex items-center justify-center gap-2 px-2" onPointerDown={(e) => e.stopPropagation()}>
-                        <motion.button
-                            onClick={() => { playClick(); onShuffleToggle?.(); }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                            className={clsx(
-                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300",
-                                shuffle
-                                    ? "bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.6)] hover:shadow-[0_0_16px_rgba(6,182,212,0.8)]"
-                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600 hover:shadow-lg"
-                            )}
-                            title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
-                            aria-label="Toggle Shuffle"
-                        >
-                            <Shuffle className="w-4 h-4" />
-                        </motion.button>
-                        <motion.button
-                            onClick={() => { playClick(); onRepeatToggle?.(); }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                            className={clsx(
-                                "flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300",
-                                repeat !== 'off'
-                                    ? "bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.6)] hover:shadow-[0_0_16px_rgba(6,182,212,0.8)]"
-                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600 hover:shadow-lg"
-                            )}
-                            title={repeat === 'off' ? 'Repeat: Off' : repeat === 'all' ? 'Repeat: All' : 'Repeat: One'}
-                            aria-label="Toggle Repeat"
-                        >
-                            {repeat === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
-                        </motion.button>
-                        <motion.button
-                            onClick={() => { playClick(); onOpenQueue?.(); }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white hover:shadow-lg"
-                            title="View Queue"
-                            aria-label="View Queue"
-                        >
-                            <ListMusic className="w-4 h-4" />
-                        </motion.button>
-                        <motion.button
-                            onClick={() => { playClick(); onOpenLyrics?.(); }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white hover:shadow-lg"
-                            title="Show Lyrics"
-                            aria-label="Show Lyrics"
-                        >
-                            <Music2 className="w-4 h-4" />
-                        </motion.button>
-                    </div>
-
-                    {/* Control Buttons */}
-                    <div className="flex items-center justify-center gap-4 py-2" onPointerDown={(e) => e.stopPropagation()}>
+                    {/* Control Buttons - Only Prev/Play/Next */}
+                    <div className="flex items-center justify-center gap-6 py-2" onPointerDown={(e) => e.stopPropagation()}>
                         <motion.button
                             onClick={() => { playClick(); onPrev?.(); }}
                             whileHover={{ scale: 1.05 }}
