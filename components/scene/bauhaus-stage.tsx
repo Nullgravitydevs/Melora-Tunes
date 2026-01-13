@@ -142,6 +142,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
 
                                 return (
                                     <motion.div
+                                        layoutId={mix.id}
                                         key={mix.id}
                                         drag
                                         dragConstraints={containerRef}
@@ -261,7 +262,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
 
                             {isLoaded && activeMix ? (
-                                <div className="transform scale-[0.95] origin-center w-full flex justify-center items-center pointer-events-none">
+                                <motion.div layoutId={activeMix.id} className="transform scale-[0.95] origin-center w-full flex justify-center items-center pointer-events-none">
                                     {/* Render the Exact Card Design */}
                                     {(() => {
                                         const mixColors = [
@@ -317,7 +318,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                             </div>
                                         );
                                     })()}
-                                </div>
+                                </motion.div>
 
                             ) : (
                                 <div className="absolute text-gray-400 font-mono text-sm tracking-widest bg-black px-2 py-1 animate-pulse">NO CASSETTE</div>
