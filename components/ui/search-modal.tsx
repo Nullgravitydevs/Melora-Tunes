@@ -23,14 +23,14 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
 
     // Load history
     useEffect(() => {
-        const saved = localStorage.getItem('tfi-search-history');
+        const saved = localStorage.getItem('melora-search-history');
         if (saved) setRecentSearches(JSON.parse(saved));
     }, []);
 
     const saveHistory = (term: string) => {
         const newHistory = [term, ...recentSearches.filter(t => t !== term)].slice(0, 5);
         setRecentSearches(newHistory);
-        localStorage.setItem('tfi-search-history', JSON.stringify(newHistory));
+        localStorage.setItem('melora-search-history', JSON.stringify(newHistory));
     };
 
     const handleSearch = (term: string) => {

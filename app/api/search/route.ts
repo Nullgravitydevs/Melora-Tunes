@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 const BASE_URL = 'https://www.jiosaavn.com/api.php';
-export const dynamic = 'force-dynamic';
+// Removed: export const dynamic = 'force-dynamic'; - conflicts with output: 'export'
+
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);

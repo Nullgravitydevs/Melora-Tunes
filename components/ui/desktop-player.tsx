@@ -7,6 +7,7 @@ import { Visualizer } from "./visualizer";
 import { useState } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
+import { useAudio } from "@/hooks/use-audio";
 
 interface PlayerProps {
     isPlaying: boolean;
@@ -74,6 +75,7 @@ export function DesktopPlayer({
 }: PlayerProps) {
     const [currentTheme] = useState<ThemeKey>('STITCH');
     const theme = THEMES[currentTheme];
+    const { playClick, playClunk, playEject } = useAudio(); // Cassette sounds
 
     const cassetteColors: Record<string, string> = {
         orange: "#ff6600", purple: "#9933ff", white: "#e0e0e0", green: "#00cc66", red: "#ff0055"
@@ -142,7 +144,7 @@ export function DesktopPlayer({
                     {/* Title */}
                     <div>
                         <h3 className="text-gray-800 dark:text-gray-200 tracking-tight text-xl font-bold leading-tight">
-                            STEREO CASSETTE PLAYER
+                            MELORA STEREO PLAYER
                         </h3>
                         <p className="text-gray-500 dark:text-gray-400 text-[10px] font-normal leading-normal">
                             AUTO REVERSE
@@ -175,7 +177,7 @@ export function DesktopPlayer({
                                         {currentSong ? decodeHtml(currentSong.name) : cassetteTitle || "Untitled"}
                                     </p>
                                     <p className="text-gray-500 text-[9px] font-bold leading-normal truncate transform rotate-180 font-mono tracking-widest pt-0.5">
-                                        {currentSong ? decodeHtml(currentSong.primaryArtists) : "TFI STEREO"}
+                                        {currentSong ? decodeHtml(currentSong.primaryArtists) : "MELORA"}
                                     </p>
                                 </div>
 
@@ -275,21 +277,21 @@ export function DesktopPlayer({
                     {/* Control Buttons */}
                     <div className="flex items-center justify-center gap-4 py-2" onPointerDown={(e) => e.stopPropagation()}>
                         <button
-                            onClick={onPrev}
+                            onClick={() => { playClick(); onPrev?.(); }}
                             className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md active:shadow-inner hover:bg-gray-600 transition-all")}
                             aria-label="Previous"
                         >
                             <SkipBack className="w-5 h-4" />
                         </button>
                         <button
-                            onClick={onPlayToggle}
+                            onClick={() => { playClunk(); onPlayToggle(); }}
                             className={clsx(theme.playButtonBg, "flex shrink-0 items-center justify-center rounded-full size-16 text-white shadow-lg active:shadow-inner transform active:scale-95 transition-transform")}
                             aria-label={isPlaying ? "Pause" : "Play"}
                         >
                             {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
                         </button>
                         <button
-                            onClick={onNext}
+                            onClick={() => { playClick(); onNext?.(); }}
                             className={clsx(theme.buttonBg, "flex shrink-0 items-center justify-center rounded-full size-12 text-white shadow-md active:shadow-inner hover:bg-gray-600 transition-all")}
                             aria-label="Next"
                         >
@@ -300,7 +302,7 @@ export function DesktopPlayer({
                     {/* Eject Button (Small, discreet) */}
                     <div className="flex justify-center pb-2" onPointerDown={(e) => e.stopPropagation()}>
                         <button
-                            onClick={onEject}
+                            onClick={() => { playEject(); onEject?.(); }}
                             className="text-[10px] font-bold text-gray-500 hover:text-red-500 tracking-widest uppercase flex items-center gap-1 transition-colors"
                         >
                             <LogOut size={12} /> EJECT

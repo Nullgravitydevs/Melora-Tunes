@@ -24,7 +24,7 @@ export function useAudio() {
 
         clickSoundRef.current = initAudio('/sounds/click.wav');
         clunkSoundRef.current = initAudio('/sounds/clunk.wav');
-        whirSoundRef.current = initAudio('/sounds/whir.wav');
+        whirSoundRef.current = initAudio('/sounds/click.wav'); // Using click.wav as fallback until whir.wav is added
         if (whirSoundRef.current) whirSoundRef.current.loop = true;
 
         ejectSoundRef.current = initAudio('/sounds/eject.wav');

@@ -44,7 +44,7 @@ export function RotatePrompt() {
             </h2>
 
             <p className="font-mono text-retro-gray text-sm md:text-base max-w-md leading-relaxed">
-                TFI Stereo requires a landscape view for the authentic cassette experience.
+                Melora requires a landscape view for the authentic cassette experience.
             </p>
 
             <div className="mt-8 flex items-center gap-2 text-retro-orange animate-pulse">

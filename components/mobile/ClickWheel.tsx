@@ -5,7 +5,7 @@ import { Play, Pause, FastForward, Rewind } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 interface ClickWheelProps {
-    theme?: 'classic' | 'black' | 'silver' | 'dark';
+    theme?: 'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush';
     enableSounds?: boolean;
     onScroll: (direction: 1 | -1) => void;
     onSelect: () => void;
@@ -188,20 +188,39 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
             case 'black':
                 return {
                     wheel: 'bg-[#1a1a1a] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]',
-                    button: 'from-[#2a2a2a] to-[#111] shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.5)]',
+                    button: 'from-[#2a2a2a] to-[#111] shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)]',
                     text: 'text-zinc-600'
                 };
             case 'silver':
+                // EXACT MATCH: Conic Gradient + Etched Text
                 return {
-                    wheel: 'bg-[#e0e0e0] shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)]',
-                    button: 'from-[#f5f5f5] to-[#dcdcdc] shadow-[inset_0_1px_2px_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.1)]',
-                    text: 'text-zinc-500'
+                    wheel: 'bg-[conic-gradient(from_180deg_at_50%_50%,#f3f4f6_0deg,#e5e7eb_180deg,#f3f4f6_360deg)] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),inset_0_2px_4px_rgba(255,255,255,0.5)]',
+                    button: 'from-[#f3f4f6] to-[#d1d5db] shadow-[0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_2px_rgba(255,255,255,1)]',
+                    text: 'text-neutral-500 drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]' // Etched effect
+                };
+            case 'blue':
+                return {
+                    wheel: 'bg-[radial-gradient(circle,#ffffff_0%,#f0f0f0_100%)] shadow-[0_10px_20px_rgba(0,0,0,0.2),inset_0_2px_5px_rgba(255,255,255,0.8)]',
+                    button: 'bg-[radial-gradient(circle,#f8f8f8_0%,#e0e0e0_100%)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_2px_2px_rgba(0,0,0,0.05)] border border-slate-200',
+                    text: 'text-slate-400 font-bold uppercase tracking-widest'
+                };
+            case 'rosegold':
+                return {
+                    wheel: 'bg-[#fcfcfc] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.2),inset_0_2px_4px_rgba(255,255,255,0.8)] border border-[#d49a89]/10',
+                    button: 'bg-gradient-to-b from-[#f4d0c5] to-[#d49a89] shadow-[0_4px_10px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(255,255,255,0.6)]',
+                    text: 'text-[#b76e79]/80 font-bold tracking-[0.15em]'
+                };
+            case 'blush':
+                return {
+                    wheel: 'bg-[#fffcf2] shadow-[inset_0_2px_5px_rgba(0,0,0,0.05),0_4px_10px_rgba(0,0,0,0.1)] border-4 border-white/20',
+                    button: 'bg-white border border-black/5 shadow-md',
+                    text: 'text-[#d4a373] font-black tracking-widest uppercase'
                 };
             case 'dark':
                 return {
-                    wheel: 'bg-[#222] shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]',
-                    button: 'from-[#333] to-[#222] shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.3)]',
-                    text: 'text-zinc-500'
+                    wheel: 'bg-[#1e2329] shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]',
+                    button: 'from-[#2b3036] to-[#1e2329] shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]',
+                    text: 'text-neutral-500'
                 };
             case 'classic':
             default:

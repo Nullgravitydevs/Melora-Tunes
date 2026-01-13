@@ -1,14 +1,22 @@
 {
-  "name": "tfi-music",
+  "name": "melora",
   "version": "0.1.0",
   "private": true,
+  "main": "desktop_app/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on tcp:3000 && node scripts/launch-electron.js\"",
+    "electron:build": "cross-env IS_ELECTRON_BUILD=true next build && electron-builder --win --x64"
   },
   "dependencies": {
+    "@capacitor-community/http": "^1.4.1",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@types/crypto-js": "^4.2.2",
     "clsx": "^2.1.1",
@@ -23,13 +31,36 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^26.4.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.melora.music",
+    "productName": "Melora",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "desktop_app/main.js",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.png"
+    },
+    "extends": null
   }
 }

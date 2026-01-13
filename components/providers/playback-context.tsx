@@ -1,10 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
-import { JioSaavnSong, getHighQualityUrl } from "@/lib/jiosaavn";
+import { JioSaavnSong, getAudioUrl } from "@/lib/jiosaavn";
 import { useAudio } from "@/hooks/use-audio";
 import { AudioPlayer, AudioPlayerRef } from "@/components/ui/audio-player";
 import { decodeHtml } from "@/lib/utils";
+import { loadSettings, saveSettings } from "@/lib/settings";
 
 export interface Mix {
     id: string;
@@ -54,10 +55,13 @@ interface PlaybackContextType {
     sleepTimer: { endTime: number; duration: number } | null;
     setSleepTimer: (timer: { endTime: number; duration: number } | null) => void;
 
-    // Crossfade
-    // Crossfade
+    // Crossfade (Fade out/in duration in seconds)
     crossfadeDuration: number;
     setCrossfadeDuration: (duration: number) => void;
+
+    // Audio Quality
+    bitrate: '320' | '160' | '96' | '48' | '12';
+    setBitrate: (bitrate: '320' | '160' | '96' | '48' | '12') => void;
 
     // End of Song Timer
     stopAtEndOfSong: boolean;
@@ -78,6 +82,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [shuffle, setShuffle] = useState(false);
     const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
+    const [bitrate, setSelectBitrate] = useState<'320' | '160' | '96' | '48' | '12'>('320'); // Default 320 for init
     const [sleepTimer, setSleepTimer] = useState<{ endTime: number; duration: number } | null>(null);
     const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
     const [stopAtEndOfSong, setStopAtEndOfSong] = useState(false);
@@ -92,7 +97,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // --- Persistence ---
     useEffect(() => {
-        const saved = localStorage.getItem('tfi-mixes');
+        const saved = localStorage.getItem('melora-mixes');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
@@ -114,7 +119,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (isLoaded) {
-            localStorage.setItem('tfi-mixes', JSON.stringify(mixes));
+            localStorage.setItem('melora-mixes', JSON.stringify(mixes));
         }
     }, [mixes, isLoaded]);
 
@@ -166,7 +171,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         else play();
     }, [isPlaying, pause, play]);
 
-    const loadSongUrl = useCallback(async (song: JioSaavnSong) => {
+    const loadSongUrl = useCallback(async (song: JioSaavnSong, overrideBitrate?: string) => {
         // Validate song has encrypted URL before attempting to play
         if (!song?.encryptedMediaUrl) {
             console.warn('Song missing encryptedMediaUrl, skipping:', song?.name || 'Unknown');
@@ -176,7 +181,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            const url = await getHighQualityUrl(song);
+            // Use provided bitrate or current state
+            const targetBitrate = overrideBitrate || bitrate;
+            const url = await getAudioUrl(song, targetBitrate as any);
             if (url) {
                 setCurrentSongUrl(url);
             } else {
@@ -188,6 +195,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             setCurrentSongUrl(null);
         }
     }, []);
+
+    const setBitrate = useCallback((newBitrate: '320' | '160' | '96' | '48' | '12') => {
+        setSelectBitrate(newBitrate);
+        saveSettings({ bitrate: newBitrate });
+        if (currentSong) {
+            loadSongUrl(currentSong, newBitrate);
+        }
+    }, [currentSong, loadSongUrl]);
 
     // Effect to load URL when song changes
     useEffect(() => {
@@ -362,7 +377,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             currentIndex: activeMix?.currentSongIndex || 0,
             sleepTimer, setSleepTimer,
             crossfadeDuration, setCrossfadeDuration,
-            stopAtEndOfSong, setStopAtEndOfSong
+            stopAtEndOfSong, setStopAtEndOfSong,
+            bitrate, setBitrate
         }}>
             {children}
 

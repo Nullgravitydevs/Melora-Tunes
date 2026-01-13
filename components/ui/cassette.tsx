@@ -103,9 +103,8 @@ export const Cassette = memo(function Cassette({
                 <line x1="90" y1="135" x2="310" y2="135" stroke="#ccc" strokeWidth="1" opacity="0.5" />
                 <line x1="90" y1="150" x2="310" y2="150" stroke="#ccc" strokeWidth="1" opacity="0.5" />
 
-                {/* TFI logo */}
                 <text x="200" y="163" textAnchor="middle" fontFamily="'Press Start 2P', monospace" fontSize="8" fill="#666" opacity="0.6">
-                    TFI
+                    M
                 </text>
 
                 {/* Reels */}

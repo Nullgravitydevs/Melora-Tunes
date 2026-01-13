@@ -3,17 +3,19 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Lazy load games for better performance
 const BrickGame = lazy(() => import("./games/BrickGame").then(m => ({ default: m.BrickGame })));
+const ParachuteGame = lazy(() => import("./games/ParachuteGame").then(m => ({ default: m.ParachuteGame })));
 const MusicQuiz = lazy(() => import("./games/MusicQuiz").then(m => ({ default: m.MusicQuiz })));
 
 const GAMES_MENU: MenuItem[] = [
     { label: "Brick", type: 'action', data: { id: 'brick-game', name: 'Brick' }, action: () => { } },
+    { label: "Parachute", type: 'action', data: { id: 'parachute-game', name: 'Parachute' }, action: () => { } },
     { label: "Music Quiz", type: 'action', data: { id: 'music-quiz', name: 'Music Quiz' }, action: () => { } }
 ];
 import { ClickWheel } from "./ClickWheel";
 import { IpodScreen } from "./IpodScreen";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
-import { JioSaavnSong, searchSongs } from "@/lib/jiosaavn";
+import { JioSaavnSong, searchSongs, getLyrics } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -29,7 +31,7 @@ interface MenuItem {
 interface ViewState {
     id: string; // Unique ID for the view context (e.g., 'main', 'playlists', 'mix-123')
     title: string;
-    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game';
+    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game' | 'lyrics';
     data?: any; // Context data (e.g., mixId)
     selectedIndex: number;
     staticItems?: MenuItem[]; // For purely static menus
@@ -55,12 +57,32 @@ const MUSIC_MENU: MenuItem[] = [
     { label: "Artists", type: 'navigation', target: 'artists' },
     { label: "Albums", type: 'navigation', target: 'albums' },
     { label: "Songs", type: 'navigation', target: 'songs' },
+    { label: "Songs", type: 'navigation', target: 'songs' },
     { label: "Current Queue", type: 'navigation', target: 'queue' },
+    { label: "Lyrics", type: 'action', data: { id: 'lyrics', name: 'Lyrics' }, action: () => { } }, // Action handled in handleSelect
 ];
 
 
 
-export function IPod() {
+interface IPodProps {
+    onSwitchToDesktop?: () => void;
+}
+
+export function IPod({ onSwitchToDesktop }: IPodProps) {
+    return (
+        <>
+            <style jsx global>{`
+                @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+                .font-vietnam { font-family: 'Be Vietnam Pro', sans-serif; }
+                .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }
+            `}</style>
+            <IPodContent onSwitchToDesktop={onSwitchToDesktop} />
+        </>
+    );
+}
+
+function IPodContent({ onSwitchToDesktop }: IPodProps) {
     const {
         play, pause, togglePlay, next, prev,
         volume, setVolume,
@@ -71,16 +93,17 @@ export function IPod() {
         queue, currentIndex,
         sleepTimer, setSleepTimer,
         crossfadeDuration, setCrossfadeDuration,
-        stopAtEndOfSong, setStopAtEndOfSong
+        stopAtEndOfSong, setStopAtEndOfSong,
+        bitrate, setBitrate
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [viewStack, setViewStack] = useState<ViewState[]>([
-        { id: 'main', title: "TFI Stereo", viewType: 'menu', selectedIndex: 0, staticItems: MAIN_MENU }
+        { id: 'main', title: "Melora", viewType: 'menu', selectedIndex: 0, staticItems: MAIN_MENU }
     ]);
     const [clickSounds, setClickSounds] = useState(true);
-    const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark'>('classic');
+    const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush'>('classic');
     const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume'); // Toggle for Player view
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -91,6 +114,29 @@ export function IPod() {
         setClickSounds(settings.clickSounds);
         setIpodTheme(settings.theme);
     }, [setVolume]);
+
+    // Dynamic Meta Theme Color for Mobile Browsers
+    useEffect(() => {
+        const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        let color = '#000000';
+        switch (ipodTheme) {
+            case 'silver': color = '#d1d5db'; break;
+            case 'classic': color = '#f5f5f5'; break;
+            case 'blue': color = '#1676f3'; break;
+            case 'rosegold': color = '#e5b1a3'; break;
+            case 'blush': color = '#f9dce7'; break;
+            case 'dark': color = '#101922'; break;
+            case 'black': color = '#111111'; break;
+        }
+        if (metaThemeColor) {
+            metaThemeColor.setAttribute('content', color);
+        } else {
+            const meta = document.createElement('meta');
+            meta.name = 'theme-color';
+            meta.content = color;
+            document.head.appendChild(meta);
+        }
+    }, [ipodTheme]);
 
     // Initial State
 
@@ -138,6 +184,122 @@ export function IPod() {
     // Compute Menu Items Dynamically based on Current View ID & Context
     // Removed useMemo to ensure closures (like playSongNow) are always fresh. 
     // This prevents stale state issues where actions use old versions of 'mixes'.
+    // --- Actions Actions ---
+
+    // Updated Navigation Handler
+    const handleNavigation = useCallback((target: string, data?: any, titleOverride?: string) => {
+        let newView: ViewState = {
+            id: target,
+            title: titleOverride || target.charAt(0).toUpperCase() + target.slice(1),
+            selectedIndex: 0,
+            viewType: 'menu',
+            data: data
+        };
+
+        if (target === 'search') {
+            newView.viewType = 'search';
+            newView.title = 'Search';
+            newView.searchQuery = "";
+            newView.staticItems = []; // Results go here
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 50);
+        }
+
+        setViewStack(prev => [...prev, newView]);
+    }, []);
+
+    const goToNowPlaying = useCallback(() => {
+        setViewStack(prev => [...prev, { id: 'now-playing', title: 'Now Playing', viewType: 'player', selectedIndex: 0 }]);
+    }, []);
+
+    const handleBack = useCallback(() => {
+        // We need access to current state, but using functional updates or refs might be cleaner
+        // However, viewStack is state.
+        // To avoid stale closures without adding viewStack to dependency (which changes often),
+        // we can use the callback form of setViewStack carefully,
+        // BUT we need to check 'currentView'. which is derived from viewStack.
+
+        setViewStack(prev => {
+            if (prev.length <= 1) return prev;
+            const current = prev[prev.length - 1];
+
+            // Cover Flow Logic
+            if (current.viewType === 'cover-flow' && current.isFlipped) {
+                const newStack = [...prev];
+                newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], isFlipped: false };
+                return newStack;
+            }
+
+            return prev.slice(0, prev.length - 1);
+        });
+    }, []);
+
+    const createNewPlaylist = () => {
+        const newId = Date.now().toString();
+        const newMix: Mix = {
+            id: newId,
+            title: `Mix ${mixes.length + 1}`,
+            color: "purple",
+            songs: [],
+            currentSongIndex: 0
+        };
+        addMix(newMix);
+        // Navigate immediately - PASS FULL MIX OBJECT to avoid race condition
+        handleNavigation(`mix-${newId}`, newMix, newMix.title);
+        // Immediately trigger Rename
+        setTimeout(() => goToRename(newMix), 100);
+    };
+
+    const goToRename = (mix: Mix) => {
+        setSearchQuery(mix.title); // Pre-fill with current name
+        setViewStack(prev => [...prev, {
+            id: 'rename',
+            title: 'Rename Playlist',
+            viewType: 'search', // Reuse search layout for input
+            selectedIndex: 0,
+            data: mix.id,
+            staticItems: [{ label: "Press Enter to Save", type: 'action', action: () => { } }]
+        }]);
+        setTimeout(() => inputRef.current?.focus(), 50);
+    };
+
+    const handleDeletePlaylist = (id: string) => {
+        deleteMix(id);
+        handleBack(); // Pop the mix view. The 'playlists' view under it will re-render with the mix gone.
+    };
+
+    const playMixSong = (mixId: string, idx: number) => {
+        loadMix(mixId);
+        updateMix(mixId, { currentSongIndex: idx });
+        // Ensure play
+        if (!isPlaying) play();
+        goToNowPlaying();
+    };
+
+    // Play single song immediate (e.g. from songs list)
+    const playSongNow = useCallback((song: JioSaavnSong) => {
+        // Simplified: Add to On-the-Go and play it
+        // Need access to 'mixes' and 'play' etc.
+        // 'mixes' is from hook, 'play' is from hook.
+        // If we don't include them in dep array, they might be stale?
+        // usePlayback hook values ideally shouldn't change identity too often except simple values.
+        // But 'mixes' might.
+
+        // Ideally we shouldn't use useCallback here if dependencies change often, OR we accept it.
+        // Re-creating this function is fine if it doesn't cause child re-renders.
+        // But it's passed to map functions.
+        const otg = mixes.find(m => m.title === "On-the-Go");
+        if (otg) {
+            updateMix(otg.id, { songs: [song], currentSongIndex: 0 });
+            loadMix(otg.id);
+            play();
+            // We can't call goToNowPlaying() here if it's memoized without adding it to deps
+            setViewStack(prev => [...prev, { id: 'now-playing', title: 'Now Playing', viewType: 'player', selectedIndex: 0 }]);
+        }
+    }, [mixes, updateMix, loadMix, play]);
+
+
     // Compute Menu Items Dynamically based on Current View ID & Context
     // Memoized to prevent heavy recalculation on scroll (selectedIndex change)
     const currentMenuItems: MenuItem[] = useMemo(() => {
@@ -183,6 +345,16 @@ export function IPod() {
                         target: 'theme-settings'
                     },
                     {
+                        label: `Audio Quality: ${bitrate}kbps`,
+                        type: 'navigation',
+                        target: 'quality-settings'
+                    },
+                    ...(onSwitchToDesktop ? [{
+                        label: "Switch to Studio Deck",
+                        type: 'action',
+                        action: onSwitchToDesktop
+                    }] : []),
+                    {
                         label: "Backup Playlists",
                         type: 'action',
                         action: () => {
@@ -203,7 +375,7 @@ export function IPod() {
                             const url = URL.createObjectURL(dataBlob);
                             const link = document.createElement('a');
                             link.href = url;
-                            link.download = `tfi-stereo-playlists-${new Date().toISOString().split('T')[0]}.json`;
+                            link.download = `melora-playlists-${new Date().toISOString().split('T')[0]}.json`;
                             link.click();
                             URL.revokeObjectURL(url);
 
@@ -238,14 +410,27 @@ export function IPod() {
                     'classic': 'Classic (White)',
                     'black': 'Black',
                     'silver': 'Silver',
-                    'dark': 'Dark'
+                    'dark': 'Dark',
+                    'blue': 'Blue (Mini)',
+                    'rosegold': 'Rose Gold (Luxury)',
+                    'blush': 'Floral Blush'
                 };
-                return (['classic', 'black', 'silver', 'dark'] as const).map(theme => ({
+                return (['classic', 'black', 'silver', 'dark', 'blue', 'rosegold', 'blush'] as const).map(theme => ({
                     label: `${themeNames[theme]}${ipodTheme === theme ? ' ✓' : ''}`,
                     type: 'action',
                     action: () => {
                         setIpodTheme(theme);
                         saveSettings({ theme });
+                    }
+                }));
+
+            case 'quality-settings':
+                const qualities = ['320', '160', '96', '48', '12'] as const;
+                return qualities.map(q => ({
+                    label: `${q} kbps ${q === '320' ? '(High)' : ''}${bitrate === q ? ' ✓' : ''}`,
+                    type: 'action',
+                    action: () => {
+                        setBitrate(q);
                     }
                 }));
 
@@ -602,34 +787,9 @@ export function IPod() {
     }, [currentView.id, currentView.data, currentView.staticItems, mixes, volume, clickSounds, ipodTheme, shuffle, repeat, sleepTimer, crossfadeDuration]);
 
     // Actions
-    const createNewPlaylist = () => {
-        const newId = Date.now().toString();
-        const newMix: Mix = {
-            id: newId,
-            title: `Mix ${mixes.length + 1}`,
-            color: "purple",
-            songs: [],
-            currentSongIndex: 0
-        };
-        addMix(newMix);
-        // Navigate immediately - PASS FULL MIX OBJECT to avoid race condition
-        handleNavigation(`mix-${newId}`, newMix, newMix.title);
-        // Immediately trigger Rename
-        setTimeout(() => goToRename(newMix), 100);
-    };
 
-    const goToRename = (mix: Mix) => {
-        setSearchQuery(mix.title); // Pre-fill with current name
-        setViewStack(prev => [...prev, {
-            id: 'rename',
-            title: 'Rename Playlist',
-            viewType: 'search', // Reuse search layout for input
-            selectedIndex: 0,
-            data: mix.id,
-            staticItems: [{ label: "Press Enter to Save", type: 'action', action: () => { } }]
-        }]);
-        setTimeout(() => inputRef.current?.focus(), 50);
-    };
+
+
 
     const handleRenameSubmit = (newName: string) => {
         const mixId = currentView.data;
@@ -639,18 +799,9 @@ export function IPod() {
         }
     };
 
-    const handleDeletePlaylist = (id: string) => {
-        deleteMix(id);
-        handleBack(); // Pop the mix view. The 'playlists' view under it will re-render with the mix gone.
-    };
 
-    const playMixSong = (mixId: string, idx: number) => {
-        loadMix(mixId);
-        updateMix(mixId, { currentSongIndex: idx });
-        // Ensure play
-        if (!isPlaying) play();
-        goToNowPlaying();
-    };
+
+
 
     const handleScroll = (direction: number) => {
         // Volume Settings Screen
@@ -736,33 +887,9 @@ export function IPod() {
     // --- Actions Actions ---
 
     // Updated Navigation Handler
-    const handleNavigation = (target: string, data?: any, titleOverride?: string) => {
-        let newView: ViewState = {
-            id: target,
-            title: titleOverride || target.charAt(0).toUpperCase() + target.slice(1),
-            selectedIndex: 0,
-            viewType: 'menu',
-            data: data
-        };
 
-        if (target === 'search') {
-            newView.viewType = 'search';
-            newView.title = 'Search';
-            newView.searchQuery = "";
-            newView.staticItems = []; // Results go here
-            setTimeout(() => {
-                inputRef.current?.focus();
-            }, 50);
-        }
 
-        setViewStack(prev => [...prev, newView]);
-    };
-
-    const goToNowPlaying = () => {
-        setViewStack(prev => [...prev, { id: 'now-playing', title: 'Now Playing', viewType: 'player', selectedIndex: 0 }]);
-    };
-
-    const handleSearch = async (query: string) => {
+    const handleSearch = useCallback(async (query: string) => {
         // Reuse for Rename Logic
         if (currentView.id === 'rename') {
             handleRenameSubmit(query);
@@ -794,52 +921,12 @@ export function IPod() {
             setIsLoading(false);
             inputRef.current?.blur();
         }
-    };
-
-    const playSongNow = (song: JioSaavnSong) => {
-        // If we have an active mix, checks if it's the "On-the-Go" one or another
-        // Actually, for "Play Now" behavior from search, users typically expect it to JUST play that song,
-        // effectively replacing the queue or starting a new one.
-        // But to keep it iPod-like, we use "On-the-Go".
-
-        // 1. Check if "On-the-Go" exists (Case insensitive check for robustness)
-        const otgMix = mixes.find(m => m.title.trim().toLowerCase() === "on-the-go");
-
-        if (otgMix) {
-            // Reuse existing OTG
-            // Check for duplicate
-            const existingIndex = otgMix.songs.findIndex(s => s.id === song.id);
-
-            if (existingIndex !== -1) {
-                // Song Exists -> Just Play It
-                updateMix(otgMix.id, { currentSongIndex: existingIndex });
-            } else {
-                // Append
-                const newSongs = [...otgMix.songs, song];
-                updateMix(otgMix.id, { songs: newSongs, currentSongIndex: newSongs.length - 1 });
-            }
-
-            loadMix(otgMix.id); // Switch context to OTG
-            if (!isPlaying) play();
-        } else {
-            // Create new OTG
-            const newMixId = Date.now().toString();
-            const newMix: Mix = {
-                id: newMixId,
-                title: "On-the-Go",
-                color: "orange",
-                songs: [song],
-                currentSongIndex: 0
-            };
-            addMix(newMix);
-            loadMix(newMixId);
-            if (!isPlaying) play(); // Ensure play for new mix
-        }
-        goToNowPlaying();
-    };
+    }, [currentView.id, handleRenameSubmit, setIsLoading, searchSongs, setViewStack, inputRef]);
 
 
-    const handleSelect = () => {
+
+
+    const handleSelect = useCallback(() => {
         // Special handling for Player View: Toggle Scrub/Volume
         if (currentView.viewType === 'player' || currentView.viewType === 'cinema') {
             if (controlMode === 'volume') {
@@ -912,46 +999,67 @@ export function IPod() {
                     selectedIndex: 0,
                     data: { id: 'music-quiz' }
                 }]);
-            } else if (selectedItem.action) {
-                selectedItem.action();
+
+            } else if (selectedItem.data?.id === 'parachute-game') {
+                // Navigate to Parachute Game
+                setViewStack(prev => [...prev, {
+                    id: 'parachute-game',
+                    title: 'Parachute',
+                    viewType: 'game',
+                    selectedIndex: 0,
+                    data: { id: 'parachute-game' }
+                }]);
+            } else if (selectedItem.data?.id === 'lyrics') {
+                if (!currentSong) {
+                    alert("No song playing!");
+                    return;
+                }
+                setIsLoading(true);
+                getLyrics(currentSong.id).then(lyrics => {
+                    setIsLoading(false);
+                    setViewStack(prev => [...prev, {
+                        id: 'lyrics',
+                        title: 'Lyrics',
+                        viewType: 'lyrics',
+                        selectedIndex: 0,
+                        data: {
+                            id: 'lyrics',
+                            message: lyrics || "No lyrics found."
+                        }
+                    }]);
+                });
             } else if (selectedItem.type === 'navigation' && selectedItem.target) {
                 handleNavigation(selectedItem.target, selectedItem.data, selectedItem.label);
             }
         }
-    };
+    }, [currentView, controlMode, currentMenuItems, mixes, currentSong, playSongNow, goToNowPlaying, handleNavigation]);
 
 
 
 
-    const handleBack = () => {
-        // If in cover-flow and flipped, unflip first before going back
-        if (currentView.viewType === 'cover-flow' && currentView.isFlipped) {
-            setViewStack(prev => {
-                const newStack = [...prev];
-                newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], isFlipped: false };
-                return newStack;
-            });
-            return; // Don't navigate back yet
-        }
 
-        // Otherwise, normal back navigation
-        if (viewStack.length > 1) {
-            setViewStack(prev => prev.slice(0, prev.length - 1));
-        }
-    };
 
     // Theme-based styling
     const getThemeClasses = () => {
         switch (ipodTheme) {
             case 'black':
-                // Glossy Black (U2 Edition / Video style) - Removed harsh white insets
-                return 'bg-gradient-to-b from-[#2a2a2a] via-[#111] to-[#050505] border-[#1a1a1a] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]';
+                // Glossy Black (U2 / Video)
+                return 'bg-gradient-to-b from-[#2a2a2a] via-[#111] to-[#050505] border-[#1a1a1a] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.1)]';
             case 'silver':
-                // Anodized Aluminum (Classic 6G/7G style) - Smoother metal look
-                return 'bg-gradient-to-b from-[#f0f0f0] via-[#dca] to-[#b0b0b0] border-[#b0b0b0] shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)]';
+                // EXACT MATCH: Modern iPod Silver Aluminum Edition
+                return 'bg-gradient-to-br from-[#e5e7eb] via-[#d1d5db] to-[#9ca3af] border-[#e5e7eb] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]';
+            case 'blue':
+                // iPod Mini Blue Edition
+                return 'bg-[linear-gradient(to_right,#0a4da5_0%,#1676f3_15%,#2b87ff_50%,#1676f3_85%,#0a4da5_100%)] border-white/20 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5),inset_0_0_40px_rgba(0,0,0,0.3)]';
+            case 'rosegold':
+                // Rose Gold Luxury Edition
+                return 'bg-[linear-gradient(135deg,#f4d0c5_0%,#e5b1a3_25%,#f9e3dc_45%,#d49a89_65%,#e5b1a3_100%)] bg-[length:200%_200%] border-white/30 shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6),inset_0_1px_3px_rgba(255,255,255,0.9),inset_0_-2px_6px_rgba(0,0,0,0.3)]';
+            case 'blush':
+                // Floral Blush iPod Edition
+                return 'bg-[#f9dce7] border-white/40 border-[8px] shadow-2xl shadow-[inset_0_0_40px_rgba(242,54,132,0.1),0_10px_30px_rgba(0,0,0,0.05)]';
             case 'dark':
                 // Modern Matte Dark - Deep and flat
-                return 'bg-[#181818] border-[#222] shadow-[inset_0_1px_2px_rgba(255,255,255,0.03)]';
+                return 'bg-[#101922] border-[#1e2329] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.6),inset_0_1px_2px_rgba(255,255,255,0.05)]';
             case 'classic':
             default:
                 // Classic Polycarbonate White (Glossy) - Clean ceramic look
@@ -959,23 +1067,67 @@ export function IPod() {
         }
     };
 
-    return (
-        <div className="fixed inset-0 flex items-center justify-center bg-zinc-900 p-4 overflow-hidden pointer-events-none">
+    const getScreenClasses = () => {
+        switch (ipodTheme) {
+            case 'blue':
+                return 'border-[#083a7a] bg-[#bcd4e6] shadow-[inset_2px_2px_10px_rgba(0,0,0,0.2)]';
+            case 'rosegold':
+                return 'border-none bg-black shadow-[inset_0_2px_15px_rgba(0,0,0,0.3)]';
+            case 'blush':
+                return 'border-white/30 bg-white/20 shadow-inner';
+            case 'dark':
+                return 'border-[#1e2329] bg-black shadow-inner';
+            default:
+                return 'border-[#333] bg-black shadow-inner';
+        }
+    };
 
-            {/* iPod Case */}
+    return (
+        <div className={`flex flex-col items-center justify-center select-none w-full h-full min-h-screen ${ipodTheme === 'blue' ? 'font-jakarta' : 'font-vietnam'}`}>
             <motion.div
-                className={`relative w-full max-w-[450px] aspect-[1/1.65] ${getThemeClasses()} rounded-[3.5rem] shadow-2xl flex flex-col items-center p-6 border-[6px] ring-1 ring-black/5 will-change-transform contain-layout pointer-events-auto select-none touch-manipulation`}
-                style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                className={`relative w-full max-w-[370px] aspect-[9/16] rounded-[3rem] ${getThemeClasses()} p-5 flex flex-col ring-1 ring-black/10 select-none touch-manipulation my-auto transition-all duration-500`}
+                style={{
+                    WebkitTapHighlightColor: 'transparent',
+                    WebkitTouchCallout: 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none'
+                }}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 260, damping: 20 }}
             >
                 {/* Metallic Sheen (CSS only, no heavy blends) */}
                 <div className="absolute inset-0 rounded-[2.6rem] bg-gradient-to-tr from-transparent via-white/40 to-transparent pointer-events-none" />
 
-                {/* Screen Area (Top 48%) - Made Bigger */}
+                {/* Floral Decorations (Blush Theme Only) */}
+                {ipodTheme === 'blush' && (
+                    <>
+                        <div className="absolute top-0 left-0 w-32 h-32 opacity-60 pointer-events-none z-0">
+                            <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
+                                <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
+                                <circle cx="15" cy="45" fill="#f23684" fillOpacity="0.15" r="12"></circle>
+                            </svg>
+                        </div>
+                        <div className="absolute top-0 right-0 w-32 h-32 rotate-90 opacity-60 pointer-events-none z-0">
+                            <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
+                                <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
+                                <circle cx="15" cy="45" fill="#f23684" fillOpacity="0.15" r="12"></circle>
+                            </svg>
+                        </div>
+                        <div className="absolute bottom-[-10px] right-[-10px] w-24 h-24 rotate-180 opacity-40 pointer-events-none z-0">
+                            <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
+                                <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
+                            </svg>
+                        </div>
+                    </>
+                )}
+
+                {/* Screen Area (Top 48%) - Dynamic Border/Background */}
                 <div
-                    className="w-full h-[48%] bg-black rounded-lg border-[3px] border-[#333] shadow-inner mb-4 overflow-hidden relative z-10"
+                    className={`w-full h-[48%] rounded-lg border-[3px] mb-4 overflow-hidden relative z-10 ${getScreenClasses()}`}
                     onClick={() => {
                         // If in search mode, tapping screen focuses input
                         if (currentView.viewType === 'search') inputRef.current?.focus();
@@ -1061,6 +1213,7 @@ export function IPod() {
                         }>
                             <div className="absolute inset-0 z-50 bg-black">
                                 {currentView.data?.id === 'brick-game' && <BrickGame onBack={handleBack} />}
+                                {currentView.data?.id === 'parachute-game' && <ParachuteGame onBack={handleBack} isActive={true} />}
                                 {currentView.data?.id === 'music-quiz' && <MusicQuiz onBack={handleBack} />}
                             </div>
                         </Suspense>
@@ -1069,7 +1222,7 @@ export function IPod() {
 
                 {/* Branding */}
                 <div className="w-full flex justify-center items-center mb-6 relative z-10">
-                    <span className={`text-[10px] font-bold tracking-[0.2em] font-sans ${ipodTheme === 'black' || ipodTheme === 'dark' ? 'text-white/20' : 'text-zinc-500/80'}`}>TFI STEREO</span>
+                    <span className={`text-[10px] font-bold tracking-[0.2em] font-sans ${ipodTheme === 'black' || ipodTheme === 'dark' ? 'text-white/20' : 'text-zinc-500/80'}`}>MELORA</span>
                 </div>
                 {/* Glass Reflection */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-50 pointer-events-none" />
@@ -1119,3 +1272,4 @@ export function IPod() {
 
     );
 }
+

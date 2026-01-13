@@ -1,3 +1,4 @@
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import CryptoJS from 'crypto-js';
 
 export interface JioSaavnSong {
@@ -38,25 +39,40 @@ export interface SearchResponse {
 
 const DES_KEY = '38346591';
 
-export async function searchSongs(query: string): Promise<JioSaavnSong[]> {
+const isElectron = typeof window !== 'undefined' && /Electron/i.test(window.navigator.userAgent);
+
+export async function searchSongs(query: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
     try {
-        const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
-        const data: SearchResponse = await response.json();
+        console.log(`[Search] Query: "${query}", Mode: ${isElectron ? 'ELECTRON' : 'WEB'}`);
+        let data: any;
 
+        if (Capacitor.isNativePlatform()) {
+            // 🚀 NATIVE MODE (Android/iOS): Direct fetch via CapacitorHttp
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            // 🚀 ELECTRON MODE (Windows/Mac): Direct fetch (CORS disabled)
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        } else {
+            // 🐢 WEB MODE (Browser): Use Next.js Proxy
+            const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`);
+            data = await response.json();
+        }
+
+        let list = [];
         if (data.results) {
-            // V4 API returns results in 'results' key.
-            const list = Array.isArray(data.results) ? data.results : [];
-            if (list.length > 0) console.log("Search Result Item Sample:", list[0]);
+            list = Array.isArray(data.results) ? data.results : [];
+        } else if (Array.isArray(data)) {
+            list = data;
+        }
 
+        if (list.length > 0) {
             return list.map((item: any) => {
-                // V4 API Field Mapping
-                // DEBUG: If title is missing, show available keys to diagnose
-                const title = item.title || item.name || item.song || `[DEBUG_KEYS: ${Object.keys(item).join(',')}]`;
+                const title = item.title || item.name || item.song || `[Unknown]`;
                 const encryptedUrl = item.more_info?.encrypted_media_url || item.encrypted_media_url || "";
-
-                if (!encryptedUrl) {
-                    console.warn("Missing Encrypted Media URL for:", title, item);
-                }
 
                 return {
                     id: item.id,
@@ -87,10 +103,6 @@ export async function searchSongs(query: string): Promise<JioSaavnSong[]> {
                     downloadUrl: [],
                     encryptedMediaUrl: encryptedUrl
                 };
-            }).sort((a: any, b: any) => {
-                const yearA = parseInt(a.year || '0');
-                const yearB = parseInt(b.year || '0');
-                return yearB - yearA;
             });
         }
         return [];
@@ -116,7 +128,7 @@ export function decryptUrl(encryptedUrl: string): string {
     return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
-export function getHighQualityUrl(song: JioSaavnSong): string {
+export function getAudioUrl(song: JioSaavnSong, bitrate: '320' | '160' | '96' | '48' | '12' = '320'): string {
     if (!song.encryptedMediaUrl) {
         console.warn("No encrypted media URL found for song:", song.name);
         return '';
@@ -124,8 +136,8 @@ export function getHighQualityUrl(song: JioSaavnSong): string {
 
     try {
         const decryptedUrl = decryptUrl(song.encryptedMediaUrl);
-        // Force 320kbps by replacing various quality suffixes
-        return decryptedUrl.replace(/_(160|96|48|12)\./g, '_320.');
+        // Replace suffix with requested bitrate
+        return decryptedUrl.replace(/_(160|96|48|12)\./g, `_${bitrate}.`);
     } catch (e) {
         console.warn('Failed to decrypt URL for song:', song.name, e);
         return '';
@@ -145,8 +157,19 @@ export function getThumbnailUrl(song: JioSaavnSong): string {
 
 export async function getLyrics(songId: string): Promise<string | null> {
     try {
-        const response = await fetch(`/api/lyrics?id=${songId}`);
-        const data = await response.json();
+        let data: any;
+        if (Capacitor.isNativePlatform()) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        } else {
+            const response = await fetch(`/api/lyrics?id=${songId}`);
+            data = await response.json();
+        }
 
         if (data.lyrics) {
             // JioSaavn returns lyrics with <br> tags, replace them with newlines
@@ -187,14 +210,29 @@ export async function getLyricsWithFallback(song: JioSaavnSong): Promise<string 
 
 export async function getSongDetails(songId: string): Promise<JioSaavnSong | null> {
     try {
-        const response = await fetch(`/api/song?id=${songId}`);
-        const data = await response.json();
+        let data: any;
+
+        if (Capacitor.isNativePlatform()) {
+            // 🚀 NATIVE MODE: Direct fetch to JioSaavn (Bypasses Proxy)
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            // 🚀 ELECTRON MODE: Direct fetch
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        } else {
+            // 🐢 WEB MODE: Use Next.js Proxy
+            const response = await fetch(`/api/song?id=${songId}`);
+            data = await response.json();
+        }
 
         // JioSaavn returns an object where keys are IDs, or sometimes a list
         // We need to handle the specific format for song.getDetails
-        const songData = data[songId];
+        const songData = data[songId] || (data.songs && data.songs[0]) || data;
 
-        if (songData) {
+        if (songData && (songData.id || songData.song)) {
             return {
                 id: songData.id,
                 name: songData.song || songData.title || songData.name || "Unknown Details Title",

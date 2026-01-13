@@ -12,7 +12,17 @@ export function useIsMobile() {
             // iPadOS 13+ often reports as Macintosh with maxTouchPoints > 1
             const isIPad = (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
 
-            setIsMobile(window.innerWidth < 1024 || isMobileUA || isIPad);
+            // User Request: If Landscape, show Studio UI (Desktop Mode)
+            // If Portrait, show iPod UI (Mobile Mode)
+            const isLandscape = window.innerWidth > window.innerHeight;
+
+            if (isLandscape) {
+                // Force Desktop UI in Landscape
+                setIsMobile(false);
+            } else {
+                // Standard Mobile Check in Portrait
+                setIsMobile(window.innerWidth < 1024 || isMobileUA || isIPad);
+            }
         };
 
         // Initial check

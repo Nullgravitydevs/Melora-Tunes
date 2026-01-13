@@ -5,9 +5,10 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { CinemaModeMobile as CinemaMode } from "@/components/scene/cinema-mode-mobile";
 import { CoverFlowMobile as CoverFlow } from "@/components/scene/cover-flow-mobile";
+import { ParachuteGame } from "./games/ParachuteGame";
 
 interface IpodScreenProps {
-    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game';
+    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game' | 'lyrics';
     title: string;
     menuItems: string[]; // List of labels to display
     itemsData?: any[]; // Optional rich data for items (images etc)
@@ -33,6 +34,8 @@ interface IpodScreenProps {
     shuffle?: boolean;
     repeat?: 'off' | 'one' | 'all';
     isLocked?: boolean;
+    lyrics?: string | null;
+    scrollDirection?: 'left' | 'right' | null;
 }
 
 export function IpodScreen({
@@ -61,7 +64,9 @@ export function IpodScreen({
     controlMode,
     shuffle,
     repeat,
-    isLocked
+    isLocked,
+    lyrics,
+    scrollDirection
 }: IpodScreenProps) {
 
     // Format helper
@@ -195,6 +200,14 @@ export function IpodScreen({
                     <div className="w-full h-full flex items-center justify-center p-6 text-center">
                         <p className="text-sm font-medium text-zinc-400 leading-relaxed">{message}</p>
                     </div>
+                ) : variant === 'lyrics' ? (
+                    <div className="w-full h-full bg-black overflow-y-auto scrollbar-hide">
+                        <div className="p-4 min-h-full flex items-center justify-center">
+                            <pre className="whitespace-pre-wrap font-sans text-center text-xs text-zinc-300 leading-loose">
+                                {lyrics || "No lyrics available."}
+                            </pre>
+                        </div>
+                    </div>
                 ) : variant === 'cinema' ? (
                     <div className="w-full h-full bg-black">
                         <CinemaMode
@@ -213,6 +226,18 @@ export function IpodScreen({
                             isFlipped={isFlipped}
                             trackIndex={trackIndex}
                         />
+                    </div>
+                ) : variant === 'game' ? (
+                    <div className="w-full h-full bg-black">
+                        {/* We assume Parachute is the only game for now, or use title to switch */}
+                        {title === 'Parachute' && (
+                            <ParachuteGame
+                                isActive={true}
+                                onBack={onBack}
+                                scrollDirection={scrollDirection}
+                                onSelect={() => onItemSelect?.(0)} // Center button trigger
+                            />
+                        )}
                     </div>
                 ) : variant === 'search' ? (
                     <div className="flex flex-col h-full bg-black">
@@ -410,7 +435,7 @@ export function IpodScreen({
                             <div className="flex-1 flex flex-col justify-center text-left overflow-hidden min-w-0">
                                 <h2 className="text-white font-bold text-xs truncate leading-snug mb-0.5 drop-shadow-md">{decodeHtml(currentSong?.name || "No Music")}</h2>
                                 <p className="text-zinc-300 text-[10px] truncate mb-0.5">{decodeHtml(currentSong?.primaryArtists || "Unknown Artist")}</p>
-                                <p className="text-zinc-500 text-[9px] truncate mb-2">{decodeHtml(currentSong?.album?.name || "TFI Stereo")}</p>
+                                <p className="text-zinc-500 text-[9px] truncate mb-2">{decodeHtml(currentSong?.album?.name || "Melora")}</p>
 
                                 {/* Progress Bar */}
                                 <div className="w-full mt-1">

@@ -18,3 +18,13 @@ body {
   color: var(--color-retro-white);
   font-family: var(--font-sans);
 }
+
+/* Hide Next.js Dev Indicator (Compiling...) to reduce visual noise */
+[data-nextjs-toast] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+#next-route-announcer {
+  display: none !important;
+}

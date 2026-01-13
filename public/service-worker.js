@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'tfi-music-v1';
+const CACHE_NAME = 'melora-music-v1';
 
 self.addEventListener('install', (event) => {
     self.skipWaiting();

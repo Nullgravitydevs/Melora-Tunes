@@ -1,7 +1,8 @@
 export interface AppSettings {
     volume: number;
     clickSounds: boolean;
-    theme: 'classic' | 'black' | 'silver' | 'dark';
+    theme: 'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush';
+    bitrate: '320' | '160' | '96' | '48' | '12';
     lastPlayedSongId: string | null;
     version: string;
 }
@@ -10,11 +11,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     volume: 0.7,
     clickSounds: true,
     theme: 'classic', // White/Classic iPod
+    bitrate: '320', // Default to High Quality
     lastPlayedSongId: null,
     version: '2.0.0'
 };
 
-const STORAGE_KEY = 'tfi-stereo-settings';
+const STORAGE_KEY = 'melora-settings';
 
 export function loadSettings(): AppSettings {
     if (typeof window === 'undefined') return DEFAULT_SETTINGS;

@@ -87,7 +87,7 @@ export function InstallPrompt() {
                                     <img src="/install-icon.png" alt="Install" className="w-full h-full object-contain" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="font-bold text-white text-sm uppercase tracking-wider">TFI Stereo</span>
+                                    <span className="font-bold text-white text-sm uppercase tracking-wider">Melora</span>
                                     <span className="text-[10px] text-gray-400 font-mono">App Available</span>
                                 </div>
                             </div>

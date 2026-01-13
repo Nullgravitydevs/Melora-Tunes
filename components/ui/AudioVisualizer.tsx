@@ -10,9 +10,9 @@ interface AudioVisualizerProps {
 
 export function AudioVisualizer({ audioElement, isPlaying, compact = false }: AudioVisualizerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const animationRef = useRef<number>();
-    const analyzerRef = useRef<AnalyserNode>();
-    const audioContextRef = useRef<AudioContext>();
+    const animationRef = useRef<number | null>(null);
+    const analyzerRef = useRef<AnalyserNode | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
 
     useEffect(() => {
         if (!audioElement || !canvasRef.current) return;
