@@ -577,85 +577,36 @@ export function Stage({ onSwitchToMobile }: StageProps) {
             </div>
 
             {/* Main Content Transformation Wrapper */}
-            <div className="w-full flex flex-col items-center origin-top scale-[0.6] sm:scale-75 md:scale-100 transition-transform">
-                <header className="w-full max-w-6xl flex justify-between items-center mb-12 z-10 relative pointer-events-none">
-                    <motion.div
-                        className="flex items-center gap-3 pointer-events-auto cursor-move"
-                        drag
-                        dragConstraints={containerRef as any}
-                        dragMomentum={false}
-                    >
-                        <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
-                        <h1 className="text-4xl font-retro text-retro-white tracking-tighter pointer-events-none">
-                            Mel<span className="text-retro-white">ora</span>
-                        </h1>
-                    </motion.div>
+            <div className="w-full min-h-screen metal-bg text-gray-900 dark:text-gray-100 font-sans transition-colors duration-300 flex flex-col items-center">
 
-                    <motion.div
-                        className="flex gap-4 items-center pointer-events-auto cursor-move"
-                        drag
-                        dragConstraints={containerRef as any}
-                        dragMomentum={false}
-                        onPointerDown={(e) => e.stopPropagation()}
-                    >
-                        {/* Backup & Restore Controls */}
-                        <div className="flex gap-2 mr-2">
-                            <button
-                                onClick={handleExport}
-                                className="p-2 text-retro-gray hover:text-retro-white hover:bg-white/10 rounded-full transition-colors"
-                                title="Backup Library"
-                            >
-                                <Download size={20} />
-                            </button>
-                            <div className="relative">
-                                <button
-                                    className="p-2 text-retro-gray hover:text-retro-white hover:bg-white/10 rounded-full transition-colors"
-                                    title="Restore Library"
-                                >
-                                    <Upload size={20} />
-                                </button>
-                                <input
-                                    type="file"
-                                    accept=".json"
-                                    onChange={handleImport}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    title="Restore Library"
-                                />
-                            </div>
+                {/* Header */}
+                <header className="w-full max-w-7xl px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4 z-10 relative">
+                    <div className="flex items-center gap-3 select-none">
+                        <div className="w-10 h-6 bg-gray-800 dark:bg-gray-200 rounded-sm relative flex items-center justify-center border-2 border-gray-900 dark:border-white transform -rotate-6">
+                            <div className="w-6 h-2 bg-white dark:bg-black rounded-sm"></div>
                         </div>
+                        <h1 className="font-display text-2xl tracking-tighter text-gray-900 dark:text-white mt-1">
+                            TFI Stereo
+                        </h1>
+                    </div>
 
-                        <button
-                            onClick={() => {
-                                playClick();
-                                setIsSettingsOpen(true);
-                            }}
-                            className="flex items-center gap-2 bg-retro-black border border-retro-gray/50 text-retro-white px-3 py-2 rounded hover:bg-white/10 transition-colors shadow-lg"
-                            title="Settings"
-                        >
-                            <Settings size={20} />
+                    <div className="flex items-center gap-4">
+                        <button className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-white/10 hidden md:block">
+                            <Download size={20} />
                         </button>
-
-                        {onSwitchToMobile && (
-                            <button
-                                onClick={() => {
-                                    playClick();
-                                    onSwitchToMobile?.();
-                                }}
-                                className="flex items-center gap-2 bg-retro-black border border-retro-gray/50 text-retro-white px-3 py-2 rounded hover:bg-white/10 transition-colors shadow-lg"
-                                title="Switch to iPod Mode"
-                            >
-                                <Smartphone size={20} />
-                            </button>
-                        )}
+                        <button className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-white/10 mr-2 hidden md:block">
+                            <Upload size={20} />
+                        </button>
 
                         <button
                             onClick={() => {
                                 setIsCinemaMode(true);
                                 document.documentElement.requestFullscreen().catch(err => console.error("Fullscreen failed:", err));
                             }}
-                            className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded font-bold hover:bg-purple-500 transition-colors shadow-lg"
+                            className="hidden md:flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:scale-95 transition-all uppercase text-sm tracking-wider"
                         >
-                            <Maximize2 size={16} /> <span className="hidden md:inline">CINEMA MODE</span>
+                            <Maximize2 size={18} />
+                            Cinema Mode
                         </button>
 
                         <button
@@ -663,70 +614,71 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                                 setNewMixTitle(`Mixtape Vol. ${mixes.length + 1}`);
                                 setIsModalOpen(true);
                             }}
-                            className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded font-bold hover:bg-orange-500 transition-colors shadow-lg"
+                            className="flex items-center gap-2 bg-gray-100 dark:bg-gray-200 hover:bg-white text-black font-bold py-2 px-4 rounded shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:scale-95 transition-all uppercase text-sm tracking-wider"
                         >
-                            <Plus size={16} /> <span className="hidden md:inline">CREATE MIX</span>
+                            <Plus size={18} />
+                            Create Mix
                         </button>
-                    </motion.div>
+
+                        {onSwitchToMobile && (
+                            <button
+                                onClick={() => {
+                                    playClick();
+                                    onSwitchToMobile();
+                                }}
+                                className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-white/10"
+                                title="Switch to Mobile View"
+                            >
+                                <Smartphone size={20} />
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() => {
+                                playClick();
+                                setIsSettingsOpen(true);
+                            }}
+                            className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-white/10"
+                            title="Settings"
+                        >
+                            <Settings size={20} />
+                        </button>
+                    </div>
                 </header>
 
-                {/* Player Visual */}
-                <div className="flex flex-col md:flex-row gap-12 items-center justify-center w-full max-w-6xl flex-1">
-                    {/* Mixes Grid */}
-                    <div className="flex-1 h-full relative min-h-[400px] w-full">
-                        <motion.h2
-                            className="text-retro-gray text-xl mb-4 font-retro opacity-50 w-fit cursor-move"
-                            drag
-                            dragConstraints={containerRef as any}
-                            dragMomentum={false}
-                        >
-                            YOUR MIXTAPES
-                        </motion.h2>
-                        <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                {/* Main Grid Layout */}
+                <main className="flex-grow w-full max-w-7xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start relative">
+
+                    {/* Left Column: Mixtapes */}
+                    <section className="lg:col-span-7 flex flex-col gap-8">
+                        <h2 className="font-display text-2xl md:text-3xl text-gray-500 dark:text-gray-600 uppercase tracking-widest mb-4 opacity-80 pl-2">
+                            Your Mixtapes
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
                             {mixes.map((mix) => {
                                 if (mix.id === activeMixId) return null;
                                 return (
-                                    <motion.div
-                                        key={mix.id}
-                                        className="relative group cursor-grab active:cursor-grabbing"
-                                        drag
-                                        dragConstraints={containerRef as any}
-                                        dragMomentum={false}
-                                        onDragEnd={(e, info) => handleDragEnd(e, info, mix.id)}
-                                        whileDrag={{ zIndex: 100, scale: 1.05 }}
-                                    >
+                                    <div key={mix.id} className="relative group">
                                         <Cassette
                                             id={mix.id}
                                             title={mix.title}
                                             color={mix.color}
                                             songCount={mix.songs.length}
+                                            drag={true}
+                                            onDragEnd={(e, info) => handleDragEnd(e, info, mix.id)}
                                             className="hover:z-50"
-                                            drag={false} // Disable internal drag, let parent wrapper handle it
                                         />
-                                        {/* Realistic "Tape Tabs" Actions */}
-                                        <div className="absolute -top-3 right-4 flex gap-2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 ease-out z-[40]" onPointerDown={(e) => e.stopPropagation()}>
 
-                                            {/* Edit Tab (Yellow Masking Tape) */}
+                                        {/* Action Tabs - Styled to fit theme */}
+                                        <div className="absolute -top-3 right-4 flex gap-2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 ease-out z-[40]" onPointerDown={(e) => e.stopPropagation()}>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setEditingMix(mix); }}
                                                 className="relative group/btn flex items-center justify-center w-8 h-10 bg-[#fef3c7] shadow-md border-b-2 border-[#dce0c0] hover:-translate-y-1 transition-transform duration-200 origin-bottom rotate-[-2deg] rounded-t-sm"
                                                 title="Edit Mix"
                                             >
-                                                <div className="absolute top-0 w-full h-1 bg-black/5 opacity-20"></div> {/* Tape Texture */}
-                                                <Pencil size={16} className="text-blue-900 opacity-80" strokeWidth={2.5} />
+                                                <Pencil size={16} className="text-blue-900 opacity-80" />
                                             </button>
-
-                                            {/* Share Tab (White Label) */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleLibrarySnapshot(mix); }}
-                                                className="relative group/btn flex items-center justify-center w-8 h-10 bg-[#f4f4f5] shadow-md border-b-2 border-[#d4d4d8] hover:-translate-y-1 transition-transform duration-200 origin-bottom rotate-[1deg] rounded-t-sm"
-                                                title="Share Snapshot"
-                                            >
-                                                <div className="absolute top-0 w-full h-1 bg-black/5 opacity-20"></div>
-                                                <Camera size={16} className="text-zinc-800 opacity-80" strokeWidth={2.5} />
-                                            </button>
-
-                                            {/* Add Songs Tab (Green Sticker) */}
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -736,53 +688,39 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                                                 className="relative group/btn flex items-center justify-center w-8 h-10 bg-[#dcfce7] shadow-md border-b-2 border-[#bbf7d0] hover:-translate-y-1 transition-transform duration-200 origin-bottom rotate-[-1deg] rounded-t-sm"
                                                 title="Add Songs"
                                             >
-                                                <div className="absolute top-0 w-full h-1 bg-black/5 opacity-20"></div>
-                                                <Plus size={16} className="text-green-900 opacity-80" strokeWidth={3} />
+                                                <Plus size={16} className="text-green-900 opacity-80" />
                                             </button>
                                         </div>
-                                    </motion.div>
+                                    </div>
                                 );
                             })}
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="flex-shrink-0 z-20 pointer-events-none">
-                        <motion.div
-                            ref={playerRef}
-                            className="cursor-move pointer-events-auto"
-                            drag
-                            dragConstraints={containerRef as any}
-                            dragMomentum={false}
-                        >
-                            <motion.div
-                                id="cassette-player-node"
-
-                                transition={{ duration: 0.2 }}
-                            >
-                                <DesktopPlayer
-                                    isPlaying={isPlaying}
-                                    hasCassette={!!activeMix}
-                                    cassetteTitle={activeMix?.title}
-                                    cassetteColor={activeMix?.color}
-                                    currentSong={currentSong}
-                                    onPlayToggle={togglePlay}
-                                    onNext={next}
-                                    onPrev={prev}
-                                    volume={volume}
-                                    onVolumeChange={setVolume}
-                                    progress={progress}
-                                    onSeek={handleSeek}
-                                    className="scale-90 md:scale-100 origin-center"
-                                    drag={false} // Disable internal drag, wrapper handles it
-                                    onEject={() => {
-                                        playClick();
-                                        loadMix(""); // Clear active mix
-                                    }}
-                                />
-                            </motion.div>
-                        </motion.div>
-                    </div>
-                </div>
+                    {/* Right Column: Player (Sticky) */}
+                    <section className="lg:col-span-5 sticky top-8 z-20">
+                        <DesktopPlayer
+                            isPlaying={isPlaying}
+                            hasCassette={!!activeMix}
+                            cassetteTitle={activeMix?.title}
+                            cassetteColor={activeMix?.color}
+                            currentSong={currentSong}
+                            onPlayToggle={togglePlay}
+                            onNext={next}
+                            onPrev={prev}
+                            volume={volume}
+                            onVolumeChange={setVolume}
+                            progress={progress}
+                            onSeek={handleSeek}
+                            className="w-full"
+                            drag={false}
+                            onEject={() => {
+                                playClick();
+                                loadMix(""); // Clear active mix
+                            }}
+                        />
+                    </section>
+                </main>
 
                 <div id="snapshot-studio-node" className="absolute top-[-9999px] left-[-9999px] w-[800px] h-[600px] bg-gradient-to-br from-retro-black to-zinc-900 flex items-center justify-center p-12">
                     {snapshotTarget && (
@@ -801,7 +739,7 @@ export function Stage({ onSwitchToMobile }: StageProps) {
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         </div >
     );
 }

@@ -1,67 +1,71 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme inline {
-  --color-retro-black: #111111;
-  --color-retro-gray: #2a2a2a;
-  --color-retro-white: #f0f0f0;
-  --color-retro-orange: #ff6600;
-  --color-retro-purple: #9933ff;
-  --color-retro-green: #00cc66;
-  --color-retro-red: #ff0055;
-  --color-retro-yellow: #ffcc00;
-  --font-sans: var(--font-inter);
-  --font-retro: var(--font-press-start);
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
 }
 
 body {
-  background-color: var(--color-retro-black);
-  color: var(--color-retro-white);
-  font-family: var(--font-sans);
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Hide Next.js Dev Indicator (Compiling...) to reduce visual noise */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* TFI Stereo Custom Textures */
+  .scanlines {
+    background: linear-gradient(to bottom,
+        rgba(255, 255, 255, 0),
+        rgba(255, 255, 255, 0) 50%,
+        rgba(0, 0, 0, 0.1) 50%,
+        rgba(0, 0, 0, 0.1));
+    background-size: 100% 4px;
+    pointer-events: none;
+  }
+
+  .tape-texture {
+    background-image: repeating-linear-gradient(45deg,
+        rgba(0, 0, 0, 0.02) 0px,
+        rgba(0, 0, 0, 0.02) 2px,
+        transparent 2px,
+        transparent 4px);
+  }
+
+  .metal-bg {
+    background-color: #1a1a1a;
+    background-image:
+      radial-gradient(circle at center, rgba(255, 255, 255, 0.03) 0%, transparent 70%),
+      linear-gradient(0deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2));
+  }
+
+  /* Font Utilities for TFI Stereo */
+  .font-display {
+    font-family: var(--font-press-start), cursive;
+  }
+
+  .font-mono {
+    font-family: var(--font-share-tech-mono), monospace;
+  }
+
+  .font-hand {
+    font-family: var(--font-courier-prime), monospace;
+  }
+}
+
+/* Hide Next.js dev indicator */
 [data-nextjs-toast] {
   display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-}
-
-#next-route-announcer {
-  display: none !important;
-}
-
-/* TFI Stereo Custom Styles */
-.scanlines {
-  background: linear-gradient(to bottom,
-      rgba(255, 255, 255, 0),
-      rgba(255, 255, 255, 0) 50%,
-      rgba(0, 0, 0, 0.1) 50%,
-      rgba(0, 0, 0, 0.1));
-  background-size: 100% 4px;
-}
-
-.tape-texture {
-  background-image: repeating-linear-gradient(45deg,
-      rgba(0, 0, 0, 0.02) 0px,
-      rgba(0, 0, 0, 0.02) 2px,
-      transparent 2px,
-      transparent 4px);
-}
-
-.metal-bg {
-  background-image:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.03) 0%, transparent 70%),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2));
-}
-
-.font-display {
-  font-family: var(--font-press-start);
-}
-
-.font-hand {
-  font-family: var(--font-courier-prime);
-}
-
-.font-mono {
-  font-family: var(--font-share-tech-mono);
 }

@@ -13,14 +13,15 @@ interface CassetteProps {
     onDragEnd?: (event: any, info: any, id?: string) => void;
     drag?: boolean;
     dragConstraints?: React.RefObject<Element>;
+    songCount?: number;
 }
 
 const colors = {
-    orange: { body: "#ff6600", label: "#ffcc00", accent: "#ff8800" },
-    purple: { body: "#9933ff", label: "#cc99ff", accent: "#aa55ff" },
-    white: { body: "#e0e0e0", label: "#ffffff", accent: "#cccccc" },
-    green: { body: "#00cc66", label: "#66ff99", accent: "#33dd77" },
-    red: { body: "#ff0055", label: "#ff99aa", accent: "#ff3377" },
+    orange: "#f97316",
+    purple: "#8b5cf6",
+    white: "#e0e0e0",
+    green: "#00cc66",
+    red: "#ff0055",
 };
 
 export const Cassette = memo(function Cassette({
@@ -33,125 +34,84 @@ export const Cassette = memo(function Cassette({
     drag = true,
     dragConstraints,
     songCount = 0,
-}: CassetteProps & { songCount?: number }) {
-    const theme = colors[color];
+}: CassetteProps) {
+    const bgColor = colors[color];
 
     return (
         <motion.div
-            className={clsx(
-                "relative w-64 h-40 cursor-grab active:cursor-grabbing rounded-2xl",
-                className
-            )}
-            style={{
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                transform: 'translateZ(0)',
-                willChange: 'transform'
-            }}
             drag={drag}
             dragConstraints={dragConstraints}
             dragSnapToOrigin
             dragElastic={0.1}
             dragMomentum={false}
-            whileDrag={{
-                zIndex: 50,
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                scale: 1.02
-            }}
             onDragStart={onDragStart}
             onDragEnd={(e, info) => onDragEnd?.(e, info, id)}
+            whileHover={{ y: -4, boxShadow: "0 20px 25px -5px rgba(0,0,0,0.2)" }}
+            transition={{ duration: 0.3 }}
+            className={clsx(
+                "group relative w-full aspect-[3/2] rounded-xl shadow-lg cursor-grab active:cursor-grabbing",
+                "border-t border-l border-white/20 border-b border-r border-black/30 p-3 flex flex-col justify-between",
+                "tape-texture",
+                className
+            )}
+            style={{ backgroundColor: bgColor }}
         >
-            <svg viewBox="0 0 400 250" className="w-full h-full">
-                <defs>
-                    <linearGradient id={`grad-${color}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor={theme.body} />
-                        <stop offset="100%" stopColor={theme.body} stopOpacity="0.8" />
-                    </linearGradient>
-                    <linearGradient id={`shine-${color}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
-                        <stop offset="50%" stopColor="#ffffff" stopOpacity="0.1" />
-                        <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                    </linearGradient>
-                </defs>
-
-                {/* Main Body - NO FILTER for performance */}
-                <rect x="10" y="10" width="380" height="230" rx="15" fill={`url(#grad-${color})`} stroke="#111" strokeWidth="4" />
-
-                {/* Shine overlay */}
-                <rect x="10" y="10" width="380" height="230" rx="15" fill={`url(#shine-${color})`} opacity="0.6" pointerEvents="none" />
-
-                {/* Top area */}
-                <path d="M 60 10 L 340 10 L 320 60 L 80 60 Z" fill="#222" opacity="0.2" />
-
-                {/* Label */}
-                <rect x="80" y="70" width="240" height="100" rx="5" fill="#f5f5dc" opacity="0.95" />
-
-                {/* Title */}
-                <text
-                    x="200"
-                    y="105"
-                    textAnchor="middle"
-                    fontFamily="'Courier New', monospace"
-                    fontSize="18"
-                    fontWeight="bold"
-                    fill="#222"
+            {/* Corner Screws */}
+            {[
+                { top: "8px", left: "8px", rotate: "rotate-45" },
+                { top: "8px", right: "8px", rotate: "-rotate-45" },
+                { bottom: "8px", left: "8px", rotate: "rotate-12" },
+                { bottom: "8px", right: "8px", rotate: "-rotate-12" }
+            ].map((pos, i) => (
+                <div
+                    key={i}
+                    className="absolute w-2 h-2 rounded-full bg-gray-300 shadow-inner flex items-center justify-center"
+                    style={pos}
                 >
-                    {title.length > 12 ? title.substring(0, 12) + "..." : title}
-                </text>
+                    <div className={`w-1 h-0.5 bg-gray-400 ${pos.rotate}`}></div>
+                </div>
+            ))}
 
-                {/* Lines */}
-                <line x1="90" y1="120" x2="310" y2="120" stroke="#ccc" strokeWidth="1" opacity="0.5" />
-                <line x1="90" y1="135" x2="310" y2="135" stroke="#ccc" strokeWidth="1" opacity="0.5" />
-                <line x1="90" y1="150" x2="310" y2="150" stroke="#ccc" strokeWidth="1" opacity="0.5" />
+            {/* Label */}
+            <div className="relative bg-amber-50 mx-4 mt-2 h-32 rounded-sm shadow-sm p-2 transform rotate-0 group-hover:rotate-[0.5deg] transition-transform duration-500 flex flex-col justify-center items-center">
+                <div className="absolute top-0 left-0 w-full h-4 opacity-20" style={{ backgroundColor: bgColor }}></div>
+                <div className="absolute top-2 left-2 font-mono font-bold text-gray-800 text-lg opacity-60">A</div>
+                <h3 className="font-hand font-bold text-xl text-gray-900 tracking-tight">
+                    {title}
+                </h3>
+                <p className="font-mono text-[10px] text-gray-400 absolute bottom-1 uppercase tracking-widest">
+                    TFI Stereo High Bias
+                </p>
+                <div className="w-full h-px bg-gray-200 mt-2 mb-1"></div>
+                <div className="w-full h-px bg-gray-200"></div>
+            </div>
 
-                <text x="200" y="163" textAnchor="middle" fontFamily="'Press Start 2P', monospace" fontSize="8" fill="#666" opacity="0.6">
-                    M
-                </text>
+            {/* Reels Container */}
+            <div className="mx-8 mb-2 h-10 bg-black/20 rounded-full flex items-center justify-between px-4 relative backdrop-blur-sm">
+                {/* Left Reel */}
+                <div className="w-10 h-10 bg-white rounded-full border-4 border-gray-800 flex items-center justify-center group-hover:animate-[spin_4s_linear_infinite]">
+                    <div className="w-8 h-8 rounded-full border-2 border-dashed border-gray-400"></div>
+                    <div className="absolute w-2 h-2 bg-gray-800 rounded-full"></div>
+                    <div className="absolute w-full h-1 bg-transparent border-t-2 border-gray-800 rotate-45"></div>
+                    <div className="absolute w-full h-1 bg-transparent border-t-2 border-gray-800 -rotate-45"></div>
+                </div>
 
-                {/* Reels */}
-                <circle cx="130" cy="200" r="18" fill="#2a2a2a" stroke="#111" strokeWidth="2" />
-                <circle cx="130" cy="200" r="13" fill={theme.accent} opacity="0.7" />
-                <circle cx="130" cy="200" r="6" fill="#fff" />
-                <path d="M 130 188 L 130 212 M 118 200 L 142 200" stroke="#111" strokeWidth="1.5" />
+                {/* Tape Label */}
+                <div className="flex-grow h-6 mx-2 bg-transparent flex items-center justify-center">
+                    <span className="text-[8px] text-white/50 font-mono">TYPE I - 90 MIN</span>
+                </div>
 
-                <circle cx="270" cy="200" r="18" fill="#2a2a2a" stroke="#111" strokeWidth="2" />
-                <circle cx="270" cy="200" r="15" fill={theme.accent} opacity="0.7" />
-                <circle cx="270" cy="200" r="6" fill="#fff" />
-                <path d="M 270 188 L 270 212 M 258 200 L 282 200" stroke="#111" strokeWidth="1.5" />
+                {/* Right Reel */}
+                <div className="w-10 h-10 bg-white rounded-full border-4 border-gray-800 flex items-center justify-center group-hover:animate-[spin_4s_linear_infinite]">
+                    <div className="w-8 h-8 rounded-full border-2 border-dashed border-gray-400"></div>
+                    <div className="absolute w-2 h-2 bg-gray-800 rounded-full"></div>
+                    <div className="absolute w-full h-1 bg-transparent border-t-2 border-gray-800 rotate-45"></div>
+                    <div className="absolute w-full h-1 bg-transparent border-t-2 border-gray-800 -rotate-45"></div>
+                </div>
+            </div>
 
-                {/* Tape */}
-                <rect x="148" y="197" width="104" height="6" fill="#3a2410" opacity="0.6" />
-
-                {/* Screws */}
-                {[
-                    { cx: 30, cy: 30 }, { cx: 370, cy: 30 },
-                    { cx: 30, cy: 220 }, { cx: 370, cy: 220 }
-                ].map((pos, i) => (
-                    <g key={i}>
-                        <circle cx={pos.cx} cy={pos.cy} r="5" fill="#666" stroke="#333" strokeWidth="1" />
-                        <path d={`M ${pos.cx - 3} ${pos.cy - 3} L ${pos.cx + 3} ${pos.cy + 3} M ${pos.cx + 3} ${pos.cy - 3} L ${pos.cx - 3} ${pos.cy + 3}`} stroke="#333" strokeWidth="1.5" />
-                    </g>
-                ))}
-
-                {/* Wear effects */}
-                <g opacity="0.25">
-                    <line x1="50" y1="25" x2="75" y2="40" stroke="#fff" strokeWidth="0.5" opacity="0.5" />
-                    <line x1="330" y1="180" x2="360" y2="200" stroke="#000" strokeWidth="0.5" opacity="0.4" />
-                    <line x1="100" y1="220" x2="130" y2="225" stroke="#fff" strokeWidth="0.5" opacity="0.3" />
-                    <rect x="10" y="10" width="35" height="35" fill="#fff" opacity="0.15" />
-                    <rect x="355" y="195" width="35" height="35" fill="#000" opacity="0.12" />
-                </g>
-
-                {/* Side marker */}
-                <text x="50" y="105" fontFamily="sans-serif" fontSize="24" fontWeight="bold" fill="#111" opacity="0.8">A</text>
-
-                {/* Type */}
-                <text x="200" y="230" textAnchor="middle" fontFamily="sans-serif" fontSize="9" fill="#111" opacity="0.6">
-                    TYPE I - 90 MIN
-                </text>
-            </svg>
-
-            {/* Song Count Badge (Integrated) */}
-            <div className="absolute bottom-3 right-5 bg-black/80 px-2 py-0.5 rounded text-[10px] text-white font-mono pointer-events-none border border-white/20 shadow-sm">
+            {/* Song Count Badge */}
+            <div className="absolute -right-2 top-3/4 bg-black text-white text-xs font-bold py-1 px-3 rounded shadow-md border border-gray-700 z-10">
                 {songCount} SONGS
             </div>
         </motion.div>
