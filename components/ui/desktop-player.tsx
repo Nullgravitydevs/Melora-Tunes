@@ -37,7 +37,7 @@ export interface PlayerProps {
     currentTheme?: ThemeKey;
 }
 
-export type LayoutType = 'cassette' | 'studio' | 'zen' | 'bauhaus';
+export type LayoutType = 'cassette' | 'studio' | 'zen' | 'bauhaus' | 'nordic' | 'opendeck';
 
 export interface ThemeConfig {
     name: string;
@@ -52,17 +52,8 @@ export interface ThemeConfig {
 }
 
 export const THEMES: Record<string, ThemeConfig> = {
-    STITCH: {
-        name: "Stitch Edition",
-        layout: 'cassette',
-        bodyGradient: "bg-white",
-        screenBg: "bg-gray-900",
-        cassetteBg: "bg-gray-100",
-        labelBg: "bg-white",
-        lcdBg: "bg-[#D6F0F9]", // Light cyan/blue LCD
-        buttonBg: "bg-[#478ECC]", // Stitch Blue
-        playButtonBg: "bg-[#2A6BB0]" // Darker Stitch Blue
-    },
+    // STITCH Removed
+
     METAL: {
         name: "Realistic Metal Edition",
         layout: 'studio',
@@ -95,6 +86,28 @@ export const THEMES: Record<string, ThemeConfig> = {
         lcdBg: "bg-neutral-900",
         buttonBg: "bg-white",
         playButtonBg: "bg-[#0052cc]"
+    },
+    NORDIC: {
+        name: "Nordic Noir Minimal",
+        layout: 'nordic',
+        bodyGradient: "bg-[#1a1c20]",
+        screenBg: "bg-[#1a1c20]",
+        cassetteBg: "bg-[#24272b]",
+        labelBg: "bg-[#f0f2f5]",
+        lcdBg: "bg-[#7b8577]",
+        buttonBg: "bg-[#24272b]",
+        playButtonBg: "bg-[#3b82f6]"
+    },
+    OPENDECK: {
+        name: "Zen Open Deck Edition",
+        layout: 'opendeck',
+        bodyGradient: "bg-[#f6f5f4]",
+        screenBg: "bg-[#f6f5f4]",
+        cassetteBg: "bg-white",
+        labelBg: "bg-neutral-100",
+        lcdBg: "bg-neutral-200",
+        buttonBg: "bg-white",
+        playButtonBg: "bg-[#2d8652]"
     }
 };
 
@@ -613,7 +626,7 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
 }
 
 export function DesktopPlayer(props: PlayerProps) {
-    const { currentTheme = 'STITCH' } = props;
+    const { currentTheme = 'ZEN' } = props;
     const theme = THEMES[currentTheme];
 
     if (theme.layout === 'studio') {

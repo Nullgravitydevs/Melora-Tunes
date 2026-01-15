@@ -1,10 +1,12 @@
 "use client";
 
 import { Suspense, useState, useEffect } from 'react';
-import { Stage } from "@/components/scene/stage";
-import { IPod } from "@/components/mobile/IPod";
+import dynamic from 'next/dynamic';
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+
+const WindowsStage = dynamic(() => import("@/components/windows/scenes/stage").then(mod => mod.WindowsStage), { ssr: false });
+const AndroidEntry = dynamic(() => import("@/components/android/AndroidEntry").then(mod => mod.AndroidEntry), { ssr: false });
 
 export default function Home() {
   const isMobileSystem = useIsMobile();
@@ -15,25 +17,23 @@ export default function Home() {
     setMounted(true);
   }, []);
 
-  // UseEffect to reset override when system state changes (e.g. rotation)
-  // This ensures that if the user rotates their device, the UI adapts naturally,
-  // unless they specifically want to force a mode, but rotation usually implies intent to switch view.
+  // Reset override on system change (rotation/resize)
   useEffect(() => {
     setViewModeOverride(null);
   }, [isMobileSystem]);
 
-  if (!mounted) return null; // Prevent hydration mismatch
+  if (!mounted) return null;
 
   const effectiveMode = viewModeOverride || (isMobileSystem ? 'mobile' : 'desktop');
 
   return (
-    <main>
+    <main className="w-full h-full">
       <ErrorBoundary>
-        <Suspense fallback={<div className="min-h-screen bg-retro-black text-retro-white flex items-center justify-center font-mono">LOADING TAPES...</div>}>
+        <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center font-mono">LOADING SYSTEM...</div>}>
           {effectiveMode === 'mobile' ? (
-            <IPod onSwitchToDesktop={() => setViewModeOverride('desktop')} />
+            <AndroidEntry onSwitchToDesktop={() => setViewModeOverride('desktop')} />
           ) : (
-            <Stage onSwitchToMobile={() => setViewModeOverride('mobile')} />
+            <WindowsStage onSwitchToMobile={() => setViewModeOverride('mobile')} />
           )}
         </Suspense>
       </ErrorBoundary>

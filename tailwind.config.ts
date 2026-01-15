@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import typography from "@tailwindcss/typography";
 
 const config: Config = {
     darkMode: "class",
@@ -74,7 +75,21 @@ const config: Config = {
                     purple: "#8b5cf6",
                     orange: "#f97316",
                     dark: "#1f2937",
-                }
+                },
+                zen: {
+                    primary: "#d97706",
+                    bg: { light: "#fcfbf9", dark: "#1c1917" },
+                    surface: { light: "#ffffff", dark: "#292524" },
+                    cassette: { cream: "#f5f5f4", purple: "#8b5cf6" }
+                },
+                nordic: {
+                    primary: "#3b82f6", // Clean glowing blue
+                    bg: "#1a1c20", // Deep matte charcoal
+                    surface: "#24272b", // Lighter charcoal
+                    light: "#f0f2f5", // Light grey
+                    silver: "#9ca3af", // Metallic silver
+                },
+
             },
             borderRadius: {
                 lg: 'var(--radius)',
@@ -83,6 +98,8 @@ const config: Config = {
             }
         }
     },
-    plugins: [],
+    plugins: [
+        typography,
+    ],
 };
 export default config;

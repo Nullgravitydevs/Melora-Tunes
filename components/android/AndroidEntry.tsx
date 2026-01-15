@@ -64,11 +64,11 @@ const MUSIC_MENU: MenuItem[] = [
 
 
 
-interface IPodProps {
+interface AndroidEntryProps {
     onSwitchToDesktop?: () => void;
 }
 
-export function IPod({ onSwitchToDesktop }: IPodProps) {
+export function AndroidEntry({ onSwitchToDesktop }: AndroidEntryProps) {
     return (
         <>
             <style jsx global>{`
@@ -77,12 +77,12 @@ export function IPod({ onSwitchToDesktop }: IPodProps) {
                 .font-vietnam { font-family: 'Be Vietnam Pro', sans-serif; }
                 .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }
             `}</style>
-            <IPodContent onSwitchToDesktop={onSwitchToDesktop} />
+            <AndroidEntryContent onSwitchToDesktop={onSwitchToDesktop} />
         </>
     );
 }
 
-function IPodContent({ onSwitchToDesktop }: IPodProps) {
+function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const {
         play, pause, togglePlay, next, prev,
         volume, setVolume,

@@ -3,8 +3,8 @@ import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume
 import { useEffect, useState } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
-import { CinemaModeMobile as CinemaMode } from "@/components/scene/cinema-mode-mobile";
-import { CoverFlowMobile as CoverFlow } from "@/components/scene/cover-flow-mobile";
+import { CinemaModeMobile as CinemaMode } from "./cinema-mode-mobile";
+import { CoverFlowMobile as CoverFlow } from "./cover-flow-mobile";
 import { ParachuteGame } from "./games/ParachuteGame";
 
 interface IpodScreenProps {

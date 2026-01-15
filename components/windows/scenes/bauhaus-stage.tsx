@@ -1,13 +1,12 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1, Pencil } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Smartphone, Settings, Plus, Maximize2, Pencil } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
-import { decodeHtml } from "@/lib/utils";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 
 interface BauhausStageProps {
@@ -20,9 +19,11 @@ interface BauhausStageProps {
     onOpenSearch?: (mixId: string) => void;
     onCreateMix?: () => void;
     onCinemaMode?: () => void;
+    onOpenThemeSelector?: () => void;
+    onSnapshotMix?: (mix: any) => void;
 }
 
-export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode }: BauhausStageProps) {
+export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector }: BauhausStageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
@@ -31,19 +32,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
     } = usePlayback();
 
     const { playClick, playClunk, playEject } = useAudio();
-    const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+    // const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
     const activeMix = mixes.find(m => m.id === activeMixId) || null;
-
-    // Bauhaus Colors
-    const colors = {
-        primary: "#0052cc", // Blue
-        secondary: "#ff3333", // Red
-        accent: "#ffcc00", // Yellow
-        neutral: "#1a1a1a",
-        bgLight: "#f4f4f0",
-        surface: "#ffffff"
-    };
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -87,32 +78,12 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         {/* Theme Dropdown */}
                         <div className="relative">
                             <button
-                                onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
+                                onClick={() => onOpenThemeSelector?.()}
                                 className="p-3 bg-white border-2 border-[#1a1a1a] hover:bg-gray-100 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
                                 title="Change Theme"
                             >
                                 <Palette size={20} />
                             </button>
-                            {isThemeMenuOpen && (
-                                <div className="absolute right-0 top-full mt-2 bg-white border-2 border-[#1a1a1a] shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] py-2 min-w-[200px] z-50">
-                                    {Object.entries(THEMES).map(([key, theme]) => (
-                                        <button
-                                            key={key}
-                                            onClick={() => {
-                                                onSelectTheme?.(key as ThemeKey);
-                                                setIsThemeMenuOpen(false);
-                                            }}
-                                            className={clsx(
-                                                "w-full px-4 py-3 text-left text-sm hover:bg-[#ffcc00] transition-colors flex items-center gap-2 font-bold uppercase tracking-wider border-b border-gray-100 last:border-0",
-                                                currentTheme === key ? "text-[#0052cc] bg-gray-50" : "text-[#1a1a1a]"
-                                            )}
-                                        >
-                                            {currentTheme === key && <div className="w-2 h-2 bg-[#0052cc] rounded-full"></div>}
-                                            {theme.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
 
                         <button onClick={onOpenSettings} className="p-3 bg-white border-2 border-[#1a1a1a] hover:bg-gray-100 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all">
@@ -161,7 +132,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                             }
                                         }}
                                         onClick={(e) => {
-                                            // Click disabled as per request, drag only
                                             e.stopPropagation();
                                         }}
                                         className={clsx("relative group cursor-grab active:cursor-grabbing hover:z-50", mix.id === activeMixId && "invisible pointer-events-none")}
@@ -173,7 +143,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                 color.bg
                                             )}
                                         >
-                                            {/* Action Buttons - Always Visible now */}
+                                            {/* Action Buttons */}
                                             <div className="absolute top-2 right-2 flex flex-row gap-1 z-20 no-snapshot">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }}
@@ -197,15 +167,12 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                                     link.download = `melora-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
                                                                     link.href = dataUrl;
                                                                     link.click();
-
-                                                                    // Also Copy Link
                                                                     const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                                     navigator.clipboard.writeText(shareUrl);
                                                                     alert("Snapshot Downloading... Link Copied to Clipboard! 📸 clipboard");
                                                                 })
                                                                 .catch((err) => {
                                                                     console.error('Snapshot failed', err);
-                                                                    // Fallback
                                                                     const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                                     navigator.clipboard.writeText(shareUrl);
                                                                     alert('Snapshot failed. Link Copied!');
@@ -241,7 +208,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                             </div>
 
                                             <div className="flex justify-between items-center mt-4 px-2">
-                                                {/* Reels Visual (Static representation) */}
                                                 <div className="flex gap-6 items-center">
                                                     <div className={clsx("w-10 h-10 rounded-full border-4 flex items-center justify-center", index % 3 === 2 ? "border-[#1a1a1a]" : "border-white")}>
                                                         <div className={clsx("w-full h-0.5", index % 3 === 2 ? "bg-[#1a1a1a]" : "bg-white")}></div>
@@ -256,9 +222,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                     </motion.div>
                                 );
                             })}
-
-                            {/* Create New Mix Card */}
-
                         </div>
                     </section>
 
@@ -271,7 +234,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         whileDrag={{ scale: 1.02 }}
                         className="fixed right-6 top-24 w-[380px] bg-white border-4 border-[#1a1a1a] p-4 flex flex-col gap-4 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-80px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
                     >
-                        {/* Decorative Screws */}
+                        {/* Screws */}
                         <div className="absolute top-2 left-2 text-gray-300 font-mono text-xl">+</div>
                         <div className="absolute top-2 right-2 text-gray-300 font-mono text-xl">+</div>
                         <div className="absolute bottom-2 left-2 text-gray-300 font-mono text-xl">+</div>
@@ -283,9 +246,8 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.3em]">Auto Reverse System</p>
                         </div>
 
-                        {/* Player Screen / Window */}
+                        {/* Player Screen */}
                         <div className="bg-[#1a1a1a] p-0 rounded-sm border-4 border-gray-200 h-40 flex flex-col items-center justify-center relative shadow-inner overflow-hidden group select-none">
-                            {/* Carbon Texture */}
                             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
 
                             {isLoaded && activeMix ? (
@@ -293,9 +255,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                     {/* Render the Exact Card Design */}
                                     {(() => {
                                         const mixColors = [
-                                            { bg: "bg-[#0052cc]", text: "text-white" }, // Blue
-                                            { bg: "bg-[#ff3333]", text: "text-white" }, // Red
-                                            { bg: "bg-[#ffcc00]", text: "text-[#1a1a1a]" }, // Yellow
+                                            { bg: "bg-[#0052cc]", text: "text-white" },
+                                            { bg: "bg-[#ff3333]", text: "text-white" },
+                                            { bg: "bg-[#ffcc00]", text: "text-[#1a1a1a]" },
                                         ];
                                         const activeIndex = mixes.findIndex(m => m.id === activeMix.id);
                                         const color = activeIndex >= 0 ? mixColors[activeIndex % mixColors.length] : mixColors[0];
@@ -313,7 +275,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                         </div>
                                                     </div>
 
-                                                    {/* Tape Label */}
                                                     <div className={clsx("bg-white relative p-2 border-2 border-[#1a1a1a] shadow-sm mx-1", activeIndex % 2 === 0 ? "transform -rotate-1" : "transform rotate-1")}>
                                                         <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-1.5 bg-black opacity-10 rounded-b"></div>
                                                         <p className="font-mono text-center text-sm font-bold text-[#1a1a1a] tracking-tight truncate uppercase">{activeMix.title}</p>
@@ -322,7 +283,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                     </div>
 
                                                     <div className="flex justify-between items-center mt-4 px-2">
-                                                        {/* Reels Visual (Static representation) */}
                                                         <div className="flex gap-6 items-center">
                                                             <motion.div
                                                                 animate={isPlaying ? { rotate: 360 } : {}}
@@ -350,8 +310,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             ) : (
                                 <div className="absolute text-gray-400 font-mono text-sm tracking-widest bg-black px-2 py-1 animate-pulse">NO CASSETTE</div>
                             )}
-
-                            {/* Glass Reflection */}
                             <div className="absolute -top-10 -right-10 w-40 h-80 bg-gradient-to-l from-white/10 to-transparent skew-x-12 rotate-12 pointer-events-none z-30"></div>
                         </div>
 
@@ -365,7 +323,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             </div>
                         </div>
 
-                        {/* Progress Bar & Visuals */}
+                        {/* Progress */}
                         <div className="space-y-1">
                             <div className="flex justify-between font-mono text-[10px] text-gray-400 uppercase tracking-widest">
                                 <span>{formatTime(progress)}</span>
@@ -374,7 +332,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             </div>
                             <div
                                 className="h-6 bg-gray-100 w-full border-2 border-[#1a1a1a] relative group cursor-pointer"
-                                onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                     if (duration && isLoaded) {
                                         const rect = e.currentTarget.getBoundingClientRect();
@@ -392,7 +349,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             </div>
                         </div>
 
-                        {/* Audio Meters (Static CSS Effect for visual style) */}
+                        {/* Meters */}
                         <div className="h-6 w-full flex gap-1 items-end">
                             <div className="flex-1 h-full flex gap-0.5 items-end opacity-80">
                                 {[30, 60, 100, 50, 75, 40, 80, 100].map((h, i) => (
@@ -425,10 +382,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                     <div className={clsx("w-3 h-3 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]", isLoaded ? "bg-red-500" : "bg-gray-400")}></div>
                                     <span className="text-[10px] uppercase font-bold text-gray-400">PWR</span>
                                 </div>
-                                <button
-                                    onClick={() => { playEject(); loadMix(null as any); }}
-                                    className="w-10 h-10 bg-gray-200 border-2 border-[#1a1a1a] flex items-center justify-center hover:bg-[#ff3333] hover:text-white transition-colors group" title="Eject"
-                                >
+                                <button onClick={() => { playEject(); loadMix(null as any); }} className="w-10 h-10 bg-gray-200 border-2 border-[#1a1a1a] flex items-center justify-center hover:bg-[#ff3333] hover:text-white transition-colors group">
                                     <LogOut size={20} className="group-hover:-translate-y-0.5 transition-transform" />
                                 </button>
                             </div>
@@ -437,10 +391,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                 <button onClick={() => { playClick(); prev(); }} className="w-14 h-14 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none">
                                     <SkipBack size={24} className="fill-current" />
                                 </button>
-                                <button
-                                    onClick={() => { playClick(); togglePlay(); }}
-                                    className="w-24 h-24 bg-[#0052cc] text-white rounded-full border-4 border-white shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center"
-                                >
+                                <button onClick={() => { playClick(); togglePlay(); }} className="w-24 h-24 bg-[#0052cc] text-white rounded-full border-4 border-white shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center">
                                     {isPlaying ? <Pause size={48} className="fill-current" /> : <Play size={48} className="fill-current ml-2" />}
                                 </button>
                                 <button onClick={() => { playClick(); next(); }} className="w-14 h-14 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none">
@@ -449,16 +400,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                             </div>
 
                             <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                <div className="w-3 h-20 bg-gray-100 border-2 border-[#1a1a1a] relative overflow-hidden flex items-end cursor-pointer rounded-full" onPointerDown={(e) => e.stopPropagation()}>
-                                    <motion.div
-                                        className="w-full bg-[#ffcc00] group-hover:bg-yellow-400"
-                                        style={{ height: `${volume * 100}%` }}
-                                    />
-                                    <input
-                                        type="range" min="0" max="1" step="0.05" value={volume}
-                                        onChange={(e) => setVolume(parseFloat(e.target.value))}
-                                        className="absolute inset-0 opacity-0 cursor-pointer"
-                                    />
+                                <div className="w-3 h-20 bg-gray-100 border-2 border-[#1a1a1a] relative overflow-hidden flex items-end cursor-pointer rounded-full">
+                                    <motion.div className="w-full bg-[#ffcc00] group-hover:bg-yellow-400" style={{ height: `${volume * 100}%` }} />
+                                    <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer" />
                                 </div>
                                 <Volume2 size={16} className="text-gray-400" />
                             </div>

@@ -10,7 +10,7 @@ import { Download, Upload, Settings, Smartphone, Palette, Maximize2, Plus, Penci
 import { Visualizer } from "@/components/ui/visualizer";
 import { Mix } from "@/components/providers/playback-context";
 
-interface StudioStageProps {
+interface studioStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
@@ -20,10 +20,12 @@ interface StudioStageProps {
     onOpenSearch?: (mixId: string) => void;
     onCreateMix?: () => void;
     onCinemaMode?: () => void;
+    onOpenThemeSelector?: () => void;
+    onSnapshotMix?: (mix: any) => void;
 }
 
 
-export function StudioStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode }: StudioStageProps) {
+export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector }: studioStageProps) {
     const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -123,35 +125,12 @@ export function StudioStage({ currentTheme, onThemeChange, onSelectTheme, onSwit
 
                     <div className="relative">
                         <button
-                            onClick={() => { playClick(); setIsThemeMenuOpen(!isThemeMenuOpen); }}
+                            onClick={() => { playClick(); onOpenThemeSelector?.(); }}
                             className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                             title="Change Theme"
                         >
                             <Palette size={20} />
                         </button>
-
-                        {/* Theme Dropdown */}
-                        {isThemeMenuOpen && (
-                            <div className="absolute right-0 top-full mt-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-2 min-w-[180px] z-50">
-                                {Object.entries(THEMES).map(([key, theme]) => (
-                                    <button
-                                        key={key}
-                                        onClick={() => {
-                                            playClick();
-                                            onSelectTheme?.(key as ThemeKey);
-                                            setIsThemeMenuOpen(false);
-                                        }}
-                                        className={clsx(
-                                            "w-full px-4 py-2 text-left text-sm hover:bg-zinc-800 transition-colors flex items-center gap-2",
-                                            currentTheme === key ? "text-purple-400 bg-zinc-800" : "text-gray-300"
-                                        )}
-                                    >
-                                        {currentTheme === key && <span className="text-purple-400">✓</span>}
-                                        {theme.name}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     <button
@@ -194,7 +173,7 @@ export function StudioStage({ currentTheme, onThemeChange, onSelectTheme, onSwit
                                     dragElastic={0.2}
                                     dragMomentum={true}
                                     onDragEnd={(e, info) => handleDragEnd(e, info, mix.id)}
-                                    whileDrag={{ zIndex: 1000, scale: 1.05 }}
+                                    whileDrag={{ zIndex: 9999, scale: 1.1 }}
                                     className={clsx(
                                         "group relative w-full aspect-[3/2] rounded-lg shadow-lg hover:shadow-xl p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing",
                                         bgColor
