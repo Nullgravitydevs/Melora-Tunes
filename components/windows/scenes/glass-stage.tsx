@@ -261,7 +261,6 @@ export function GlassStage({
                                 active={currentView.type === 'search'}
                                 onClick={() => navigateTo({ type: 'search' })}
                             />
-                            <NavItem icon={<Compass size={20} />} label="Browse TFI" active={false} onClick={() => { }} />
                         </nav>
                     </div>
 
