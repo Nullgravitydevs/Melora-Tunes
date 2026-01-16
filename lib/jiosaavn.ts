@@ -37,7 +37,7 @@ export interface SearchResponse {
     results: any[];
 }
 
-const DES_KEY = '38346591';
+const DES_KEY = process.env.NEXT_PUBLIC_DES_KEY || '38346591';
 
 const isElectron = typeof window !== 'undefined' && /Electron/i.test(window.navigator.userAgent);
 
@@ -303,8 +303,17 @@ export async function getTopCharts(): Promise<any[]> {
 }
 
 export async function getTrending(): Promise<JioSaavnSong[]> {
-    // Placeholder - getLaunchData is complex.
-    return [];
+    try {
+        const data = await fetchApi('__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4');
+        if (!data || !Array.isArray(data)) return [];
+        // Trending API returns a slightly different structure sometimes, but usually list of songs/albums
+        // We filter for songs only for now
+        const songs = data.filter((item: any) => item.type === 'song');
+        return songs.map(mapToSong);
+    } catch (e) {
+        console.error("Error fetching trending:", e);
+        return [];
+    }
 }
 
 export async function getRecommendations(songId: string, limit: number = 5): Promise<JioSaavnSong[]> {

@@ -11,7 +11,7 @@ import { loadSettings, saveSettings } from "@/lib/settings";
 export interface Mix {
     id: string;
     title: string;
-    color: "orange" | "purple" | "white" | "green" | "red";
+    color: "orange" | "purple" | "white" | "green" | "red" | "blue" | "cyan" | "pink" | "teal" | "yellow";
     songs: JioSaavnSong[];
     currentSongIndex: number;
 }
