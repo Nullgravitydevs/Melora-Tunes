@@ -46,20 +46,25 @@ export async function searchSongs(query: string, page: number = 1, limit: number
         console.log(`[Search] Query: "${query}", Mode: ${isElectron ? 'ELECTRON' : 'WEB'}`);
         let data: any;
 
-        if (Capacitor.isNativePlatform()) {
-            // 🚀 NATIVE MODE (Android/iOS): Direct fetch via CapacitorHttp
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
-            const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
-        } else if (isElectron) {
-            // 🚀 ELECTRON MODE (Windows/Mac): Direct fetch (CORS disabled)
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
-            const response = await fetch(apiUrl);
-            data = await response.json();
+        const STATIC_QUERIES = ['Trending', 'Telugu Hits', 'New Releases'];
+        const useCache = STATIC_QUERIES.some(q => query.includes(q));
+
+        if (useCache) {
+            data = await fetchApi(`__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`, true);
         } else {
-            // 🐢 WEB MODE (Browser): Use Next.js Proxy
-            const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`);
-            data = await response.json();
+            // Normal Search - No Aggressive Caching
+            if (Capacitor.isNativePlatform()) {
+                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+                const response = await CapacitorHttp.get({ url: apiUrl });
+                data = response.data;
+            } else if (isElectron) {
+                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+                const response = await fetch(apiUrl);
+                data = await response.json();
+            } else {
+                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`);
+                data = await response.json();
+            }
         }
 
         let list = [];
@@ -270,26 +275,113 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
     }
 }
 
+// --- CACHE IMPLEMENTATION ---
+const CACHE_DURATION = 1000 * 60 * 15; // 15 Minutes
+const CACHE_KEY_PREFIX = 'melora_cache_';
+
+interface CacheEntry {
+    timestamp: number;
+    data: any;
+}
+
+class ApiCache {
+    private memoryCache = new Map<string, CacheEntry>();
+
+    get(key: string): any | null {
+        // 1. Try Memory
+        if (this.memoryCache.has(key)) {
+            const entry = this.memoryCache.get(key)!;
+            if (Date.now() - entry.timestamp < CACHE_DURATION) {
+                console.log(`[Cache] Hit (Memory): ${key}`);
+                return entry.data;
+            } else {
+                this.memoryCache.delete(key);
+            }
+        }
+
+        // 2. Try LocalStorage (Client Side Only)
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem(CACHE_KEY_PREFIX + key);
+                if (stored) {
+                    const entry: CacheEntry = JSON.parse(stored);
+                    if (Date.now() - entry.timestamp < CACHE_DURATION) {
+                        console.log(`[Cache] Hit (Disk): ${key}`);
+                        // Hydrate memory
+                        this.memoryCache.set(key, entry);
+                        if (entry.data?.length === 0) return null; // Don't return empty cached arrays
+                        return entry.data;
+                    } else {
+                        localStorage.removeItem(CACHE_KEY_PREFIX + key);
+                    }
+                }
+            } catch (e) { console.warn("[Cache] Read Failed", e); }
+        }
+        return null;
+    }
+
+    set(key: string, data: any) {
+        if (!data || (Array.isArray(data) && data.length === 0)) return; // Don't cache empty
+
+        const entry: CacheEntry = { timestamp: Date.now(), data };
+        this.memoryCache.set(key, entry);
+
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.setItem(CACHE_KEY_PREFIX + key, JSON.stringify(entry));
+            } catch (e) {
+                console.warn("[Cache] Write Failed (Quota?)", e);
+                // Clear old cache if full?
+                try { localStorage.clear(); } catch { }
+            }
+        }
+    }
+}
+
+export const apiCache = new ApiCache();
+
 // --- HELPER FUNCTION FOR ALL PLATFORMS ---
-async function fetchApi(params: string): Promise<any> {
+async function fetchApi(params: string, useCache: boolean = false): Promise<any> {
     try {
+        if (useCache) {
+            const cached = apiCache.get(params);
+            if (cached) return cached;
+        }
+
         const urlStr = params.startsWith('?') ? params.slice(1) : params;
+        let resData: any = null;
 
         if (Capacitor.isNativePlatform()) {
             const url = `https://www.jiosaavn.com/api.php?${urlStr}`;
             const res = await CapacitorHttp.get({ url });
-            return res.data;
+            resData = res.data;
         } else if (isElectron) {
             const url = `https://www.jiosaavn.com/api.php?${urlStr}`;
             const res = await fetch(url);
-            return await res.json();
+            resData = await res.json();
         } else {
             // Web Proxy
             const url = `/api/proxy?${urlStr}`;
             const res = await fetch(url);
+            if (res.status === 429) {
+                console.error("API Rate Limit (429) - Returning cached stale if available");
+                // Aggressive fallback: try to find ANYTHING in cache for this key even if expired
+                if (typeof window !== 'undefined') {
+                    const stored = localStorage.getItem(CACHE_KEY_PREFIX + params);
+                    if (stored) return JSON.parse(stored).data;
+                }
+                throw new Error("429 Rate Limit");
+            }
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            return await res.json();
+            resData = await res.json();
         }
+
+        if (useCache && resData) {
+            apiCache.set(params, resData);
+        }
+
+        return resData;
+
     } catch (e) {
         console.error("API Fetch Error:", e);
         return null;
@@ -297,14 +389,14 @@ async function fetchApi(params: string): Promise<any> {
 }
 
 export async function getTopCharts(): Promise<any[]> {
-    const data = await fetchApi('__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0');
+    const data = await fetchApi('__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0', true); // CACHED
     // Ensure it's an array, otherwise return empty
     return Array.isArray(data) ? data : [];
 }
 
 export async function getTrending(): Promise<JioSaavnSong[]> {
     try {
-        const data = await fetchApi('__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4');
+        const data = await fetchApi('__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4', true); // CACHED
         if (!data || !Array.isArray(data)) return [];
         // Trending API returns a slightly different structure sometimes, but usually list of songs/albums
         // We filter for songs only for now

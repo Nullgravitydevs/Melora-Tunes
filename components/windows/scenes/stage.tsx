@@ -46,7 +46,8 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
         addMix, updateMix, deleteMix, isLoaded,
         shuffle, setShuffle, repeat, setRepeat,
         queue, currentIndex,
-        notificationsEnabled
+        notificationsEnabled,
+        likedSongs, toggleLike
     } = usePlayback();
 
     // UI State (Local)
@@ -271,26 +272,9 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
     };
 
     const handleToggleFavorite = (song: JioSaavnSong) => {
-        const favMix = mixes.find(m => m.id === 'favorites');
-        if (!favMix) {
-            const newFav: Mix = {
-                id: 'favorites',
-                title: 'Favorites ❤️',
-                color: 'red',
-                songs: [song],
-                currentSongIndex: 0
-            };
-            addMix(newFav);
-            addToast("Added to Favorites ❤️");
-        } else {
-            const exists = favMix.songs.some(s => s.id === song.id);
-            const newSongs = exists
-                ? favMix.songs.filter(s => s.id !== song.id)
-                : [...favMix.songs, song];
-
-            updateMix('favorites', { songs: newSongs });
-            addToast(exists ? "Removed from Favorites" : "Added to Favorites ❤️");
-        }
+        toggleLike(song);
+        const exists = likedSongs.some(s => s.id === song.id);
+        addToast(exists ? "Removed from Favorites" : "Added to Favorites ❤️");
     };
 
     const layout = THEMES[currentTheme]?.layout || 'zen';
@@ -477,7 +461,7 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
                         isOpen={isSearchOpen}
                         onClose={() => setIsSearchOpen(false)}
                         onAddSong={handleAddSong}
-                        favorites={new Set((mixes.find(m => m.id === 'favorites')?.songs || []).map(s => s.id))}
+                        favorites={new Set(likedSongs.map(s => s.id))}
                         onToggleFavorite={handleToggleFavorite}
                     />
                 )

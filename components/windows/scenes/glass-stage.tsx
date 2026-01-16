@@ -121,9 +121,11 @@ export function GlassStage({
     // --- Data State ---
     const [charts, setCharts] = useState<any[]>([]);
     const [heroData, setHeroData] = useState<any>(null);
+    const [dailyMix, setDailyMix] = useState<any>(null);
     const [tfiPicks, setTfiPicks] = useState<JioSaavnSong[]>([]); // Telugu Specific
     const [playlistDetails, setPlaylistDetails] = useState<JioSaavnSong[]>([]);
     const [isDetailsLoading, setIsDetailsLoading] = useState(false);
+    const [isHomeLoading, setIsHomeLoading] = useState(true);
 
     // --- Search State ---
     const [searchQuery, setSearchQuery] = useState("");
@@ -131,30 +133,60 @@ export function GlassStage({
     const [isSearching, setIsSearching] = useState(false);
     const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-    // Fetch Charts & TFI Content on Mount
-    useEffect(() => {
-        const loadContent = async () => {
-            try {
-                // 1. Get Generic Charts
-                const data = await getTopCharts();
-                if (Array.isArray(data)) {
-                    // Sort charts to show Telugu first
-                    const sortedCharts = prioritizeTelugu(data);
-                    setCharts(sortedCharts);
-                    // Try to find a Telugu chart for hero, else default
-                    const teluguChart = data.find((c: any) => (c.title || c.listname || "").toLowerCase().includes("telugu"));
-                    setHeroData(teluguChart || sortedCharts[0]);
-                }
+    // --- Data Fetching (Stitch Layout Logic - Improved) ---
+    const loadContent = async () => {
+        try {
+            // Only set loading if we don't have charts yet
+            if (charts.length === 0) setIsHomeLoading(true);
 
-                // 2. Explicitly Fetch Telugu Hits for "TFI Section"
-                const tfiData = await searchSongs("Telugu Hits", 1, 5);
-                setTfiPicks(tfiData);
-            } catch (e) {
-                console.error(e);
+            // 1. Get Generic Charts
+            let data: any[] = [];
+            try {
+                data = await getTopCharts();
+            } catch (err) { console.warn(err); }
+
+            // Fallback
+            if (!Array.isArray(data) || data.length === 0) {
+                try {
+                    const trending = await searchSongs("Trending", 1, 10);
+                    if (trending && trending.length > 0) {
+                        data = [{ title: "Trending Now", listname: "Trending Now", image: trending[0]?.image, link: "", songs: trending, language: "Global" }];
+                    }
+                } catch (e) {
+                    console.error("Fallback failed", e);
+                }
             }
-        };
-        loadContent();
-    }, []);
+
+            if (Array.isArray(data) && data.length > 0) {
+                const sortedCharts = prioritizeTelugu(data);
+                setCharts(sortedCharts);
+
+                // Hero: First Telugu Chart or First Item
+                const teluguChart = data.find((c: any) => (c.title || c.listname || "").toLowerCase().includes("telugu"));
+                setHeroData(teluguChart || sortedCharts[0]);
+
+                // Daily Mix: Second item or fallback
+                setDailyMix(sortedCharts.length > 1 ? sortedCharts[1] : sortedCharts[0]);
+            } else {
+                console.warn("GlassStage: getTopCharts returned empty/invalid data", data);
+            }
+
+            // 2. Explicitly Fetch Telugu Hits for "Top Picks"
+            const tfiData = await searchSongs("Telugu Hits", 1, 5);
+            setTfiPicks(tfiData);
+        } catch (e) {
+            console.error("GlassStage: loadContent failed", e);
+        } finally {
+            setIsHomeLoading(false);
+        }
+    };
+
+    // Initial Load & Retry
+    useEffect(() => {
+        if (charts.length === 0) {
+            loadContent(); // Call immediately on mount if empty
+        }
+    }, [currentView.type]); // Retry on nav change too if empty
 
     // Load Playlist Details when view changes
     useEffect(() => {
@@ -400,67 +432,91 @@ export function GlassStage({
                                         ))}
                                     </div>
 
-                                    {/* Hero Section - FIXED HEIGHT */}
-                                    {heroData && (
-                                        <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-64 lg:h-72 shrink-0">
-                                            <div className="lg:col-span-2 relative rounded-xl overflow-hidden group h-full border border-white/5 cursor-pointer" onClick={() => navigateTo({ type: 'playlist', data: heroData })}>
-                                                <Image src={(Array.isArray(heroData.image || heroData.img) ? (heroData.image || heroData.img)[1]?.link : (heroData.image || heroData.img)) || ""} alt="Hero" fill className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" unoptimized />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"></div>
-                                                <div className="absolute inset-0 p-6 flex flex-col justify-between z-10 transition-all duration-500 group-hover:p-8">
-                                                    <div>
-                                                        <p className="text-xs text-gray-200 mb-1 font-medium bg-white/10 w-fit px-2 py-0.5 rounded backdrop-blur-md">Featured • {heroData.language || "Trending"}</p>
-                                                        <h2 className="text-3xl font-bold text-white drop-shadow-lg max-w-lg leading-tight mt-1 truncate-2-lines">{decodeHtml(heroData.title || heroData.listname)}</h2>
-                                                    </div>
-                                                    <button className="w-12 h-12 rounded-full bg-white/90 text-black flex items-center justify-center hover:scale-110 hover:bg-white transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] self-start mt-2">
-                                                        <Play size={24} fill="currentColor" className="ml-1" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {/* Side Card: Top Picks */}
-                                            <div className="glass-card rounded-xl p-4 flex flex-col overflow-hidden h-full">
-                                                <div className="flex items-center gap-2 mb-3 shrink-0">
-                                                    <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500"><Star size={12} fill="currentColor" /></div>
-                                                    <h3 className="font-bold text-sm">Top Picks</h3>
-                                                </div>
-                                                <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1">
-                                                    {tfiPicks.map((song, i) => (
-                                                        <div key={i} className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-1 rounded transition-colors" onClick={() => handleSongClick(song)}>
-                                                            <div className="w-8 h-8 rounded bg-white/10 relative overflow-hidden shrink-0">
-                                                                <Image src={(Array.isArray(song.image) ? (song.image[1]?.link || song.image[0]?.link) : song.image) || ""} alt="" fill className="object-cover" unoptimized />
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h4 className="text-xs font-medium truncate group-hover:text-orange-400 transition-colors">{decodeHtml(song.name)}</h4>
-                                                                <p className="text-[10px] text-gray-500 truncate">{decodeHtml(song.primaryArtists)}</p>
-                                                            </div>
-                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <Play size={12} className="text-white" fill="white" />
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                    {tfiPicks.length === 0 && <p className="text-[10px] text-center text-gray-500">Loading TFI hits...</p>}
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {/* Charts Grid */}
-                                    <motion.div variants={itemVariants}>
-                                        <h3 className="text-lg font-bold mb-3">Top Charts & Playlists</h3>
-                                        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 pb-8">
-                                            {charts.map((chart: any, i) => (
-                                                <motion.div variants={itemVariants} key={i} className="group cursor-pointer" onClick={() => navigateTo({ type: 'playlist', data: chart })}>
-                                                    <div className="aspect-square rounded-lg overflow-hidden mb-2 relative glass-card border-none shadow-lg">
-                                                        <Image src={chart.image || chart.img} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
-                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-[2px]">
-                                                            <Play size={24} fill="white" className="text-white drop-shadow-lg scale-0 group-hover:scale-100 transition-transform delay-75" />
-                                                        </div>
-                                                    </div>
-                                                    <h4 className="text-xs font-bold truncate pr-1 group-hover:text-blue-400 transition-colors">{decodeHtml(chart.title || chart.listname)}</h4>
-                                                    <p className="text-[10px] text-gray-400 capitalize">{chart.language || "Chart"}</p>
-                                                </motion.div>
-                                            ))}
+                                    {isHomeLoading ? (
+                                        <div className="h-80 flex items-center justify-center flex-col gap-4">
+                                            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <p className="text-xs text-gray-500 animate-pulse">Curating your mix...</p>
                                         </div>
-                                    </motion.div>
+                                    ) : (heroData ? (
+                                        <>
+                                            {/* Hero Section - FIXED HEIGHT */}
+                                            {/* Hero Grid (Stitch Layout) */}
+                                            {heroData && (
+                                                <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-80 shrink-0 mb-8">
+
+                                                    {/* Left: Daily Mix (Vertical) */}
+                                                    {dailyMix && (
+                                                        <div className="hidden lg:flex relative rounded-3xl overflow-hidden group cursor-pointer border border-white/5 h-full shadow-xl" onClick={() => navigateTo({ type: 'playlist', data: dailyMix })}>
+                                                            <div className="absolute inset-0 bg-[#2b2b2b]"></div>
+                                                            <Image src={(Array.isArray(dailyMix.image || dailyMix.img) ? (dailyMix.image || dailyMix.img)[2]?.link : (dailyMix.image || dailyMix.img)) || ""} alt="Daily Mix" fill className="object-cover opacity-80 group-hover:scale-110 transition-transform duration-700" unoptimized />
+                                                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20"></div>
+
+                                                            <div className="absolute inset-0 p-6 flex flex-col justify-between">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] uppercase tracking-widest font-bold text-white/60 bg-black/20 backdrop-blur-md px-2 py-1 rounded-md">Daily Mix</span>
+                                                                    <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-colors"><Heart size={14} className="text-white" /></div>
+                                                                </div>
+                                                                <div>
+                                                                    <h3 className="text-2xl font-black text-white leading-tight mb-2 drop-shadow-md line-clamp-2">{decodeHtml(dailyMix.title || dailyMix.listname)}</h3>
+                                                                    <p className="text-xs text-white/60 line-clamp-1">{dailyMix.language || "Mix"}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Right: Feature Card (Horizontal) */}
+                                                    <div className={`col-span-1 ${dailyMix ? 'lg:col-span-2' : 'lg:col-span-3'} relative rounded-3xl overflow-hidden group cursor-pointer border border-white/5 h-64 lg:h-full shadow-2xl`} onClick={() => navigateTo({ type: 'playlist', data: heroData })}>
+                                                        <Image src={(Array.isArray(heroData.image || heroData.img) ? (heroData.image || heroData.img)[2]?.link : (heroData.image || heroData.img)) || ""} alt="Hero" fill className="object-cover opacity-70 group-hover:scale-105 transition-transform duration-700" unoptimized />
+                                                        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent"></div>
+
+                                                        <div className="absolute inset-0 p-8 flex flex-col justify-center items-start z-10">
+                                                            <div className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 backdrop-blur-md border border-blue-500/20">Featured Album</div>
+                                                            <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tight drop-shadow-2xl max-w-lg leading-[0.9]">{decodeHtml(heroData.title || heroData.listname)}</h1>
+                                                            <p className="text-gray-300 text-sm md:text-base max-w-lg mb-8 line-clamp-2 drop-shadow-md font-medium">{decodeHtml(heroData.subtitle || heroData.language || "The best music, right now.")}</p>
+
+                                                            <div className="flex items-center gap-4">
+                                                                <button className="h-12 w-12 bg-white rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.4)] text-black">
+                                                                    <Play fill="currentColor" size={20} className="ml-1" />
+                                                                </button>
+                                                                <button className="h-12 w-12 rounded-full border border-white/20 hover:bg-white/10 flex items-center justify-center backdrop-blur-md transition-all text-white">
+                                                                    <Heart size={20} />
+                                                                </button>
+                                                                <button className="h-12 w-12 rounded-full border border-white/20 hover:bg-white/10 flex items-center justify-center backdrop-blur-md transition-all text-white">
+                                                                    <MoreVertical size={20} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+
+                                            {/* Charts Grid */}
+                                            <motion.div variants={itemVariants}>
+                                                <h3 className="text-lg font-bold mb-3">Top Charts & Playlists</h3>
+                                                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 pb-8">
+                                                    {charts.map((chart: any, i) => (
+                                                        <motion.div variants={itemVariants} key={i} className="group cursor-pointer" onClick={() => navigateTo({ type: 'playlist', data: chart })}>
+                                                            <div className="aspect-square rounded-lg overflow-hidden mb-2 relative glass-card border-none shadow-lg">
+                                                                <Image src={chart.image || chart.img} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
+                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-[2px]">
+                                                                    <Play size={24} fill="white" className="text-white drop-shadow-lg scale-0 group-hover:scale-100 transition-transform delay-75" />
+                                                                </div>
+                                                            </div>
+                                                            <h4 className="text-xs font-bold truncate pr-1 group-hover:text-blue-400 transition-colors">{decodeHtml(chart.title || chart.listname)}</h4>
+                                                            <p className="text-[10px] text-gray-400 capitalize">{chart.language || "Chart"}</p>
+                                                        </motion.div>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        </>
+                                    ) : (
+                                        <div className="h-80 flex flex-col items-center justify-center gap-4 text-center">
+                                            <p className="text-gray-400 text-sm">Unable to load home feed.</p>
+                                            <button onClick={loadContent} className="px-6 py-2 bg-white text-black font-bold rounded-full text-xs hover:scale-105 transition-transform">
+                                                Retry
+                                            </button>
+                                        </div>
+                                    ))}
                                 </motion.div>
                             )}
 
@@ -595,7 +651,13 @@ export function GlassStage({
                         {mixes.length > 0 ? mixes.slice(0, 5).map(mix => (
                             <div key={mix.id} onClick={() => loadMix(mix.id)} className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-1.5 rounded-lg transition-colors -mx-1">
                                 <div className="w-10 h-10 rounded-md bg-gray-800 overflow-hidden shrink-0 shadow-md relative">
-                                    <Image src={mix.songs[0]?.image[1]?.link || ""} alt="" fill className="object-cover" unoptimized />
+                                    {mix.songs[0]?.image[1]?.link ? (
+                                        <Image src={mix.songs[0]?.image[1]?.link} alt="" fill className="object-cover" unoptimized />
+                                    ) : (
+                                        <div className="flex items-center justify-center w-full h-full">
+                                            <Disc size={18} className="text-gray-500" />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex-1 overflow-hidden">
                                     <h4 className="text-xs font-medium text-white truncate">{mix.title}</h4>
