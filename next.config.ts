@@ -19,7 +19,15 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
-  turbopack: {}
+  turbopack: {},
+  async rewrites() {
+    return [
+      {
+        source: '/api/proxy',
+        destination: 'https://www.jiosaavn.com/api.php',
+      },
+    ];
+  },
 };
 
 export default withPWA(nextConfig);

@@ -25,15 +25,17 @@ interface EditMixModalProps {
 
 export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, onDeleteMix }: EditMixModalProps) {
     const [editedSongs, setEditedSongs] = useState<JioSaavnSong[]>([]);
+    const [editedTitle, setEditedTitle] = useState("");
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     useEffect(() => {
-        if (mix) {
+        if (mix && isOpen) {
             setEditedSongs(mix.songs);
+            setEditedTitle(mix.title);
         }
-        // Reset delete confirmation when modal opens/closes
+        // Reset delete confirmation when modal opens
         setShowDeleteConfirm(false);
-    }, [mix, isOpen]);
+    }, [isOpen, mix?.id]);
 
     const handleDelete = (index: number) => {
         const newSongs = [...editedSongs];
@@ -57,7 +59,11 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
 
     const handleSave = () => {
         if (mix) {
-            onUpdateMix({ ...mix, songs: editedSongs });
+            onUpdateMix({
+                ...mix,
+                title: editedTitle,
+                songs: editedSongs
+            });
             onClose();
         }
     };
@@ -97,7 +103,14 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
                         className="bg-black/90 backdrop-blur-md p-6 rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col border border-white/10"
                     >
                         <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                            <h2 className="text-2xl font-bold text-white">Edit Mixtape: {mix.title}</h2>
+                            <div className="flex-1">
+                                <input
+                                    value={editedTitle}
+                                    onChange={(e) => setEditedTitle(e.target.value)}
+                                    className="text-2xl font-bold text-white bg-transparent border-b border-white/20 focus:border-cyan-400 outline-none w-full pb-1"
+                                    placeholder="Mixtape Name"
+                                />
+                            </div>
                             <div className="flex gap-2">
                                 <button
                                     onClick={handleShare}

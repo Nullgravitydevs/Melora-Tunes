@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ListMusic } from "lucide-react";
+import { decodeHtml } from "@/lib/utils";
 
 interface CoverFlowMobileProps {
     isOpen: boolean;
@@ -142,7 +143,7 @@ export function CoverFlowMobile({
                                             <div key={t} className={`flex items-center px-1 py-0.5 ${t === 0 ? 'bg-blue-600' : 'even:bg-zinc-50'}`}>
                                                 <span className={`text-[6px] font-medium w-3 ${t === 0 ? 'text-white' : 'text-zinc-500'}`}>{t + 1}</span>
                                                 <span className={`text-[6px] truncate max-w-[70%] ${t === 0 ? 'text-white font-bold' : 'text-black'}`}>
-                                                    {song.name || `Track ${t + 1}`}
+                                                    {song.name ? decodeHtml(song.name) : `Track ${t + 1}`}
                                                 </span>
                                                 <span className={`text-[6px] ml-auto ${t === 0 ? 'text-white' : 'text-zinc-400'}`}>
                                                     {song.duration ? `${Math.floor(song.duration / 60)}:${Math.floor(song.duration % 60).toString().padStart(2, '0')}` : '3:42'}

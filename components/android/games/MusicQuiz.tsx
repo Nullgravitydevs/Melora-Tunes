@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { usePlayback } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
+import { decodeHtml } from "@/lib/utils";
 
 interface MusicQuizProps {
     onBack: () => void;
@@ -193,7 +194,7 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
                                     key={song.id}
                                     className={`p-3 border-b border-zinc-700 ${bgColor} transition-colors`}
                                 >
-                                    <p className="text-xs font-semibold truncate">{song.name}</p>
+                                    <p className="text-xs font-semibold truncate">{decodeHtml(song.name)}</p>
                                     <p className="text-[10px] text-zinc-300 truncate">{song.album?.name || ''}</p>
                                 </div>
                             );

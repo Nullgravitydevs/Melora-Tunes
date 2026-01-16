@@ -21,9 +21,11 @@ interface ZenStageProps {
     onCinemaMode?: () => void;
     onOpenThemeSelector?: () => void;
     onSnapshotMix?: (mix: any) => void;
+    onShowQueue?: () => void;
+    onShareMix?: (mix: any) => void;
 }
 
-export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector }: ZenStageProps) {
+export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix }: ZenStageProps) {
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const {
@@ -214,7 +216,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchT
                         )}
 
                         {/* Up Next List */}
-                        <div className="mt-12 hidden lg:flex flex-col w-full max-w-lg pl-4 flex-grow overflow-y-auto [&::-webkit-scrollbar]:hidden -mr-4 pr-4">
+                        <div className="mt-8 lg:flex flex-col w-full max-w-lg pl-4 min-h-0 max-h-[300px] overflow-y-auto [&::-webkit-scrollbar]:hidden -mr-4 pr-4">
                             <h4 className="font-mono text-xs text-stone-400 uppercase tracking-widest mb-4">Your Collection</h4>
                             <ul className="space-y-3">
                                 {mixes.map((mix) => (
@@ -274,7 +276,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchT
 
                             {/* Time & Progress */}
                             <div className="flex justify-between items-end mb-4 font-mono text-xs text-stone-400">
-                                <span>{formatTime(progress)}</span>
+                                <span>{formatTime(progress * duration)}</span>
                                 <div className="flex flex-col items-end gap-1">
                                     <span className="text-[10px] tracking-widest uppercase">Tape A</span>
                                     <span>{formatTime(duration || 0)}</span>
@@ -287,13 +289,13 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchT
                                     if (duration && isLoaded) {
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         const percent = (e.clientX - rect.left) / rect.width;
-                                        seek(percent * duration);
+                                        seek(percent);
                                     }
                                 }}
                             >
                                 <motion.div
                                     className="absolute top-0 left-0 h-full bg-stone-800 dark:bg-stone-200 group-hover:bg-zen-primary transition-colors"
-                                    style={{ width: `${(progress / (duration || 1)) * 100}%` }}
+                                    style={{ width: `${progress * 100}%` }}
                                 ></motion.div>
                             </div>
 

@@ -5,6 +5,7 @@ import { JioSaavnSong, getAudioUrl } from "@/lib/jiosaavn";
 import { useAudio } from "@/hooks/use-audio";
 import { AudioPlayer, AudioPlayerRef } from "@/components/ui/audio-player";
 import { decodeHtml } from "@/lib/utils";
+import { recordPlay } from "@/lib/stats";
 import { loadSettings, saveSettings } from "@/lib/settings";
 
 export interface Mix {
@@ -66,6 +67,10 @@ interface PlaybackContextType {
     // End of Song Timer
     stopAtEndOfSong: boolean;
     setStopAtEndOfSong: (val: boolean) => void;
+
+    // Desktop Notifications
+    notificationsEnabled: boolean;
+    setNotificationsEnabled: (enabled: boolean) => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -86,6 +91,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [sleepTimer, setSleepTimer] = useState<{ endTime: number; duration: number } | null>(null);
     const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
     const [stopAtEndOfSong, setStopAtEndOfSong] = useState(false);
+    const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
@@ -373,6 +379,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
 
 
+    const nextIndex = activeMix ? (activeMix.currentSongIndex + 1) % activeMix.songs.length : 0;
+    const nextSong = activeMix?.songs[nextIndex];
+    const nextSongUrl = nextSong?.downloadUrl?.find((d: any) => d.quality === bitrate)?.link || nextSong?.downloadUrl?.[4]?.link || nextSong?.downloadUrl?.[0]?.link || null;
+
     return (
         <PlaybackContext.Provider value={{
             mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
@@ -384,7 +394,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             sleepTimer, setSleepTimer,
             crossfadeDuration, setCrossfadeDuration,
             stopAtEndOfSong, setStopAtEndOfSong,
-            bitrate, setBitrate
+            bitrate, setBitrate,
+            notificationsEnabled, setNotificationsEnabled
         }}>
             {children}
 
@@ -392,9 +403,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             <AudioPlayer
                 ref={audioPlayerRef}
                 url={currentSongUrl}
+                nextUrl={nextSongUrl}
                 playing={isPlaying}
                 volume={volume}
-                onEnded={next}
+                onEnded={() => {
+                    if (currentSong) recordPlay(currentSong, duration);
+                    next();
+                }}
                 onProgress={({ played }) => setProgress(played)}
                 onDuration={setDuration}
                 title={decodeHtml(currentSong?.name || "")}

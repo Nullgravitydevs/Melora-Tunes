@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from 'react';
 
 interface AudioPlayerProps {
     url: string | null;
+    nextUrl?: string | null;
     playing: boolean;
     volume: number;
     title?: string;
@@ -16,7 +17,7 @@ interface AudioPlayerProps {
     onError?: (message: string) => void;
     onNext?: () => void;
     onPrev?: () => void;
-    onPlayToggle?: () => void; // Using onPlayToggle to match PlayerProps naming convention if needed, or stick to standard
+    onPlayToggle?: () => void;
 }
 
 export interface AudioPlayerRef {
@@ -29,6 +30,7 @@ export interface AudioPlayerRef {
 
 export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     url,
+    nextUrl,
     playing,
     volume,
     title,
@@ -41,181 +43,166 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     onError,
     onNext,
     onPrev,
-    onPlayToggle: onPlayPause // Mapping onPlayToggle prop to internal onPlayPause usage
+    onPlayToggle: onPlayPause
 }, ref) => {
-    const audioRef = useRef<HTMLAudioElement>(null);
+    const primaryRef = useRef<HTMLAudioElement>(null);
+    const secondaryRef = useRef<HTMLAudioElement>(null);
+    const [activeId, setActiveId] = useState<'primary' | 'secondary'>('primary');
     const progressIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+    const getActive = useCallback(() => activeId === 'primary' ? primaryRef.current : secondaryRef.current, [activeId]);
+    const getInactive = useCallback(() => activeId === 'primary' ? secondaryRef.current : primaryRef.current, [activeId]);
 
     useImperativeHandle(ref, () => ({
         seekTo: (amount: number) => {
-            if (audioRef.current) {
-                if (audioRef.current.duration) {
-                    audioRef.current.currentTime = amount * audioRef.current.duration;
+            const active = getActive();
+            if (active) {
+                if (active.duration) {
+                    active.currentTime = amount * active.duration;
                 } else if (amount === 0) {
-                    audioRef.current.currentTime = 0;
+                    active.currentTime = 0;
                 }
             }
         },
-        getCurrentTime: () => {
-            return audioRef.current?.currentTime || 0;
-        },
-        play: () => {
-            audioRef.current?.play().catch(() => { });
-        },
-        pause: () => {
-            audioRef.current?.pause();
-        },
+        getCurrentTime: () => getActive()?.currentTime || 0,
+        play: () => getActive()?.play().catch(() => { }),
+        pause: () => getActive()?.pause(),
         setVolume: (vol: number) => {
-            if (audioRef.current) audioRef.current.volume = vol;
+            const active = getActive();
+            if (active) active.volume = vol;
         }
     }));
 
-    // ... (useEffect hooks remain the same) ...
-
-    // Handle URL changes
+    // Handle URL changes (The core Gapless Logic)
     useEffect(() => {
-        if (!audioRef.current) return;
+        const active = getActive();
+        const inactive = getInactive();
 
-        if (url) {
-            audioRef.current.src = url;
-            audioRef.current.load();
+        if (!active || !inactive) return;
+
+        // Check if the requested URL is already loaded in the inactive player (Preloaded)
+        // We compare checks cleanly to avoid relative/absolute URL mismatches
+        const isPreloaded = inactive.src === url || (url && inactive.src.endsWith(url));
+
+        if (isPreloaded && url) {
+            console.log("⚡ Gapless Switch!");
+            // Swap roles
+            setActiveId(prev => prev === 'primary' ? 'secondary' : 'primary');
+            // Play immediately if supposed to be playing
+            if (playing) {
+                inactive.play().catch(e => console.error(e));
+            }
+            // Reset old active
+            active.pause();
+            active.currentTime = 0;
         } else {
-            audioRef.current.src = '';
+            // Standard load
+            if (url) {
+                active.src = url;
+                active.load();
+                if (playing) active.play().catch(e => console.error(e));
+            } else {
+                active.removeAttribute('src');
+            }
         }
-    }, [url]);
+    }, [url]); // Intentionally not including deps that would trigger unnecessary re-runs
 
-    // Handle play/pause
+    // Handle Next URL (Preloading)
     useEffect(() => {
-        if (!audioRef.current || !url) return;
+        const inactive = getInactive();
+        if (!inactive || !nextUrl) return;
+
+        // Prevent reloading if already loaded
+        if (inactive.src === nextUrl || inactive.src.endsWith(nextUrl)) return;
+
+        console.log("Preloading next:", nextUrl);
+        inactive.src = nextUrl;
+        inactive.load();
+    }, [nextUrl, activeId]); // When activeId changes, inactive changes, so we might need to preload active's old content? No, nextUrl stays same usually.
+
+    // Handle Play/Pause
+    useEffect(() => {
+        const active = getActive();
+        if (!active || !url) return;
 
         if (playing) {
-            audioRef.current.play().catch(error => {
-                // Ignore AbortError which happens on rapid skipping
+            active.play().catch(error => {
                 if (error.name === 'AbortError') return;
-
-                console.error("Playback failed:", error);
                 onError?.(`Playback failed: ${error.message}`);
             });
         } else {
-            audioRef.current.pause();
+            active.pause();
         }
-    }, [playing, url, onError]);
+    }, [playing, activeId]);
 
-    // Handle volume changes
+    // Handle Volume
     useEffect(() => {
-        if (!audioRef.current) return;
-        audioRef.current.volume = volume;
-    }, [volume]);
+        const active = getActive();
+        const inactive = getInactive();
+        if (active) active.volume = volume;
+        if (inactive) inactive.volume = volume;
+    }, [volume, activeId]);
 
-    // Setup progress tracking
+    // Progress Tracking - Only from Active
     useEffect(() => {
-        if (!audioRef.current || !playing) {
-            if (progressIntervalRef.current) {
-                clearInterval(progressIntervalRef.current);
-            }
-            return;
-        }
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+
+        if (!playing) return;
 
         progressIntervalRef.current = setInterval(() => {
-            if (audioRef.current && audioRef.current.duration) {
-                const played = audioRef.current.currentTime / audioRef.current.duration;
+            const active = getActive();
+            if (active && active.duration) {
+                const played = active.currentTime / active.duration;
                 onProgress({
                     played,
-                    playedSeconds: audioRef.current.currentTime,
-                    loaded: audioRef.current.buffered.length > 0
-                        ? audioRef.current.buffered.end(0) / audioRef.current.duration
+                    playedSeconds: active.currentTime,
+                    loaded: active.buffered.length > 0
+                        ? active.buffered.end(0) / active.duration
                         : 0,
-                    loadedSeconds: audioRef.current.buffered.length > 0
-                        ? audioRef.current.buffered.end(0)
+                    loadedSeconds: active.buffered.length > 0
+                        ? active.buffered.end(0)
                         : 0
                 });
             }
         }, 200);
 
         return () => {
-            if (progressIntervalRef.current) {
-                clearInterval(progressIntervalRef.current);
-            }
+            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    }, [playing, onProgress]);
+    }, [playing, onProgress, activeId]);
 
-    // Media Session API Integration
-    useEffect(() => {
-        if (!playing || !url || !navigator.mediaSession) return;
+    // Event Handlers helper
+    const handleEvent = (e: React.SyntheticEvent<HTMLAudioElement>, type: 'ended' | 'duration' | 'error') => {
+        const target = e.currentTarget;
+        // Verify this event comes from the ACTIVE player
+        // We use refs comparison
+        const isPrimary = target === primaryRef.current;
+        const isActivePrimary = activeId === 'primary';
 
-        // Update Metadata
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: title || 'Unknown Title',
-            artist: artist || 'Unknown Artist',
-            album: album || 'Melora',
-            artwork: artwork ? [{ src: artwork, sizes: '512x512', type: 'image/jpeg' }] : []
-        });
+        if (isPrimary !== isActivePrimary) return; // Ignore events from inactive player
 
-        // Update Action Handlers
-        try {
-            if (onPlayPause) {
-                navigator.mediaSession.setActionHandler('play', () => onPlayPause());
-                navigator.mediaSession.setActionHandler('pause', () => onPlayPause());
-            }
-            if (onPrev) {
-                navigator.mediaSession.setActionHandler('previoustrack', () => onPrev());
-            }
-            if (onNext) {
-                navigator.mediaSession.setActionHandler('nexttrack', () => onNext());
-            }
-            navigator.mediaSession.setActionHandler('seekto', (details) => {
-                if (details.seekTime && audioRef.current) {
-                    audioRef.current.currentTime = details.seekTime;
-                }
-            });
-        } catch (e) {
-            console.error("MediaSession action error:", e);
+        if (type === 'ended') onEnded();
+        if (type === 'duration') onDuration(target.duration);
+        if (type === 'error') {
+            const error = target.error;
+            if (error) onError?.(error.message);
         }
+    };
 
-        return () => {
-            if (navigator.mediaSession) {
-                navigator.mediaSession.setActionHandler('play', null);
-                navigator.mediaSession.setActionHandler('pause', null);
-                navigator.mediaSession.setActionHandler('previoustrack', null);
-                navigator.mediaSession.setActionHandler('nexttrack', null);
-                navigator.mediaSession.setActionHandler('seekto', null);
-            }
-        };
-    }, [playing, url, title, artist, album, artwork, onPlayPause, onNext, onPrev]);
-
-    if (!url) {
-        return null;
-    }
+    // Shared Props for audio elements
+    const audioProps = {
+        preload: "auto",
+        style: { display: 'none' },
+        onEnded: (e: any) => handleEvent(e, 'ended'),
+        onLoadedMetadata: (e: any) => handleEvent(e, 'duration'),
+        onError: (e: any) => handleEvent(e, 'error'),
+    };
 
     return (
-        <audio
-            ref={audioRef}
-            onLoadedMetadata={(e) => {
-                const target = e.currentTarget;
-                onDuration(target.duration);
-            }}
-            onError={(e) => {
-                const target = e.currentTarget;
-                const error = target.error;
-                if (error) {
-                    console.error("Audio playback error:", {
-                        code: error.code,
-                        message: error.message
-                    });
-                    let errorMessage = "Unknown playback error";
-                    switch (error.code) {
-                        case 1: errorMessage = "Aborted"; break;
-                        case 2: errorMessage = "Network error"; break;
-                        case 3: errorMessage = "Decoding error"; break;
-                        case 4: errorMessage = "Source not supported"; break;
-                    }
-                    onError?.(errorMessage);
-                }
-            }}
-            onEnded={onEnded}
-            preload="metadata"
-            style={{ display: 'none' }}
-        />
+        <>
+            <audio ref={primaryRef} {...audioProps} />
+            <audio ref={secondaryRef} {...audioProps} />
+        </>
     );
 });
 

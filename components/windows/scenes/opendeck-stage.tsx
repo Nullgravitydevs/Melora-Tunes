@@ -24,6 +24,8 @@ interface OpenDeckStageProps {
     onCinemaMode?: () => void;
     onOpenThemeSelector?: () => void;
     onSnapshotMix?: (mix: Mix) => void;
+    onShowQueue?: () => void;
+    onShareMix?: (mix: Mix) => void;
 }
 
 export function OpenDeckStage({
@@ -37,7 +39,9 @@ export function OpenDeckStage({
     onCreateMix,
     onCinemaMode,
     onOpenThemeSelector,
-    onSnapshotMix
+    onSnapshotMix,
+    onShowQueue,
+    onShareMix
 }: OpenDeckStageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<HTMLDivElement>(null);
@@ -47,7 +51,7 @@ export function OpenDeckStage({
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, togglePlay, next, prev, setVolume, isLoaded
+        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek
     } = usePlayback();
 
     const { playClick, playEject, playClunk } = useAudio();
@@ -237,6 +241,20 @@ export function OpenDeckStage({
                                 </div>
                             </div>
 
+                            {/* Progress Bar */}
+                            <div
+                                className="h-6 px-4 flex items-center cursor-pointer"
+                                onClick={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const p = (e.clientX - rect.left) / rect.width;
+                                    seek(Math.min(Math.max(p, 0), 1));
+                                }}
+                            >
+                                <div className="relative h-1 w-full bg-neutral-200 rounded-full">
+                                    <div className="absolute inset-y-0 left-0 bg-[#2d8652] rounded-full" style={{ width: `${progress * 100}%` }} />
+                                </div>
+                            </div>
+
                             {/* Controls */}
                             <div className="h-12 border-t border-neutral-200 flex items-center justify-center gap-6 px-4">
                                 <button onClick={() => { playClick(); prev(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipBack size={18} className="fill-current" /></button>
@@ -263,7 +281,7 @@ export function OpenDeckStage({
                         <p className="text-base font-light text-[#101814]">{isLoaded ? "Now Playing" : "Waiting"}</p>
                         {activeMix && <p className="text-xs text-neutral-500 truncate max-w-[120px]">{activeMix.title}</p>}
                         <div className="pt-3 space-y-1 text-neutral-400">
-                            <div className="flex items-center justify-end gap-2"><span className="text-[8px] font-bold uppercase">Time</span><span className="text-[9px] font-mono">{formatTime(progress)}/{formatTime(duration || 0)}</span></div>
+                            <div className="flex items-center justify-end gap-2"><span className="text-[8px] font-bold uppercase">Time</span><span className="text-[9px] font-mono">{formatTime(progress * duration)}/{formatTime(duration || 0)}</span></div>
                             <div className="flex items-center justify-end gap-2"><span className="text-[8px] font-bold uppercase">Vol</span><span className="text-[9px] font-mono">{Math.round(volume * 100)}%</span></div>
                         </div>
                     </div>

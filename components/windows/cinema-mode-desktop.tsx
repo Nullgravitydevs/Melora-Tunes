@@ -2,18 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Music2, Play, Pause, SkipBack, SkipForward, LogOut } from "lucide-react";
-// ...
-
-
-import { JioSaavnSong, getLyricsWithFallback } from "@/lib/jiosaavn";
+import { X } from "lucide-react";
+import { JioSaavnSong } from "@/lib/jiosaavn";
 
 interface CinemaModeProps {
     isOpen: boolean;
     onClose: () => void;
     currentSong: JioSaavnSong | null;
     isPlaying: boolean;
-    className?: string; // Allow overriding positioning
+    className?: string;
     showCloseButton?: boolean;
     onPlayPause?: () => void;
     onNext?: () => void;
@@ -35,9 +32,6 @@ export function CinemaModeDesktop({
     isPlaying,
     className,
     showCloseButton = false,
-    onPlayPause,
-    onNext,
-    onPrev
 }: CinemaModeProps) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -62,15 +56,14 @@ export function CinemaModeDesktop({
             .replace(/&gt;/g, '>');
     };
 
-
     return (
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`bg-black flex flex-col overflow-hidden ${className || 'fixed inset-0 z-[100]'}`} // Default to fixed/fullscreen
+            className={`bg-black flex flex-col overflow-hidden ${className || 'fixed inset-0 z-[100]'}`}
         >
-            {/* Background Slideshow or Song Art */}
+            {/* Background Slideshow */}
             <div className="absolute inset-0 overflow-hidden">
                 <AnimatePresence mode="popLayout">
                     <motion.img
@@ -84,13 +77,11 @@ export function CinemaModeDesktop({
                         transition={{ duration: 2, ease: "easeInOut" }}
                     />
                 </AnimatePresence>
-                {/* Gradient removed for full clarity as requested */}
             </div>
 
             {/* Content */}
             <div className="relative z-10 flex-1 flex flex-col p-12">
-                {/* Header */}
-                {/* Header */}
+                {/* Close Button */}
                 {showCloseButton && (
                     <div className="absolute top-8 right-8 z-50">
                         <button
@@ -102,7 +93,7 @@ export function CinemaModeDesktop({
                     </div>
                 )}
 
-                {/* Main Content */}
+                {/* Song Info at bottom */}
                 <div className="flex-1 flex flex-col justify-end pb-12">
                     {currentSong && (
                         <motion.div
@@ -119,14 +110,6 @@ export function CinemaModeDesktop({
                             </p>
                         </motion.div>
                     )}
-
-                    {/* Static Scrollable Lyrics - Bottom Right (Hidden Scrollbar) */}
-                    {/* Static Scrollable Lyrics - Bottom Right (Hidden Scrollbar) */}
-
-
-                    {/* Desktop Controls Overlay - REMOVED as per user request */}
-                    {/* Only Show close button at top - kept */}
-                    {/* User wants only images + lyrics + close button */}
                 </div>
             </div>
         </motion.div>

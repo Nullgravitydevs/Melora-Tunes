@@ -6,7 +6,7 @@ import { useAudio } from "@/hooks/use-audio";
 import { ThemeConfig, ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useState, useRef } from "react";
 import { decodeHtml } from "@/lib/utils";
-import { Download, Upload, Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera } from "lucide-react";
+import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc } from "lucide-react";
 import { Visualizer } from "@/components/ui/visualizer";
 import { Mix } from "@/components/providers/playback-context";
 
@@ -22,10 +22,13 @@ interface studioStageProps {
     onCinemaMode?: () => void;
     onOpenThemeSelector?: () => void;
     onSnapshotMix?: (mix: any) => void;
+    onShowLyrics?: () => void;
+    onShowQueue?: () => void;
+    onShareMix?: (mix: any) => void;
 }
 
 
-export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector }: studioStageProps) {
+export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowLyrics, onShowQueue, onShareMix }: studioStageProps) {
     const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +90,10 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
 
     return (
         <div ref={containerRef} className="bg-black text-gray-100 min-h-screen flex flex-col font-sans overflow-x-hidden selection:bg-purple-500 selection:text-white">
+            <style jsx global>{`
+                ::-webkit-scrollbar { display: none; }
+                * { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             {/* Header */}
             <header className="w-full px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4 z-10 relative">
                 <div className="flex items-center gap-3 select-none">
@@ -98,13 +105,6 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <button className="p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10" title="Backup Library">
-                        <Download size={20} />
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10" title="Restore Library">
-                        <Upload size={20} />
-                    </button>
-
                     <button
                         onClick={() => { playClick(); onOpenSettings?.(); }}
                         className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
@@ -166,7 +166,6 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
 
                             return (
                                 <motion.div
-                                    layoutId={mix.id}
                                     key={mix.id}
                                     drag
                                     dragConstraints={containerRef}
@@ -298,26 +297,22 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
 
                 {/* Right Column: Player */}
                 <section className="lg:col-span-5 sticky top-8 z-50">
-                    <motion.div
+                    <div
                         ref={playerRef}
-                        drag
-                        dragConstraints={containerRef}
-                        dragElastic={0.1}
-                        dragMomentum={true}
-                        className="bg-[#f8fafc] text-gray-800 rounded-2xl p-4 md:p-5 shadow-2xl border-4 border-gray-300 relative overflow-hidden ring-1 ring-black/5 max-w-[340px] cursor-grab active:cursor-grabbing"
+                        className="bg-[#f8fafc] text-gray-800 rounded-2xl p-4 md:p-5 shadow-2xl border-4 border-gray-300 relative overflow-hidden ring-1 ring-black/5 max-w-[340px]"
                     >
                         {/* Corner Screws */}
                         <div className="absolute top-4 left-4 text-gray-400">
-                            <span className="material-icons-round text-sm">add</span>
+                            <Plus size={14} />
                         </div>
                         <div className="absolute top-4 right-4 text-gray-400">
-                            <span className="material-icons-round text-sm">add</span>
+                            <Plus size={14} />
                         </div>
                         <div className="absolute bottom-4 left-4 text-gray-400">
-                            <span className="material-icons-round text-sm">add</span>
+                            <Plus size={14} />
                         </div>
                         <div className="absolute bottom-4 right-4 text-gray-400">
-                            <span className="material-icons-round text-sm">add</span>
+                            <Plus size={14} />
                         </div>
 
                         {/* Title */}
@@ -341,7 +336,6 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
 
                             {hasCassette && activeMix ? (
                                 <motion.div
-                                    layoutId={activeMix.id}
                                     className="w-[95%] h-[92%] rounded-md shadow-lg border-t border-l border-white/20 border-b border-r border-black/30 p-1.5 flex flex-col justify-between relative z-10"
                                     style={{
                                         backgroundColor: activeMix.color === 'purple' ? '#9333ea' :
@@ -438,21 +432,19 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
                                 onClick={() => { playClick(); prev(); }}
                                 className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-2 border-blue-300"
                             >
-                                <span className="material-icons-round text-xl drop-shadow-md">skip_previous</span>
+                                <SkipBack size={20} className="drop-shadow-md" />
                             </button>
                             <button
                                 onClick={() => { playClick(); togglePlay(); }}
                                 className="w-14 h-14 rounded-full bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-4 border-blue-300 z-10"
                             >
-                                <span className="material-icons-round text-3xl ml-0.5 drop-shadow-md">
-                                    {isPlaying ? 'pause' : 'play_arrow'}
-                                </span>
+                                {isPlaying ? <Pause size={28} className="drop-shadow-md" /> : <Play size={28} className="drop-shadow-md pl-0.5" />}
                             </button>
                             <button
                                 onClick={() => { playClick(); next(); }}
                                 className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-2 border-blue-300"
                             >
-                                <span className="material-icons-round text-xl drop-shadow-md">skip_next</span>
+                                <SkipForward size={20} className="drop-shadow-md" />
                             </button>
                         </div>
 
@@ -473,12 +465,17 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
                                 onClick={() => { playEject(); loadMix(""); }}
                                 className="flex flex-col items-center cursor-pointer hover:text-blue-600 transition-colors"
                             >
-                                <span className="material-icons-round text-sm">eject</span>
+                                <Disc size={14} />
                                 <span className="mt-0.5 tracking-widest text-[9px]">EJECT</span>
                             </button>
 
+
+
+
+
+
                             <div className="flex items-center gap-2 w-24">
-                                <span className="material-icons-round text-base text-gray-400">volume_up</span>
+                                <Volume2 size={14} className="text-gray-400" />
                                 <div
                                     className="h-1 flex-grow bg-gray-300 rounded-full relative cursor-pointer"
                                     onPointerDown={(e) => e.stopPropagation()}
@@ -496,7 +493,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
                                 </div>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 </section>
             </main>
         </div >

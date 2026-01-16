@@ -21,9 +21,11 @@ interface BauhausStageProps {
     onCinemaMode?: () => void;
     onOpenThemeSelector?: () => void;
     onSnapshotMix?: (mix: any) => void;
+    onShowQueue?: () => void;
+    onShareMix?: (mix: any) => void;
 }
 
-export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector }: BauhausStageProps) {
+export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix }: BauhausStageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
@@ -326,7 +328,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         {/* Progress */}
                         <div className="space-y-1">
                             <div className="flex justify-between font-mono text-[10px] text-gray-400 uppercase tracking-widest">
-                                <span>{formatTime(progress)}</span>
+                                <span>{formatTime(progress * duration)}</span>
                                 <span>Side A</span>
                                 <span>{formatTime(duration || 0)}</span>
                             </div>
@@ -336,7 +338,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                     if (duration && isLoaded) {
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         const percent = (e.clientX - rect.left) / rect.width;
-                                        seek(percent * duration);
+                                        seek(percent);
                                     }
                                 }}
                             >

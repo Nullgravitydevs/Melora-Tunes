@@ -269,3 +269,104 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
         return null;
     }
 }
+
+// --- HELPER FUNCTION FOR ALL PLATFORMS ---
+async function fetchApi(params: string): Promise<any> {
+    try {
+        const urlStr = params.startsWith('?') ? params.slice(1) : params;
+
+        if (Capacitor.isNativePlatform()) {
+            const url = `https://www.jiosaavn.com/api.php?${urlStr}`;
+            const res = await CapacitorHttp.get({ url });
+            return res.data;
+        } else if (isElectron) {
+            const url = `https://www.jiosaavn.com/api.php?${urlStr}`;
+            const res = await fetch(url);
+            return await res.json();
+        } else {
+            // Web Proxy
+            const url = `/api/proxy?${urlStr}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return await res.json();
+        }
+    } catch (e) {
+        console.error("API Fetch Error:", e);
+        return null;
+    }
+}
+
+export async function getTopCharts(): Promise<any[]> {
+    const data = await fetchApi('__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0');
+    // Ensure it's an array, otherwise return empty
+    return Array.isArray(data) ? data : [];
+}
+
+export async function getTrending(): Promise<JioSaavnSong[]> {
+    // Placeholder - getLaunchData is complex.
+    return [];
+}
+
+export async function getRecommendations(songId: string, limit: number = 5): Promise<JioSaavnSong[]> {
+    const data = await fetchApi(`__call=reco.getreco&api_version=4&_format=json&ctx=wap6dot0&pid=${songId}&n=${limit}`);
+
+    if (!data || !Array.isArray(data)) return [];
+
+    return data.map(mapToSong);
+}
+
+export async function getPlaylistDetails(id: string): Promise<JioSaavnSong[]> {
+    const data = await fetchApi(`__call=playlist.getDetails&api_version=4&_format=json&ctx=wap6dot0&listid=${id}`);
+
+    // Playlist structure can vary
+    const list = data?.list || data?.songs || [];
+    if (!Array.isArray(list)) return [];
+
+    return list.map(mapToSong);
+}
+
+export async function getAlbumDetails(id: string): Promise<JioSaavnSong[]> {
+    const data = await fetchApi(`__call=content.getAlbumDetails&api_version=4&_format=json&ctx=wap6dot0&albumid=${id}`);
+
+    // Album structure can vary
+    const list = data?.list || data?.songs || [];
+    if (!Array.isArray(list)) return [];
+
+    return list.map(mapToSong);
+}
+
+// Helper to map API response to JioSaavnSong
+function mapToSong(item: any): JioSaavnSong {
+    const title = item.title || item.name || item.song || `[Unknown]`;
+    const encryptedUrl = item.more_info?.encrypted_media_url || item.encrypted_media_url || "";
+
+    return {
+        id: item.id,
+        name: title,
+        type: item.type,
+        album: {
+            id: item.more_info?.album_id || '',
+            name: item.more_info?.album || '',
+            url: item.more_info?.album_url || ''
+        },
+        year: item.year || item.more_info?.year || '',
+        releaseDate: item.more_info?.release_date || '',
+        duration: parseInt(item.more_info?.duration || item.duration || '0'),
+        label: item.more_info?.label || '',
+        primaryArtists: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.name).join(', ') || item.subtitle || '',
+        featuredArtists: '',
+        explicitContent: item.explicit_content,
+        playCount: parseInt(item.play_count || '0'),
+        language: item.language,
+        hasLyrics: item.more_info?.has_lyrics,
+        url: item.perma_url,
+        copyright: item.more_info?.copyright_text || '',
+        image: [
+            { quality: '500x500', link: (item.image || '').replace(/150x150|50x50/g, '500x500') },
+            { quality: '150x150', link: (item.image || '').replace(/50x50/g, '150x150') },
+            { quality: '50x50', link: (item.image || '').replace(/150x150/g, '50x50') }
+        ],
+        downloadUrl: [],
+        encryptedMediaUrl: encryptedUrl
+    };
+}

@@ -24,6 +24,9 @@ interface NordicStageProps {
     onCinemaMode?: () => void;
     onOpenThemeSelector?: () => void;
     onSnapshotMix?: (mix: Mix) => void;
+    onShowLyrics?: () => void;
+    onShowQueue?: () => void;
+    onShareMix?: (mix: Mix) => void;
 }
 
 export function NordicStage({
@@ -37,7 +40,10 @@ export function NordicStage({
     onCreateMix,
     onCinemaMode,
     onOpenThemeSelector,
-    onSnapshotMix
+    onSnapshotMix,
+    onShowLyrics,
+    onShowQueue,
+    onShareMix
 }: NordicStageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const {
@@ -189,7 +195,7 @@ export function NordicStage({
                             {/* Progress Bar */}
                             <div className="mb-6">
                                 <div className="flex justify-between text-[10px] font-mono text-slate-500 mb-2">
-                                    <span>{formatTime(progress)}</span>
+                                    <span>{formatTime(progress * duration)}</span>
                                     <span>{formatTime(duration || 0)}</span>
                                 </div>
                                 <div
@@ -198,7 +204,7 @@ export function NordicStage({
                                         if (duration && isLoaded) {
                                             const rect = e.currentTarget.getBoundingClientRect();
                                             const percent = (e.clientX - rect.left) / rect.width;
-                                            seek(percent * duration);
+                                            seek(percent);
                                         }
                                     }}
                                 >

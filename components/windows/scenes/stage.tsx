@@ -8,11 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Plus, Maximize2, Pencil, Camera, Download, Upload, MoreHorizontal, Settings, Smartphone, Palette } from "lucide-react";
 import { useAudio } from "@/hooks/use-audio";
 import { JioSaavnSong, getSongDetails } from "@/lib/jiosaavn";
+import { decodeHtml } from "@/lib/utils";
 import { DeckStage } from "./deck-stage";
 import { ZenStage } from "./zen-stage";
 import { BauhausStage } from "./bauhaus-stage";
 import { NordicStage } from "./nordic-stage";
 import { OpenDeckStage } from "./opendeck-stage";
+import { BoomboxStage } from "./boombox-stage";
+import { SilverFrostStage } from "./silverfrost-stage";
+import { GlassStage } from "./glass-stage";
 import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
@@ -22,8 +26,10 @@ import { InstallPrompt } from "@/components/ui/install-prompt";
 import { toPng } from "html-to-image";
 import { CinemaModeDesktop } from "../cinema-mode-desktop";
 import { QueueModal } from "@/components/ui/queue-modal";
-import { LyricsModal } from "@/components/ui/lyrics-modal";
+import { ShareMixModal } from "@/components/ui/share-mix-modal";
 import { DesktopThemeSelector } from "@/components/ui/desktop-theme-selector";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { WelcomeScreen } from "@/components/windows/scenes/welcome-screen";
 
 interface StageProps {
     onSwitchToMobile?: () => void;
@@ -38,7 +44,9 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         setMixes, loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
         addMix, updateMix, deleteMix, isLoaded,
-        shuffle, setShuffle, repeat, setRepeat
+        shuffle, setShuffle, repeat, setRepeat,
+        queue, currentIndex,
+        notificationsEnabled
     } = usePlayback();
 
     // UI State (Local)
@@ -46,19 +54,24 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchTargetMixId, setSearchTargetMixId] = useState<string | null>(null);
     const [newMixTitle, setNewMixTitle] = useState("");
-    const [currentTheme, setCurrentTheme] = useState<ThemeKey>('ZEN');
+    const [currentTheme, setCurrentTheme] = useState<ThemeKey>('BOOMBOX');
     const [isCinemaMode, setIsCinemaMode] = useState(false);
     const [editingMix, setEditingMix] = useState<Mix | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isQueueOpen, setIsQueueOpen] = useState(false);
-    const [isLyricsOpen, setIsLyricsOpen] = useState(false);
+    const [isShareOpen, setIsShareOpen] = useState(false);
+    const [shareMix, setShareMix] = useState<Mix | null>(null);
     const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'error' }[]>([]);
+    const [isWelcome, setIsWelcome] = useState(true);
 
     const playerRef = useRef<HTMLDivElement>(null);
     const { playClick, playClunk, playInsert } = useAudio();
 
     // Init Theme from LocalStorage
+    const [isMounted, setIsMounted] = useState(false);
+
     useEffect(() => {
+        setIsMounted(true);
         const savedTheme = localStorage.getItem('melora-theme') as ThemeKey;
         if (savedTheme && THEMES[savedTheme]) {
             setCurrentTheme(savedTheme);
@@ -86,110 +99,7 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
         }, 3000);
     };
 
-    // Handle Shared Mix URL
-    useEffect(() => {
-        const sharedMixData = searchParams.get('mix');
-        if (sharedMixData && isLoaded) {
-            try {
-                const decoded = atob(sharedMixData);
-                const { title, color, songIds } = JSON.parse(decoded);
-
-                // Check if already imported
-                const exists = mixes.some(m => m.title === `${title} (Imported)` && m.songs.length === songIds.length);
-                if (exists) {
-                    addToast(`Mix "${title}" already imported.`, "success");
-                    router.replace('/', { scroll: false });
-                    return;
-                }
-
-                addToast("Importing shared mix...", "success");
-
-                // Fetch song details
-                Promise.all(songIds.map((id: string) => getSongDetails(id)))
-                    .then((songs) => {
-                        const validSongs = songs.filter((s): s is JioSaavnSong => s !== null);
-
-                        const newMix: Mix = {
-                            id: crypto.randomUUID(),
-                            title: `${title} (Imported)`,
-                            color: color || 'orange',
-                            songs: validSongs,
-                            currentSongIndex: 0
-                        };
-
-                        addMix(newMix);
-                        addToast(`Imported mix: ${title}`);
-
-                        // Clear URL param
-                        router.replace('/', { scroll: false });
-                    })
-                    .catch(err => {
-                        console.error("Failed to import mix", err);
-                        addToast("Failed to import shared mix", "error");
-                        router.replace('/', { scroll: false });
-                    });
-
-            } catch (e) {
-                console.error("Invalid share data", e);
-                addToast("Invalid share link", "error");
-            }
-        }
-    }, [searchParams, isLoaded, mixes, router, addMix]);
-
-    // Keyboard Shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (
-                document.activeElement?.tagName === 'INPUT' ||
-                document.activeElement?.tagName === 'TEXTAREA' ||
-                isModalOpen ||
-                isSearchOpen ||
-                isCinemaMode ||
-                editingMix
-            ) {
-                return;
-            }
-
-            switch (e.code) {
-                case 'Space':
-                    e.preventDefault();
-                    if (activeMixId) {
-                        togglePlay();
-                    }
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    if (e.ctrlKey || e.metaKey) {
-                        next();
-                    } else if (duration > 0) {
-                        const newTime = Math.min(progress + 0.05, 1);
-                        seek(newTime);
-                    }
-                    break;
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    if (e.ctrlKey || e.metaKey) {
-                        prev();
-                    } else if (duration > 0) {
-                        const newTime = Math.max(progress - 0.05, 0);
-                        seek(newTime);
-                    }
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    setVolume(Math.min(volume + 0.1, 1));
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    setVolume(Math.max(volume - 0.1, 0));
-                    break;
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeMixId, isModalOpen, isSearchOpen, isCinemaMode, editingMix, progress, duration, volume, togglePlay, seek, setVolume]);
-
+    const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
 
     const handleSeek = (amount: number) => {
         seek(amount);
@@ -247,7 +157,7 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
             if (current) {
                 updateMix(targetMixId, { songs: [...current.songs, song] });
                 playClick();
-                addToast(`Added "${song.name}" to mix`);
+                addToast(`Added "${decodeHtml(song.name)}" to mix`);
             }
         }
     };
@@ -383,43 +293,63 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
         }
     };
 
-
-    const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
-
-    // --- RENDER CUSTOM LAYOUT STAGES (Studio, Zen, Bauhaus) ---
-    // --- RENDER STAGE ---
     const layout = THEMES[currentTheme]?.layout || 'zen';
     const StageComponent =
         layout === 'zen' ? ZenStage :
             layout === 'bauhaus' ? BauhausStage :
                 layout === 'nordic' ? NordicStage :
                     layout === 'opendeck' ? OpenDeckStage :
-                        DeckStage;
+                        layout === 'boombox' ? BoomboxStage :
+                            layout === 'silverfrost' ? SilverFrostStage :
+                                layout === 'glass' ? GlassStage :
+                                    DeckStage;
+
+    if (!isMounted) return null; // Prevent hydration mismatch/flash
+
+
+    const handleSelectMode = (mode: ThemeKey) => {
+        setIsWelcome(false);
+        setCurrentTheme(mode);
+        // localStorage.setItem('melora-theme', mode);
+    };
+
+    if (!isMounted) return null; // Prevent hydration mismatch/flash
+
+    if (isWelcome) {
+        return <WelcomeScreen onSelectMode={handleSelectMode} />;
+    }
 
     return (
         <>
-            <StageComponent
-                currentTheme={currentTheme}
-                onThemeChange={handleThemeChange}
-                onSelectTheme={(theme: ThemeKey) => {
-                    setCurrentTheme(theme);
-                    localStorage.setItem('melora-theme', theme);
-                }}
-                onSwitchToMobile={onSwitchToMobile}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-                onEditMix={(mix) => setEditingMix(mix)}
-                onOpenSearch={(mixId) => {
-                    setSearchTargetMixId(mixId);
-                    setIsSearchOpen(true);
-                }}
-                onCreateMix={() => {
-                    setNewMixTitle(`Mixtape Vol. ${mixes.length + 1}`);
-                    setIsModalOpen(true);
-                }}
-                onCinemaMode={() => setIsCinemaMode(true)}
-                onOpenThemeSelector={() => setIsThemeSelectorOpen(true)}
-                onSnapshotMix={handleLibrarySnapshot}
-            />
+            <ErrorBoundary>
+                <StageComponent
+                    currentTheme={currentTheme}
+                    onThemeChange={handleThemeChange}
+                    onSelectTheme={(theme: ThemeKey) => {
+                        setCurrentTheme(theme);
+                        localStorage.setItem('melora-theme', theme);
+                    }}
+                    onSwitchToMobile={onSwitchToMobile}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                    onEditMix={(mix) => setEditingMix(mix)}
+                    onOpenSearch={(mixId) => {
+                        setSearchTargetMixId(mixId);
+                        setIsSearchOpen(true);
+                    }}
+                    onCreateMix={() => {
+                        setNewMixTitle(`Mixtape Vol. ${mixes.length + 1}`);
+                        setIsModalOpen(true);
+                    }}
+                    onCinemaMode={() => setIsCinemaMode(true)}
+                    onOpenThemeSelector={() => setIsThemeSelectorOpen(true)}
+                    onSnapshotMix={handleLibrarySnapshot}
+                    onShowQueue={() => setIsQueueOpen(true)}
+                    onShareMix={(mix) => {
+                        setShareMix(mix);
+                        setIsShareOpen(true);
+                    }}
+                />
+            </ErrorBoundary>
 
             <DesktopThemeSelector
                 isOpen={isThemeSelectorOpen}
@@ -516,35 +446,63 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
                 onClose={() => setIsSettingsOpen(false)}
             />
 
+
+
+            {/* Queue Modal */}
+            <QueueModal
+                isOpen={isQueueOpen}
+                onClose={() => setIsQueueOpen(false)}
+                queue={queue}
+                currentIndex={currentIndex}
+                onJumpTo={(index) => {
+                    // Jump to a specific song in the queue
+                    const mix = mixes.find(m => m.id === activeMixId);
+                    if (mix) {
+                        updateMix(mix.id, { currentSongIndex: index });
+                    }
+                }}
+            />
+
+            {/* Share Mix Modal */}
+            <ShareMixModal
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
+                mix={shareMix}
+            />
+
             {/* Search Modal */}
-            {isSearchOpen && (
-                <SearchModal
-                    isOpen={isSearchOpen}
-                    onClose={() => setIsSearchOpen(false)}
-                    onAddSong={handleAddSong}
-                    favorites={new Set((mixes.find(m => m.id === 'favorites')?.songs || []).map(s => s.id))}
-                    onToggleFavorite={handleToggleFavorite}
-                />
-            )}
+            {
+                isSearchOpen && (
+                    <SearchModal
+                        isOpen={isSearchOpen}
+                        onClose={() => setIsSearchOpen(false)}
+                        onAddSong={handleAddSong}
+                        favorites={new Set((mixes.find(m => m.id === 'favorites')?.songs || []).map(s => s.id))}
+                        onToggleFavorite={handleToggleFavorite}
+                    />
+                )
+            }
 
             {/* Edit Mix Modal */}
-            {editingMix && (
-                <EditMixModal
-                    isOpen={!!editingMix}
-                    mix={editingMix}
-                    onClose={() => setEditingMix(null)}
-                    onUpdateMix={(updatedMix: Mix) => {
-                        updateMix(updatedMix.id, updatedMix);
-                        setEditingMix(null);
-                        addToast(`Updated "${updatedMix.title}"`);
-                    }}
-                    onDeleteMix={(mixId: string) => {
-                        deleteMix(mixId);
-                        setEditingMix(null);
-                        addToast("Mixtape deleted");
-                    }}
-                />
-            )}
+            {
+                editingMix && (
+                    <EditMixModal
+                        isOpen={!!editingMix}
+                        mix={editingMix}
+                        onClose={() => setEditingMix(null)}
+                        onUpdateMix={(updatedMix: Mix) => {
+                            updateMix(updatedMix.id, updatedMix);
+                            setEditingMix(null);
+                            addToast(`Updated "${updatedMix.title}"`);
+                        }}
+                        onDeleteMix={(mixId: string) => {
+                            deleteMix(mixId);
+                            setEditingMix(null);
+                            addToast("Mixtape deleted");
+                        }}
+                    />
+                )
+            }
 
             {/* Toast Container */}
             <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-2 pointer-events-none">

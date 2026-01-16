@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Shuffle, Repeat, Repeat1, ListMusic, Music2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react";
 import { Visualizer } from "./visualizer";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
@@ -28,7 +28,6 @@ export interface PlayerProps {
     repeat?: 'off' | 'one' | 'all';
     onRepeatToggle?: () => void;
     onOpenQueue?: () => void;
-    onOpenLyrics?: () => void;
 
     className?: string;
     dragConstraints?: React.RefObject<Element>;
@@ -37,7 +36,7 @@ export interface PlayerProps {
     currentTheme?: ThemeKey;
 }
 
-export type LayoutType = 'cassette' | 'studio' | 'zen' | 'bauhaus' | 'nordic' | 'opendeck';
+export type LayoutType = 'cassette' | 'studio' | 'zen' | 'bauhaus' | 'nordic' | 'opendeck' | 'boombox' | 'silverfrost' | 'glass';
 
 export interface ThemeConfig {
     name: string;
@@ -108,6 +107,39 @@ export const THEMES: Record<string, ThemeConfig> = {
         lcdBg: "bg-neutral-200",
         buttonBg: "bg-white",
         playButtonBg: "bg-[#2d8652]"
+    },
+    BOOMBOX: {
+        name: "Sport Boombox Edition",
+        layout: 'boombox',
+        bodyGradient: "bg-yellow-400",
+        screenBg: "bg-[#3e2f24]",
+        cassetteBg: "bg-neutral-800",
+        labelBg: "bg-yellow-100",
+        lcdBg: "bg-[#9ea792]",
+        buttonBg: "bg-zinc-700",
+        playButtonBg: "bg-blue-500"
+    },
+    SILVERFROST: {
+        name: "Silver Frost Lab Edition",
+        layout: 'silverfrost',
+        bodyGradient: "bg-[#f7f7f8]",
+        screenBg: "bg-[#f7f7f8]",
+        cassetteBg: "bg-white/40",
+        labelBg: "bg-white",
+        lcdBg: "bg-black",
+        buttonBg: "bg-white/40",
+        playButtonBg: "bg-[#00aaff]"
+    },
+    GLASS: {
+        name: "Glass OS (Discovery Mode)",
+        layout: 'glass',
+        bodyGradient: "bg-black",
+        screenBg: "bg-black",
+        cassetteBg: "bg-transparent",
+        labelBg: "bg-transparent",
+        lcdBg: "bg-transparent",
+        buttonBg: "bg-transparent",
+        playButtonBg: "bg-transparent"
     }
 };
 
@@ -120,7 +152,7 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
         isPlaying, hasCassette, cassetteTitle, cassetteColor = "orange", currentSong,
         onPlayToggle, onNext, onPrev, volume, onVolumeChange,
         progress = 0, onSeek, shuffle, onShuffleToggle, repeat = 'off', onRepeatToggle,
-        onOpenQueue, onOpenLyrics, className, dragConstraints, drag = true, onEject
+        onOpenQueue, className, dragConstraints, drag = true, onEject
     } = props;
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -355,17 +387,7 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
                         >
                             <ListMusic className="w-4 h-4" />
                         </motion.button>
-                        <motion.button
-                            onClick={() => { playClick(); onOpenLyrics?.(); }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                            className="flex items-center justify-center rounded-full size-9 shadow-md transition-all duration-300 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white hover:shadow-lg"
-                            title="Show Lyrics"
-                            aria-label="Show Lyrics"
-                        >
-                            <Music2 className="w-4 h-4" />
-                        </motion.button>
+
                     </div>
 
                     {/* Control Buttons */}
@@ -548,8 +570,8 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
                         className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner cursor-pointer"
                         onClick={(e) => {
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const p = (e.clientX - rect.left) / rect.width;
-                            onSeek(p);
+                            const newP = (e.clientX - rect.left) / rect.width;
+                            if (onSeek) onSeek(newP);
                         }}
                     >
                         <motion.div className="h-full bg-gray-800 dark:bg-black" style={{ width: `${progress * 100}%` }} />
