@@ -79,6 +79,19 @@ interface GlassStageProps {
     onShareMix: (mix: Mix) => void;
 }
 
+const prioritizeTelugu = (items: any[]) => {
+    return [...items].sort((a, b) => {
+        const strA = (a.title || a.listname || a.name || a.language || "").toLowerCase();
+        const strB = (b.title || b.listname || b.name || b.language || "").toLowerCase();
+        // Weighted sorting: Explicit "Telugu" language or title gets priority
+        const isTelA = strA.includes('telugu');
+        const isTelB = strB.includes('telugu');
+        if (isTelA && !isTelB) return -1;
+        if (!isTelA && isTelB) return 1;
+        return 0;
+    });
+};
+
 export function GlassStage({
     onOpenSearch,
     onOpenThemeSelector,
@@ -125,10 +138,12 @@ export function GlassStage({
                 // 1. Get Generic Charts
                 const data = await getTopCharts();
                 if (Array.isArray(data)) {
-                    setCharts(data);
+                    // Sort charts to show Telugu first
+                    const sortedCharts = prioritizeTelugu(data);
+                    setCharts(sortedCharts);
                     // Try to find a Telugu chart for hero, else default
                     const teluguChart = data.find((c: any) => (c.title || c.listname || "").toLowerCase().includes("telugu"));
-                    setHeroData(teluguChart || data[0]);
+                    setHeroData(teluguChart || sortedCharts[0]);
                 }
 
                 // 2. Explicitly Fetch Telugu Hits for "TFI Section"
@@ -176,7 +191,9 @@ export function GlassStage({
         searchTimeout.current = setTimeout(async () => {
             try {
                 const results = await searchSongs(searchQuery);
-                setSearchResults(results);
+                // Sort results: Telugu First
+                const sortedResults = prioritizeTelugu(results);
+                setSearchResults(sortedResults);
             } catch (e) {
                 console.error(e);
             } finally {
@@ -347,7 +364,7 @@ export function GlassStage({
                                     {heroData && (
                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-64 lg:h-72">
                                             <div className="lg:col-span-2 relative rounded-xl overflow-hidden group h-full border border-white/5 cursor-pointer" onClick={() => navigateTo({ type: 'playlist', data: heroData })}>
-                                                <Image src={heroData.image || heroData.img} alt="Hero" fill className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" unoptimized />
+                                                <Image src={(Array.isArray(heroData.image || heroData.img) ? (heroData.image || heroData.img)[1]?.link : (heroData.image || heroData.img)) || ""} alt="Hero" fill className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" unoptimized />
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"></div>
                                                 <div className="absolute inset-0 p-6 flex flex-col justify-between z-10">
                                                     <div>
@@ -369,7 +386,7 @@ export function GlassStage({
                                                     {tfiPicks.map((song, i) => (
                                                         <div key={i} className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-1 rounded transition-colors" onClick={() => handleSongClick(song)}>
                                                             <div className="w-8 h-8 rounded bg-white/10 relative overflow-hidden shrink-0">
-                                                                <Image src={song.image?.[1]?.link || song.image || ""} alt="" fill className="object-cover" unoptimized />
+                                                                <Image src={(Array.isArray(song.image) ? song.image[1]?.link : song.image) || ""} alt="" fill className="object-cover" unoptimized />
                                                             </div>
                                                             <div className="min-w-0 flex-1">
                                                                 <h4 className="text-xs font-medium truncate group-hover:text-orange-400 transition-colors">{decodeHtml(song.name)}</h4>
@@ -450,7 +467,7 @@ export function GlassStage({
                                                     <div className="w-8 hidden group-hover:flex justify-center text-white"><Play size={14} fill="currentColor" /></div>
 
                                                     <div className="w-10 h-10 rounded bg-gray-800 ml-2 mr-4 overflow-hidden shadow relative shrink-0">
-                                                        <Image src={song.image?.[1]?.link || song.image || ""} alt="Art" fill className="object-cover" unoptimized />
+                                                        <Image src={(Array.isArray(song.image) ? song.image[1]?.link : song.image) || ""} alt="Art" fill className="object-cover" unoptimized />
                                                     </div>
 
                                                     <div className="flex-1 min-w-0">
@@ -491,7 +508,7 @@ export function GlassStage({
                                                         onClick={() => handleSongClick(song)}
                                                     >
                                                         <div className="w-10 h-10 rounded bg-gray-800 mr-3 overflow-hidden shadow relative shrink-0">
-                                                            <Image src={song.image?.[1]?.link || song.image || ""} alt="Art" fill className="object-cover" unoptimized />
+                                                            <Image src={(Array.isArray(song.image) ? song.image[1]?.link : song.image) || ""} alt="Art" fill className="object-cover" unoptimized />
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <h4 className="text-white font-medium text-sm truncate">{decodeHtml(song.name)}</h4>
