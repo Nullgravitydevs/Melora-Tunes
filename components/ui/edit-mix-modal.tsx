@@ -6,13 +6,7 @@ import { X, Trash2, ArrowUp, ArrowDown, Save, Share2 } from "lucide-react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 
-interface Mix {
-    id: string;
-    title: string;
-    color: "orange" | "purple" | "white" | "green" | "red";
-    songs: JioSaavnSong[];
-    currentSongIndex: number;
-}
+import { Mix } from "@/components/providers/playback-context";
 
 interface EditMixModalProps {
     isOpen: boolean;

@@ -137,8 +137,8 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                                     <button
                                         onClick={copyToClipboard}
                                         className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all ${copied
-                                                ? 'bg-green-500 text-white'
-                                                : 'bg-blue-500 hover:bg-blue-400 text-white'
+                                            ? 'bg-green-500 text-white'
+                                            : 'bg-blue-500 hover:bg-blue-400 text-white'
                                             }`}
                                     >
                                         {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -148,7 +148,7 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                             </div>
 
                             {/* Native Share Button (if supported) */}
-                            {typeof navigator !== 'undefined' && navigator.share && (
+                            {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
                                 <button
                                     onClick={shareNative}
                                     className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-medium hover:from-blue-400 hover:to-purple-400 transition-all flex items-center justify-center gap-2"

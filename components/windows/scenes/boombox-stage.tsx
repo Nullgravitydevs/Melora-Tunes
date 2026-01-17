@@ -5,7 +5,7 @@ import { motion, useMotionValue } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-    Palette, Smartphone, Settings, Plus, Tv, Pencil, Camera, Search
+    Palette, Smartphone, Settings, Plus, Tv, Pencil, Camera, Search, Share2
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -17,7 +17,7 @@ interface BoomboxStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -42,7 +42,8 @@ function DraggablePolaroid({
     onHoverPlayer,
     onEditMix,
     onSnapshotMix,
-    onOpenSearch
+    onOpenSearch,
+    onShareMix
 }: {
     mix: Mix;
     initialX: number;
@@ -56,6 +57,7 @@ function DraggablePolaroid({
     onEditMix?: (mix: Mix) => void;
     onSnapshotMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
+    onShareMix?: (mix: Mix) => void;
 }) {
     const x = useMotionValue(initialX);
     const y = useMotionValue(initialY);
@@ -124,6 +126,7 @@ function DraggablePolaroid({
                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-1">
                             <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Edit Mix"><Pencil size={12} className="text-gray-700" /></button>
                             <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Share"><Share2 size={12} className="text-gray-700" /></button>
                             <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
                         </div>
                     )}
@@ -152,7 +155,7 @@ const getInitialPositions = (count: number): { x: number, y: number, rotation: n
 };
 
 export function BoomboxStage({
-    currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings,
+    currentTheme, onThemeChange, onSelectTheme, onOpenSettings,
     onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onSnapshotMix, onShowQueue, onShareMix
 }: BoomboxStageProps) {
     const playerRef = useRef<HTMLDivElement>(null);
@@ -222,7 +225,7 @@ export function BoomboxStage({
                     </button>
                 </nav>
                 <div className="flex gap-2">
-                    <button onClick={onSwitchToMobile} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Smartphone size={18} className="text-white" /></button>
+                    {/* Switch Mobile Removed */}
                     <button onClick={onOpenThemeSelector} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Palette size={18} className="text-white" /></button>
                     <button onClick={onOpenSettings} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Settings size={18} className="text-white" /></button>
                 </div>
@@ -335,6 +338,7 @@ export function BoomboxStage({
                         onEditMix={onEditMix}
                         onSnapshotMix={onSnapshotMix}
                         onOpenSearch={onOpenSearch}
+                        onShareMix={onShareMix}
                     />
                 );
             })}

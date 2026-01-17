@@ -1,265 +1,439 @@
 "use client";
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings as SettingsIcon, Palette, Volume2, Database, BarChart3, Monitor, Smartphone, Disc, Sliders } from 'lucide-react';
-import { usePlayback } from '@/components/providers/playback-context';
-import { saveSettings, clearCache, resetSettings } from '@/lib/settings';
-import { decodeHtml } from "@/lib/utils";
-import { getStats, GlobalStats } from "@/lib/stats";
+
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio } from "lucide-react";
+import { useState, useEffect } from "react";
+import { usePlayback } from "@/components/providers/playback-context";
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSwitchLayout?: (layout: 'glass' | 'deck' | 'ipod') => void;
-    currentLayout?: 'glass' | 'deck' | 'ipod';
+    onSwitchLayout?: (layout: 'deck' | 'ipod' | 'discovery') => void;
+    currentLayout?: 'deck' | 'ipod' | 'discovery';
 }
 
-// Theme options
-const THEMES = [
-    { id: 'onyx', name: 'Monochrome Onyx', desc: 'Deep blacks and sharp whites', preview: 'bg-gradient-to-br from-zinc-900 to-black' },
-    { id: 'midnight', name: 'Midnight Glass', desc: 'Blur, translucency, and depth', preview: 'bg-gradient-to-br from-blue-900/50 to-purple-900/50' },
-    { id: 'deep', name: 'Deep Black', desc: 'Pure OLED black, minimal light', preview: 'bg-black' },
-];
+type SettingsTab = 'layout' | 'audio' | 'data' | 'about';
 
-export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'glass' }: DesktopSettingsModalProps) {
+export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const {
         bitrate, setBitrate,
         crossfadeDuration, setCrossfadeDuration,
-        shuffle, setShuffle,
-        repeat, setRepeat,
+        playbackSpeed, setPlaybackSpeed,
         sleepTimer, setSleepTimer,
-        stopAtEndOfSong, setStopAtEndOfSong,
-        volume, setVolume,
-        mixes, setMixes,
-        notificationsEnabled, setNotificationsEnabled
+        mixes, setMixes
     } = usePlayback();
 
-    const [stats, setStats] = useState<GlobalStats | null>(null);
-    const [activeTab, setActiveTab] = useState<'appearance' | 'audio' | 'data' | 'stats'>('appearance');
-    const [selectedTheme, setSelectedTheme] = useState('onyx');
-    const [normalizeVolume, setNormalizeVolume] = useState(false);
+    // UI State for things not yet in context
+    const [normalize, setNormalize] = useState(false);
 
-    useEffect(() => {
-        if (isOpen && activeTab === 'stats') {
-            setStats(getStats());
-        }
-    }, [isOpen, activeTab]);
+    const [activeTab, setActiveTab] = useState<SettingsTab>('layout');
 
     if (!isOpen) return null;
 
+    const tabs = [
+        { id: 'layout', label: 'Layout Mode', icon: Layout },
+        { id: 'audio', label: 'Audio Quality', icon: Music },
+        { id: 'data', label: 'Data & Storage', icon: Database },
+        { id: 'about', label: 'About Melora', icon: Info },
+    ] as const;
+
     return (
         <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md" onClick={onClose}>
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        transition={{ duration: 0.2 }}
-                        className="bg-[#0a0a0f] border border-white/10 rounded-3xl w-[520px] max-h-[85vh] overflow-hidden shadow-2xl relative"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 pb-4">
-                            <div>
-                                <h2 className="text-2xl font-bold text-white">Settings</h2>
-                                <p className="text-sm text-gray-500">Manage your preferences and app experience</p>
-                            </div>
-                            <button
-                                onClick={onClose}
-                                className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                            >
-                                <X size={20} />
-                            </button>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                onClick={onClose}
+            >
+                <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    className="w-full max-w-4xl h-[600px] bg-zinc-950 border border-zinc-800/50 rounded-2xl shadow-2xl flex overflow-hidden ring-1 ring-white/5"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Sidebar */}
+                    <div className="w-64 bg-zinc-950/50 border-r border-white/5 p-6 flex flex-col gap-8">
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tighter text-white mb-1">Settings</h2>
+                            <p className="text-zinc-500 text-xs uppercase tracking-widest font-medium">Control Center</p>
                         </div>
 
-                        {/* Content - No tabs, just scrollable sections */}
-                        <div className="px-6 pb-6 max-h-[calc(85vh-100px)] overflow-y-auto no-scrollbar space-y-8">
+                        <nav className="flex flex-col gap-2">
+                            {tabs.map((tab) => {
+                                const Icon = tab.icon;
+                                const isActive = activeTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as SettingsTab)}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${isActive
+                                            ? 'bg-white/10 text-white shadow-lg shadow-black/20'
+                                            : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
+                                            }`}
+                                    >
+                                        <Icon size={18} className={isActive ? 'text-white' : 'text-zinc-600'} />
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </nav>
 
-                            {/* Appearance Section */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Palette size={18} className="text-purple-400" />
-                                    <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Appearance</h3>
-                                </div>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {THEMES.map((theme) => (
+                        <div className="mt-auto">
+                            <div className="p-4 rounded-xl bg-gradient-to-br from-purple-900/20 to-blue-900/10 border border-white/5">
+                                <p className="text-xs text-zinc-400 font-mono">Melora Tunes</p>
+                                <p className="text-[10px] text-zinc-600 mt-1">v1.2.0-beta</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content Area */}
+                    <div className="flex-1 bg-gradient-to-br from-zinc-900/20 via-black to-black p-8 overflow-y-auto relative">
+                        <button
+                            onClick={onClose}
+                            className="absolute top-6 right-6 p-2 bg-zinc-900/50 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="max-w-xl mx-auto py-4">
+                            {/* LAYOUT TAB */}
+                            {activeTab === 'layout' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div>
+                                        <h3 className="text-2xl font-bold text-white mb-2">Interface Mode</h3>
+                                        <p className="text-zinc-400 text-sm">Choose your preferred operating experience.</p>
+                                    </div>
+
+                                    <div className="grid gap-4">
+                                        {/* Deck Studio */}
                                         <button
-                                            key={theme.id}
-                                            onClick={() => setSelectedTheme(theme.id)}
-                                            className={`rounded-2xl p-3 border transition-all text-left ${selectedTheme === theme.id
-                                                    ? 'border-blue-500 bg-blue-500/10'
-                                                    : 'border-white/10 hover:border-white/20 bg-white/5'
+                                            onClick={() => onSwitchLayout?.('deck')}
+                                            className={`group relative flex items-start gap-4 p-5 rounded-2xl border transition-all text-left ${currentLayout === 'deck'
+                                                ? 'bg-gradient-to-br from-purple-500/20 to-blue-600/5 border-purple-500/50 ring-1 ring-purple-500/20'
+                                                : 'bg-zinc-900/40 border-white/5 hover:bg-zinc-900/80 hover:border-white/10'
                                                 }`}
                                         >
-                                            <div className={`w-full h-16 rounded-xl mb-3 ${theme.preview} flex items-center justify-center`}>
-                                                <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur"></div>
+                                            <div className={`p-3 rounded-xl ${currentLayout === 'deck' ? 'bg-purple-500 text-white shadow-lg shadow-purple-900/50' : 'bg-zinc-800 text-zinc-400 group-hover:text-zinc-200'}`}>
+                                                <Radio size={24} />
                                             </div>
-                                            <div className="text-xs font-semibold text-white mb-0.5">{theme.name}</div>
-                                            <div className="text-[10px] text-gray-500 leading-tight">{theme.desc}</div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-white text-base">Deck Studio</span>
+                                                    {currentLayout === 'deck' && <span className="bg-purple-500/20 text-purple-300 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Active</span>}
+                                                </div>
+                                                <p className="text-sm text-zinc-400 mt-1 leading-relaxed">
+                                                    Professional cassette deck interface. Features realistic physics, multiple deck themes (Zen, Bauhaus), and tactile controls.
+                                                </p>
+                                            </div>
                                         </button>
-                                    ))}
-                                </div>
-                            </div>
 
-                            {/* Layout Section */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Monitor size={18} className="text-blue-400" />
-                                    <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Layout Mode</h3>
-                                </div>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {[
-                                        { id: 'glass', name: 'Glass Stage', icon: Monitor, desc: 'Modern desktop' },
-                                        { id: 'deck', name: 'Deck Studio', icon: Sliders, desc: 'Pro controls' },
-                                        { id: 'ipod', name: 'iPod Classic', icon: Smartphone, desc: 'Retro vibes' },
-                                    ].map((layout) => (
+                                        {/* Discovery Mode */}
                                         <button
-                                            key={layout.id}
-                                            onClick={() => onSwitchLayout?.(layout.id as any)}
-                                            className={`rounded-2xl p-4 border transition-all text-center ${currentLayout === layout.id
-                                                    ? 'border-blue-500 bg-blue-500/10'
-                                                    : 'border-white/10 hover:border-white/20 bg-white/5'
+                                            onClick={() => onSwitchLayout?.('discovery')}
+                                            className={`group relative flex items-start gap-4 p-5 rounded-2xl border transition-all text-left ${currentLayout === 'discovery'
+                                                ? 'bg-gradient-to-br from-pink-500/20 to-purple-600/5 border-pink-500/50 ring-1 ring-pink-500/20'
+                                                : 'bg-zinc-900/40 border-white/5 hover:bg-zinc-900/80 hover:border-white/10'
                                                 }`}
                                         >
-                                            <layout.icon size={28} className={`mx-auto mb-2 ${currentLayout === layout.id ? 'text-blue-400' : 'text-gray-400'}`} />
-                                            <div className="text-xs font-semibold text-white">{layout.name}</div>
-                                            <div className="text-[10px] text-gray-500">{layout.desc}</div>
+                                            <div className={`p-3 rounded-xl ${currentLayout === 'discovery' ? 'bg-pink-500 text-white shadow-lg shadow-pink-900/50' : 'bg-zinc-800 text-zinc-400 group-hover:text-zinc-200'}`}>
+                                                <Disc size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-white text-base">Discovery Mode OS</span>
+                                                    {currentLayout === 'discovery' && <span className="bg-pink-500/20 text-pink-300 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Active</span>}
+                                                </div>
+                                                <p className="text-sm text-zinc-400 mt-1 leading-relaxed">
+                                                    Modern glassmorphic interface focused on exploration and visuals. Ideal for fullscreen listening and ambient mode.
+                                                </p>
+                                            </div>
                                         </button>
-                                    ))}
-                                </div>
-                            </div>
 
-                            {/* Audio Quality Section */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Volume2 size={18} className="text-green-400" />
-                                    <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Audio Quality</h3>
+                                        {/* iPod Classic */}
+                                        <button
+                                            onClick={() => onSwitchLayout?.('ipod')}
+                                            className={`group relative flex items-start gap-4 p-5 rounded-2xl border transition-all text-left ${currentLayout === 'ipod'
+                                                ? 'bg-gradient-to-br from-blue-500/20 to-cyan-600/5 border-blue-500/50 ring-1 ring-blue-500/20'
+                                                : 'bg-zinc-900/40 border-white/5 hover:bg-zinc-900/80 hover:border-white/10'
+                                                }`}
+                                        >
+                                            <div className={`p-3 rounded-xl ${currentLayout === 'ipod' ? 'bg-blue-500 text-white shadow-lg shadow-blue-900/50' : 'bg-zinc-800 text-zinc-400 group-hover:text-zinc-200'}`}>
+                                                <Smartphone size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-white text-base">iPod Classic</span>
+                                                    {currentLayout === 'ipod' && <span className="bg-blue-500/20 text-blue-300 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Active</span>}
+                                                </div>
+                                                <p className="text-sm text-zinc-400 mt-1 leading-relaxed">
+                                                    Retro mobile simulator with click wheel navigation. Perfect for distraction-free listening.
+                                                </p>
+                                            </div>
+                                        </button>
+                                    </div>
                                 </div>
+                            )}
 
-                                {/* Streaming Quality */}
-                                <div className="bg-white/5 rounded-2xl p-4 mb-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div>
-                                            <div className="text-sm font-medium text-white">Streaming Quality</div>
-                                            <div className="text-xs text-gray-500">Adjust audio fidelity for playback</div>
-                                        </div>
-                                        <div className="flex gap-1 bg-black/30 rounded-lg p-1">
-                                            {['Normal', 'High', 'Lossless'].map((q, i) => {
-                                                const val = ['96', '160', '320'][i];
-                                                return (
+                            {/* AUDIO TAB */}
+                            {activeTab === 'audio' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div>
+                                        <h3 className="text-2xl font-bold text-white mb-2">Audio Quality</h3>
+                                        <p className="text-zinc-400 text-sm">Customize playback settings.</p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div>
+                                                    <span className="font-medium text-white">Streaming Quality</span>
+                                                    <div className="text-xs text-zinc-500 mt-1">Higher quality uses more data</div>
+                                                </div>
+                                                <span className="text-xs bg-zinc-800 text-zinc-300 px-2 py-1 rounded-md font-medium">
+                                                    {bitrate === '320' ? 'Lossless' : bitrate === '160' ? 'High' : bitrate === '96' ? 'Normal' : bitrate === '48' ? 'Low' : 'Very Low'}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {[
+                                                    { value: '12', label: 'Very Low', desc: 'Data saver' },
+                                                    { value: '48', label: 'Low', desc: 'Basic' },
+                                                    { value: '96', label: 'Normal', desc: 'Standard' },
+                                                    { value: '160', label: 'High', desc: 'Better' },
+                                                    { value: '320', label: 'Lossless', desc: 'Best quality' }
+                                                ].map((q) => (
                                                     <button
-                                                        key={q}
-                                                        onClick={() => setBitrate(val as any)}
-                                                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${bitrate === val
-                                                                ? 'bg-white/20 text-white'
-                                                                : 'text-gray-400 hover:text-white'
+                                                        key={q.value}
+                                                        onClick={() => setBitrate(q.value as any)}
+                                                        className={`py-3 px-2 rounded-xl text-center transition-all ${bitrate === q.value
+                                                            ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-900/30'
+                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
                                                             }`}
                                                     >
-                                                        {q} {q === 'Lossless' && '+'}
+                                                        <div className="text-xs font-bold">{q.label}</div>
+                                                        <div className="text-[10px] opacity-70 mt-0.5">{q.desc}</div>
                                                     </button>
-                                                );
-                                            })}
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5 flex items-center justify-between">
+                                            <div>
+                                                <div className="font-medium text-white">Crossfade Songs</div>
+                                                <div className="text-xs text-zinc-500 mt-1">Smooth transitions between tracks</div>
+                                            </div>
+                                            <button
+                                                onClick={() => setCrossfadeDuration(crossfadeDuration > 0 ? 0 : 3)}
+                                                className={`w-12 h-6 rounded-full p-1 transition-colors ${crossfadeDuration > 0 ? 'bg-purple-600' : 'bg-zinc-700'}`}
+                                            >
+                                                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${crossfadeDuration > 0 ? 'translate-x-6' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+
+                                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5 flex items-center justify-between">
+                                            <div>
+                                                <div className="font-medium text-white">Volume Normalization</div>
+                                                <div className="text-xs text-zinc-500 mt-1">Consistent volume across tracks</div>
+                                            </div>
+                                            <button
+                                                onClick={() => setNormalize(prev => !prev)}
+                                                className={`w-12 h-6 rounded-full p-1 transition-colors ${normalize ? 'bg-purple-600' : 'bg-zinc-700'}`}
+                                            >
+                                                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${normalize ? 'translate-x-6' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+
+                                        {/* Playback Speed */}
+                                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="font-medium text-white">Playback Speed</span>
+                                                <span className="text-xs bg-zinc-800 text-zinc-300 px-2 py-1 rounded-md font-mono">{playbackSpeed}x</span>
+                                            </div>
+                                            <div className="grid grid-cols-6 gap-2">
+                                                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
+                                                    <button
+                                                        key={speed}
+                                                        onClick={() => setPlaybackSpeed(speed)}
+                                                        className={`py-2 rounded-lg text-xs font-bold transition-all ${playbackSpeed === speed
+                                                            ? 'bg-white text-black'
+                                                            : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        {speed}x
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Sleep Timer */}
+                                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div>
+                                                    <div className="font-medium text-white">Sleep Timer</div>
+                                                    <div className="text-xs text-zinc-500 mt-1">Auto-pause after set time</div>
+                                                </div>
+                                                {sleepTimer && (
+                                                    <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-md font-mono">
+                                                        {Math.ceil((sleepTimer.endTime - Date.now()) / 60000)}m left
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {[
+                                                    { label: 'Off', mins: 0 },
+                                                    { label: '15m', mins: 15 },
+                                                    { label: '30m', mins: 30 },
+                                                    { label: '45m', mins: 45 },
+                                                    { label: '1h', mins: 60 }
+                                                ].map(({ label, mins }) => (
+                                                    <button
+                                                        key={label}
+                                                        onClick={() => {
+                                                            if (mins === 0) {
+                                                                setSleepTimer(null);
+                                                            } else {
+                                                                setSleepTimer({
+                                                                    endTime: Date.now() + mins * 60 * 1000,
+                                                                    duration: mins * 60 * 1000
+                                                                });
+                                                            }
+                                                        }}
+                                                        className={`py-2 rounded-lg text-xs font-bold transition-all ${(mins === 0 && !sleepTimer) || (sleepTimer && sleepTimer.duration === mins * 60 * 1000)
+                                                            ? 'bg-white text-black'
+                                                            : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                            )}
 
-                                {/* Crossfade Slider */}
-                                <div className="bg-white/5 rounded-2xl p-4 mb-3">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="text-sm font-medium text-white">Crossfade</div>
-                                        <div className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded">{crossfadeDuration}s</div>
-                                    </div>
-                                    <div className="relative">
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max="12"
-                                            value={crossfadeDuration}
-                                            onChange={(e) => setCrossfadeDuration(parseInt(e.target.value))}
-                                            className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer"
-                                            style={{
-                                                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(crossfadeDuration / 12) * 100}%, rgba(255,255,255,0.1) ${(crossfadeDuration / 12) * 100}%, rgba(255,255,255,0.1) 100%)`
-                                            }}
-                                        />
-                                        <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                                            <span>off</span>
-                                            <span>12s</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Normalize Volume */}
-                                <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
+                            {/* DATA TAB */}
+                            {activeTab === 'data' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div>
-                                        <div className="text-sm font-medium text-white">Normalize Volume</div>
-                                        <div className="text-xs text-gray-500">Set the same volume level for all tracks</div>
+                                        <h3 className="text-2xl font-bold text-white mb-2">Data & Storage</h3>
+                                        <p className="text-zinc-400 text-sm">Manage your library and settings.</p>
                                     </div>
-                                    <button
-                                        onClick={() => setNormalizeVolume(!normalizeVolume)}
-                                        className={`w-12 h-6 rounded-full p-1 transition-colors ${normalizeVolume ? 'bg-blue-500' : 'bg-white/20'}`}
-                                    >
-                                        <motion.div
-                                            className="w-4 h-4 rounded-full bg-white shadow-sm"
-                                            animate={{ x: normalizeVolume ? 24 : 0 }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
 
-                            {/* Data Section */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Database size={18} className="text-orange-400" />
-                                    <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Data & Storage</h3>
-                                </div>
+                                    <div className="space-y-4">
+                                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5">
+                                            <h4 className="font-bold text-white mb-4">Backup Library</h4>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => {
+                                                        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mixes));
+                                                        const downloadAnchorNode = document.createElement('a');
+                                                        downloadAnchorNode.setAttribute("href", dataStr);
+                                                        downloadAnchorNode.setAttribute("download", "melora-backup.json");
+                                                        document.body.appendChild(downloadAnchorNode);
+                                                        downloadAnchorNode.click();
+                                                        downloadAnchorNode.remove();
+                                                    }}
+                                                    className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white font-medium text-sm transition-colors border border-white/5"
+                                                >
+                                                    Export JSON
+                                                </button>
+                                                <label className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white font-medium text-sm transition-colors border border-white/5 cursor-pointer text-center">
+                                                    Import JSON
+                                                    <input
+                                                        type="file"
+                                                        accept=".json"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            const reader = new FileReader();
+                                                            reader.onload = (event) => {
+                                                                try {
+                                                                    const importedMixes = JSON.parse(event.target?.result as string);
+                                                                    if (Array.isArray(importedMixes)) {
+                                                                        setMixes(importedMixes);
+                                                                        window.location.reload();
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.error(err);
+                                                                }
+                                                            };
+                                                            reader.readAsText(file);
+                                                        }}
+                                                    />
+                                                </label>
+                                            </div>
+                                        </div>
 
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => {
-                                            const playlistsData = {
-                                                version: '2.0.0',
-                                                exportDate: new Date().toISOString(),
-                                                playlists: mixes.map(mix => ({
-                                                    id: mix.id,
-                                                    title: mix.title,
-                                                    color: mix.color,
-                                                    songs: mix.songs
-                                                }))
-                                            };
-                                            const dataStr = JSON.stringify(playlistsData, null, 2);
-                                            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                                            const url = URL.createObjectURL(dataBlob);
-                                            const link = document.createElement('a');
-                                            link.href = url;
-                                            link.download = `melora-playlists-${new Date().toISOString().split('T')[0]}.json`;
-                                            link.click();
-                                            URL.revokeObjectURL(url);
-                                        }}
-                                        className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-center transition-all border border-white/5"
-                                    >
-                                        <span className="text-2xl mb-2 block">📦</span>
-                                        <span className="text-sm font-medium text-white">Backup</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (confirm('Reset all settings to default?')) {
-                                                resetSettings();
-                                                window.location.reload();
-                                            }
-                                        }}
-                                        className="p-4 bg-white/5 hover:bg-red-500/10 rounded-2xl text-center transition-all border border-white/5 hover:border-red-500/30"
-                                    >
-                                        <span className="text-2xl mb-2 block">🔄</span>
-                                        <span className="text-sm font-medium text-white">Reset</span>
-                                    </button>
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5">
+                                            <h4 className="font-bold text-red-500 mb-2">Danger Zone</h4>
+                                            <p className="text-xs text-red-400/70 mb-4">Irreversible actions.</p>
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm("Are you sure? This will delete all playlists and reset settings.")) {
+                                                        localStorage.clear();
+                                                        window.location.reload();
+                                                    }
+                                                }}
+                                                className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl font-medium text-sm transition-colors"
+                                            >
+                                                Reset Application
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
+                            {/* ABOUT TAB */}
+                            {activeTab === 'about' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="text-center pt-4">
+                                        <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-600 rounded-3xl mx-auto shadow-2xl flex items-center justify-center mb-4 ring-4 ring-white/10">
+                                            <Music size={40} className="text-white" />
+                                        </div>
+                                        <h2 className="text-3xl font-bold tracking-tighter text-white mb-1">Melora</h2>
+                                        <p className="text-zinc-500 tracking-widest text-xs uppercase">The Ultimate Audiophile OS</p>
+                                    </div>
+
+                                    {/* Listening Stats */}
+                                    <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5">
+                                        <h4 className="font-bold text-white mb-4 text-center">Your Listening Stats</h4>
+                                        <div className="grid grid-cols-3 gap-4 text-center">
+                                            <div className="p-4 bg-zinc-800/50 rounded-xl">
+                                                <div className="text-2xl font-bold text-purple-400">{mixes.reduce((acc, m) => acc + m.songs.length, 0)}</div>
+                                                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">Songs Saved</div>
+                                            </div>
+                                            <div className="p-4 bg-zinc-800/50 rounded-xl">
+                                                <div className="text-2xl font-bold text-pink-400">{mixes.length}</div>
+                                                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">Playlists</div>
+                                            </div>
+                                            <div className="p-4 bg-zinc-800/50 rounded-xl">
+                                                <div className="text-2xl font-bold text-blue-400">
+                                                    {(() => {
+                                                        const liked = JSON.parse(localStorage.getItem('melora-liked-songs') || '[]');
+                                                        return liked.length;
+                                                    })()}
+                                                </div>
+                                                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">Liked</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="max-w-sm mx-auto p-4 bg-zinc-900/50 rounded-2xl border border-white/5 text-xs text-zinc-400 leading-relaxed text-center">
+                                        Designed for music lovers who appreciate the tactile feel of physical media and the convenience of modern streaming.
+                                    </div>
+
+                                    <div className="text-xs text-zinc-600 text-center">
+                                        &copy; 2024 Melora Tunes. Built with ❤️ for music.
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </motion.div>
-                </div>
-            )}
+                    </div>
+                </motion.div>
+            </motion.div>
         </AnimatePresence>
     );
 }

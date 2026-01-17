@@ -7,6 +7,8 @@ interface AudioPlayerProps {
     nextUrl?: string | null;
     playing: boolean;
     volume: number;
+    speed?: number;
+    crossfadeDuration?: number; // seconds for crossfade (0 = off)
     title?: string;
     artist?: string;
     album?: string;
@@ -33,6 +35,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     nextUrl,
     playing,
     volume,
+    speed = 1,
+    crossfadeDuration = 0,
     title,
     artist,
     album,
@@ -49,6 +53,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const secondaryRef = useRef<HTMLAudioElement>(null);
     const [activeId, setActiveId] = useState<'primary' | 'secondary'>('primary');
     const progressIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
+    const crossfadeIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
+    const isCrossfadingRef = useRef(false);
 
     const getActive = useCallback(() => activeId === 'primary' ? primaryRef.current : secondaryRef.current, [activeId]);
     const getInactive = useCallback(() => activeId === 'primary' ? secondaryRef.current : primaryRef.current, [activeId]);
@@ -143,7 +149,15 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         if (inactive) inactive.volume = volume;
     }, [volume, activeId]);
 
-    // Progress Tracking - Only from Active
+    // Handle Playback Speed
+    useEffect(() => {
+        const active = getActive();
+        const inactive = getInactive();
+        if (active) active.playbackRate = speed;
+        if (inactive) inactive.playbackRate = speed;
+    }, [speed, activeId]);
+
+    // Progress Tracking + Crossfade Logic
     useEffect(() => {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 
@@ -151,8 +165,11 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
         progressIntervalRef.current = setInterval(() => {
             const active = getActive();
+            const inactive = getInactive();
             if (active && active.duration) {
                 const played = active.currentTime / active.duration;
+                const remainingSeconds = active.duration - active.currentTime;
+
                 onProgress({
                     played,
                     playedSeconds: active.currentTime,
@@ -163,13 +180,40 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                         ? active.buffered.end(0)
                         : 0
                 });
+
+                // Crossfade Logic: Start fading when within crossfadeDuration of end
+                if (crossfadeDuration > 0 && remainingSeconds <= crossfadeDuration && nextUrl && inactive && !isCrossfadingRef.current) {
+                    isCrossfadingRef.current = true;
+                    console.log("🎵 Starting crossfade...");
+
+                    // Start playing next track at volume 0
+                    inactive.volume = 0;
+                    inactive.play().catch(() => { });
+
+                    // Ramp volumes over crossfadeDuration
+                    const fadeSteps = 20;
+                    const stepDuration = (crossfadeDuration * 1000) / fadeSteps;
+                    let step = 0;
+
+                    crossfadeIntervalRef.current = setInterval(() => {
+                        step++;
+                        const fadeRatio = step / fadeSteps;
+                        if (active) active.volume = Math.max(0, volume * (1 - fadeRatio));
+                        if (inactive) inactive.volume = volume * fadeRatio;
+
+                        if (step >= fadeSteps) {
+                            clearInterval(crossfadeIntervalRef.current);
+                            isCrossfadingRef.current = false;
+                        }
+                    }, stepDuration);
+                }
             }
         }, 200);
 
         return () => {
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    }, [playing, onProgress, activeId]);
+    }, [playing, onProgress, activeId, crossfadeDuration, nextUrl, volume]);
 
     // Event Handlers helper
     const handleEvent = (e: React.SyntheticEvent<HTMLAudioElement>, type: 'ended' | 'duration' | 'error') => {

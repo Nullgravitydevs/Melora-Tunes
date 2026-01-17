@@ -17,6 +17,7 @@ import { OpenDeckStage } from "./opendeck-stage";
 import { BoomboxStage } from "./boombox-stage";
 import { SilverFrostStage } from "./silverfrost-stage";
 import { GlassStage } from "./glass-stage";
+
 import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
@@ -143,12 +144,15 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
             currentSongIndex: 0
         };
 
-        addMix(newMix);
-        setNewMixTitle("");
-        setIsModalOpen(false);
-        setSearchTargetMixId(newMix.id);
-        setIsSearchOpen(true);
-        addToast(`Created mix: ${newMixTitle}`);
+        if (addMix(newMix)) {
+            setNewMixTitle("");
+            setIsModalOpen(false);
+            setSearchTargetMixId(newMix.id);
+            setIsSearchOpen(true);
+            addToast(`Mix Created Successfully: ${newMixTitle}`);
+        } else {
+            addToast("Limit Reached: You have 8 tapes already!", "error");
+        }
     };
 
     const handleAddSong = (song: JioSaavnSong) => {
@@ -313,7 +317,7 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
                         setCurrentTheme(theme);
                         localStorage.setItem('melora-theme', theme);
                     }}
-                    onSwitchToMobile={onSwitchToMobile}
+                    // onSwitchToMobile removed
                     onOpenSettings={() => setIsSettingsOpen(true)}
                     onEditMix={(mix) => setEditingMix(mix)}
                     onOpenSearch={(mixId) => {
@@ -408,10 +412,13 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
                                             songs: [],
                                             currentSongIndex: 0
                                         };
-                                        addMix(newMix);
-                                        setIsModalOpen(false);
-                                        setNewMixTitle("");
-                                        addToast(`Created mixtape "${newMix.title}"`);
+                                        if (addMix(newMix)) {
+                                            setIsModalOpen(false);
+                                            setNewMixTitle("");
+                                            addToast(`Created mixtape "${newMix.title}"`);
+                                        } else {
+                                            addToast("Limit Reached: You have 8 tapes already!", "error");
+                                        }
                                     }}
                                     disabled={!newMixTitle.trim()}
                                     className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded disabled:opacity-50"
@@ -428,21 +435,25 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
             <DesktopSettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
-                currentLayout={THEMES[currentTheme]?.layout === 'glass' ? 'glass' : THEMES[currentTheme]?.layout === 'opendeck' ? 'deck' : 'glass'}
-                onSwitchLayout={(layout) => {
-                    if (layout === 'ipod') {
-                        // Switch to mobile/iPod view
+                currentLayout={
+                    THEMES[currentTheme]?.layout === 'glass' ? 'discovery' : 'deck'
+                }
+                onSwitchLayout={(mode) => {
+                    if (mode === 'ipod') {
                         onSwitchToMobile?.();
                         setIsSettingsOpen(false);
-                    } else {
-                        // Map layout to a theme that uses that layout
-                        const themeMap: Record<string, ThemeKey> = {
-                            'glass': 'GLASS_STAGE',
-                            'deck': 'OPEN_DECK'
-                        };
-                        const newTheme = themeMap[layout] || 'GLASS_STAGE';
-                        setCurrentTheme(newTheme);
-                        localStorage.setItem('melora-theme', newTheme);
+                    } else if (mode === 'discovery') {
+                        // Switch to Glass Theme
+                        setCurrentTheme('GLASS');
+                        localStorage.setItem('melora-theme', 'GLASS');
+                        setIsSettingsOpen(false);
+                    } else if (mode === 'deck') {
+                        // Switch to Deck Theme (Restore default if currently on Glass)
+                        const currentLayout = THEMES[currentTheme]?.layout;
+                        if (currentLayout === 'glass') {
+                            setCurrentTheme('ZEN'); // Default fallback for Deck
+                            localStorage.setItem('melora-theme', 'ZEN');
+                        }
                         setIsSettingsOpen(false);
                     }
                 }}

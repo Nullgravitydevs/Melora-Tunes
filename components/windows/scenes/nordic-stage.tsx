@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Volume2, LogOut,
-    Download, Upload, Palette, Smartphone, Settings, Plus, Maximize2
+    Download, Upload, Palette, Smartphone, Settings, Plus, Maximize2, Camera, Share2
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -16,7 +16,7 @@ interface NordicStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -33,7 +33,7 @@ export function NordicStage({
     currentTheme,
     onThemeChange,
     onSelectTheme,
-    onSwitchToMobile,
+    // onSwitchToMobile removed
     onOpenSettings,
     onEditMix,
     onOpenSearch,
@@ -97,9 +97,7 @@ export function NordicStage({
                         </button>
 
                         <div className="flex gap-4 ml-4 border-l border-slate-700 pl-6">
-                            <button onClick={onSwitchToMobile} className="p-2 text-slate-400 hover:text-white transition-colors" title="Switch to Mobile">
-                                <Smartphone size={20} />
-                            </button>
+                            {/* Mobile Switch Removed */}
                             <button onClick={onOpenThemeSelector} className="p-2 text-slate-400 hover:text-white transition-colors" title="Change Theme">
                                 <Palette size={20} />
                             </button>
@@ -156,6 +154,20 @@ export function NordicStage({
                                             className="p-2 bg-blue-600 hover:bg-blue-500 rounded text-white"
                                         >
                                             <Plus size={14} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }}
+                                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                                            title="Snapshot"
+                                        >
+                                            <Camera size={14} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }}
+                                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                                            title="Share"
+                                        >
+                                            <Share2 size={14} />
                                         </button>
                                     </div>
                                 </div>

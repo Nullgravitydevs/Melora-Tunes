@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, LogOut,
-    Palette, Smartphone, Settings
+    Palette, Smartphone, Settings, Pencil, Camera, Search, Share2, Plus
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -16,7 +16,7 @@ interface OpenDeckStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -32,7 +32,7 @@ export function OpenDeckStage({
     currentTheme,
     onThemeChange,
     onSelectTheme,
-    onSwitchToMobile,
+    // onSwitchToMobile removed
     onOpenSettings,
     onEditMix,
     onOpenSearch,
@@ -130,7 +130,7 @@ export function OpenDeckStage({
                         <button onClick={onCreateMix} className="text-[#101814] text-[10px] font-semibold tracking-widest uppercase hover:text-[#2d8652]">+ Create Mix</button>
                     </nav>
                     <div className="flex gap-2">
-                        <button onClick={onSwitchToMobile} className="flex size-8 items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-[#2d8652]/10"><Smartphone size={14} className="text-neutral-600" /></button>
+                        {/* Switch Mobile Removed */}
                         <button onClick={onOpenThemeSelector} className="flex size-8 items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-[#2d8652]/10"><Palette size={14} className="text-neutral-600" /></button>
                         <button onClick={onOpenSettings} className="flex size-8 items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-[#2d8652]/10"><Settings size={14} className="text-neutral-600" /></button>
                     </div>
@@ -178,6 +178,15 @@ export function OpenDeckStage({
                                             {isInsidePlayer && (
                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
                                                     <span className="text-[7px] font-bold text-white uppercase tracking-wider">Playing</span>
+                                                </div>
+                                            )}
+                                            {/* Hover Actions Overlay */}
+                                            {!isInsidePlayer && !isDragging && (
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
+                                                    <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Settings"><Pencil size={10} className="text-slate-800" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Snapshot"><Camera size={10} className="text-slate-800" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Share"><Share2 size={10} className="text-slate-800" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Add Songs"><Plus size={10} className="text-slate-800" /></button>
                                                 </div>
                                             )}
                                         </div>

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Smartphone, Settings, Plus, Maximize2, Pencil } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Smartphone, Settings, Plus, Maximize2, Pencil, Camera } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
@@ -13,7 +13,7 @@ interface BauhausStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -25,7 +25,7 @@ interface BauhausStageProps {
     onShareMix?: (mix: any) => void;
 }
 
-export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix }: BauhausStageProps) {
+export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix, onSnapshotMix }: BauhausStageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
@@ -70,9 +70,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                         <button onClick={onCinemaMode} className="hidden md:flex items-center gap-2 bg-[#0052cc] text-white px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a] text-sm">
                             <Maximize2 size={14} /> Cinema Mode
                         </button>
-                        <button onClick={onSwitchToMobile} className="hidden md:flex items-center gap-2 bg-white text-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all border-2 border-[#1a1a1a] text-sm">
-                            <Smartphone size={14} /> Mobile
-                        </button>
+                        {/* Mobile Switch Removed */}
                         <button onClick={onCreateMix} className="flex items-center gap-2 bg-[#ffcc00] text-[#1a1a1a] border-2 border-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all text-sm">
                             <Plus size={14} /> Create Mix
                         </button>
@@ -154,9 +152,15 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                 >
                                                     <Pencil size={10} />
                                                 </button>
+                                                {/* Snapshot Button */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        // Use prop if available, or fallback to local logic?
+                                                        // For now, keep local logic as it targets specific ID structure, but use onSnapshotMix if simpler?
+                                                        // actually the prop version in stage.tsx is generic handles document.getElementById("snapshot-studio-node").
+                                                        // Bauhaus has specific IDs like `mix-card-${mix.id}`.
+                                                        // Let's keep the custom logic but switch icon to Camera
                                                         const node = document.getElementById(`mix-card-${mix.id}`);
                                                         if (node) {
                                                             toPng(node, {
@@ -182,7 +186,15 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onSwi
                                                         }
                                                     }}
                                                     className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
-                                                    title="Share Snapshot"
+                                                    title="Save Snapshot"
+                                                >
+                                                    <Camera size={10} />
+                                                </button>
+                                                {/* Share Button (New) */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }}
+                                                    className="p-1.5 bg-white border-2 border-[#1a1a1a] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[#ffcc00] transition-colors"
+                                                    title="Share Mix"
                                                 >
                                                     <Share2 size={10} />
                                                 </button>

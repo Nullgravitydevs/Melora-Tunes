@@ -42,7 +42,7 @@ interface PlaybackContextType {
     setRepeat: (val: 'off' | 'one' | 'all') => void;
 
     // Mix Management
-    addMix: (mix: Mix) => void;
+    addMix: (mix: Mix) => boolean;
     updateMix: (mixId: string, updates: Partial<Mix>) => void;
     deleteMix: (mixId: string) => void;
     isLoaded: boolean;
@@ -79,6 +79,10 @@ interface PlaybackContextType {
 
     // Recently Played
     recentlyPlayed: JioSaavnSong[];
+
+    // Playback Speed
+    playbackSpeed: number;
+    setPlaybackSpeed: (speed: number) => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -102,6 +106,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [likedSongs, setLikedSongs] = useState<JioSaavnSong[]>([]);
     const [recentlyPlayed, setRecentlyPlayed] = useState<JioSaavnSong[]>([]);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1); // 0.5, 0.75, 1, 1.25, 1.5, 2
 
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
@@ -141,8 +146,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     const setDefaults = () => {
         setMixes([
-            { id: "1", title: "Pawan Kalyan Hits", color: "orange", songs: [], currentSongIndex: 0 },
-            { id: "2", title: "DSP Specials", color: "purple", songs: [], currentSongIndex: 0 },
+            { id: "1", title: "My Tapes", color: "orange", songs: [], currentSongIndex: 0 }
         ]);
     };
 
@@ -199,10 +203,22 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // --- Actions ---
 
+    // Use ref to track current mixes for synchronous checks in addMix
+    const mixesRef = useRef(mixes);
+    useEffect(() => {
+        mixesRef.current = mixes;
+    }, [mixes]);
+
     // Helpers defined first (hoisted manually) to be available for next/prev
-    const addMix = (mix: Mix) => {
+    const addMix = useCallback((mix: Mix) => {
+        console.log("Adding mix. Current count:", mixesRef.current.length);
+        if (mixesRef.current.length >= 8) {
+            console.log("Limit blocked.");
+            return false;
+        }
         setMixes(prev => [...prev, mix]);
-    };
+        return true;
+    }, []);
 
     const updateMix = useCallback((mixId: string, updates: Partial<Mix>) => {
         setMixes(prev => prev.map(m => m.id === mixId ? { ...m, ...updates } : m));
@@ -454,7 +470,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             bitrate, setBitrate,
             notificationsEnabled, setNotificationsEnabled,
             likedSongs, toggleLike, isLiked,
-            recentlyPlayed
+            recentlyPlayed,
+            playbackSpeed, setPlaybackSpeed
         }}>
             {children}
 
@@ -465,6 +482,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 nextUrl={nextSongUrl}
                 playing={isPlaying}
                 volume={volume}
+                speed={playbackSpeed}
+                crossfadeDuration={crossfadeDuration}
                 onEnded={() => {
                     if (currentSong) recordPlay(currentSong, duration);
                     next();

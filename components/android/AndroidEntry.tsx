@@ -1,16 +1,14 @@
 import { lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Lazy load games for better performance
-const BrickGame = lazy(() => import("./games/BrickGame").then(m => ({ default: m.BrickGame })));
-const ParachuteGame = lazy(() => import("./games/ParachuteGame").then(m => ({ default: m.ParachuteGame })));
-const MusicQuiz = lazy(() => import("./games/MusicQuiz").then(m => ({ default: m.MusicQuiz })));
+// Games removed
+// const BrickGame = lazy(() => import("./games/BrickGame").then(m => ({ default: m.BrickGame })));
+// const MusicQuiz = lazy(() => import("./games/MusicQuiz").then(m => ({ default: m.MusicQuiz })));
 
-const GAMES_MENU: MenuItem[] = [
-    { label: "Brick", type: 'action', data: { id: 'brick-game', name: 'Brick' }, action: () => { } },
-    { label: "Parachute", type: 'action', data: { id: 'parachute-game', name: 'Parachute' }, action: () => { } },
-    { label: "Music Quiz", type: 'action', data: { id: 'music-quiz', name: 'Music Quiz' }, action: () => { } }
-];
+// const GAMES_MENU: MenuItem[] = [
+//     { label: "Brick", type: 'action', data: { id: 'brick-game', name: 'Brick' }, action: () => { } },
+//     { label: "Music Quiz", type: 'action', data: { id: 'music-quiz', name: 'Music Quiz' }, action: () => { } }
+// ];
 import { ClickWheel } from "./ClickWheel";
 import { IpodScreen } from "./IpodScreen";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
@@ -31,7 +29,7 @@ interface MenuItem {
 interface ViewState {
     id: string; // Unique ID for the view context (e.g., 'main', 'playlists', 'mix-123')
     title: string;
-    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game' | 'lyrics';
+    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'lyrics';
     data?: any; // Context data (e.g., mixId)
     selectedIndex: number;
     staticItems?: MenuItem[]; // For purely static menus
@@ -46,7 +44,6 @@ const MAIN_MENU: MenuItem[] = [
     { label: "Music", type: 'navigation', target: 'music' },
     { label: 'Cover Flow', type: 'action', data: { id: 'cover-flow', name: 'Cover Flow' } },
     { label: 'Cinema Mode', type: 'action', data: { id: 'cinema', name: 'Cinema Mode' } },
-    { label: "Games", type: 'navigation', target: 'games' },
     { label: "Settings", type: 'navigation', target: 'settings' },
     { label: 'Now Playing', type: 'action', data: { id: 'now-playing', name: 'Now Playing' } }
 ];
@@ -244,11 +241,15 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             songs: [],
             currentSongIndex: 0
         };
-        addMix(newMix);
-        // Navigate immediately - PASS FULL MIX OBJECT to avoid race condition
-        handleNavigation(`mix-${newId}`, newMix, newMix.title);
-        // Immediately trigger Rename
-        setTimeout(() => goToRename(newMix), 100);
+        if (addMix(newMix)) {
+            // Navigate immediately - PASS FULL MIX OBJECT to avoid race condition
+            handleNavigation(`mix-${newId}`, newMix, newMix.title);
+            // Immediately trigger Rename
+            setTimeout(() => goToRename(newMix), 100);
+        } else {
+            // Native alert is acceptable here as Android interface uses them primarily
+            alert("Maximum limit of 8 tapes reached. Please delete a tape.");
+        }
     };
 
     const goToRename = (mix: Mix) => {
@@ -308,7 +309,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         switch (currentView.id) {
             case 'music': return MUSIC_MENU;
             case 'games':
-                return GAMES_MENU as any;
+                return [] as MenuItem[]; // Games unavailable
 
             case 'settings':
                 // Dynamic Settings Menu
@@ -422,7 +423,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         setIpodTheme(theme);
                         saveSettings({ theme });
                     }
-                }));
+                })) as MenuItem[];
 
             case 'quality-settings':
                 const qualities = ['320', '160', '96', '48', '12'] as const;
@@ -432,7 +433,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     action: () => {
                         setBitrate(q);
                     }
-                }));
+                })) as MenuItem[];
 
             case 'volume-settings':
                 // Volume adjustment screen
@@ -440,7 +441,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     label: `Volume: ${Math.round(volume * 100)}%`,
                     type: 'action',
                     action: () => { } // Use scroll wheel to adjust
-                }];
+                }] as MenuItem[];
 
             case 'sleep-timer':
                 return [
@@ -475,7 +476,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             setStopAtEndOfSong(true);
                         }
                     }
-                ];
+                ] as MenuItem[];
 
             case 'crossfade':
                 return [
@@ -494,7 +495,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         type: 'action',
                         action: () => setCrossfadeDuration(5)
                     }
-                ];
+                ] as MenuItem[];
 
             case 'playlists':
                 // Dynamic Playlists List
@@ -534,7 +535,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     type: 'navigation',
                     target: `artist-${artist}`,
                     data: artist
-                }));
+                })) as MenuItem[];
             }
 
 
@@ -543,7 +544,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     label: a.title,
                     type: 'action',
                     data: a
-                }));
+                })) as MenuItem[];
 
                 // If user has music, show it. Otherwise show message.
                 if (userAlbums.length > 0) return userAlbums;
@@ -573,7 +574,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     type: 'navigation',
                     target: `album-${album.id}`,
                     data: album
-                }));
+                })) as MenuItem[];
             }
 
             case 'songs': {
@@ -606,7 +607,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                 if (items.length === 1) return [{ label: "(No Songs Found)", type: 'action', action: () => handleBack() }];
 
-                return items;
+                return items as MenuItem[];
             }
 
             case 'rename':
@@ -634,7 +635,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             }
                         }
                     }
-                }));
+                })) as MenuItem[];
 
             default:
                 // Handle dynamic IDs
@@ -719,7 +720,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         data: artistSongs
                     });
 
-                    return albumItems;
+                    return albumItems as MenuItem[];
                 }
 
                 // Artist -> All Songs
@@ -730,7 +731,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         type: 'action',
                         data: s,
                         action: () => playSongNow(s)
-                    }));
+                    })) as MenuItem[];
                 }
 
                 // Album Drill-down
@@ -744,7 +745,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         type: 'action',
                         data: s,
                         action: () => playSongNow(s)
-                    }));
+                    })) as MenuItem[];
                 }
 
                 // Song Options
@@ -754,7 +755,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         { label: "Play", type: 'action', action: () => playSongNow(song) },
                         { label: "Add to Playlist", type: 'navigation', target: `add-to-${song.id}`, data: song },
                         { label: "Cancel", type: 'action', action: () => handleBack() }
-                    ];
+                    ] as MenuItem[];
                 }
 
                 // Add to Playlist Menu
@@ -779,7 +780,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                                 handleBack();
                                 handleBack();
                             }
-                        }));
+                        })) as MenuItem[];
                 }
 
                 return [];
@@ -981,34 +982,6 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: index >= 0 ? index : 0 }]);
             } else if (selectedItem.data?.id === 'now-playing') {
                 goToNowPlaying();
-            } else if (selectedItem.data?.id === 'brick-game') {
-                // Navigate to Brick Game
-                setViewStack(prev => [...prev, {
-                    id: 'brick-game',
-                    title: 'Brick',
-                    viewType: 'game',
-                    selectedIndex: 0,
-                    data: { id: 'brick-game' }
-                }]);
-            } else if (selectedItem.data?.id === 'music-quiz') {
-                // Navigate to Music Quiz
-                setViewStack(prev => [...prev, {
-                    id: 'music-quiz',
-                    title: 'Music Quiz',
-                    viewType: 'game',
-                    selectedIndex: 0,
-                    data: { id: 'music-quiz' }
-                }]);
-
-            } else if (selectedItem.data?.id === 'parachute-game') {
-                // Navigate to Parachute Game
-                setViewStack(prev => [...prev, {
-                    id: 'parachute-game',
-                    title: 'Parachute',
-                    viewType: 'game',
-                    selectedIndex: 0,
-                    data: { id: 'parachute-game' }
-                }]);
             } else if (selectedItem.data?.id === 'lyrics') {
                 if (!currentSong) {
                     alert("No song playing!");
@@ -1205,19 +1178,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
 
                     {/* Render Game View if Active - Lazy loaded for performance */}
-                    {currentView.viewType === 'game' && (
-                        <Suspense fallback={
-                            <div className="absolute inset-0 z-50 bg-black flex items-center justify-center">
-                                <div className="text-white text-xs animate-pulse">Loading Game...</div>
-                            </div>
-                        }>
-                            <div className="absolute inset-0 z-50 bg-black">
-                                {currentView.data?.id === 'brick-game' && <BrickGame onBack={handleBack} />}
-                                {currentView.data?.id === 'parachute-game' && <ParachuteGame onBack={handleBack} isActive={true} />}
-                                {currentView.data?.id === 'music-quiz' && <MusicQuiz onBack={handleBack} />}
-                            </div>
-                        </Suspense>
-                    )}
+
                 </div>
 
                 {/* Branding */}
@@ -1235,31 +1196,13 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         theme={ipodTheme}
                         enableSounds={clickSounds}
                         onScroll={(direction) => {
-                            if (currentView.viewType === 'game') {
-                                // Performance: Dispatch Custom Event to bypass React Render Cycle for Games
-                                window.dispatchEvent(new CustomEvent('ipod-scroll', { detail: direction }));
-                            } else {
-                                handleScroll(direction);
-                            }
+                            handleScroll(direction);
                         }}
                         onSelect={() => {
-                            if (currentView.viewType === 'game') {
-                                // Music Quiz needs select events, dispatch for it
-                                if (currentView.data?.id === 'music-quiz') {
-                                    window.dispatchEvent(new CustomEvent('ipod-select'));
-                                }
-                                // Other games handle their own select (Parachute uses it for shooting)
-                                return;
-                            }
                             handleSelect();
                         }}
                         onMenu={() => {
-                            if (currentView.viewType === 'game') {
-                                // Let game handle it OR just force back
-                                handleBack();
-                            } else {
-                                handleBack();
-                            }
+                            handleBack();
                         }}
                         onPlayPause={togglePlay}
                         onNext={next}

@@ -5,10 +5,10 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { CinemaModeMobile as CinemaMode } from "./cinema-mode-mobile";
 import { CoverFlowMobile as CoverFlow } from "./cover-flow-mobile";
-import { ParachuteGame } from "./games/ParachuteGame";
+
 
 interface IpodScreenProps {
-    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'game' | 'lyrics';
+    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'lyrics';
     title: string;
     menuItems: string[]; // List of labels to display
     itemsData?: any[]; // Optional rich data for items (images etc)
@@ -227,18 +227,7 @@ export function IpodScreen({
                             trackIndex={trackIndex}
                         />
                     </div>
-                ) : variant === 'game' ? (
-                    <div className="w-full h-full bg-black">
-                        {/* We assume Parachute is the only game for now, or use title to switch */}
-                        {title === 'Parachute' && (
-                            <ParachuteGame
-                                isActive={true}
-                                onBack={onBack}
-                                scrollDirection={scrollDirection}
-                                onSelect={() => onItemSelect?.(0)} // Center button trigger
-                            />
-                        )}
-                    </div>
+
                 ) : variant === 'search' ? (
                     <div className="flex flex-col h-full bg-black">
                         {/* Search Bar */}

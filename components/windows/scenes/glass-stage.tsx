@@ -3,37 +3,45 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
-import { JioSaavnSong, getTopCharts, getPlaylistDetails, searchSongs, getArtistDetails, getSyncedLyrics } from "@/lib/jiosaavn";
+import { JioSaavnSong, getTopCharts, getPlaylistDetails, searchSongs, getArtistDetails, getSyncedLyrics, getAlbumDetails } from "@/lib/jiosaavn";
 import { decodeHtml, parseLrc } from "@/lib/utils";
 import {
     Home, Search, Compass, Library, Plus, Heart, MoreVertical,
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
     Volume2, ListMusic, Mic2, Maximize2, X, ChevronUp, ChevronDown, CheckCircle,
-    Disc, Grid, Clock, Music, ArrowLeft, Zap, Star, Share2, Users, History, Settings as SettingsIcon
+    Disc, Grid, Clock, Music, ArrowLeft, Zap, Star, Share2, Users, History, Settings as SettingsIcon, Radio
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import Image from "next/image";
 
-// --- Custom Styles (Liquid Glass & No Scrollbars) ---
+// --- Custom Styles (Crystal Clear Onyx) ---
 const CUSTOM_STYLES = `
     ::-webkit-scrollbar {
-        width: 0px;
+        width: 4px;
+        height: 4px;
+    }
+    ::-webkit-scrollbar-track {
         background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
     }
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
     .glass-panel {
-        background: rgba(255, 255, 255, 0.01);
-        backdrop-filter: blur(40px);
-        -webkit-backdrop-filter: blur(40px);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9),
-                    inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
-                    inset 0 0 40px 0 rgba(255, 255, 255, 0.02);
+        background: rgba(255, 255, 255, 0.02);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
     }
     .glass-card {
-        background: rgba(255, 255, 255, 0.02);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
         border: 1px solid rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
@@ -41,8 +49,8 @@ const CUSTOM_STYLES = `
     }
     .glass-card:hover {
         background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.3);
-        box-shadow: 0 0 25px rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
         transform: translateY(-2px);
     }
     .active-nav-item {
@@ -51,23 +59,48 @@ const CUSTOM_STYLES = `
         box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.05);
     }
     .mood-capsule {
-        background: transparent;
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.05);
         transition: all 0.3s ease;
     }
     .mood-capsule:hover {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 0 15px rgba(255, 255, 255, 0.25);
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+    }
+    .mood-capsule.active {
+        background: white;
+        color: black;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+    }
+    .onyx-bg {
+        background: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #000000 70%);
+    }
+    .shadow-glow {
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+    }
+    .shadow-glow-strong {
+        box-shadow: 0 0 25px rgba(255, 255, 255, 0.15);
+    }
+    .text-accent-pink {
+        color: #E91E63;
+    }
+    .bg-accent-pink {
+        background-color: #E91E63;
+    }
+    .floating-player {
+        background: rgba(0, 0, 0, 0.60);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
     }
 `;
-
 interface GlassStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings: () => void;
     onEditMix: (mix: Mix) => void;
     onOpenSearch: (mixId: string | null) => void;
@@ -131,6 +164,7 @@ export function GlassStage({
     // --- Navigation State ---
     const [viewStack, setViewStack] = useState<Array<{ type: 'home' | 'playlist' | 'search' | 'nowplaying' | 'library' | 'queue' | 'artist' | 'explore', data?: any }>>([{ type: 'home' }]);
     const currentView = viewStack[viewStack.length - 1];
+    const [homeTab, setHomeTab] = useState<'playlist' | 'artists' | 'albums' | 'streams'>('playlist');
 
     const navigateTo = (view: { type: 'home' | 'playlist' | 'search' | 'nowplaying' | 'library' | 'queue' | 'artist' | 'explore', data?: any }) => {
         setViewStack(prev => [...prev, view]);
@@ -163,6 +197,9 @@ export function GlassStage({
         setToast({ message, visible: true });
         setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
     };
+
+    // --- Sidebar Filter State ---
+    const [sidebarFilter, setSidebarFilter] = useState<'tapes' | 'albums' | 'artists'>('tapes');
 
     // --- Artist State ---
     const [isArtistLoading, setIsArtistLoading] = useState(false);
@@ -225,6 +262,76 @@ export function GlassStage({
     const [libraryTab, setLibraryTab] = useState<'liked' | 'playlists' | 'albums' | 'artists'>('liked');
     const [likedSongs, setLikedSongs] = useState<JioSaavnSong[]>([]);
     const [recentlyPlayed, setRecentlyPlayed] = useState<JioSaavnSong[]>([]);
+
+    // --- Keyboard Shortcuts ---
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            switch (e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'ArrowRight':
+                    if (e.ctrlKey || e.metaKey) next();
+                    else seek(Math.min(1, progress + 0.05)); // Seek 5%
+                    break;
+                case 'ArrowLeft':
+                    if (e.ctrlKey || e.metaKey) prev();
+                    else seek(Math.max(0, progress - 0.05)); // Seek back 5%
+                    break;
+                case 'KeyM':
+                    setVolume(volume > 0 ? 0 : 1);
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [togglePlay, next, prev, seek, progress, volume]);
+
+    // --- Artist Follow Persistence ---
+    useEffect(() => {
+        if (currentView.type === 'artist' && currentView.data) {
+            const followed = JSON.parse(localStorage.getItem('melora-followed-artists') || '[]');
+            setIsFollowed(followed.includes(currentView.data.id));
+        }
+    }, [currentView]);
+
+    const toggleFollowArtist = () => {
+        if (!currentView.data) return;
+        const followed = JSON.parse(localStorage.getItem('melora-followed-artists') || '[]');
+        let newFollowed;
+        if (isFollowed) {
+            newFollowed = followed.filter((id: string) => id !== currentView.data.id);
+            showToast("Unfollowed Artist");
+        } else {
+            newFollowed = [...followed, currentView.data.id];
+            showToast("Following Artist");
+        }
+        localStorage.setItem('melora-followed-artists', JSON.stringify(newFollowed));
+        setIsFollowed(!isFollowed);
+    };
+
+    // --- Recently Played Logic ---
+    useEffect(() => {
+        if (currentSong) {
+            setRecentlyPlayed(prev => {
+                const filtered = prev.filter(s => s.id !== currentSong.id);
+                const updated = [currentSong, ...filtered].slice(0, 20);
+                localStorage.setItem('melora-recently-played', JSON.stringify(updated));
+                return updated;
+            });
+        }
+    }, [currentSong]);
+
+    // --- Load recently played from localStorage ---
+    useEffect(() => {
+        const saved = localStorage.getItem('melora-recently-played');
+        if (saved) setRecentlyPlayed(JSON.parse(saved));
+    }, []);
 
     // --- Load liked songs from localStorage ---
     useEffect(() => {
@@ -350,8 +457,13 @@ export function GlassStage({
                 try {
                     const id = currentView.data.listid || currentView.data.id;
                     if (id) {
-                        const songs = await getPlaylistDetails(id);
-                        setPlaylistDetails(songs);
+                        if (currentView.data.type === 'album') {
+                            const songs = await getAlbumDetails(id);
+                            setPlaylistDetails(songs);
+                        } else {
+                            const songs = await getPlaylistDetails(id);
+                            setPlaylistDetails(songs);
+                        }
                     }
                 } catch (e) {
                     console.error("Failed to load playlist details", e);
@@ -445,11 +557,19 @@ export function GlassStage({
         { name: "Trending Now", color: "from-pink-500 to-rose-500", icon: <Zap size={24} /> },
         { name: "New Releases", color: "from-purple-500 to-indigo-500", icon: <Disc size={24} /> },
         { name: "Telugu Hits", color: "from-sky-500 to-blue-500", icon: <Music size={24} /> },
+        { name: "Hindi Pop", color: "from-orange-500 to-red-500", icon: <Music size={24} /> },
         { name: "Devotional", color: "from-amber-500 to-orange-500", icon: <Star size={24} /> },
         { name: "Love Songs", color: "from-red-500 to-pink-600", icon: <Heart size={24} /> },
         { name: "Party Mix", color: "from-green-500 to-emerald-600", icon: <ListMusic size={24} /> },
         { name: "90s Retro", color: "from-yellow-500 to-amber-600", icon: <Clock size={24} /> },
         { name: "Folk Beats", color: "from-teal-500 to-cyan-600", icon: <Mic2 size={24} /> },
+        { name: "Hip Hop", color: "from-gray-600 to-gray-800", icon: <Mic2 size={24} /> },
+        { name: "Rock", color: "from-red-600 to-orange-600", icon: <Zap size={24} /> },
+        { name: "EDM", color: "from-violet-500 to-purple-600", icon: <Radio size={24} /> },
+        { name: "Classical", color: "from-amber-600 to-yellow-500", icon: <Music size={24} /> },
+        { name: "Chill Vibes", color: "from-blue-400 to-cyan-400", icon: <Volume2 size={24} /> },
+        { name: "Workout", color: "from-green-600 to-lime-500", icon: <Zap size={24} /> },
+        { name: "Sleep", color: "from-indigo-600 to-blue-700", icon: <Clock size={24} /> },
     ];
 
     const handleCategoryClick = (category: string) => {
@@ -457,15 +577,15 @@ export function GlassStage({
     };
 
     return (
-        <div className="relative w-full h-screen bg-black text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white selection:text-black">
+        <div className="relative w-full h-screen bg-black text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white selection:text-black onyx-bg">
             <style>{CUSTOM_STYLES}</style>
 
-            {/* Main Layout Container - Strict Overflow */}
-            <div className="flex-1 flex overflow-hidden p-3 gap-3 relative z-10 box-border min-h-0">
+            {/* Main Layout Container */}
+            <div className="flex-1 flex overflow-hidden p-6 gap-6 relative z-10 box-border min-h-0">
 
-                {/* LEFT SIDEBAR (Static) */}
-                <aside className="w-60 flex flex-col gap-3 hidden md:flex shrink-0 z-20 h-full">
-                    <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4">
+                {/* LEFT SIDEBAR */}
+                <aside className="w-64 flex flex-col gap-6 hidden md:flex shrink-0 z-20 h-full">
+                    <div className="glass-panel rounded-3xl p-6 flex flex-col gap-6">
                         <nav className="flex flex-col gap-1">
                             <NavItem
                                 icon={<Home size={20} />}
@@ -505,8 +625,24 @@ export function GlassStage({
                             </button>
                         </div>
                         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
-                            <FilterPill label="My Tapes" active />
-                            <FilterPill label="Albums" />
+                            <button
+                                onClick={() => setSidebarFilter('tapes')}
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${sidebarFilter === 'tapes' ? 'bg-white text-black' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
+                            >
+                                My Tapes
+                            </button>
+                            <button
+                                onClick={() => setSidebarFilter('albums')}
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${sidebarFilter === 'albums' ? 'bg-white text-black' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
+                            >
+                                Albums
+                            </button>
+                            <button
+                                onClick={() => setSidebarFilter('artists')}
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${sidebarFilter === 'artists' ? 'bg-white text-black' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
+                            >
+                                Artists
+                            </button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto flex flex-col gap-2 mt-2 pr-1 custom-scrollbar">
@@ -515,20 +651,86 @@ export function GlassStage({
                                 subtitle={`Playlist • ${likedSongs.length} songs`}
                                 icon={<Heart size={18} fill="white" />}
                                 gradient="from-indigo-500 to-purple-600"
-                                onClick={() => navigateTo({ type: 'library' })}
+                                onClick={() => { setLibraryTab('liked'); navigateTo({ type: 'library' }); }}
                             />
-                            {charts.length > 0 && (
+
+                            {sidebarFilter === 'tapes' && mixes.length > 0 && (
                                 <div className="mt-4">
-                                    <h5 className="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider pl-1">Top Charts</h5>
-                                    {charts.slice(0, 8).map((chart: any, i) => (
+                                    <h5 className="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider pl-1">My Tapes</h5>
+                                    {mixes.map((mix) => (
                                         <LibraryItem
-                                            key={i}
-                                            title={decodeHtml(chart.title || chart.listname)}
-                                            subtitle={chart.language || "Chart"}
-                                            image={chart.image || chart.img}
-                                            onClick={() => navigateTo({ type: 'playlist', data: chart })}
+                                            key={mix.id}
+                                            title={mix.title}
+                                            subtitle={`Playlist • ${mix.songs.length} songs`}
+                                            image={mix.songs[0]?.image?.[1]?.link || mix.songs[0]?.image?.[0]?.link}
+                                            onClick={() => loadMix(mix.id)}
                                         />
                                     ))}
+                                </div>
+                            )}
+
+                            {sidebarFilter === 'albums' && (
+                                <div className="mt-4">
+                                    <h5 className="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider pl-1">Albums</h5>
+                                    {(() => {
+                                        const albumMap = new Map<string, { name: string; image: any; songs: JioSaavnSong[]; id: string }>();
+                                        likedSongs.forEach(song => {
+                                            const albumName = song.album?.name || 'Unknown Album';
+                                            if (!albumMap.has(albumName)) {
+                                                albumMap.set(albumName, { name: albumName, image: song.image, songs: [], id: song.album?.id || '' });
+                                            }
+                                            albumMap.get(albumName)?.songs.push(song);
+                                        });
+                                        const albums = Array.from(albumMap.values());
+
+                                        if (albums.length === 0) {
+                                            return <p className="text-xs text-gray-500 pl-1">Like songs to see albums</p>;
+                                        }
+
+                                        return albums.map((album, i) => (
+                                            <LibraryItem
+                                                key={album.name + i}
+                                                title={decodeHtml(album.name)}
+                                                subtitle={`Album • ${album.songs.length} songs`}
+                                                image={Array.isArray(album.image) ? album.image[1]?.link || album.image[0]?.link : album.image}
+                                                onClick={() => navigateTo({ type: 'playlist', data: { title: album.name, image: album.image, type: 'album', id: album.id } })}
+                                            />
+                                        ));
+                                    })()}
+                                </div>
+                            )}
+
+                            {sidebarFilter === 'artists' && (
+                                <div className="mt-4">
+                                    <h5 className="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider pl-1">Artists</h5>
+                                    {(() => {
+                                        const uniqueArtists = new Map();
+                                        likedSongs.forEach(song => {
+                                            if (!song.primaryArtists) return;
+                                            const artistName = song.primaryArtists.split(',')[0].trim();
+                                            const artistId = (song.primaryArtistsId || "").split(',')[0]?.trim() || "";
+                                            if (!uniqueArtists.has(artistName)) {
+                                                uniqueArtists.set(artistName, { name: artistName, image: song.image, id: artistId });
+                                            }
+                                        });
+                                        const artists = Array.from(uniqueArtists.values());
+
+                                        if (artists.length === 0) {
+                                            return <p className="text-xs text-gray-500 pl-1">Like songs to see artists</p>;
+                                        }
+
+                                        return artists.map((artist, i) => (
+                                            <div key={i} onClick={() => { if (artist.id) { navigateTo({ type: 'artist', data: { id: artist.id } }); setArtistTab('popular'); } else { setSearchQuery(artist.name); navigateTo({ type: 'search' }); } }} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer transition-colors group">
+                                                <div className="w-10 h-10 rounded-full overflow-hidden relative border border-white/10">
+                                                    <Image src={Array.isArray(artist.image) ? artist.image[1]?.link || artist.image[0]?.link : artist.image || ""} alt="" fill className="object-cover" unoptimized />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="text-xs font-bold text-gray-200 group-hover:text-white truncate">{decodeHtml(artist.name)}</h4>
+                                                    <p className="text-[10px] text-gray-500 capitalize">Artist</p>
+                                                </div>
+                                            </div>
+                                        ));
+                                    })()}
                                 </div>
                             )}
                         </div>
@@ -604,99 +806,290 @@ export function GlassStage({
                                     className="space-y-6"
                                 >
                                     {/* Mood Pills */}
-                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide pt-1 shrink-0">
-                                        {['Telugu Hits', 'Mass Beats', 'Melody', 'Love', 'Sad', 'Party', 'Folk', 'Devotional'].map(mood => (
-                                            <button key={mood} onClick={() => { setSearchQuery(mood); navigateTo({ type: 'search' }); }} className="px-4 py-1.5 rounded-full mood-capsule text-xs font-medium text-white whitespace-nowrap">
+                                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                                        {['Energize', 'Feel good', 'Relax', 'Workout', 'Sad', 'Party'].map((mood, i) => (
+                                            <button
+                                                key={mood}
+                                                onClick={() => { setSearchQuery(mood); navigateTo({ type: 'search' }); }}
+                                                className={`px-6 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${i === 0 ? 'bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/5 hover:border-white/20'}`}
+                                            >
                                                 {mood}
                                             </button>
                                         ))}
                                     </div>
 
-                                    {isHomeLoading ? (
-                                        <div className="h-80 flex items-center justify-center flex-col gap-4">
-                                            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                            <p className="text-xs text-gray-500 animate-pulse">Curating your mix...</p>
+                                    {/* Hero Grid - Library First */}
+                                    <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                                        {/* Daily Mix Card - Uses first mix */}
+                                        <div className="glass-card rounded-3xl p-6 relative overflow-hidden group hover:border-white/20 transition-all duration-500">
+                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-transparent z-0"></div>
+                                            <div className="relative z-10 flex flex-col h-full justify-between">
+                                                <div>
+                                                    <p className="text-xs text-gray-400 mb-1 tracking-wider uppercase font-medium">Daily Mix</p>
+                                                    <h2 className="text-2xl font-bold text-white mb-4 leading-tight">Playlist<br />of the day</h2>
+                                                </div>
+                                                <div className="flex justify-center my-4">
+                                                    <div className="w-32 h-32 rounded-lg overflow-hidden shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-700 border border-white/10 relative">
+                                                        {mixes[0]?.songs[0]?.image && (
+                                                            <Image
+                                                                src={(Array.isArray(mixes[0].songs[0].image) ? mixes[0].songs[0].image[2]?.link || mixes[0].songs[0].image[0]?.link : mixes[0].songs[0].image) || ""}
+                                                                alt="Featured"
+                                                                fill
+                                                                className="object-cover opacity-90 group-hover:opacity-100"
+                                                                unoptimized
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-end justify-center gap-1 h-6 mt-2 opacity-40 group-hover:opacity-80 transition-opacity">
+                                                    <div className="w-1 bg-white h-3 rounded-full animate-pulse"></div>
+                                                    <div className="w-1 bg-white h-5 rounded-full animate-pulse" style={{ animationDelay: '75ms' }}></div>
+                                                    <div className="w-1 bg-white h-2 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                                                    <div className="w-1 bg-white h-6 rounded-full animate-pulse" style={{ animationDelay: '100ms' }}></div>
+                                                    <div className="w-1 bg-white h-4 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    ) : (heroData ? (
-                                        <>
-                                            {/* Hero Section - FIXED HEIGHT */}
-                                            {/* Hero Grid (Stitch Layout) */}
-                                            {heroData && (
-                                                <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-80 shrink-0 mb-8">
 
-                                                    {/* Left: Daily Mix (Vertical) */}
-                                                    {dailyMix && (
-                                                        <div className="hidden lg:flex relative rounded-3xl overflow-hidden group cursor-pointer border border-white/5 h-full shadow-xl" onClick={() => navigateTo({ type: 'playlist', data: dailyMix })}>
-                                                            <div className="absolute inset-0 bg-[#2b2b2b]"></div>
-                                                            <Image src={(Array.isArray(dailyMix.image || dailyMix.img) ? (dailyMix.image || dailyMix.img)[2]?.link : (dailyMix.image || dailyMix.img)) || ""} alt="Daily Mix" fill className="object-cover opacity-80 group-hover:scale-110 transition-transform duration-700" unoptimized />
-                                                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20"></div>
-
-                                                            <div className="absolute inset-0 p-6 flex flex-col justify-between">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-[10px] uppercase tracking-widest font-bold text-white/60 bg-black/20 backdrop-blur-md px-2 py-1 rounded-md">Daily Mix</span>
-                                                                    <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-colors"><Heart size={14} className="text-white" /></div>
-                                                                </div>
-                                                                <div>
-                                                                    <h3 className="text-2xl font-black text-white leading-tight mb-2 drop-shadow-md line-clamp-2">{decodeHtml(dailyMix.title || dailyMix.listname)}</h3>
-                                                                    <p className="text-xs text-white/60 line-clamp-1">{dailyMix.language || "Mix"}</p>
-                                                                </div>
-                                                            </div>
+                                        {/* Featured Album Card - Uses current song or first mix */}
+                                        <div className="lg:col-span-2 glass-card rounded-3xl p-0 relative overflow-hidden group border-white/10 hover:border-white/20 transition-all h-64 lg:h-auto cursor-pointer" onClick={() => currentSong ? navigateTo({ type: 'nowplaying' }) : mixes[0] && loadMix(mixes[0].id)}>
+                                            {(() => {
+                                                const imgSrc = currentSong?.image || mixes[0]?.songs[0]?.image;
+                                                const src = Array.isArray(imgSrc) ? (imgSrc[2]?.link || imgSrc[0]?.link) : imgSrc;
+                                                return src ? (
+                                                    <Image
+                                                        src={src}
+                                                        alt="Background"
+                                                        fill
+                                                        className="object-cover opacity-50 group-hover:opacity-60 group-hover:scale-105 transition-all duration-1000 saturate-0 group-hover:saturate-50"
+                                                        unoptimized
+                                                    />
+                                                ) : null;
+                                            })()}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+                                            <div className="relative z-10 p-8 flex flex-col h-full justify-between">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white/10 backdrop-blur-md mb-3 border border-white/5">
+                                                            <span className="w-2 h-2 rounded-full bg-accent-pink animate-pulse"></span>
+                                                            <span className="text-[10px] uppercase font-bold tracking-widest text-white">{currentSong ? 'Now Playing' : 'New Release'}</span>
                                                         </div>
-                                                    )}
-
-                                                    {/* Right: Feature Card (Horizontal) */}
-                                                    <div className={`col-span-1 ${dailyMix ? 'lg:col-span-2' : 'lg:col-span-3'} relative rounded-3xl overflow-hidden group cursor-pointer border border-white/5 h-64 lg:h-full shadow-2xl`} onClick={() => navigateTo({ type: 'playlist', data: heroData })}>
-                                                        <Image src={(Array.isArray(heroData.image || heroData.img) ? (heroData.image || heroData.img)[2]?.link : (heroData.image || heroData.img)) || ""} alt="Hero" fill className="object-cover opacity-70 group-hover:scale-105 transition-transform duration-700" unoptimized />
-                                                        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent"></div>
-
-                                                        <div className="absolute inset-0 p-8 flex flex-col justify-center items-start z-10">
-                                                            <div className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 backdrop-blur-md border border-blue-500/20">Featured Album</div>
-                                                            <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tight drop-shadow-2xl max-w-lg leading-[0.9]">{decodeHtml(heroData.title || heroData.listname)}</h1>
-                                                            <p className="text-gray-300 text-sm md:text-base max-w-lg mb-8 line-clamp-2 drop-shadow-md font-medium">{decodeHtml(heroData.subtitle || heroData.language || "The best music, right now.")}</p>
-
-                                                            <div className="flex items-center gap-4">
-                                                                <button className="h-12 w-12 bg-white rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.4)] text-black">
-                                                                    <Play fill="currentColor" size={20} className="ml-1" />
-                                                                </button>
-                                                                <button className="h-12 w-12 rounded-full border border-white/20 hover:bg-white/10 flex items-center justify-center backdrop-blur-md transition-all text-white">
-                                                                    <Heart size={20} />
-                                                                </button>
-                                                                <button className="h-12 w-12 rounded-full border border-white/20 hover:bg-white/10 flex items-center justify-center backdrop-blur-md transition-all text-white">
-                                                                    <MoreVertical size={20} />
-                                                                </button>
-                                                            </div>
+                                                        <h2 className="text-5xl font-bold text-white mt-1 drop-shadow-lg tracking-tight">{currentSong ? decodeHtml(currentSong.name) : mixes[0]?.title || 'Your Library'}</h2>
+                                                        <p className="text-sm text-gray-300 mt-2 font-medium">{currentSong ? decodeHtml(currentSong.primaryArtists) : `${mixes.length} playlists • ${likedSongs.length} liked songs`}</p>
+                                                    </div>
+                                                    <div className="flex gap-3">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); if (currentSong) toggleLike(currentSong); }}
+                                                            className={`w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center transition-all ${currentSong && isLiked(currentSong.id) ? 'text-accent-pink hover:bg-white/10' : 'text-white hover:bg-white hover:text-black'}`}
+                                                        >
+                                                            <Heart size={18} fill={currentSong && isLiked(currentSong.id) ? "currentColor" : "none"} />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); if (currentSong) handleContextMenu(e, currentSong); }}
+                                                            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all"
+                                                        >
+                                                            <MoreVertical size={18} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-auto flex items-end gap-6">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (currentSong) {
+                                                                togglePlay();
+                                                            } else if (mixes[0]) {
+                                                                loadMix(mixes[0].id);
+                                                            }
+                                                        }}
+                                                        className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform shadow-[0_0_25px_rgba(255,255,255,0.4)]"
+                                                    >
+                                                        {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+                                                    </button>
+                                                    <div className="flex-1 pb-2">
+                                                        <div className="flex items-center justify-between text-xs text-gray-300 font-mono mb-2">
+                                                            <span>{currentSong ? decodeHtml(currentSong.album?.name || currentSong.name) : 'Select a song to play'}</span>
+                                                            <span>{formatTime(progress * (duration || 0))} / {formatTime(duration || 0)}</span>
+                                                        </div>
+                                                        <div className="h-1 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+                                                            <div className="h-full bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${progress * 100}%` }}></div>
                                                         </div>
                                                     </div>
-                                                </motion.div>
-                                            )}
-
-                                            {/* Charts Grid */}
-                                            <motion.div variants={itemVariants}>
-                                                <h3 className="text-lg font-bold mb-3">Top Charts & Playlists</h3>
-                                                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 pb-8">
-                                                    {charts.map((chart: any, i) => (
-                                                        <motion.div variants={itemVariants} key={i} className="group cursor-pointer" onClick={() => navigateTo({ type: 'playlist', data: chart })}>
-                                                            <div className="aspect-square rounded-lg overflow-hidden mb-2 relative glass-card border-none shadow-lg">
-                                                                <Image src={chart.image || chart.img} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
-                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-[2px]">
-                                                                    <Play size={24} fill="white" className="text-white drop-shadow-lg scale-0 group-hover:scale-100 transition-transform delay-75" />
-                                                                </div>
-                                                            </div>
-                                                            <h4 className="text-xs font-bold truncate pr-1 group-hover:text-blue-400 transition-colors">{decodeHtml(chart.title || chart.listname)}</h4>
-                                                            <p className="text-[10px] text-gray-400 capitalize">{chart.language || "Chart"}</p>
-                                                        </motion.div>
-                                                    ))}
                                                 </div>
-                                            </motion.div>
-                                        </>
-                                    ) : (
-                                        <div className="h-80 flex flex-col items-center justify-center gap-4 text-center">
-                                            <p className="text-gray-400 text-sm">Unable to load home feed.</p>
-                                            <button onClick={loadContent} className="px-6 py-2 bg-white text-black font-bold rounded-full text-xs hover:scale-105 transition-transform">
-                                                Retry
-                                            </button>
+                                            </div>
                                         </div>
-                                    ))}
+                                    </motion.div>
+
+                                    {/* Tabs */}
+                                    <div className="flex items-center gap-8 border-b border-white/5 mb-6 px-2">
+                                        <button
+                                            onClick={() => setHomeTab('playlist')}
+                                            className={`pb-3 border-b-2 font-semibold tracking-wide text-sm transition-colors ${homeTab === 'playlist' ? 'border-white text-white' : 'border-transparent text-gray-500 hover:text-white'}`}
+                                        >
+                                            Playlist
+                                        </button>
+                                        <button
+                                            onClick={() => setHomeTab('artists')}
+                                            className={`pb-3 border-b-2 font-semibold tracking-wide text-sm transition-colors ${homeTab === 'artists' ? 'border-white text-white' : 'border-transparent text-gray-500 hover:text-white'}`}
+                                        >
+                                            Artists
+                                        </button>
+                                        <button
+                                            onClick={() => setHomeTab('albums')}
+                                            className={`pb-3 border-b-2 font-semibold tracking-wide text-sm transition-colors ${homeTab === 'albums' ? 'border-white text-white' : 'border-transparent text-gray-500 hover:text-white'}`}
+                                        >
+                                            Albums
+                                        </button>
+                                        <button
+                                            onClick={() => setHomeTab('streams')}
+                                            className={`pb-3 border-b-2 font-semibold tracking-wide text-sm transition-colors ${homeTab === 'streams' ? 'border-white text-white' : 'border-transparent text-gray-500 hover:text-white'}`}
+                                        >
+                                            Streams
+                                        </button>
+                                    </div>
+
+                                    {/* Content based on Tab */}
+                                    <div className="space-y-1 min-h-[300px]">
+                                        {homeTab === 'playlist' && (
+                                            <>
+                                                {/* Song List Header */}
+                                                <div className="grid grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-widest opacity-60">
+                                                    <span className="w-8 text-center">#</span>
+                                                    <span>Title</span>
+                                                    <span>Artist</span>
+                                                    <span className="text-right">Time</span>
+                                                    <span className="w-12"></span>
+                                                </div>
+
+                                                {/* Song List */}
+                                                {(likedSongs.length > 0 ? likedSongs : mixes[0]?.songs || []).slice(0, 10).map((song, i) => (
+                                                    <div
+                                                        key={song.id || i}
+                                                        onClick={() => handleSongClick(song)}
+                                                        className={`group grid grid-cols-[auto_1fr_1fr_auto_auto] gap-4 items-center px-4 py-3 rounded-xl transition-all cursor-pointer ${currentSong?.id === song.id ? 'bg-white/5 border border-white/10 shadow-lg backdrop-blur-sm' : 'hover:bg-white/5 border border-transparent hover:border-white/5'}`}
+                                                    >
+                                                        {currentSong?.id === song.id ? (
+                                                            <span className="w-8 flex justify-center">
+                                                                <div className="flex gap-0.5 items-end h-3">
+                                                                    <div className="w-0.5 bg-accent-pink h-full animate-bounce"></div>
+                                                                    <div className="w-0.5 bg-accent-pink h-2/3 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                                                    <div className="w-0.5 bg-accent-pink h-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                                                </div>
+                                                            </span>
+                                                        ) : (
+                                                            <>
+                                                                <span className="w-8 text-center text-gray-500 group-hover:hidden font-mono text-xs">{String(i + 1).padStart(2, '0')}</span>
+                                                                <span className="w-8 text-center hidden group-hover:block text-white"><Play size={14} fill="currentColor" /></span>
+                                                            </>
+                                                        )}
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 rounded-md overflow-hidden shadow-lg relative">
+                                                                <Image src={(Array.isArray(song.image) ? song.image[1]?.link || song.image[0]?.link : song.image) || ""} alt="Cover" fill className="object-cover opacity-80 group-hover:opacity-100 transition-opacity" unoptimized />
+                                                            </div>
+                                                            <div>
+                                                                <span className={`font-medium block ${currentSong?.id === song.id ? 'text-white font-bold' : 'text-gray-200 group-hover:text-white'}`}>{decodeHtml(song.name)}</span>
+                                                                {currentSong?.id === song.id && <span className="text-[10px] text-accent-pink uppercase tracking-wider font-bold">Now Playing</span>}
+                                                            </div>
+                                                        </div>
+                                                        <span className={`text-sm ${currentSong?.id === song.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>{decodeHtml(song.primaryArtists)}</span>
+                                                        <span className={`text-right font-mono text-xs ${currentSong?.id === song.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>{formatTime(song.duration)}</span>
+                                                        <div className="flex justify-end gap-2 w-12">
+                                                            <button onClick={(e) => { e.stopPropagation(); toggleLike(song); }} className={isLiked(song.id) ? 'text-accent-pink' : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-white transition-opacity'}>
+                                                                <Heart size={16} fill={isLiked(song.id) ? "currentColor" : "none"} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {likedSongs.length === 0 && mixes.length === 0 && (
+                                                    <div className="text-center py-20 text-gray-500">
+                                                        <Library size={48} className="mx-auto mb-4 opacity-50" />
+                                                        <p className="text-sm">No songs yet. Create a tape in Deck Studio or like some songs!</p>
+                                                        <button onClick={() => navigateTo({ type: 'explore' })} className="mt-4 px-6 py-2 bg-white text-black rounded-full text-sm font-bold hover:scale-105 transition-transform">
+                                                            Explore Music
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+
+                                        {homeTab === 'artists' && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                                {(() => {
+                                                    const uniqueArtists = new Map();
+                                                    [...likedSongs, ...(mixes.flatMap(m => m.songs))].forEach(song => {
+                                                        // Split artists by comma and take the first one or primary
+                                                        const artistName = song.primaryArtists.split(',')[0].trim();
+                                                        if (!uniqueArtists.has(artistName)) {
+                                                            uniqueArtists.set(artistName, { name: artistName, image: song.image });
+                                                        }
+                                                    });
+                                                    // Add Followed Artists
+                                                    // (For now using liked songs derived artists as we don't fetch full followed artist details in bulk)
+
+                                                    const artists = Array.from(uniqueArtists.values());
+
+                                                    if (artists.length === 0) return <div className="col-span-full text-center py-20 text-gray-500">Like songs to see artists here.</div>;
+
+                                                    return artists.slice(0, 15).map((artist, i) => (
+                                                        <div key={i} onClick={() => { setSearchQuery(artist.name); navigateTo({ type: 'search' }); }} className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 cursor-pointer transition-colors group">
+                                                            <div className="w-24 h-24 rounded-full overflow-hidden relative shadow-lg group-hover:scale-105 transition-transform">
+                                                                <Image src={Array.isArray(artist.image) ? artist.image[1]?.link || artist.image[0]?.link : artist.image || ""} alt="" fill className="object-cover" unoptimized />
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <h4 className="font-bold text-sm truncate max-w-[120px]">{decodeHtml(artist.name)}</h4>
+                                                                <p className="text-xs text-gray-400">Artist</p>
+                                                            </div>
+                                                        </div>
+                                                    ));
+                                                })()}
+                                            </div>
+                                        )}
+
+                                        {homeTab === 'albums' && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                                {(() => {
+                                                    const albumMap = new Map<string, { name: string; image: any; songs: JioSaavnSong[]; id: string }>();
+                                                    likedSongs.forEach(song => {
+                                                        const albumName = song.album?.name || 'Unknown Album';
+                                                        if (!albumMap.has(albumName)) {
+                                                            albumMap.set(albumName, { name: albumName, image: song.image, songs: [], id: song.album?.id || '' });
+                                                        }
+                                                        albumMap.get(albumName)?.songs.push(song);
+                                                    });
+                                                    const albums = Array.from(albumMap.values());
+
+                                                    if (albums.length === 0) return <div className="col-span-full text-center py-20 text-gray-500">Like songs to see albums here.</div>;
+
+                                                    return albums.map((album, i) => (
+                                                        <div key={i} onClick={() => navigateTo({ type: 'playlist', data: { title: album.name, image: album.image, type: 'album', id: album.id } })} className="group cursor-pointer">
+                                                            <div className="aspect-square rounded-xl overflow-hidden mb-3 relative shadow-lg bg-gray-800">
+                                                                <Image src={Array.isArray(album.image) ? album.image[1]?.link || album.image[0]?.link : album.image || ""} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
+                                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
+                                                                <button className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-accent-pink text-white flex items-center justify-center opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all shadow-lg">
+                                                                    <Play fill="currentColor" size={18} className="ml-0.5" />
+                                                                </button>
+                                                            </div>
+                                                            <h4 className="font-bold text-sm truncate group-hover:text-white transition-colors">{decodeHtml(album.name)}</h4>
+                                                            <p className="text-xs text-gray-500">{album.songs.length} songs</p>
+                                                        </div>
+                                                    ));
+                                                })()}
+                                            </div>
+                                        )}
+
+                                        {homeTab === 'streams' && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                {EXPLORE_CATEGORIES.slice(0, 8).map((cat, i) => (
+                                                    <div key={i} onClick={() => { setSearchQuery(cat.name + " Radio"); navigateTo({ type: 'search' }); }} className={`aspect-[4/3] rounded-xl bg-gradient-to-br ${cat.color} p-4 relative overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform shadow-lg group`}>
+                                                        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div>
+                                                        <h4 className="font-bold text-lg relative z-10 text-shadow">{cat.name} Radio</h4>
+                                                        <div className="absolute -bottom-2 -right-2 rotate-12 opacity-80 group-hover:scale-110 group-hover:rotate-6 transition-all">{cat.icon}</div>
+                                                        <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Live</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </motion.div>
                             )}
 
@@ -754,12 +1147,100 @@ export function GlassStage({
                                             )}
                                         </div>
                                     )}
-                                    {/* Placeholders for other tabs */}
-                                    {libraryTab !== 'liked' && (
-                                        <div className="flex flex-col items-center justify-center py-20 opacity-30 text-center">
-                                            <Library size={48} className="mb-4" />
-                                            <h3 className="text-lg font-bold">Empty Collection</h3>
-                                            <p className="text-xs max-w-xs mt-2">Save {libraryTab} to your library and they will show up here.</p>
+
+                                    {/* Playlists Tab - Show all mixes */}
+                                    {libraryTab === 'playlists' && (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {mixes.length === 0 ? (
+                                                <div className="col-span-full flex flex-col items-center justify-center py-20 opacity-50 space-y-4">
+                                                    <ListMusic size={48} className="opacity-50" />
+                                                    <p className="text-sm">No playlists yet</p>
+                                                    <button onClick={() => handleCreatePlaylist()} className="px-6 py-2 bg-white/10 rounded-full text-xs font-bold hover:bg-white/20 transition-colors">Create Playlist</button>
+                                                </div>
+                                            ) : (
+                                                mixes.map((mix, i) => (
+                                                    <div
+                                                        key={mix.id}
+                                                        onClick={() => loadMix(mix.id)}
+                                                        className="group bg-white/5 hover:bg-white/10 rounded-2xl p-4 cursor-pointer transition-all border border-transparent hover:border-white/10"
+                                                    >
+                                                        <div className="aspect-square rounded-xl overflow-hidden mb-3 relative shadow-lg bg-gradient-to-br from-purple-600/50 to-blue-600/50">
+                                                            {mix.songs[0]?.image && (
+                                                                <Image
+                                                                    src={(Array.isArray(mix.songs[0].image) ? mix.songs[0].image[2]?.link || mix.songs[0].image[0]?.link : mix.songs[0].image) || ""}
+                                                                    alt={mix.title}
+                                                                    fill
+                                                                    className="object-cover group-hover:scale-105 transition-transform"
+                                                                    unoptimized
+                                                                />
+                                                            )}
+                                                            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); loadMix(mix.id); }}
+                                                                className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all shadow-lg"
+                                                            >
+                                                                <Play size={18} fill="currentColor" className="ml-0.5" />
+                                                            </button>
+                                                        </div>
+                                                        <h4 className="font-bold text-white text-sm truncate">{mix.title}</h4>
+                                                        <p className="text-xs text-gray-400 mt-1">{mix.songs.length} songs</p>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Albums Tab - Group songs by album */}
+                                    {libraryTab === 'albums' && (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {(() => {
+                                                // Group liked songs by album
+                                                const albumMap = new Map<string, { name: string; image: any; songs: JioSaavnSong[] }>();
+                                                likedSongs.forEach(song => {
+                                                    const albumName = song.album?.name || 'Unknown Album';
+                                                    if (!albumMap.has(albumName)) {
+                                                        albumMap.set(albumName, { name: albumName, image: song.image, songs: [] });
+                                                    }
+                                                    albumMap.get(albumName)?.songs.push(song);
+                                                });
+                                                const albums = Array.from(albumMap.values());
+
+                                                if (albums.length === 0) {
+                                                    return (
+                                                        <div className="col-span-full flex flex-col items-center justify-center py-20 opacity-50 space-y-4">
+                                                            <Disc size={48} className="opacity-50" />
+                                                            <p className="text-sm">No albums yet</p>
+                                                            <p className="text-xs text-gray-500">Like songs to see their albums here</p>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return albums.map((album, i) => (
+                                                    <div
+                                                        key={album.name + i}
+                                                        onClick={() => handlePlayPlaylist(album.songs, album.name, `album-${i}`)}
+                                                        className="group bg-white/5 hover:bg-white/10 rounded-2xl p-4 cursor-pointer transition-all border border-transparent hover:border-white/10"
+                                                    >
+                                                        <div className="aspect-square rounded-xl overflow-hidden mb-3 relative shadow-lg">
+                                                            <Image
+                                                                src={(Array.isArray(album.image) ? album.image[2]?.link || album.image[0]?.link : album.image) || ""}
+                                                                alt={album.name}
+                                                                fill
+                                                                className="object-cover group-hover:scale-105 transition-transform"
+                                                                unoptimized
+                                                            />
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handlePlayPlaylist(album.songs, album.name, `album-${i}`); }}
+                                                                className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all shadow-lg"
+                                                            >
+                                                                <Play size={18} fill="currentColor" className="ml-0.5" />
+                                                            </button>
+                                                        </div>
+                                                        <h4 className="font-bold text-white text-sm truncate">{decodeHtml(album.name)}</h4>
+                                                        <p className="text-xs text-gray-400 mt-1">{album.songs.length} songs</p>
+                                                    </div>
+                                                ));
+                                            })()}
                                         </div>
                                     )}
                                 </motion.div>
@@ -839,7 +1320,7 @@ export function GlassStage({
                                                         <Play size={18} fill="currentColor" /> Play
                                                     </button>
                                                     <button
-                                                        onClick={() => { setIsFollowed(!isFollowed); showToast(isFollowed ? "Unfollowed Artist" : "Following Artist"); }}
+                                                        onClick={toggleFollowArtist}
                                                         className={`px-8 py-3 border font-bold rounded-full transition-colors flex items-center gap-2 ${isFollowed ? 'bg-white text-black border-white' : 'border-white/30 text-white hover:bg-white/10'}`}
                                                     >
                                                         {isFollowed ? "Following" : "Follow"}
@@ -891,8 +1372,64 @@ export function GlassStage({
                                                     </motion.div>
                                                 ))}
                                             </div>
+                                        ) : artistTab === 'singles' ? (
+                                            <div className="space-y-1">
+                                                {artistDetails?.singles?.length > 0 ? artistDetails.singles.map((song: any, i: number) => (
+                                                    <div key={i} className="group flex items-center p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" onClick={() => handleSongClick(song)} onContextMenu={(e) => handleContextMenu(e, song)}>
+                                                        <span className="w-8 text-center text-gray-500 text-xs font-mono group-hover:hidden">{i + 1}</span>
+                                                        <span className="w-8 hidden group-hover:flex justify-center text-white"><Play size={14} fill="currentColor" /></span>
+                                                        <div className="w-10 h-10 bg-gray-800 rounded mx-3 overflow-hidden relative"><Image src={song.image[1]?.link || ""} alt="" fill className="object-cover" unoptimized /></div>
+                                                        <span className="flex-1 text-sm font-medium text-white truncate">{decodeHtml(song.title)}</span>
+                                                        <span className="text-xs text-gray-500 pr-4">{Number(song.listener_count || 0).toLocaleString()} plays</span>
+                                                        <span className="text-xs text-gray-500 w-10 text-right">{formatTime(song.duration)}</span>
+                                                    </div>
+                                                )) : (
+                                                    <div className="py-20 text-center text-gray-500">No singles found</div>
+                                                )}
+                                            </div>
                                         ) : (
-                                            <div className="py-20 text-center text-gray-500">Content coming soon for {artistTab}</div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                                <div className="md:col-span-2 space-y-6">
+                                                    <section>
+                                                        <h3 className="text-xl font-bold mb-4">Biography</h3>
+                                                        <p className="text-gray-400 leading-relaxed text-sm whitespace-pre-wrap">
+                                                            {artistDetails?.bio ? JSON.parse(artistDetails.bio)[0]?.text || "No biography available." : "No biography available."}
+                                                        </p>
+                                                    </section>
+
+                                                    {artistDetails?.similarArtists?.length > 0 && (
+                                                        <section>
+                                                            <h3 className="text-xl font-bold mb-4">Fans also like</h3>
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                                                {artistDetails.similarArtists.slice(0, 6).map((artist: any) => (
+                                                                    <div key={artist.id} onClick={() => { navigateTo({ type: 'artist', data: { id: artist.id } }); setArtistTab('popular'); }} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 cursor-pointer transition-colors group">
+                                                                        <div className="w-12 h-12 rounded-full overflow-hidden relative">
+                                                                            <Image src={artist.image[1]?.link || ""} alt="" fill className="object-cover" unoptimized />
+                                                                        </div>
+                                                                        <span className="text-sm font-medium group-hover:text-white transition-colors">{decodeHtml(artist.name)}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </section>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-6">
+                                                    <div className="p-6 rounded-2xl bg-white/5 border border-white/5">
+                                                        <h3 className="text-lg font-bold mb-4">Stats</h3>
+                                                        <div className="space-y-4">
+                                                            <div>
+                                                                <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">Followers</div>
+                                                                <div className="text-2xl font-bold text-white">{(artistDetails?.follower_count || "0").toLocaleString()}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">Fan Rank</div>
+                                                                <div className="text-2xl font-bold text-white">#{artistDetails?.fan_count || "N/A"}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 </motion.div>
@@ -934,7 +1471,10 @@ export function GlassStage({
                                                         onClick={() => handleSongClick(song)} onContextMenu={(e) => handleContextMenu(e, song)}
                                                     >
                                                         <div className="w-10 h-10 rounded bg-gray-800 mr-3 overflow-hidden shadow relative shrink-0">
-                                                            <Image src={(Array.isArray(song.image) ? (song.image[1]?.link || song.image[0]?.link) : song.image) || ""} alt="Art" fill className="object-cover" unoptimized />
+                                                            {(() => {
+                                                                const imgSrc = Array.isArray(song.image) ? (song.image[1]?.link || song.image[0]?.link) : song.image;
+                                                                return imgSrc ? <Image src={imgSrc} alt="Art" fill className="object-cover" unoptimized /> : null;
+                                                            })()}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <h4 className="text-white font-medium text-sm truncate">{decodeHtml(song.name)}</h4>
@@ -1019,88 +1559,81 @@ export function GlassStage({
                     </div>
                 </main>
 
-                {/* RIGHT SIDEBAR (Existing) */}
-                <aside className="w-64 glass-panel rounded-2xl hidden xl:flex flex-col shrink-0 p-4 overflow-hidden z-20 h-full">
-                    <div className="flex items-center justify-between mb-4 shrink-0">
-                        <h3 className="text-sm font-medium text-white tracking-wide">Recent Played</h3>
-                        <button className="text-[10px] text-gray-400 hover:text-white transition-colors">See All</button>
+                {/* RIGHT SIDEBAR */}
+                <aside className="w-80 glass-panel rounded-3xl hidden xl:flex flex-col shrink-0 p-6 overflow-hidden z-20 h-full">
+                    <div className="flex items-center justify-between mb-6 shrink-0">
+                        <h3 className="font-bold text-white text-lg tracking-tight">Recent Played</h3>
+                        <button className="text-xs font-bold text-gray-500 hover:text-white transition-colors tracking-wide">VIEW ALL</button>
                     </div>
-                    <div className="flex-1 overflow-y-auto flex flex-col gap-2 scrollbar-hide">
-                        {mixes.length > 0 ? mixes.slice(0, 5).map(mix => (
-                            <div key={mix.id} onClick={() => loadMix(mix.id)} className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-1.5 rounded-lg transition-colors -mx-1">
-                                <div className="w-10 h-10 rounded-md bg-gray-800 overflow-hidden shrink-0 shadow-md relative">
-                                    {mix.songs[0]?.image[1]?.link ? (
-                                        <Image src={mix.songs[0]?.image[1]?.link} alt="" fill className="object-cover" unoptimized />
-                                    ) : (
-                                        <div className="flex items-center justify-center w-full h-full">
-                                            <Disc size={18} className="text-gray-500" />
-                                        </div>
-                                    )}
+                    <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
+                        {recentlyPlayed.length > 0 ? recentlyPlayed.slice(0, 6).map((song, i) => (
+                            <div key={i} onClick={() => handleSongClick(song)} className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-2 rounded-xl transition-colors border border-transparent hover:border-white/5">
+                                <div className="w-12 h-12 rounded-lg bg-gray-800 overflow-hidden shrink-0 shadow-lg relative">
+                                    <Image src={(Array.isArray(song.image) ? (song.image[1]?.link || song.image[0]?.link) : song.image) || ""} alt="" fill className="object-cover group-hover:scale-110 transition-transform" unoptimized />
                                 </div>
-                                <div className="flex-1 overflow-hidden">
-                                    <h4 className="text-xs font-medium text-white truncate">{mix.title}</h4>
-                                    <p className="text-[10px] text-gray-400 truncate">{mix.songs.length} Tracks</p>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm font-medium text-gray-200 group-hover:text-white truncate">{decodeHtml(song.name)}</h4>
+                                    <p className="text-xs text-gray-500 group-hover:text-gray-400 truncate">{decodeHtml(song.primaryArtists)}</p>
                                 </div>
+                                <button onClick={(e) => { e.stopPropagation(); toggleLike(song); }} className="text-gray-600 hover:text-accent-pink opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Heart size={16} fill={isLiked(song.id) ? "currentColor" : "none"} className={isLiked(song.id) ? "text-accent-pink" : ""} />
+                                </button>
                             </div>
                         )) : (
-                            <div className="text-gray-500 text-xs text-center mt-10">No recent mixes</div>
+                            <div className="text-gray-500 text-xs text-center mt-10">No recently played songs</div>
                         )}
-                    </div>
-                    <div className="mt-auto relative rounded-xl bg-neutral-900/80 border border-white/10 backdrop-blur-md p-4 text-white overflow-hidden shadow-2xl shrink-0">
-                        <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full bg-white/5 blur-2xl"></div>
-                        <div className="absolute -bottom-10 -left-10 w-24 h-24 rounded-full bg-white/5 blur-2xl"></div>
-                        <div className="relative z-10">
-                            <h4 className="font-bold text-sm mb-0.5 tracking-tight">Listen Offline</h4>
-                            <p className="text-[10px] text-gray-400 mb-3">Download your favorite tracks.</p>
-                            <button className="w-full py-2 rounded-full bg-white text-black font-bold text-xs hover:scale-105 transition-all">Download</button>
-                        </div>
                     </div>
                 </aside>
             </div>
 
-            {/* PLAYER BAR */}
-            <footer className="h-20 glass-panel border-t border-white/10 mx-3 mb-3 rounded-2xl flex items-center px-6 justify-between gap-6 z-50 shrink-0">
-                {/*  Track Info */}
-                <div className="w-1/4 flex items-center gap-3">
+            {/* FLOATING MINI-BAR */}
+            <footer className="h-24 floating-player mx-6 mb-6 rounded-2xl flex items-center px-6 justify-between gap-6 z-50 shrink-0 hover:scale-[1.005] transition-transform duration-300">
+                {/* Track Info */}
+                <div className="w-1/4 flex items-center gap-4">
                     {currentSong ? (
                         <>
-                            <div className="w-12 h-12 rounded-lg bg-zinc-800 relative overflow-hidden shadow-lg border border-white/10">
-                                <Image src={(Array.isArray(currentSong.image) ? (currentSong.image[1]?.link || currentSong.image[0]?.link) : currentSong.image) || ""} alt="" fill className="object-cover" unoptimized />
-                            </div>
-                            <div className="hidden md:block overflow-hidden">
-                                <h4 className="text-white font-bold text-xs drop-shadow-sm truncate">{decodeHtml(currentSong.name)}</h4>
-                                <div className="flex items-center gap-1">
-                                    <p className="text-gray-400 text-[10px] truncate">{decodeHtml(currentSong.primaryArtists)}</p>
+                            <div className="w-14 h-14 rounded-xl bg-zinc-800 relative overflow-hidden shadow-lg border border-white/10 group cursor-pointer" onClick={() => navigateTo({ type: 'nowplaying' })}>
+                                <Image src={(Array.isArray(currentSong.image) ? (currentSong.image[1]?.link || currentSong.image[0]?.link) : currentSong.image) || ""} alt="" fill className="object-cover group-hover:scale-110 transition-transform duration-700" unoptimized />
+                                <div className="absolute inset-0 bg-black/30 hidden group-hover:flex items-center justify-center">
+                                    <Maximize2 size={18} className="text-white" />
                                 </div>
                             </div>
-                            <button className="text-gray-400 hover:text-red-500 transition-colors hidden lg:block"><Heart size={16} /></button>
+                            <div className="hidden md:flex flex-col overflow-hidden">
+                                <h4 className="text-white font-bold text-sm truncate hover:underline cursor-pointer" onClick={() => navigateTo({ type: 'nowplaying' })}>{decodeHtml(currentSong.name)}</h4>
+                                <div className="flex items-center gap-1">
+                                    <p className="text-gray-400 text-xs truncate hover:text-white cursor-pointer">{decodeHtml(currentSong.primaryArtists)}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => toggleLike(currentSong)} className="text-gray-500 hover:text-accent-pink transition-colors hidden lg:block ml-2">
+                                <Heart size={18} fill={isLiked(currentSong.id) ? "currentColor" : "none"} className={isLiked(currentSong.id) ? "text-accent-pink" : ""} />
+                            </button>
                         </>
                     ) : (
-                        <div className="flex items-center gap-3 opacity-50">
-                            <div className="w-12 h-12 rounded-lg bg-white/5 animate-pulse"></div>
+                        <div className="flex items-center gap-4 opacity-50">
+                            <div className="w-14 h-14 rounded-xl bg-white/5 animate-pulse"></div>
                             <div>
-                                <div className="w-16 h-3 bg-white/10 rounded mb-1"></div>
-                                <div className="w-10 h-2 bg-white/10 rounded"></div>
+                                <div className="w-20 h-3 bg-white/10 rounded mb-1"></div>
+                                <div className="w-14 h-2 bg-white/10 rounded"></div>
                             </div>
                         </div>
                     )}
                 </div>
 
                 {/* Main Controls */}
-                <div className="flex-1 max-w-lg flex flex-col items-center gap-1.5">
-                    <div className="flex items-center gap-5">
-                        <button onClick={() => setShuffle(!shuffle)} className={`text-${shuffle ? 'white' : 'gray-400'} hover:text-white transition-colors`}><Shuffle size={16} /></button>
-                        <button onClick={prev} className="text-gray-300 hover:text-white transition-colors hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]"><SkipBack size={20} fill="currentColor" /></button>
-                        <button onClick={togglePlay} className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform shadow-[0_0_15px_rgba(255,255,255,0.4)]">
-                            {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
+                <div className="flex-1 max-w-lg flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-6">
+                        <button onClick={() => setShuffle(!shuffle)} className={`${shuffle ? 'text-white' : 'text-gray-500'} hover:text-white transition-colors`}><Shuffle size={18} /></button>
+                        <button onClick={prev} className="text-gray-400 hover:text-white transition-colors hover:scale-110"><SkipBack size={24} fill="currentColor" /></button>
+                        <button onClick={togglePlay} className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                            {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                         </button>
-                        <button onClick={next} className="text-gray-300 hover:text-white transition-colors hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]"><SkipForward size={20} fill="currentColor" /></button>
-                        <button onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')} className={`text-${repeat !== 'off' ? 'white' : 'gray-400'} hover:text-white transition-colors`}>
-                            {repeat === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
+                        <button onClick={next} className="text-gray-400 hover:text-white transition-colors hover:scale-110"><SkipForward size={24} fill="currentColor" /></button>
+                        <button onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')} className={`${repeat !== 'off' ? 'text-white' : 'text-gray-500'} hover:text-white transition-colors`}>
+                            {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
                         </button>
                     </div>
                     <div className="w-full flex items-center gap-3 text-[10px] font-medium text-gray-500 font-mono">
-                        <span className="w-8 text-right">{formatTime(progress * (duration || 0))}</span>
+                        <span>{formatTime(progress * (duration || 0))}</span>
                         <div
                             onClick={(e) => {
                                 const rect = e.currentTarget.getBoundingClientRect();
@@ -1108,35 +1641,32 @@ export function GlassStage({
                             }}
                             className="flex-1 h-1 bg-white/10 rounded-full relative group cursor-pointer overflow-hidden"
                         >
-                            <div className="absolute inset-y-0 left-0 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ width: `${progress * 100}%` }}></div>
-                            <div className="absolute inset-y-0 left-0 bg-white/0 group-hover:bg-white/20 transition-colors w-full"></div>
+                            <div className="absolute inset-0 bg-white/5 group-hover:bg-white/10"></div>
+                            <div className="w-full h-full relative">
+                                <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-white/50 to-white rounded-full group-hover:from-pink-500/50 group-hover:to-pink-500 transition-colors" style={{ width: `${progress * 100}%` }}>
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] opacity-0 group-hover:opacity-100 scale-0 group-hover:scale-100 transition-all duration-200"></div>
+                                </div>
+                            </div>
                         </div>
-                        <span className="w-8">{formatTime(duration || 0)}</span>
+                        <span>-{formatTime((duration || 0) - progress * (duration || 0))}</span>
                     </div>
                 </div>
 
                 {/* Volume & Extras */}
                 <div className="w-1/4 flex items-center justify-end gap-3">
-                    <button onClick={onShowQueue} className="text-gray-400 hover:text-white transition-colors"><ListMusic size={18} /></button>
-                    <div className="flex items-center gap-2 group w-24">
-                        <Volume2 size={18} className="text-gray-400 hover:text-white transition-colors" />
-                        <div
-                            onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setVolume((e.clientX - rect.left) / rect.width);
-                            }}
-                            className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer relative overflow-hidden"
-                        >
-                            <div className="absolute inset-y-0 left-0 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" style={{ width: `${volume * 100}%` }}></div>
+                    <Volume2 size={18} className="text-gray-500" />
+                    <div
+                        onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setVolume((e.clientX - rect.left) / rect.width);
+                        }}
+                        className="w-24 h-1 bg-white/10 rounded-full cursor-pointer group relative overflow-hidden"
+                    >
+                        <div className="absolute inset-y-0 left-0 bg-gray-500 group-hover:bg-white transition-colors rounded-full" style={{ width: `${volume * 100}%` }}>
+                            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         </div>
                     </div>
-                    <button
-                        onClick={() => navigateTo({ type: 'nowplaying' })}
-                        className="text-gray-400 hover:text-white ml-2 transition-colors"
-                        title="Cinema Mode"
-                    >
-                        <Maximize2 size={18} />
-                    </button>
+                    <button onClick={() => navigateTo({ type: 'queue' })} className="text-gray-500 hover:text-white transition-colors ml-4"><ListMusic size={18} /></button>
                 </div>
             </footer>
 
@@ -1359,12 +1889,20 @@ export function GlassStage({
                             </div>
                         </div>
                         <div className="p-1.5 flex flex-col gap-0.5">
+                            <button className="w-full text-left px-3 py-2 text-xs font-medium text-white hover:bg-white/10 rounded-lg flex items-center gap-3 transition-colors" onClick={() => { handleSongClick(contextMenu.song!); setContextMenu(prev => ({ ...prev, visible: false })); }}>
+                                <Play size={14} className="text-gray-400" /> Play Now
+                            </button>
                             <button className="w-full text-left px-3 py-2 text-xs font-medium text-white hover:bg-white/10 rounded-lg flex items-center gap-3 transition-colors" onClick={() => { addMix({ id: `q-${Date.now()}`, title: 'Queue', color: 'blue', songs: [contextMenu.song!], currentSongIndex: 0 }); showToast("Added to Queue"); }}>
                                 <ListMusic size={14} className="text-gray-400" /> Add to Queue
                             </button>
                             <button className="w-full text-left px-3 py-2 text-xs font-medium text-white hover:bg-white/10 rounded-lg flex items-center gap-3 transition-colors" onClick={() => { toggleLike(contextMenu.song!); showToast(isLiked(contextMenu.song!.id) ? "Removed from Liked" : "Added to Liked"); }}>
                                 <Heart size={14} fill={isLiked(contextMenu.song!.id) ? "currentColor" : "none"} className={isLiked(contextMenu.song!.id) ? "text-red-500" : "text-gray-400"} /> {isLiked(contextMenu.song!.id) ? "Remove from Liked" : "Save to Liked Songs"}
                             </button>
+                            {contextMenu.song?.album?.id && (
+                                <button className="w-full text-left px-3 py-2 text-xs font-medium text-white hover:bg-white/10 rounded-lg flex items-center gap-3 transition-colors" onClick={() => { navigateTo({ type: 'playlist', data: { ...contextMenu.song!.album, type: 'album', image: contextMenu.song!.image } }); }}>
+                                    <Disc size={14} className="text-gray-400" /> Go to Album
+                                </button>
+                            )}
                             <button className="w-full text-left px-3 py-2 text-xs font-medium text-white hover:bg-white/10 rounded-lg flex items-center gap-3 transition-colors" onClick={() => { setSearchQuery(contextMenu.song!.primaryArtists.split(',')[0]); navigateTo({ type: 'search' }); }}>
                                 <Users size={14} className="text-gray-400" /> Go to Artist
                             </button>

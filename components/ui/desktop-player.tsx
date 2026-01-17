@@ -51,7 +51,7 @@ export interface ThemeConfig {
 }
 
 export const THEMES: Record<string, ThemeConfig> = {
-    // STITCH Removed
+
 
     METAL: {
         name: "Realistic Metal Edition",

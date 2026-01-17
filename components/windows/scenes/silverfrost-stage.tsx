@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-    Palette, Smartphone, Settings, Plus, Tv, Pencil, Camera, Search
+    Palette, Smartphone, Settings, Plus, Tv, Pencil, Camera, Search, Share2
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -17,7 +17,7 @@ interface SilverFrostStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -31,7 +31,7 @@ interface SilverFrostStageProps {
 }
 
 export function SilverFrostStage({
-    currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings,
+    currentTheme, onThemeChange, onSelectTheme, onOpenSettings,
     onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onSnapshotMix, onShowLyrics, onShowQueue, onShareMix
 }: SilverFrostStageProps) {
     const {
@@ -87,7 +87,7 @@ export function SilverFrostStage({
                     <div className="hidden md:flex items-center bg-white/50 rounded-lg px-3 py-1.5 border border-white/20 shadow-sm">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">System: Optimal</span>
                     </div>
-                    <button onClick={onSwitchToMobile} className="size-10 rounded-full border-2 border-[#00aaff] flex items-center justify-center bg-white/50 hover:bg-white transition-colors"><Smartphone size={18} className="text-[#00aaff]" /></button>
+                    {/* Switch Mobile Removed */}
                     <button onClick={onOpenThemeSelector} className="size-10 rounded-full border-2 border-slate-300 flex items-center justify-center bg-white/50 hover:bg-white transition-colors"><Palette size={18} className="text-slate-600" /></button>
                     <button onClick={onOpenSettings} className="size-10 rounded-full border-2 border-slate-300 flex items-center justify-center bg-white/50 hover:bg-white transition-colors"><Settings size={18} className="text-slate-600" /></button>
                 </div>
@@ -126,7 +126,9 @@ export function SilverFrostStage({
                                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
                                                 <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Pencil size={12} className="text-gray-700" /></button>
                                                 <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Camera size={12} className="text-gray-700" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Search size={12} className="text-gray-700" /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Share"><Share2 size={12} className="text-gray-700" /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
                                             </div>
                                         )}
                                     </div>

@@ -15,6 +15,7 @@ export interface JioSaavnSong {
     duration: number;
     label: string;
     primaryArtists: string;
+    primaryArtistsId: string;
     featuredArtists: string;
     explicitContent: number;
     playCount: number;
@@ -252,6 +253,7 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
                 duration: parseInt(songData.duration),
                 label: songData.label,
                 primaryArtists: songData.primary_artists,
+                primaryArtistsId: songData.primary_artists_id || '',
                 featuredArtists: songData.featured_artists,
                 explicitContent: songData.explicit_content,
                 playCount: parseInt(songData.play_count),
@@ -460,6 +462,7 @@ function mapToSong(item: any): JioSaavnSong {
         duration: parseInt(item.more_info?.duration || item.duration || '0'),
         label: item.more_info?.label || '',
         primaryArtists: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.name).join(', ') || item.subtitle || '',
+        primaryArtistsId: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.id).join(', ') || item.primary_artists_id || '',
         featuredArtists: '',
         explicitContent: item.explicit_content,
         playCount: parseInt(item.play_count || '0'),

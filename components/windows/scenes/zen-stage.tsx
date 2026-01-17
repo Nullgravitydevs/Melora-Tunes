@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1, Moon, Sun } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1, Moon, Sun, Camera } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
@@ -13,7 +13,7 @@ interface ZenStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -25,7 +25,7 @@ interface ZenStageProps {
     onShareMix?: (mix: any) => void;
 }
 
-export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix }: ZenStageProps) {
+export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix, onSnapshotMix }: ZenStageProps) {
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const {
@@ -205,8 +205,10 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchT
 
                                 {/* Edit/Action Buttons overlay on hover */}
                                 <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30">
-                                    <button onClick={() => onEditMix?.(activeMix)} className="bg-white text-stone-800 p-2 rounded-full shadow-lg hover:scale-110 transition-transform"><Settings size={16} /></button>
-                                    <button onClick={() => onOpenSearch?.(activeMix.id)} className="bg-zen-primary text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform"><Plus size={16} /></button>
+                                    <button onClick={() => onEditMix?.(activeMix)} className="bg-white text-stone-800 p-2 rounded-full shadow-lg hover:scale-110 transition-transform" title="Settings"><Settings size={16} /></button>
+                                    <button onClick={() => onSnapshotMix?.(activeMix)} className="bg-white text-stone-800 p-2 rounded-full shadow-lg hover:scale-110 transition-transform" title="Snapshot"><Camera size={16} /></button>
+                                    <button onClick={() => onShareMix?.(activeMix)} className="bg-white text-stone-800 p-2 rounded-full shadow-lg hover:scale-110 transition-transform" title="Share"><Share2 size={16} /></button>
+                                    <button onClick={() => onOpenSearch?.(activeMix.id)} className="bg-zen-primary text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform" title="Add Songs"><Plus size={16} /></button>
                                 </div>
                             </motion.div>
                         ) : (

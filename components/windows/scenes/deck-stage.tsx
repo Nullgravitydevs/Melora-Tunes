@@ -6,15 +6,15 @@ import { useAudio } from "@/hooks/use-audio";
 import { ThemeConfig, ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useState, useRef } from "react";
 import { decodeHtml } from "@/lib/utils";
-import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc } from "lucide-react";
+import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc, Share2 } from "lucide-react";
 import { Visualizer } from "@/components/ui/visualizer";
 import { Mix } from "@/components/providers/playback-context";
 
-interface studioStageProps {
+interface DeckStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    onSwitchToMobile?: () => void;
+    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -28,7 +28,7 @@ interface studioStageProps {
 }
 
 
-export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitchToMobile, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowLyrics, onShowQueue, onShareMix }: studioStageProps) {
+export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowLyrics, onShowQueue, onShareMix }: DeckStageProps) {
     const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -113,15 +113,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
                         <Settings size={20} />
                     </button>
 
-                    {onSwitchToMobile && (
-                        <button
-                            onClick={() => { playClick(); onSwitchToMobile(); }}
-                            className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-                            title="Switch to iPod Mode"
-                        >
-                            <Smartphone size={20} />
-                        </button>
-                    )}
+
 
                     <div className="relative">
                         <button
@@ -280,6 +272,13 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onSwitch
                                             title="Share Snapshot"
                                         >
                                             <Camera size={12} className="text-zinc-800" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }}
+                                            className="flex items-center justify-center w-6 h-7 bg-[#e0f2fe] shadow-md hover:-translate-y-0.5 transition-transform"
+                                            title="Share Mix"
+                                        >
+                                            <Share2 size={12} className="text-blue-900" />
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }}
