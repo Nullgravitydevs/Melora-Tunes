@@ -71,6 +71,14 @@ interface PlaybackContextType {
     // Desktop Notifications
     notificationsEnabled: boolean;
     setNotificationsEnabled: (enabled: boolean) => void;
+
+    // Liked Songs
+    likedSongs: JioSaavnSong[];
+    toggleLike: (song: JioSaavnSong) => void;
+    isLiked: (songId: string) => boolean;
+
+    // Recently Played
+    recentlyPlayed: JioSaavnSong[];
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -92,6 +100,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
     const [stopAtEndOfSong, setStopAtEndOfSong] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const [likedSongs, setLikedSongs] = useState<JioSaavnSong[]>([]);
+    const [recentlyPlayed, setRecentlyPlayed] = useState<JioSaavnSong[]>([]);
 
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
@@ -136,14 +146,61 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         ]);
     };
 
+    // Load liked songs and recently played from localStorage
+    useEffect(() => {
+        const savedLiked = localStorage.getItem('melora-liked-songs');
+        if (savedLiked) {
+            try { setLikedSongs(JSON.parse(savedLiked)); } catch (e) { console.error(e); }
+        }
+        const savedRecent = localStorage.getItem('melora-recently-played');
+        if (savedRecent) {
+            try { setRecentlyPlayed(JSON.parse(savedRecent)); } catch (e) { console.error(e); }
+        }
+    }, []);
+
+    // Persist liked songs
+    useEffect(() => {
+        if (likedSongs.length > 0) {
+            localStorage.setItem('melora-liked-songs', JSON.stringify(likedSongs));
+        }
+    }, [likedSongs]);
+
+    // Persist recently played
+    useEffect(() => {
+        if (recentlyPlayed.length > 0) {
+            localStorage.setItem('melora-recently-played', JSON.stringify(recentlyPlayed));
+        }
+    }, [recentlyPlayed]);
+
+    // Toggle like function
+    const toggleLike = useCallback((song: JioSaavnSong) => {
+        setLikedSongs(prev => {
+            const exists = prev.some(s => s.id === song.id);
+            if (exists) {
+                return prev.filter(s => s.id !== song.id);
+            } else {
+                return [song, ...prev];
+            }
+        });
+    }, []);
+
+    // Check if song is liked
+    const isLiked = useCallback((songId: string) => {
+        return likedSongs.some(s => s.id === songId);
+    }, [likedSongs]);
+
+    // Add to recently played (called on song play)
+    const addToRecentlyPlayed = useCallback((song: JioSaavnSong) => {
+        setRecentlyPlayed(prev => {
+            const filtered = prev.filter(s => s.id !== song.id);
+            return [song, ...filtered].slice(0, 20); // Keep last 20
+        });
+    }, []);
+
     // --- Actions ---
 
     // Helpers defined first (hoisted manually) to be available for next/prev
     const addMix = (mix: Mix) => {
-        if (mixes.length >= 8) {
-            alert('Maximum 8 Mixtapes allowed!');
-            return;
-        }
         setMixes(prev => [...prev, mix]);
     };
 
@@ -395,7 +452,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             crossfadeDuration, setCrossfadeDuration,
             stopAtEndOfSong, setStopAtEndOfSong,
             bitrate, setBitrate,
-            notificationsEnabled, setNotificationsEnabled
+            notificationsEnabled, setNotificationsEnabled,
+            likedSongs, toggleLike, isLiked,
+            recentlyPlayed
         }}>
             {children}
 

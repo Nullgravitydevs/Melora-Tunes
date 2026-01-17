@@ -436,6 +436,11 @@ export async function getAlbumDetails(id: string): Promise<JioSaavnSong[]> {
     return list.map(mapToSong);
 }
 
+export async function getArtistDetails(artistId: string): Promise<any> {
+    const data = await fetchApi(`__call=artist.getArtistPageDetails&api_version=4&_format=json&ctx=wap6dot0&artistId=${artistId}`);
+    return data;
+}
+
 // Helper to map API response to JioSaavnSong
 function mapToSong(item: any): JioSaavnSong {
     const title = item.title || item.name || item.song || `[Unknown]`;
@@ -470,4 +475,39 @@ function mapToSong(item: any): JioSaavnSong {
         downloadUrl: [],
         encryptedMediaUrl: encryptedUrl
     };
+}
+
+export async function getSyncedLyrics(trackName: string, artistName: string, albumName: string, duration: number): Promise<{ synced: boolean, text: string }> {
+    try {
+        const query = `track_name=${encodeURIComponent(trackName)}&artist_name=${encodeURIComponent(artistName)}&album_name=${encodeURIComponent(albumName)}&duration=${duration}`;
+        const res = await fetch(`https://lrclib.net/api/get?${query}`);
+
+        if (!res.ok) {
+            // Try search fallback if direct match fails
+            const searchRes = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(trackName + " " + artistName)}`);
+            if (searchRes.ok) {
+                const searchData = await searchRes.json();
+                if (Array.isArray(searchData) && searchData.length > 0) {
+                    // Pick the best match (closest duration)
+                    const best = searchData.sort((a, b) => Math.abs(a.duration - duration) - Math.abs(b.duration - duration))[0];
+                    if (Math.abs(best.duration - duration) < 10) { // Tolerance 10s
+                        return {
+                            synced: !!best.syncedLyrics,
+                            text: best.syncedLyrics || best.plainLyrics || "No lyrics found."
+                        };
+                    }
+                }
+            }
+            throw new Error("Lyrics not found");
+        }
+
+        const data = await res.json();
+
+        if (data.syncedLyrics) {
+            return { synced: true, text: data.syncedLyrics };
+        }
+        return { synced: false, text: data.plainLyrics || "No lyrics found" };
+    } catch (e) {
+        return { synced: false, text: "Lyrics not available" };
+    }
 }

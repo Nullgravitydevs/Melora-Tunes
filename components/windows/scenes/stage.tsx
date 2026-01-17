@@ -428,6 +428,24 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
             <DesktopSettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
+                currentLayout={THEMES[currentTheme]?.layout === 'glass' ? 'glass' : THEMES[currentTheme]?.layout === 'opendeck' ? 'deck' : 'glass'}
+                onSwitchLayout={(layout) => {
+                    if (layout === 'ipod') {
+                        // Switch to mobile/iPod view
+                        onSwitchToMobile?.();
+                        setIsSettingsOpen(false);
+                    } else {
+                        // Map layout to a theme that uses that layout
+                        const themeMap: Record<string, ThemeKey> = {
+                            'glass': 'GLASS_STAGE',
+                            'deck': 'OPEN_DECK'
+                        };
+                        const newTheme = themeMap[layout] || 'GLASS_STAGE';
+                        setCurrentTheme(newTheme);
+                        localStorage.setItem('melora-theme', newTheme);
+                        setIsSettingsOpen(false);
+                    }
+                }}
             />
 
 

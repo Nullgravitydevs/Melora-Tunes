@@ -60,10 +60,11 @@
     }
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar - Hidden by default per user request */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 0px;
+    height: 0px;
+    display: none;
 }
 
 ::-webkit-scrollbar-track {
@@ -71,12 +72,14 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #52525b;
-    /* zinc-600 */
-    border-radius: 4px;
+    background: transparent;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #71717a;
-    /* zinc-500 */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
