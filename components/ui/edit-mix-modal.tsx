@@ -27,7 +27,6 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
             setEditedSongs(mix.songs);
             setEditedTitle(mix.title);
         }
-        // Reset delete confirmation when modal opens
         setShowDeleteConfirm(false);
     }, [isOpen, mix?.id]);
 
@@ -77,6 +76,23 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
         }
     };
 
+    const getQualityBadge = (song: any) => {
+        const quality = song._quality;
+        if (!quality) return null;
+
+        let colorClass = "bg-zinc-800 text-zinc-400";
+        if (quality === "Hi-Res" || quality === "Master") colorClass = "bg-yellow-500/20 text-yellow-300 border border-yellow-500/20";
+        else if (quality === "FLAC" || quality === "Lossless") colorClass = "bg-purple-500/20 text-purple-300 border border-purple-500/20";
+        else if (quality === "320kbps") colorClass = "bg-blue-500/20 text-blue-300 border border-blue-500/20";
+        else if (quality === "160kbps") colorClass = "bg-green-500/20 text-green-300 border border-green-500/20";
+
+        return (
+            <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider ml-2 ${colorClass}`}>
+                {quality}
+            </span>
+        );
+    };
+
     if (!isOpen || !mix) return null;
 
     return (
@@ -86,78 +102,92 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]"
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60]"
                     onClick={onClose}
                 >
                     <motion.div
-                        initial={{ scale: 0.9, y: 20 }}
-                        animate={{ scale: 1, y: 0 }}
-                        exit={{ scale: 0.9, y: 20 }}
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.95, opacity: 0 }}
                         onClick={(e) => e.stopPropagation()}
-                        className="bg-black/90 backdrop-blur-md p-6 rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col border border-white/10"
+                        className="bg-black/90 p-8 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col border border-zinc-800 ring-1 ring-white/5"
                     >
-                        <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                            <div className="flex-1">
+                        {/* Header */}
+                        <div className="flex justify-between items-start mb-8 pb-4 border-b border-zinc-800">
+                            <div className="flex-1 mr-4">
+                                <label className="block text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Mixtape Title</label>
                                 <input
                                     value={editedTitle}
                                     onChange={(e) => setEditedTitle(e.target.value)}
-                                    className="text-2xl font-bold text-white bg-transparent border-b border-white/20 focus:border-cyan-400 outline-none w-full pb-1"
-                                    placeholder="Mixtape Name"
+                                    className="text-3xl font-bold text-white bg-transparent border-none focus:outline-none focus:ring-0 p-0 w-full placeholder:text-zinc-700"
+                                    placeholder="Untitled Mix"
                                 />
                             </div>
                             <div className="flex gap-2">
                                 <button
                                     onClick={handleShare}
-                                    className="p-2 text-cyan-400 hover:bg-white/10 rounded-full transition-colors"
+                                    className="p-3 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all border border-transparent hover:border-zinc-700"
                                     title="Share Mixtape"
                                 >
-                                    <Share2 size={20} />
+                                    <Share2 size={18} />
                                 </button>
-                                <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-                                    <X size={24} />
+                                <button
+                                    onClick={onClose}
+                                    className="p-3 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all border border-transparent hover:border-zinc-700"
+                                >
+                                    <X size={20} />
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2 space-y-2 mb-6">
+                        {/* Song List */}
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-1 mb-8">
                             {editedSongs.length === 0 ? (
-                                <div className="text-center text-gray-500 py-8 italic">
-                                    No songs in this mix yet.
+                                <div className="flex flex-col items-center justify-center h-40 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-xl">
+                                    <p className="text-sm font-medium">Empty Mixtape</p>
+                                    <p className="text-xs mt-1">Add songs from search</p>
                                 </div>
                             ) : (
                                 editedSongs.map((song, index) => (
                                     <div
                                         key={`${song.id}-${index}`}
-                                        className="flex items-center justify-between bg-white/5 p-3 rounded border border-white/5 hover:border-white/20 transition-colors"
+                                        className="group flex items-center justify-between p-3 rounded-lg hover:bg-zinc-900 transition-colors border border-transparent hover:border-zinc-800/50"
                                     >
-                                        <div className="flex-1 min-w-0 mr-4">
-                                            <p className="font-bold text-sm truncate text-gray-200">{decodeHtml(song.name)}</p>
-                                            <p className="text-xs text-gray-400 truncate">{decodeHtml(song.primaryArtists)}</p>
+                                        <div className="flex items-center flex-1 min-w-0 mr-4">
+                                            <span className="text-xs font-mono text-zinc-600 w-6 text-right mr-4 opacity-50">{index + 1}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center">
+                                                    <p className="font-medium text-sm truncate text-zinc-200">{decodeHtml(song.name)}</p>
+                                                    {getQualityBadge(song)}
+                                                </div>
+                                                <p className="text-[11px] text-zinc-500 truncate mt-0.5">{decodeHtml(song.primaryArtists)}</p>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1">
+
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => handleMoveUp(index)}
                                                 disabled={index === 0}
-                                                className="p-1 text-gray-500 hover:text-cyan-400 disabled:opacity-30 transition-colors"
+                                                className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
                                                 title="Move Up"
                                             >
-                                                <ArrowUp size={18} />
+                                                <ArrowUp size={14} />
                                             </button>
                                             <button
                                                 onClick={() => handleMoveDown(index)}
                                                 disabled={index === editedSongs.length - 1}
-                                                className="p-1 text-gray-500 hover:text-cyan-400 disabled:opacity-30 transition-colors"
+                                                className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
                                                 title="Move Down"
                                             >
-                                                <ArrowDown size={18} />
+                                                <ArrowDown size={14} />
                                             </button>
-                                            <div className="w-px h-6 bg-white/10 mx-1" />
+                                            <div className="w-px h-3 bg-zinc-800 mx-1" />
                                             <button
                                                 onClick={() => handleDelete(index)}
-                                                className="p-1 text-gray-500 hover:text-red-500 transition-colors"
+                                                className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors"
                                                 title="Remove Song"
                                             >
-                                                <Trash2 size={18} />
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                     </div>
@@ -165,50 +195,50 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
                             )}
                         </div>
 
-                        <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
-                            <div className="flex gap-3">
+                        {/* Footer Actions */}
+                        <div className="pt-6 border-t border-zinc-900">
+                            <div className="flex gap-4">
                                 <button
                                     onClick={handleSave}
-                                    className="flex-1 bg-green-600 text-white py-3 rounded font-bold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-green-500/20"
+                                    className="flex-1 bg-white text-black py-3 rounded-lg font-bold hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 text-sm tracking-wide"
                                 >
-                                    <Save size={20} /> SAVE CHANGES
+                                    <Save size={16} /> SAVE CHANGES
                                 </button>
-                                <button
-                                    onClick={onClose}
-                                    className="px-6 bg-white/10 text-white rounded font-bold hover:bg-white/20 transition-colors"
-                                >
-                                    CANCEL
-                                </button>
+
+                                {onDeleteMix && !showDeleteConfirm && (
+                                    <button
+                                        onClick={handleDeleteClick}
+                                        className="px-4 py-3 bg-zinc-900 text-zinc-500 hover:text-red-400 hover:bg-zinc-900/80 rounded-lg font-bold transition-colors text-sm border border-zinc-800"
+                                        title="Delete Mixtape"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                )}
                             </div>
-                            {onDeleteMix && (
-                                <div className="border-t border-white/10 pt-3 mt-3">
-                                    {!showDeleteConfirm ? (
+
+                            {/* Delete Confirmation */}
+                            {showDeleteConfirm && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="mt-4 bg-red-950/20 border border-red-900/30 rounded-lg p-4"
+                                >
+                                    <p className="text-xs text-red-400 text-center font-medium mb-3">Delete this mixtape permanently?</p>
+                                    <div className="flex gap-3">
                                         <button
                                             onClick={handleDeleteClick}
-                                            className="w-full text-red-500 hover:text-red-400 text-sm font-bold py-2 hover:bg-red-500/10 rounded transition-colors flex items-center justify-center gap-2"
+                                            className="flex-1 bg-red-600 text-white py-2 rounded font-bold hover:bg-red-700 transition-colors text-xs"
                                         >
-                                            <Trash2 size={16} /> DELETE MIXTAPE
+                                            CONFIRM DELETE
                                         </button>
-                                    ) : (
-                                        <div className="flex flex-col gap-2">
-                                            <p className="text-sm text-center text-gray-400 font-semibold">Are you sure you want to delete this mixtape?</p>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={handleDeleteClick}
-                                                    className="flex-1 bg-red-600 text-white py-2 rounded font-bold hover:bg-red-700 transition-colors"
-                                                >
-                                                    YES, DELETE
-                                                </button>
-                                                <button
-                                                    onClick={() => setShowDeleteConfirm(false)}
-                                                    className="flex-1 bg-white/10 text-white py-2 rounded font-bold hover:bg-white/20 transition-colors"
-                                                >
-                                                    CANCEL
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                        <button
+                                            onClick={() => setShowDeleteConfirm(false)}
+                                            className="flex-1 bg-transparent border border-red-900/50 text-red-400 py-2 rounded font-bold hover:bg-red-950/30 transition-colors text-xs"
+                                        >
+                                            CANCEL
+                                        </button>
+                                    </div>
+                                </motion.div>
                             )}
                         </div>
                     </motion.div>

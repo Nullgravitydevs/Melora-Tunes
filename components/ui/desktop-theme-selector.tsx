@@ -21,7 +21,7 @@ export function DesktopThemeSelector({ isOpen, onClose, currentTheme, onSelectTh
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
                 onClick={onClose}
             >
                 <div onClick={(e) => e.stopPropagation()} className="w-full max-w-4xl">
@@ -29,27 +29,27 @@ export function DesktopThemeSelector({ isOpen, onClose, currentTheme, onSelectTh
                         initial={{ scale: 0.95, y: 20, opacity: 0 }}
                         animate={{ scale: 1, y: 0, opacity: 1 }}
                         exit={{ scale: 0.95, y: 20, opacity: 0 }}
-                        className="bg-zinc-950 border border-zinc-800/50 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/5"
+                        className="bg-black border border-white/10 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-white/5"
                     >
                         {/* Header */}
-                        <div className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-zinc-900/50 to-transparent">
+                        <div className="px-8 py-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-white/5 to-transparent">
                             <div>
-                                <h2 className="text-2xl font-bold text-white flex items-center gap-3 tracking-tight">
-                                    <Palette className="text-purple-500" size={24} />
+                                <h2 className="text-3xl font-bold text-white flex items-center gap-3 tracking-tighter">
+                                    <Palette className="text-white" size={28} />
                                     Theme Gallery
                                 </h2>
-                                <p className="text-zinc-500 text-sm mt-1">Select your preferred visual style.</p>
+                                <p className="text-neutral-500 text-sm mt-2">Select your preferred visual style.</p>
                             </div>
                             <button
                                 onClick={onClose}
-                                className="p-2 bg-zinc-900/50 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors border border-transparent hover:border-white/10"
+                                className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-neutral-500 hover:text-white transition-all border border-transparent hover:border-white/10"
                             >
                                 <X size={20} />
                             </button>
                         </div>
 
                         {/* Theme Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 max-h-[60vh] overflow-y-auto bg-black/40">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 max-h-[60vh] overflow-y-auto bg-neutral-950/30">
                             {Object.entries(THEMES)
                                 .filter(([_, theme]) => {
                                     // Determine if current mode is "Discovery" (Glass) or "Deck" (Everything else)
@@ -76,20 +76,20 @@ export function DesktopThemeSelector({ isOpen, onClose, currentTheme, onSelectTh
                                             className={clsx(
                                                 "relative group text-left rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col h-full",
                                                 isActive
-                                                    ? "border-purple-500/50 bg-gradient-to-br from-purple-500/10 to-blue-500/5 ring-1 ring-purple-500/20 shadow-lg shadow-purple-900/20"
-                                                    : "border-zinc-800/50 bg-zinc-900/40 hover:bg-zinc-900 hover:border-zinc-700 hover:shadow-xl hover:-translate-y-1"
+                                                    ? "border-white/20 bg-white/5 ring-1 ring-white/10"
+                                                    : "border-white/5 bg-black hover:bg-white/5 hover:border-white/10 hover:-translate-y-1"
                                             )}
                                         >
                                             {/* Preview Area */}
                                             <div className={clsx("h-32 w-full relative overflow-hidden", theme.bodyGradient)}>
                                                 {/* Overlay Gradient */}
-                                                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
 
                                                 {/* Active Badge */}
                                                 <div className="absolute top-3 right-3 z-10">
                                                     {isActive && (
-                                                        <span className="px-2.5 py-1 bg-purple-500 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg flex items-center gap-1.5">
-                                                            <Check size={10} strokeWidth={4} /> Active
+                                                        <span className="w-6 h-6 bg-white text-black rounded-full shadow-lg flex items-center justify-center">
+                                                            <Check size={14} strokeWidth={4} />
                                                         </span>
                                                     )}
                                                 </div>
@@ -108,16 +108,16 @@ export function DesktopThemeSelector({ isOpen, onClose, currentTheme, onSelectTh
                                             </div>
 
                                             {/* Content */}
-                                            <div className="p-5 flex flex-col gap-2 flex-grow bg-zinc-950/30">
+                                            <div className="p-5 flex flex-col gap-2 flex-grow bg-black">
                                                 <div className="flex justify-between items-start">
-                                                    <h3 className={clsx("font-bold text-lg transition-colors", isActive ? "text-white" : "text-zinc-300 group-hover:text-white")}>
+                                                    <h3 className={clsx("font-bold text-lg transition-colors tracking-tight", isActive ? "text-white" : "text-neutral-400 group-hover:text-white")}>
                                                         {theme.name}
                                                     </h3>
-                                                    {theme.layout === 'glass' ? <Disc size={16} className="text-pink-500" /> : <Radio size={16} className="text-purple-500" />}
+                                                    {theme.layout === 'glass' ? <Disc size={16} className="text-neutral-500" /> : <Radio size={16} className="text-neutral-500" />}
                                                 </div>
 
                                                 <div className="flex items-center gap-2 mt-auto pt-2">
-                                                    <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest border border-zinc-800 rounded px-1.5 py-0.5">
+                                                    <span className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest border border-white/5 rounded px-1.5 py-0.5">
                                                         {theme.layout}
                                                     </span>
                                                 </div>
@@ -125,10 +125,6 @@ export function DesktopThemeSelector({ isOpen, onClose, currentTheme, onSelectTh
                                         </button>
                                     );
                                 })}
-                        </div>
-
-                        <div className="px-8 py-4 bg-zinc-950/50 border-t border-white/5 text-zinc-600 text-xs text-center font-mono">
-                            New premium themes added weekly.
                         </div>
                     </motion.div>
                 </div>

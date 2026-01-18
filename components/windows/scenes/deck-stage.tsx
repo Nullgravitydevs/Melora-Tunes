@@ -89,7 +89,10 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     };
 
     return (
-        <div ref={containerRef} className="bg-black text-gray-100 min-h-screen flex flex-col font-sans overflow-x-hidden selection:bg-purple-500 selection:text-white">
+        <div ref={containerRef} className={clsx(
+            "min-h-screen flex flex-col font-sans overflow-x-hidden selection:bg-purple-500 selection:text-white",
+            theme.bodyGradient // Use theme background
+        )}>
             <style jsx global>{`
                 ::-webkit-scrollbar { display: none; }
                 * { -ms-overflow-style: none; scrollbar-width: none; }
@@ -99,7 +102,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                 <div className="flex items-center gap-3 select-none">
                     {/* Logo - matching default theme */}
                     <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
-                    <h1 className="font-display text-4xl tracking-tighter text-white mt-1">
+                    <h1 className={clsx("font-display text-4xl tracking-tighter mt-1",
+                        currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' || currentTheme === 'SILVERFROST' ? "text-gray-900" : "text-white"
+                    )}>
                         Melora
                     </h1>
                 </div>
@@ -107,7 +112,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => { playClick(); onOpenSettings?.(); }}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                        className={clsx("p-2 rounded-full transition-colors",
+                            currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-500 hover:bg-black/5" : "text-gray-400 hover:text-white hover:bg-white/10"
+                        )}
                         title="Settings"
                     >
                         <Settings size={20} />
@@ -118,7 +125,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                     <div className="relative">
                         <button
                             onClick={() => { playClick(); onOpenThemeSelector?.(); }}
-                            className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                            className={clsx("p-2 rounded-full transition-colors",
+                                currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-500 hover:bg-black/5" : "text-gray-400 hover:text-white hover:bg-white/10"
+                            )}
                             title="Change Theme"
                         >
                             <Palette size={20} />
@@ -146,7 +155,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
             <main className="flex-grow w-full max-w-7xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start relative">
                 {/* Left Column: Mixtapes */}
                 <section className="lg:col-span-7 flex flex-col gap-8">
-                    <h2 className="font-display text-2xl md:text-3xl text-gray-600 uppercase tracking-widest mb-4 opacity-80 pl-2">
+                    <h2 className={clsx("font-display text-2xl md:text-3xl uppercase tracking-widest mb-4 opacity-80 pl-2",
+                        currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-800" : "text-gray-600"
+                    )}>
                         Your Mixtapes
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-12">
@@ -229,7 +240,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     </div>
 
                                     {/* Action Buttons (Edit/Share/Add) */}
-                                    <div className="absolute -top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-300 ease-out no-snapshot" onPointerDown={(e) => e.stopPropagation()}>
+                                    <div className="absolute -top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-300 ease-out no-snapshot z-50" onPointerDown={(e) => e.stopPropagation()}>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }}
                                             className="flex items-center justify-center w-6 h-7 bg-[#fef3c7] shadow-md hover:-translate-y-0.5 transition-transform rounded-t-sm"
@@ -476,7 +487,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             <div className="flex items-center gap-2 w-24">
                                 <Volume2 size={14} className="text-gray-400" />
                                 <div
-                                    className="h-1 flex-grow bg-gray-300 rounded-full relative cursor-pointer"
+                                    className="h-1 flex-grow bg-gray-300 rounded-full relative cursor-pointer z-50"
                                     onPointerDown={(e) => e.stopPropagation()}
                                     onClick={(e) => {
                                         const rect = e.currentTarget.getBoundingClientRect();
@@ -484,9 +495,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                         setVolume(Math.min(Math.max(p, 0), 1));
                                     }}
                                 >
-                                    <div className="absolute top-0 left-0 bottom-0 bg-blue-500 rounded-full" style={{ width: `${volume * 100}%` }}></div>
+                                    <div className="absolute top-0 left-0 bottom-0 bg-blue-500 rounded-full pointer-events-none" style={{ width: `${volume * 100}%` }}></div>
                                     <div
-                                        className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-white border border-gray-400 rounded-full shadow-sm"
+                                        className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-white border border-gray-400 rounded-full shadow-sm pointer-events-none"
                                         style={{ left: `calc(${volume * 100}% - 4px)` }}
                                     ></div>
                                 </div>

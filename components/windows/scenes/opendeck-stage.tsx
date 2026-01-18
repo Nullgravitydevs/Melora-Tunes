@@ -101,17 +101,13 @@ export function OpenDeckStage({
     return (
         <div
             ref={containerRef}
-            className="w-full h-screen font-sans overflow-hidden relative flex flex-col"
+            className="w-full h-screen font-sans overflow-hidden relative flex flex-col [&::-webkit-scrollbar]:hidden"
             style={{ backgroundColor: '#f6f5f4', fontFamily: 'Manrope, sans-serif' }}
             onPointerMove={handleDragMove}
             onPointerUp={handleDragEnd}
             onPointerLeave={handleDragEnd}
         >
-            {/* Hide all scrollbars globally */}
-            <style jsx global>{`
-                ::-webkit-scrollbar { display: none; }
-                * { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+            {/* Hide all scrollbars globally - Handled by utility now */}
 
             {/* Grainy Texture */}
             <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E")` }} />

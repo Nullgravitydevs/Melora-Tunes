@@ -89,6 +89,11 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
         const newTheme = keys[nextIndex];
         setCurrentTheme(newTheme);
         localStorage.setItem('melora-theme', newTheme);
+
+        // Save deck preference if not glass
+        if (THEMES[newTheme]?.layout !== 'glass') {
+            localStorage.setItem('melora-deck-theme', newTheme);
+        }
     };
 
     const activeMix = mixes.find(m => m.id === activeMixId);
@@ -298,7 +303,6 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
     const handleSelectMode = (mode: ThemeKey) => {
         setIsWelcome(false);
         setCurrentTheme(mode);
-        // localStorage.setItem('melora-theme', mode);
     };
 
     if (!isMounted) return null; // Prevent hydration mismatch/flash
@@ -316,6 +320,9 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
                     onSelectTheme={(theme: ThemeKey) => {
                         setCurrentTheme(theme);
                         localStorage.setItem('melora-theme', theme);
+                        if (THEMES[theme]?.layout !== 'glass') {
+                            localStorage.setItem('melora-deck-theme', theme);
+                        }
                     }}
                     // onSwitchToMobile removed
                     onOpenSettings={() => setIsSettingsOpen(true)}
@@ -346,6 +353,9 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
                 onSelectTheme={(theme) => {
                     setCurrentTheme(theme);
                     localStorage.setItem('melora-theme', theme);
+                    if (THEMES[theme]?.layout !== 'glass') {
+                        localStorage.setItem('melora-deck-theme', theme);
+                    }
                 }}
             />
 
@@ -448,12 +458,14 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
                         localStorage.setItem('melora-theme', 'GLASS');
                         setIsSettingsOpen(false);
                     } else if (mode === 'deck') {
-                        // Switch to Deck Theme (Restore default if currently on Glass)
-                        const currentLayout = THEMES[currentTheme]?.layout;
-                        if (currentLayout === 'glass') {
-                            setCurrentTheme('ZEN'); // Default fallback for Deck
-                            localStorage.setItem('melora-theme', 'ZEN');
-                        }
+                        // Restore preferred deck theme
+                        const savedDeckTheme = localStorage.getItem('melora-deck-theme') as ThemeKey;
+                        const targetTheme = (savedDeckTheme && THEMES[savedDeckTheme] && THEMES[savedDeckTheme].layout !== 'glass')
+                            ? savedDeckTheme
+                            : 'ZEN';
+
+                        setCurrentTheme(targetTheme);
+                        localStorage.setItem('melora-theme', targetTheme);
                         setIsSettingsOpen(false);
                     }
                 }}

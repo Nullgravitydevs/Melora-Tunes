@@ -51,12 +51,13 @@ const MAIN_MENU: MenuItem[] = [
 const MUSIC_MENU: MenuItem[] = [
     { label: "Playlists", type: 'navigation', target: 'playlists' },
     { label: "Search", type: 'navigation', target: 'search' },
+    { label: "Liked Songs", type: 'navigation', target: 'liked-songs' },
+    { label: "Recently Played", type: 'navigation', target: 'recently-played' },
     { label: "Artists", type: 'navigation', target: 'artists' },
     { label: "Albums", type: 'navigation', target: 'albums' },
     { label: "Songs", type: 'navigation', target: 'songs' },
-    { label: "Songs", type: 'navigation', target: 'songs' },
     { label: "Current Queue", type: 'navigation', target: 'queue' },
-    { label: "Lyrics", type: 'action', data: { id: 'lyrics', name: 'Lyrics' }, action: () => { } }, // Action handled in handleSelect
+    { label: "Lyrics", type: 'action', data: { id: 'lyrics', name: 'Lyrics' }, action: () => { } },
 ];
 
 
@@ -91,7 +92,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         sleepTimer, setSleepTimer,
         crossfadeDuration, setCrossfadeDuration,
         stopAtEndOfSong, setStopAtEndOfSong,
-        bitrate, setBitrate
+        bitrate, setBitrate,
+        likedSongs, toggleLike, isLiked, recentlyPlayed
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
@@ -517,6 +519,30 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
             case 'search':
                 return currentView.staticItems || [];
+
+            case 'liked-songs': {
+                if (likedSongs.length === 0) {
+                    return [{ label: "(No Liked Songs)", type: 'action', action: () => handleBack() }];
+                }
+                return likedSongs.map(s => ({
+                    label: `♥ ${decodeHtml(s.name)}`,
+                    type: 'action',
+                    data: s,
+                    action: () => playSongNow(s)
+                })) as MenuItem[];
+            }
+
+            case 'recently-played': {
+                if (recentlyPlayed.length === 0) {
+                    return [{ label: "(No Recent Songs)", type: 'action', action: () => handleBack() }];
+                }
+                return recentlyPlayed.map(s => ({
+                    label: decodeHtml(s.name),
+                    type: 'action',
+                    data: s,
+                    action: () => playSongNow(s)
+                })) as MenuItem[];
+            }
 
             case 'artists': {
                 const artists = new Set<string>();

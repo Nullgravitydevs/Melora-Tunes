@@ -94,6 +94,7 @@ export async function searchSongs(query: string, page: number = 1, limit: number
                     duration: parseInt(item.more_info?.duration || item.duration || '0'),
                     label: item.more_info?.label || '',
                     primaryArtists: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.name).join(', ') || item.subtitle || '',
+                    primaryArtistsId: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.id).join(', ') || '',
                     featuredArtists: '',
                     explicitContent: item.explicit_content,
                     playCount: parseInt(item.play_count || '0'),
@@ -114,6 +115,93 @@ export async function searchSongs(query: string, page: number = 1, limit: number
         return [];
     } catch (error) {
         console.error('Error searching songs:', error);
+        return [];
+    }
+}
+
+export async function searchAlbums(query: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
+    try {
+        console.log(`[Search Albums] Query: "${query}"`);
+        let data: any;
+
+        // Use search.getAlbumResults
+        if (Capacitor.isNativePlatform()) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        } else {
+            // Web Proxy - we can reuse the generic proxy or specific one
+            // Assuming /api/proxy handles generic calls or we make a new one?
+            // Existing searchSongs uses /api/search. Let's create a similar pattern or reuse fetchApi
+            // For simplicity and reusing existing patterns, let's use fetchApi wrapper we made or similar logic
+            data = await fetchApi(`__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`, true);
+        }
+
+        let list = [];
+        if (data.results) {
+            list = Array.isArray(data.results) ? data.results : [];
+        } else if (Array.isArray(data)) {
+            list = data;
+        }
+
+        if (list.length > 0) {
+            return list.map((item: any) => {
+                // Albums have slightly different structure in search results
+                // Usually they look like songs but type='album'
+                const title = item.title || item.name || item.song || `[Unknown Album]`;
+                const encryptedUrl = item.more_info?.encrypted_media_url || item.encrypted_media_url || "";
+
+                // Handle Header/Flat Properties (JioSaavn Album Search often returns these at top level)
+                // Fallback to more_info if top level missing
+                const year = item.year || item.more_info?.year || '';
+                const language = item.language || item.more_info?.language || '';
+                const releaseDate = item.release_date || item.more_info?.release_date || '';
+
+                // Artist Mapping: Check top-level 'primary_artists' string, or nested map
+                let primaryArtists = item.primary_artists || item.subtitle || item.music || '';
+                if (!primaryArtists && item.more_info?.artistMap?.primary_artists) {
+                    primaryArtists = item.more_info.artistMap.primary_artists.map((a: any) => a.name).join(', ');
+                }
+
+                return {
+                    id: item.id || item.albumid, // Search sometimes uses 'albumid'
+                    name: title,
+                    type: 'album',
+                    album: {
+                        id: item.id || item.albumid,
+                        name: title,
+                        url: item.perma_url || ''
+                    },
+                    year: year,
+                    releaseDate: releaseDate,
+                    duration: 0,
+                    label: item.label || item.more_info?.label || '',
+                    primaryArtists: primaryArtists,
+                    primaryArtistsId: '',
+                    featuredArtists: '',
+                    explicitContent: item.explicit_content,
+                    playCount: 0,
+                    language: language,
+                    hasLyrics: 'false',
+                    url: item.perma_url,
+                    copyright: '',
+                    image: [
+                        { quality: '500x500', link: (item.image || '').replace(/150x150|50x50/g, '500x500') },
+                        { quality: '150x150', link: (item.image || '').replace(/50x50/g, '150x150') },
+                        { quality: '50x50', link: (item.image || '').replace(/150x150/g, '50x50') }
+                    ],
+                    downloadUrl: [],
+                    encryptedMediaUrl: encryptedUrl
+                };
+            });
+        }
+        return [];
+    } catch (error) {
+        console.error('Error searching albums:', error);
         return [];
     }
 }
@@ -418,6 +506,12 @@ export async function getRecommendations(songId: string, limit: number = 5): Pro
     return data.map(mapToSong);
 }
 
+export async function getStation(songId: string): Promise<JioSaavnSong[]> {
+    // Station endpoint often requires specific station ID, but recommendations are similar enough for Autoplay
+    // We use getRecommendations as the underlying implementation for "Station"
+    return getRecommendations(songId, 10);
+}
+
 export async function getPlaylistDetails(id: string): Promise<JioSaavnSong[]> {
     const data = await fetchApi(`__call=playlist.getDetails&api_version=4&_format=json&ctx=wap6dot0&listid=${id}`);
 
@@ -441,6 +535,87 @@ export async function getAlbumDetails(id: string): Promise<JioSaavnSong[]> {
 export async function getArtistDetails(artistId: string): Promise<any> {
     const data = await fetchApi(`__call=artist.getArtistPageDetails&api_version=4&_format=json&ctx=wap6dot0&artistId=${artistId}`);
     return data;
+}
+
+export async function getArtistTopSongs(artistId: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
+    const data = await fetchApi(`__call=artist.getArtistPageDetails&api_version=4&_format=json&ctx=wap6dot0&artistId=${artistId}&n=${limit}&p=${page}`);
+    const songs = data.topSongs || [];
+    return Array.isArray(songs) ? songs.map(mapToSong) : [];
+}
+
+export async function getArtistStation(artistId: string): Promise<JioSaavnSong[]> {
+    try {
+        console.log(`[ArtistRadio] Generating station for ${artistId}...`);
+
+        // 1. Fetch Artist Details (Parallel: Details + Top Songs + Albums + Similar)
+        const artist = await getArtistDetails(artistId);
+        if (!artist) throw new Error("Artist not found");
+
+        const topSongsRaw = artist.topSongs || [];
+        const albumsRaw = artist.albums || [];
+        const similarArtistsRaw = artist.similarArtists || [];
+
+        // 2. Pool Generation
+
+        // A. Target Artist Pools (High Familiarity)
+        const topSongs = Array.isArray(topSongsRaw) ? topSongsRaw.map(mapToSong) : [];
+        console.log(`[ArtistRadio] Found ${topSongs.length} top songs`);
+
+        // B. Related Artist Pool (High Relevance)
+        const relatedSongs: JioSaavnSong[] = [];
+        if (similarArtistsRaw.length > 0) {
+            // Take top 3 similar artists
+            const targets = similarArtistsRaw.slice(0, 3);
+            console.log(`[ArtistRadio] Fetching hits from: ${targets.map((a: any) => a.name).join(', ')}`);
+
+            const promises = targets.map((a: any) => getArtistTopSongs(a.id, 1, 5)); // Fetch Top 5 from each
+            const results = await Promise.all(promises);
+            results.forEach(list => relatedSongs.push(...list));
+        }
+        console.log(`[ArtistRadio] Found ${relatedSongs.length} related songs`);
+
+        // C. Deep Cuts Pool (Surprise Factor)
+        const deepCuts: JioSaavnSong[] = [];
+        if (albumsRaw.length > 0) {
+            // Pick 2 random albums
+            const randomAlbums = albumsRaw.sort(() => 0.5 - Math.random()).slice(0, 2);
+            console.log(`[ArtistRadio] Digging deep into albums: ${randomAlbums.map((a: any) => a.name).join(', ')}`);
+
+            const promises = randomAlbums.map((a: any) => getAlbumDetails(a.id));
+            const results = await Promise.all(promises);
+            results.forEach(list => {
+                // Pick random 2 songs from each album to avoid spamming one album
+                if (list.length > 0) deepCuts.push(...list.sort(() => 0.5 - Math.random()).slice(0, 2));
+            });
+        }
+        console.log(`[ArtistRadio] Found ${deepCuts.length} deep cuts`);
+
+        // 3. Mixing Logic (The Golden Ratio)
+        // Target: 20 Songs -> 8 Top (40%), 8 Related (40%), 4 Deep (20%)
+
+        const selectedTop = topSongs.slice(0, 8);
+        const selectedRelated = relatedSongs.sort(() => 0.5 - Math.random()).slice(0, 8);
+        const selectedDeep = deepCuts.sort(() => 0.5 - Math.random()).slice(0, 4);
+
+        // Combine
+        let station = [...selectedTop, ...selectedRelated, ...selectedDeep];
+
+        // Ensure we have at least something
+        if (station.length === 0) {
+            console.warn("[ArtistRadio] Station generation failed (no tracks), falling back to simple station");
+            return getStation(topSongs[0]?.id || "");
+        }
+
+        // Shuffle slightly but keep Top song first for instant gratification
+        const firstSong = selectedTop[0] || station[0];
+        const rest = station.filter(s => s.id !== firstSong.id).sort(() => 0.5 - Math.random());
+
+        return [firstSong, ...rest];
+
+    } catch (e) {
+        console.error("[ArtistRadio] Algorithm Failed:", e);
+        return [];
+    }
 }
 
 // Helper to map API response to JioSaavnSong

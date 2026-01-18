@@ -108,8 +108,8 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-1">
-                                    {mix.songs.slice(0, 5).map(s => (
-                                        <span key={s.id} className="text-[10px] px-2 py-0.5 bg-zinc-700 rounded text-zinc-300">
+                                    {mix.songs.slice(0, 5).map((s, i) => (
+                                        <span key={`${s.id}-${i}`} className="text-[10px] px-2 py-0.5 bg-zinc-700 rounded text-zinc-300">
                                             {decodeHtml(s.name).substring(0, 20)}...
                                         </span>
                                     ))}

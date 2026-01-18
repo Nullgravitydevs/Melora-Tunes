@@ -108,7 +108,11 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                 active.load();
                 if (playing) active.play().catch(e => console.error(e));
             } else {
+                // Unload content
+                active.pause();
                 active.removeAttribute('src');
+                active.src = ""; // Explicitly clear
+                active.load();   // Force unload buffer
             }
         }
     }, [url]); // Intentionally not including deps that would trigger unnecessary re-runs

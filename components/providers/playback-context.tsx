@@ -1,12 +1,12 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
-import { JioSaavnSong, getAudioUrl } from "@/lib/jiosaavn";
-import { useAudio } from "@/hooks/use-audio";
+import { JioSaavnSong, getAudioUrl, getStation } from "@/lib/jiosaavn";
 import { AudioPlayer, AudioPlayerRef } from "@/components/ui/audio-player";
-import { decodeHtml } from "@/lib/utils";
+import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { recordPlay } from "@/lib/stats";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { getSkipSegments, SkipSegment } from "@/lib/sponsorblock";
 
 export interface Mix {
     id: string;
@@ -106,11 +106,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [likedSongs, setLikedSongs] = useState<JioSaavnSong[]>([]);
     const [recentlyPlayed, setRecentlyPlayed] = useState<JioSaavnSong[]>([]);
+
     const [playbackSpeed, setPlaybackSpeed] = useState(1); // 0.5, 0.75, 1, 1.25, 1.5, 2
+    const [skipSegments, setSkipSegments] = useState<SkipSegment[]>([]);
 
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
-    const { playClick, playClunk, playEject, playInsert } = useAudio();
 
     // Derived State
     const activeMix = mixes.find(m => m.id === activeMixId);
@@ -188,6 +189,48 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         });
     }, []);
 
+    // --- Autoplay & Pre-fetch Logic ---
+    // Tracks if we have already fetched recommendations for the current song to avoid duplicates
+    const autoplayFetchedRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!activeMixId || !isPlaying || duration <= 0 || !currentSong) return;
+
+        // Reset fetcher if song changed
+        if (autoplayFetchedRef.current !== currentSong.id) {
+            autoplayFetchedRef.current = null;
+        }
+
+        // Trigger 20 seconds before end (or 50% for short songs)
+        const threshold = Math.max(duration - 20, duration * 0.5);
+
+        if (progress >= threshold && !autoplayFetchedRef.current) {
+            const activeMix = mixes.find(m => m.id === activeMixId);
+            // Only fetch if we are actually at the end of the queue
+            if (activeMix && activeMix.currentSongIndex >= activeMix.songs.length - 1) {
+                console.log("[Autoplay] Pre-fetching recommendations for:", currentSong.name);
+                autoplayFetchedRef.current = currentSong.id; // Mark as fetching
+
+                getStation(currentSong.id).then((stationSongs) => {
+                    if (stationSongs && stationSongs.length > 0) {
+                        const currentMix = mixesRef.current.find(m => m.id === activeMixId);
+                        if (currentMix) {
+                            // Filter duplicates
+                            const newUnique = stationSongs.filter(s => !currentMix.songs.some(existing => existing.id === s.id));
+                            if (newUnique.length > 0) {
+                                console.log(`[Autoplay] Added ${newUnique.length} tracks to queue`);
+                                updateMix(activeMixId, { songs: [...currentMix.songs, ...newUnique] });
+                            }
+                        }
+                    }
+                }).catch(err => {
+                    console.error("[Autoplay] Failed to fetch station:", err);
+                    autoplayFetchedRef.current = null; // Reset on failure to retry
+                });
+            }
+        }
+    }, [progress, duration, activeMixId, isPlaying, currentSong]);
+
     // Check if song is liked
     const isLiked = useCallback((songId: string) => {
         return likedSongs.some(s => s.id === songId);
@@ -221,47 +264,172 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updateMix = useCallback((mixId: string, updates: Partial<Mix>) => {
-        setMixes(prev => prev.map(m => m.id === mixId ? { ...m, ...updates } : m));
-    }, []);
+        setMixes(prev => {
+            const nextMixes = prev.map(m => {
+                if (m.id !== mixId) return m;
+
+                // If updating songs, check if we need to handle playback state
+                if (updates.songs && activeMixId === mixId) {
+                    const currentSong = m.songs[m.currentSongIndex];
+                    const newSongs = updates.songs;
+
+                    // If current song is no longer in the new list (deleted)
+                    const stillExists = currentSong && newSongs.some(s => s.id === currentSong.id);
+
+                    if (!stillExists) {
+                        console.log("[updateMix] Current song deleted, stopping playback");
+                        // We can't call setIsPlaying/setCurrentSongUrl here directly cleanly inside the updater
+                        // but we can schedule it.
+                        setTimeout(() => {
+                            setIsPlaying(false);
+                            setCurrentSongUrl(null);
+                            if (audioPlayerRef.current) audioPlayerRef.current.seekTo(0);
+                        }, 0);
+
+                        // Also reset index to 0 or valid range
+                        return { ...m, ...updates, currentSongIndex: 0 };
+                    }
+                }
+
+                return { ...m, ...updates };
+            });
+            return nextMixes;
+        });
+    }, [activeMixId]);
 
     const deleteMix = (mixId: string) => {
         setMixes(prev => prev.filter(m => m.id !== mixId));
         if (activeMixId === mixId) {
             setActiveMixId(null);
             setIsPlaying(false);
-            playEject();
         }
     };
 
     const loadMix = useCallback((mixId: string) => {
-        if (activeMixId === mixId) return; // Already loaded
-        playInsert();
+        console.log("[loadMix] Called with:", mixId, "current:", activeMixId);
+
+        // Eject: If loading empty mixId, pause and clear
+        if (!mixId || mixId === "") {
+            console.log("[loadMix] Ejecting - stopping playback");
+            setIsPlaying(false);
+            setActiveMixId(null);
+            setCurrentSongUrl(null);
+            audioPlayerRef.current?.pause();
+            return;
+        }
+
+        // If same mix, just start playing if stopped
+        if (activeMixId === mixId) {
+            console.log("[loadMix] Same mix, resuming");
+            setIsPlaying(true);
+            return;
+        }
+
+        // New mix - stop current, load new
+        console.log("[loadMix] Switching to new mix:", mixId);
+        setIsPlaying(false); // Stop current
+        setCurrentSongUrl(null); // Clear old URL
+        audioPlayerRef.current?.pause(); // Explicitly pause audio engine
+        if (audioPlayerRef.current) {
+            audioPlayerRef.current.seekTo(0); // Reset progress
+        }
+
+        // Reset the new mix to start from song 0
+        setMixes(prev => prev.map(m =>
+            m.id === mixId ? { ...m, currentSongIndex: 0 } : m
+        ));
+
         setActiveMixId(mixId);
-        setIsPlaying(true);
-    }, [activeMixId, playInsert]);
+
+        // Delay to let state update and audio engine clear
+        setTimeout(() => setIsPlaying(true), 150);
+    }, [activeMixId]);
 
     const play = useCallback(() => {
+        console.log("[play] Called, activeMixId:", activeMixId);
         if (!activeMixId) return;
-        playClick();
         setIsPlaying(true);
-    }, [activeMixId, playClick]);
+        audioPlayerRef.current?.play();
+    }, [activeMixId]);
 
     const pause = useCallback(() => {
-        playClick();
+        console.log("[pause] Called");
         setIsPlaying(false);
-    }, [playClick]);
+        audioPlayerRef.current?.pause();
+    }, []);
 
     const togglePlay = useCallback(() => {
-        if (isPlaying) pause();
-        else play();
+        console.log("[togglePlay] isPlaying:", isPlaying);
+        if (isPlaying) {
+            pause();
+        } else {
+            play();
+        }
     }, [isPlaying, pause, play]);
 
     const loadSongUrl = useCallback(async (song: JioSaavnSong, overrideBitrate?: string) => {
-        // Validate song has encrypted URL before attempting to play
+        // Helper to detect YouTube ID (11 chars, alphanumeric + underscore/hyphen)
+        const isYouTubeId = (id: string) => /^[a-zA-Z0-9_-]{11}$/.test(id);
+
+        // Check for HiFi tracks (Tidal/Qobuz)
+        // Check explicit source OR quality tags (for legacy mixes where source might be missing)
+        let songSource = (song as any)?.source as string | undefined;
+        const qualityTag = (song as any)?._quality;
+        const isHiFi = songSource === 'tidal' || songSource === 'qobuz' || qualityTag === 'FLAC' || qualityTag === '24-bit';
+
+        if (isHiFi) {
+            // Fallback: If source is missing but we know it's HiFi, default to Tidal (common) 
+            // or we could check ID pattern eventually.
+            if (!songSource) {
+                console.warn("[Playback] HiFi track missing source, defaulting to Tidal");
+                songSource = 'tidal';
+            }
+
+            console.log(`[Playback] Loading ${songSource?.toUpperCase()} LOSSLESS stream for:`, song.name, { id: song.id, quality: qualityTag });
+            try {
+                const res = await fetch(`/api/hifi?type=stream&id=${song.id}&source=${songSource}`);
+                if (!res.ok) throw new Error(`HiFi API error: ${res.status}`);
+                const data = await res.json();
+                if (data.url) {
+                    console.log(`[Playback] ✓ Got ${data.quality} stream`);
+                    setCurrentSongUrl(data.url);
+                    return;
+                }
+            } catch (err) {
+                console.warn(`[Playback] ${songSource} stream failed:`, err);
+                setCurrentSongUrl(null);
+                setIsPlaying(false);
+                return;
+            }
+        }
+
+        // Check if this is a YouTube track (no encrypted URL but valid YT ID, or explicit video type)
+        const isYouTubeTrack = !song?.encryptedMediaUrl && isYouTubeId(song?.id || '') || song?.type === 'video';
+
+        if (isYouTubeTrack && song?.id) {
+            // Fetch from YouTube stream API
+            console.log("[Playback] Loading YouTube stream for:", song.name);
+            try {
+                const res = await fetch(`/api/stream?id=${song.id}`);
+                if (!res.ok) throw new Error(`Stream API error: ${res.status}`);
+                const data = await res.json();
+                if (data.url) {
+                    setCurrentSongUrl(data.url);
+                    return;
+                }
+            } catch (err) {
+                console.warn("[Playback] YouTube stream failed, track may be unavailable:", err);
+                setCurrentSongUrl(null);
+                setIsPlaying(false);
+                return;
+            }
+        }
+
+        // JioSaavn track - validate encrypted URL
         if (!song?.encryptedMediaUrl) {
             console.warn('Song missing encryptedMediaUrl, skipping:', song?.name || 'Unknown');
-            // Don't set URL, player will stay paused
             setCurrentSongUrl(null);
+            setIsPlaying(false);
             return;
         }
 
@@ -274,12 +442,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             } else {
                 console.warn("No URL found for song", song.name);
                 setCurrentSongUrl(null);
+                setIsPlaying(false);
             }
         } catch (err) {
             console.warn("Failed to load song URL", err);
             setCurrentSongUrl(null);
+            setIsPlaying(false);
         }
-    }, []);
+    }, [bitrate]);
 
     const setBitrate = useCallback((newBitrate: '320' | '160' | '96' | '48' | '12') => {
         setSelectBitrate(newBitrate);
@@ -293,8 +463,21 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (currentSong) {
             loadSongUrl(currentSong);
+
+            // SponsorBlock: Fetch segments if it looks like a YouTube ID
+            setSkipSegments([]);
+            if (currentSong.id && currentSong.id.length === 11 && !currentSong.id.includes('-') && !currentSong.id.includes(' ')) {
+                getSkipSegments(currentSong.id).then(segs => {
+                    if (segs.length > 0) console.log(`Loaded ${segs.length} skip segments`);
+                    setSkipSegments(segs);
+                });
+            } else if (currentSong.type === 'video') {
+                // Explicit video type from my hybrid search
+                getSkipSegments(currentSong.id).then(setSkipSegments);
+            }
         } else {
             setCurrentSongUrl(null);
+            setSkipSegments([]);
         }
     }, [currentSong, loadSongUrl]);
 
@@ -340,6 +523,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [progress, duration, crossfadeDuration, volume, isPlaying]);
 
     const next = useCallback(() => {
+        console.log("[NEXT] Called", {
+            activeMix: activeMix?.title,
+            songCount: activeMix?.songs?.length,
+            currentIndex: activeMix?.currentSongIndex,
+            activeMixId,
+            stopAtEndOfSong
+        });
+
         // End of Song Check
         if (stopAtEndOfSong) {
             pause();
@@ -347,8 +538,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        if (!activeMix) return;
-        playClick();
+        if (!activeMix) {
+            console.warn("[NEXT] No activeMix, returning");
+            return;
+        }
 
         console.log("NEXT called", {
             current: activeMix.currentSongIndex,
@@ -395,9 +588,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     // Stop playback at end
                     console.log("End of playlist (Repeat Off). Stopping.");
                     setIsPlaying(false);
-                    nextIndex = 0; // Reset to start but don't play? Or just stay at end?
-                    // Typically iPod goes to menu or resets to 0. 
-                    // Let's reset to 0 and stop.
+                    nextIndex = 0; // Reset to start
                     updateMix(activeMix.id, { currentSongIndex: 0 });
                     return;
                 } else {
@@ -410,11 +601,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         console.log("Going to index:", nextIndex);
         updateMix(activeMix.id, { currentSongIndex: nextIndex });
         if (!isPlaying) setIsPlaying(true); // Ensure play continues
-    }, [activeMix, repeat, shuffle, isPlaying, updateMix]);  // Dependencies updated
+    }, [activeMix, repeat, shuffle, isPlaying, updateMix, stopAtEndOfSong, pause]);
 
     const prev = useCallback(() => {
         if (!activeMix) return;
-        playClick();
 
         // If played > 3s, restart song
         if (audioPlayerRef.current && (audioPlayerRef.current.getCurrentTime() || 0) > 3) {
@@ -422,9 +612,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Shuffle Previous: For now, just go to random or previous order. 
-        // True iPod shuffle history is complex. 
-        // Simple approach: if shuffle, pick random.
+        // Shuffle Previous
         let prevIndex = activeMix.currentSongIndex;
         const len = activeMix.songs.length;
 
@@ -488,9 +676,28 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     if (currentSong) recordPlay(currentSong, duration);
                     next();
                 }}
-                onProgress={({ played }) => setProgress(played)}
+                onProgress={({ played, playedSeconds }) => {
+                    setProgress(played);
+
+                    // SponsorBlock Check
+                    if (skipSegments.length > 0 && duration > 0) {
+                        for (const seg of skipSegments) {
+                            // Check if inside segment (with slight buffer at start to allow seek)
+                            if (playedSeconds >= seg.segment[0] && playedSeconds < seg.segment[1]) {
+                                // console.log(`Skipping ${seg.category} (${seg.segment[0]} -> ${seg.segment[1]})`);
+                                const seekRatio = seg.segment[1] / duration;
+                                if (seekRatio < 1) {
+                                    audioPlayerRef.current?.seekTo(seekRatio);
+                                    // Prevent bouncing back by updating UI state immediately? 
+                                    // seekTo usually handles it.
+                                    break; // Only skip one at a time
+                                }
+                            }
+                        }
+                    }
+                }}
                 onDuration={setDuration}
-                title={decodeHtml(currentSong?.name || "")}
+                title={cleanTrackTitle(decodeHtml(currentSong?.name || ""))}
                 artist={decodeHtml(currentSong?.primaryArtists || "")}
                 album={decodeHtml(currentSong?.album?.name || "")}
                 artwork={currentSong?.image?.[0]?.link}

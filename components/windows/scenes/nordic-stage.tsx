@@ -64,13 +64,9 @@ export function NordicStage({
     return (
         <div
             ref={containerRef}
-            className="w-full h-full font-sans overflow-hidden relative bg-[#1a1c20] text-slate-200"
+            className="w-full h-full font-sans overflow-hidden relative bg-[#1a1c20] text-slate-200 [&::-webkit-scrollbar]:hidden"
         >
-            {/* Global Styles: Hide Scrollbars */}
-            <style jsx global>{`
-                ::-webkit-scrollbar { display: none; }
-                * { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+            {/* Global Styles: Hide Scrollbars - Handled by utility now */}
 
             <div className="max-w-7xl mx-auto px-6 py-8 relative z-10 flex flex-col h-screen w-full">
 
