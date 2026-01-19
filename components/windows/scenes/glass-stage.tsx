@@ -462,7 +462,6 @@ export function GlassStage({
                 setIsFollowed(false); // Reset follow state
                 try {
                     const id = currentView.data.id || currentView.data.artistId;
-                    console.log(`[GlassStage] Loading Artist: ID=${id}, Name=${currentView.data.name || 'Unknown'}`);
 
                     if (id && id !== 'undefined' && id !== 'null') {
                         const data = await getArtistDetails(id);
@@ -676,7 +675,6 @@ export function GlassStage({
                                     if (rawSubtitle.includes('Unknown')) rawSubtitle = '';
 
                                     const query = `${rawTitle} ${rawSubtitle}`.trim();
-                                    console.log(`[Failover] Searching fallback for: "${query}"`);
 
                                     let recoveredId: string | null = null;
 
@@ -686,10 +684,8 @@ export function GlassStage({
                                         // Fuzzy match title
                                         const match = albumRes.find(a => a.name.toLowerCase().includes(rawTitle.toLowerCase()));
                                         if (match?.id) {
-                                            console.log(`[Failover] Found via matching album search: ${match.id}`);
                                             recoveredId = match.id;
                                         } else if (albumRes[0]?.id) {
-                                            console.log(`[Failover] Using first album result: ${albumRes[0].id}`);
                                             recoveredId = albumRes[0].id;
                                         }
                                     }
@@ -700,7 +696,6 @@ export function GlassStage({
                                         if (songRes && songRes.length > 0) {
                                             const match = songRes.find(s => s.name.toLowerCase().includes(rawTitle.toLowerCase()));
                                             if (match?.album?.id) {
-                                                console.log(`[Failover] Found via song search: ${match.album.id}`);
                                                 recoveredId = match.album.id;
                                             }
                                         }
@@ -1178,7 +1173,7 @@ export function GlassStage({
                         {/* === SEARCH VIEW === */}
                         {currentView.type === 'search' && (
                             <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-                                <SearchFilters filter={searchFilter} onFilterChange={setSearchFilter} />
+                                <SearchFilters value={searchFilter} onChange={setSearchFilter} />
 
                                 {isSearching ? (
                                     <div className="flex items-center justify-center py-20">
@@ -1360,16 +1355,15 @@ export function GlassStage({
                         {/* === ARTIST VIEW === */}
                         {currentView.type === 'artist' && (
                             <ArtistView
-                                artistData={artistDetails}
+                                artist={currentView.data}
+                                details={artistDetails}
                                 isLoading={isArtistLoading}
                                 isFollowed={isFollowed}
-                                onBack={goBack}
-                                onFollowToggle={toggleFollowArtist}
-                                onSongClick={handleSongClick}
+                                onToggleFollow={toggleFollowArtist}
+                                onPlaySong={handleSongClick}
+                                onPlayAll={() => artistDetails?.topSongs?.[0] && handleSongClick(artistDetails.topSongs[0])}
                                 onStartRadio={() => artistDetails && handleArtistRadio(artistDetails.artistId, artistDetails.name)}
-                                onContextMenu={handleContextMenu}
-                                currentSongId={currentSong?.id}
-                                isPlaying={isPlaying}
+                                onShare={() => navigator.clipboard.writeText(`${window.location.origin}?artist=${currentView.data?.id}`)}
                             />
                         )}
 

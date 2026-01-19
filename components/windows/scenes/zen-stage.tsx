@@ -20,9 +20,9 @@ interface ZenStageProps {
     onCreateMix?: () => void;
     onCinemaMode?: () => void;
     onOpenThemeSelector?: () => void;
-    onSnapshotMix?: (mix: any) => void;
+    onSnapshotMix?: (mix: Mix) => void;
     onShowQueue?: () => void;
-    onShareMix?: (mix: any) => void;
+    onShareMix?: (mix: Mix) => void;
 }
 
 export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix, onSnapshotMix }: ZenStageProps) {

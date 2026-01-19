@@ -21,15 +21,17 @@ interface DeckStageProps {
     onCreateMix?: () => void;
     onCinemaMode?: () => void;
     onOpenThemeSelector?: () => void;
-    onSnapshotMix?: (mix: any) => void;
+    onSnapshotMix?: (mix: Mix) => void;
     onShowLyrics?: () => void;
     onShowQueue?: () => void;
-    onShareMix?: (mix: any) => void;
+    onShareMix?: (mix: Mix) => void;
 }
 
 
 export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowLyrics, onShowQueue, onShareMix }: DeckStageProps) {
     const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+    const [toast, setToast] = useState<string | null>(null);
+    const [isEjecting, setIsEjecting] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const {
@@ -265,17 +267,17 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                                             link.href = dataUrl;
                                                             link.click();
 
-                                                            // Also Copy Link
                                                             const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                             navigator.clipboard.writeText(shareUrl);
-                                                            alert("Snapshot Downloading... Link Copied to Clipboard! 📸 clipboard");
+                                                            setToast("Snapshot saved! Link copied 📸");
+                                                            setTimeout(() => setToast(null), 3000);
                                                         })
                                                         .catch((err) => {
                                                             console.error("Snapshot failed", err);
-                                                            // Fallback: Just copy link if image fails
                                                             const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                             navigator.clipboard.writeText(shareUrl);
-                                                            alert("Snapshot failed (Security Block). Link Copied instead!");
+                                                            setToast("Snapshot failed. Link copied!");
+                                                            setTimeout(() => setToast(null), 3000);
                                                         });
                                                 }
                                             }}
@@ -472,8 +474,16 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             </div>
 
                             <button
-                                onClick={() => { playEject(); loadMix(""); }}
-                                className="flex flex-col items-center cursor-pointer hover:text-blue-600 transition-colors"
+                                onClick={() => {
+                                    playEject();
+                                    setIsEjecting(true);
+                                    setTimeout(() => {
+                                        loadMix("");
+                                        setIsEjecting(false);
+                                    }, 500);
+                                }}
+                                disabled={isEjecting}
+                                className={`flex flex-col items-center cursor-pointer hover:text-blue-600 transition-colors ${isEjecting ? 'opacity-50' : ''}`}
                             >
                                 <Disc size={14} />
                                 <span className="mt-0.5 tracking-widest text-[9px]">EJECT</span>

@@ -26,6 +26,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     // UI State for things not yet in context
     const [normalize, setNormalize] = useState(false);
     const [activeTab, setActiveTab] = useState<SettingsTab>('layout');
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
     if (!isOpen) return null;
 
@@ -318,17 +319,32 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8">
                                             <h4 className="font-bold text-red-500 mb-2 flex items-center gap-2">Danger Zone ⚠️</h4>
                                             <p className="text-zinc-500 text-xs mb-6 font-medium">Irreversible actions. Proceed with caution.</p>
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm("Are you sure? This will delete all playlists and reset settings.")) {
-                                                        localStorage.clear();
-                                                        window.location.reload();
-                                                    }
-                                                }}
-                                                className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl font-bold text-sm transition-colors border border-red-500/20"
-                                            >
-                                                Factory Reset Melora ☢️
-                                            </button>
+                                            {!showResetConfirm ? (
+                                                <button
+                                                    onClick={() => setShowResetConfirm(true)}
+                                                    className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl font-bold text-sm transition-colors border border-red-500/20"
+                                                >
+                                                    Factory Reset Melora ☢️
+                                                </button>
+                                            ) : (
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={() => setShowResetConfirm(false)}
+                                                        className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl font-bold text-sm transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            localStorage.clear();
+                                                            window.location.reload();
+                                                        }}
+                                                        className="flex-1 py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-bold text-sm transition-colors"
+                                                    >
+                                                        Yes, Reset ☢️
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </motion.div>

@@ -43,6 +43,7 @@ export async function initDiscordRPC(): Promise<boolean> {
 
     try {
         // Dynamic import to avoid bundling in web builds
+        // @ts-ignore - discord-rpc only available in Electron builds
         const { Client } = await import('discord-rpc');
 
         rpcClient = new Client({ transport: 'ipc' });

@@ -175,13 +175,12 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                                                                     link.click();
                                                                     const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                                     navigator.clipboard.writeText(shareUrl);
-                                                                    alert("Snapshot Downloading... Link Copied to Clipboard! 📸 clipboard");
                                                                 })
                                                                 .catch((err) => {
                                                                     console.error('Snapshot failed', err);
                                                                     const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                                     navigator.clipboard.writeText(shareUrl);
-                                                                    alert('Snapshot failed. Link Copied!');
+                                                                    // Toast handled by parent
                                                                 });
                                                         }
                                                     }}
