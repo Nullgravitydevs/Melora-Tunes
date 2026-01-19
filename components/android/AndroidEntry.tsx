@@ -2,58 +2,7 @@ import { lazy, Suspense } from "react";
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform, useMotionTemplate } from "framer-motion";
 
 // --- HOOKS ---
-function useParallax() {
-    const x = useMotionValue(0);
-    const y = useMotionValue(0);
 
-    // Spring physics for weight
-    const smoothX = useSpring(x, { stiffness: 400, damping: 90 });
-    const smoothY = useSpring(y, { stiffness: 400, damping: 90 });
-
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-            // Map cursor to rotation (Max 15deg)
-            // rotateX is based on Y distance (tilted up/down)
-            // rotateY is based on X distance (tilted left/right)
-            const rotX = (e.clientY - centerY) / 25; // Inverted or direct? standard: top (-Y) -> tilt away? or towards? CSS rotateX: positive tips bottom away. negative tips top away.
-            // Let's stick to user math logic: (Cursor Y - Center Y) / 25.
-            // If Cursor Y is 0 (Top), result is negative -> Rotate X negative -> Top tips away. Correct.
-
-            const rotY = (e.clientX - centerX) / 25;
-            // If Cursor X is 0 (Left), result is negative -> Rotate Y negative -> Left tips away. Correct.
-
-            // Clamp to 15deg
-            x.set(Math.max(-15, Math.min(15, rotX)));
-            y.set(Math.max(-15, Math.min(15, rotY)));
-        };
-
-        const handleOrientation = (e: DeviceOrientationEvent) => {
-            if (e.beta !== null && e.gamma !== null) {
-                // Mobile tilt
-                // Beta: Front/Back tilt (-180 to 180). Rest is ~0 (flat) or ~45 (held).
-                // Gamma: Left/Right tilt (-90 to 90).
-
-                // Simplified mapping
-                const rotX = (e.beta || 0) / 2;
-                const rotY = (e.gamma || 0) / 2;
-
-                x.set(Math.max(-15, Math.min(15, rotX)));
-                y.set(Math.max(-15, Math.min(15, rotY)));
-            }
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('deviceorientation', handleOrientation);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('deviceorientation', handleOrientation);
-        };
-    }, [x, y]);
-
-    return { rotateX: smoothX, rotateY: smoothY };
-}
 
 const BrickGame = lazy(() => import("./games/BrickGame").then(m => ({ default: m.BrickGame })));
 const MusicQuiz = lazy(() => import("./games/MusicQuiz").then(m => ({ default: m.MusicQuiz })));
@@ -199,9 +148,22 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const [stickers, setStickers] = useState<Sticker[]>([]);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+    const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+
     const showToast = useCallback((msg: string) => {
+        // Clear existing timer if any - preventing premature close of new toast
+        if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current);
+        }
+
         setToastMessage(msg);
-        setTimeout(() => setToastMessage(null), 4500);
+
+        // Set fresh timer
+        toastTimerRef.current = setTimeout(() => {
+            setToastMessage(null);
+            toastTimerRef.current = null;
+        }, 4500);
     }, []);
 
     // Load stickers from localStorage
@@ -243,7 +205,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         }
 
         const newSticker: Sticker = {
-            id: Date.now(),
+            id: Date.now() + Math.random(),
             type,
             x,
             y,
@@ -283,7 +245,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             } else {
                 setBacklight(1);
             }
-        }, 100);
+        }, 500);
         return () => clearInterval(interval);
     }, [lastActivity]);
 
@@ -296,18 +258,13 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     useEffect(() => {
         const handleInteraction = () => registerActivity();
         window.addEventListener('mousemove', handleInteraction);
-        window.addEventListener('mousedown', handleInteraction);
-        window.addEventListener('touchstart', handleInteraction);
         window.addEventListener('keydown', handleInteraction);
-        window.addEventListener('wheel', handleInteraction);
+        window.addEventListener('click', handleInteraction);
         window.addEventListener('click', handleInteraction);
 
         return () => {
             window.removeEventListener('mousemove', handleInteraction);
-            window.removeEventListener('mousedown', handleInteraction);
-            window.removeEventListener('touchstart', handleInteraction);
             window.removeEventListener('keydown', handleInteraction);
-            window.removeEventListener('wheel', handleInteraction);
             window.removeEventListener('click', handleInteraction);
         };
     }, [registerActivity]);
@@ -315,11 +272,20 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const playClick = useCallback(() => {
         if (clickSounds) {
             try {
-                // Synthetic Click Sound (Crisp tick)
                 const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
                 if (!AudioContext) return;
 
-                const ctx = new AudioContext();
+                // Resume or Create Context
+                if (!audioContextRef.current) {
+                    audioContextRef.current = new AudioContext();
+                }
+
+                const ctx = audioContextRef.current;
+
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
@@ -549,8 +515,11 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 goToNowPlaying();
             }, 100);
         } else {
-            console.log("[iPod] Updating On-the-Go mix");
-            updateMix(otg.id, { songs: [song], currentSongIndex: 0 });
+            console.log("[iPod] Appending to On-the-Go mix");
+            // Check if song already exists to avoid duplicates (optional, but good UX)
+            // For now, allow duplicates as it's a queue
+            const newSongs = [...otg.songs, song];
+            updateMix(otg.id, { songs: newSongs, currentSongIndex: newSongs.length - 1 });
             loadMix(otg.id);
             play();
             goToNowPlaying();
@@ -1573,30 +1542,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 </div>
 
                 {/* Toast Notification Overlay */}
-                {/* Toast Notification Overlay - Phone Style Banner */}
-                <AnimatePresence>
-                    {toastMessage && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -40, scale: 0.9 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                            className="absolute top-4 left-1/2 -translate-x-1/2 w-[92%] bg-zinc-900/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-2xl p-3 flex items-center gap-3 z-[120] pointer-events-none"
-                        >
-                            <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-inner ring-1 ring-white/10">
-                                <MessageSquare size={18} className="text-white fill-white/20" />
-                            </div>
-                            <div className="flex flex-col gap-0.5 min-w-0">
-                                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
-                                    MESSAGES <span className="text-zinc-600">•</span> NOW
-                                </span>
-                                <span className="text-[13px] font-medium text-white leading-tight truncate w-full drop-shadow-sm pr-1">
-                                    {toastMessage}
-                                </span>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+
 
                 {/* Sticker Constraints Area (Hidden) - Only bottom 52% allowed */}
                 <div ref={stickerConstraintsRef} className="absolute top-[48%] left-0 right-0 bottom-4 pointer-events-none z-0" />
@@ -1758,6 +1704,31 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                                 )
                             }
                         </Suspense>
+
+                        {/* In-Screen Toast Notification */}
+                        <AnimatePresence>
+                            {toastMessage && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -40, scale: 0.9 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                    className="absolute top-2 left-1/2 -translate-x-1/2 w-[95%] bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-xl p-2.5 flex items-center gap-3 z-[50] pointer-events-none"
+                                >
+                                    <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-inner ring-1 ring-white/10">
+                                        <MessageSquare size={14} className="text-white fill-white/20" />
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                        <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+                                            MELORA <span className="text-zinc-600">•</span> NOW
+                                        </span>
+                                        <span className="text-[11px] font-medium text-white leading-tight truncate w-full drop-shadow-sm pr-1">
+                                            {toastMessage}
+                                        </span>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Branding */}
