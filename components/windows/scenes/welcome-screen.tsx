@@ -6,9 +6,10 @@ import { Disc, CassetteTape, Smartphone, Zap, ArrowRight } from "lucide-react";
 
 interface WelcomeScreenProps {
     onSelectMode: (mode: ThemeKey) => void;
+    onSelectIpod?: () => void;
 }
 
-export function WelcomeScreen({ onSelectMode }: WelcomeScreenProps) {
+export function WelcomeScreen({ onSelectMode, onSelectIpod }: WelcomeScreenProps) {
     return (
         <div className="relative w-full h-screen bg-black text-white overflow-hidden flex flex-col items-center justify-center font-sans selection:bg-white selection:text-black">
             {/* Minimal Grid Background */}
@@ -53,7 +54,7 @@ export function WelcomeScreen({ onSelectMode }: WelcomeScreenProps) {
                         title="IPOD CLASSIC"
                         subtitle="Click Wheel Navigation"
                         icon={<Smartphone size={24} />}
-                        onClick={() => onSelectMode('ZEN')}
+                        onClick={() => onSelectIpod?.()}
                         delay={0.3}
                     />
                     <ModeItem

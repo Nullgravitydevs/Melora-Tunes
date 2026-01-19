@@ -1,20 +1,77 @@
 import { lazy, Suspense } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useSpring, useMotionValue, useTransform, useMotionTemplate } from "framer-motion";
 
-// Games removed
-// const BrickGame = lazy(() => import("./games/BrickGame").then(m => ({ default: m.BrickGame })));
-// const MusicQuiz = lazy(() => import("./games/MusicQuiz").then(m => ({ default: m.MusicQuiz })));
+// --- HOOKS ---
+function useParallax() {
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
 
-// const GAMES_MENU: MenuItem[] = [
-//     { label: "Brick", type: 'action', data: { id: 'brick-game', name: 'Brick' }, action: () => { } },
-//     { label: "Music Quiz", type: 'action', data: { id: 'music-quiz', name: 'Music Quiz' }, action: () => { } }
-// ];
+    // Spring physics for weight
+    const smoothX = useSpring(x, { stiffness: 400, damping: 90 });
+    const smoothY = useSpring(y, { stiffness: 400, damping: 90 });
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            // Map cursor to rotation (Max 15deg)
+            // rotateX is based on Y distance (tilted up/down)
+            // rotateY is based on X distance (tilted left/right)
+            const rotX = (e.clientY - centerY) / 25; // Inverted or direct? standard: top (-Y) -> tilt away? or towards? CSS rotateX: positive tips bottom away. negative tips top away.
+            // Let's stick to user math logic: (Cursor Y - Center Y) / 25.
+            // If Cursor Y is 0 (Top), result is negative -> Rotate X negative -> Top tips away. Correct.
+
+            const rotY = (e.clientX - centerX) / 25;
+            // If Cursor X is 0 (Left), result is negative -> Rotate Y negative -> Left tips away. Correct.
+
+            // Clamp to 15deg
+            x.set(Math.max(-15, Math.min(15, rotX)));
+            y.set(Math.max(-15, Math.min(15, rotY)));
+        };
+
+        const handleOrientation = (e: DeviceOrientationEvent) => {
+            if (e.beta !== null && e.gamma !== null) {
+                // Mobile tilt
+                // Beta: Front/Back tilt (-180 to 180). Rest is ~0 (flat) or ~45 (held).
+                // Gamma: Left/Right tilt (-90 to 90).
+
+                // Simplified mapping
+                const rotX = (e.beta || 0) / 2;
+                const rotY = (e.gamma || 0) / 2;
+
+                x.set(Math.max(-15, Math.min(15, rotX)));
+                y.set(Math.max(-15, Math.min(15, rotY)));
+            }
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('deviceorientation', handleOrientation);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('deviceorientation', handleOrientation);
+        };
+    }, [x, y]);
+
+    return { rotateX: smoothX, rotateY: smoothY };
+}
+
+const BrickGame = lazy(() => import("./games/BrickGame").then(m => ({ default: m.BrickGame })));
+const MusicQuiz = lazy(() => import("./games/MusicQuiz").then(m => ({ default: m.MusicQuiz })));
+const Calendar = lazy(() => import("./extras/Calendar").then(m => ({ default: m.Calendar })));
+
+const GAMES_MENU: MenuItem[] = [
+    { label: "Brick", type: 'navigation', target: 'game-brick', data: { id: 'brick-game', name: 'Brick' } },
+    { label: "Music Quiz", type: 'navigation', target: 'game-music-quiz', data: { id: 'music-quiz', name: 'Music Quiz' } }
+];
 import { ClickWheel } from "./ClickWheel";
 import { IpodScreen } from "./IpodScreen";
+import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight, Star, Heart, Music, Zap, Smile, Ghost, Skull, Trash2, ShoppingBag, MessageSquare } from "lucide-react";
+import { StickerLayer, Sticker, StickerType } from './stickers/StickerLayer';
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
-import { JioSaavnSong, searchSongs, getLyrics } from "@/lib/jiosaavn";
-import { decodeHtml } from "@/lib/utils";
+import { JioSaavnSong, getLyrics, getAlbumDetails } from "@/lib/jiosaavn";
+import { searchUnified, GroupedSong } from "@/lib/unified-search";
+import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -29,7 +86,7 @@ interface MenuItem {
 interface ViewState {
     id: string; // Unique ID for the view context (e.g., 'main', 'playlists', 'mix-123')
     title: string;
-    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'lyrics';
+    viewType: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'lyrics' | 'stickers';
     data?: any; // Context data (e.g., mixId)
     selectedIndex: number;
     staticItems?: MenuItem[]; // For purely static menus
@@ -44,26 +101,55 @@ const MAIN_MENU: MenuItem[] = [
     { label: "Music", type: 'navigation', target: 'music' },
     { label: 'Cover Flow', type: 'action', data: { id: 'cover-flow', name: 'Cover Flow' } },
     { label: 'Cinema Mode', type: 'action', data: { id: 'cinema', name: 'Cinema Mode' } },
+    { label: "Extras", type: 'navigation', target: 'extras' },
+    { label: "Games", type: 'navigation', target: 'games' },
     { label: "Settings", type: 'navigation', target: 'settings' },
     { label: 'Now Playing', type: 'action', data: { id: 'now-playing', name: 'Now Playing' } }
 ];
 
+
 const MUSIC_MENU: MenuItem[] = [
     { label: "Playlists", type: 'navigation', target: 'playlists' },
-    { label: "Search", type: 'navigation', target: 'search' },
-    { label: "Liked Songs", type: 'navigation', target: 'liked-songs' },
-    { label: "Recently Played", type: 'navigation', target: 'recently-played' },
     { label: "Artists", type: 'navigation', target: 'artists' },
     { label: "Albums", type: 'navigation', target: 'albums' },
     { label: "Songs", type: 'navigation', target: 'songs' },
-    { label: "Current Queue", type: 'navigation', target: 'queue' },
-    { label: "Lyrics", type: 'action', data: { id: 'lyrics', name: 'Lyrics' }, action: () => { } },
+    { label: "Search", type: 'navigation', target: 'search' }
+];
+
+const SYSTEM_MENU: MenuItem[] = [
+    {
+        label: "Backup Playlists",
+        type: 'action',
+        action: () => {
+            alert('Backup functionality triggered.'); // Placeholder to be replaced by dynamic logic
+        }
+    },
+    {
+        label: "Clear Cache",
+        type: 'action',
+        action: () => {
+            if (confirm('Clear all cached data? Settings will be preserved.')) {
+                // clearCache(); imported
+                // alert('Cache cleared successfully!');
+            }
+        }
+    },
+    {
+        label: "Reset All Settings",
+        type: 'action',
+        action: () => {
+            if (confirm('Reset all settings to defaults? This cannot be undone.')) {
+                // resetSettings();
+                // window.location.reload();
+            }
+        }
+    }
 ];
 
 
 
 interface AndroidEntryProps {
-    onSwitchToDesktop?: () => void;
+    onSwitchToDesktop?: (theme?: string) => void;
 }
 
 export function AndroidEntry({ onSwitchToDesktop }: AndroidEntryProps) {
@@ -92,7 +178,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         sleepTimer, setSleepTimer,
         crossfadeDuration, setCrossfadeDuration,
         stopAtEndOfSong, setStopAtEndOfSong,
-        bitrate, setBitrate,
+        bitrate, setBitrate, setForceLossless,
         likedSongs, toggleLike, isLiked, recentlyPlayed
     } = usePlayback();
 
@@ -103,8 +189,158 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     ]);
     const [clickSounds, setClickSounds] = useState(true);
     const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush'>('classic');
-    const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume'); // Toggle for Player view
+    const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume');
+    const [isLocked, setIsLocked] = useState(false); // Hold Switch state
     const inputRef = useRef<HTMLInputElement>(null);
+    const stickerConstraintsRef = useRef<HTMLDivElement>(null);
+    const iPodBodyRef = useRef<HTMLDivElement>(null);
+
+    // Sticker State
+    const [stickers, setStickers] = useState<Sticker[]>([]);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+    const showToast = useCallback((msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 4500);
+    }, []);
+
+    // Load stickers from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('ipod_stickers_v2');
+        if (saved) {
+            try { setStickers(JSON.parse(saved)); } catch (e) { console.error(e); }
+        }
+    }, []);
+
+    // Save stickers to localStorage
+    useEffect(() => {
+        localStorage.setItem('ipod_stickers_v2', JSON.stringify(stickers));
+    }, [stickers]);
+
+    // Add Sticker from Drawer
+    const handleAddSticker = useCallback((type: StickerType, color: string) => {
+        if (stickers.length >= 3) {
+            showToast("No space left! Remove a sticker first.");
+            return;
+        }
+
+        // Random Zone Logic (Wheel Sides or Chin)
+        const zone = Math.random();
+        let x, y;
+
+        if (zone < 0.4) {
+            // Left of Wheel
+            x = 20 + Math.random() * 30;
+            y = 400 + Math.random() * 100;
+        } else if (zone < 0.8) {
+            // Right of Wheel
+            x = 280 + Math.random() * 30;
+            y = 400 + Math.random() * 100;
+        } else {
+            // Chin Area - Keep safely inside constraints (Max Y ~570)
+            x = 50 + Math.random() * 200;
+            y = 530 + Math.random() * 30; // 530-560
+        }
+
+        const newSticker: Sticker = {
+            id: Date.now(),
+            type,
+            x,
+            y,
+            rotation: Math.floor(Math.random() * 41) - 20,
+            color,
+            isResidue: false
+        };
+        setStickers(prev => [...prev, newSticker]);
+        showToast("Sticker Added!");
+    }, [stickers, showToast]);
+
+    const handleUpdateSticker = useCallback((id: number, updates: Partial<Sticker>) => {
+        setStickers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    }, []);
+
+    const handleRemoveSticker = useCallback((id: number) => {
+        setStickers(prev => prev.filter(s => s.id !== id));
+    }, []);
+
+    const handleClearStickers = useCallback(() => {
+        // "Cheat" clean - no residue
+        // showToast("Cleaning all stickers...");
+        setStickers([]);
+        showToast("Case is shiny new!");
+    }, [showToast]);
+
+    // Activity & Backlight
+    const [lastActivity, setLastActivity] = useState(Date.now());
+    const [backlight, setBacklight] = useState(1); // 0 (dim) to 1 (bright)
+
+    useEffect(() => {
+        const timeout = 10000; // 10 seconds to dim
+        const interval = setInterval(() => {
+            const timeSinceActivity = Date.now() - lastActivity;
+            if (timeSinceActivity > timeout) {
+                setBacklight(Math.max(0, 1 - (timeSinceActivity - timeout) / 5000)); // Slowly dim over 5s
+            } else {
+                setBacklight(1);
+            }
+        }, 100);
+        return () => clearInterval(interval);
+    }, [lastActivity]);
+
+    const registerActivity = useCallback(() => {
+        setLastActivity(Date.now());
+        setBacklight(1);
+    }, []);
+
+    // Global Activity Listener for Backlight
+    useEffect(() => {
+        const handleInteraction = () => registerActivity();
+        window.addEventListener('mousemove', handleInteraction);
+        window.addEventListener('mousedown', handleInteraction);
+        window.addEventListener('touchstart', handleInteraction);
+        window.addEventListener('keydown', handleInteraction);
+        window.addEventListener('wheel', handleInteraction);
+        window.addEventListener('click', handleInteraction);
+
+        return () => {
+            window.removeEventListener('mousemove', handleInteraction);
+            window.removeEventListener('mousedown', handleInteraction);
+            window.removeEventListener('touchstart', handleInteraction);
+            window.removeEventListener('keydown', handleInteraction);
+            window.removeEventListener('wheel', handleInteraction);
+            window.removeEventListener('click', handleInteraction);
+        };
+    }, [registerActivity]);
+
+    const playClick = useCallback(() => {
+        if (clickSounds) {
+            try {
+                // Synthetic Click Sound (Crisp tick)
+                const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+                if (!AudioContext) return;
+
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                // Short, sharp tick
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.01);
+
+                gain.gain.setValueAtTime(0.05, ctx.currentTime); // Low volume
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.01);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start();
+                osc.stop(ctx.currentTime + 0.01);
+            } catch (e) {
+                // Ignore audio context errors
+            }
+        }
+    }, [clickSounds]);
 
     // Load settings on mount
     useEffect(() => {
@@ -113,6 +349,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         setClickSounds(settings.clickSounds);
         setIpodTheme(settings.theme);
     }, [setVolume]);
+
+
 
     // Dynamic Meta Theme Color for Mobile Browsers
     useEffect(() => {
@@ -142,6 +380,10 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
     // Derived state for current view
     const currentView = viewStack[viewStack.length - 1];
+
+    // Cover Flow Logic: Fetch Tracks Hoisted
+    const [cfTracks, setCfTracks] = useState<JioSaavnSong[]>([]);
+
 
     // Helper to get albums from Library (Shared logic)
     const getLibraryAlbums = (currentMixes: typeof mixes) => {
@@ -181,7 +423,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     };
 
     // Compute Menu Items Dynamically based on Current View ID & Context
-    // Removed useMemo to ensure closures (like playSongNow) are always fresh. 
+    // Removed useMemo to ensure closures (like playSongNow) are always fresh.
     // This prevents stale state issues where actions use old versions of 'mixes'.
     // --- Actions Actions ---
 
@@ -281,26 +523,39 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     };
 
     // Play single song immediate (e.g. from songs list)
-    const playSongNow = useCallback((song: JioSaavnSong) => {
-        // Simplified: Add to On-the-Go and play it
-        // Need access to 'mixes' and 'play' etc.
-        // 'mixes' is from hook, 'play' is from hook.
-        // If we don't include them in dep array, they might be stale?
-        // usePlayback hook values ideally shouldn't change identity too often except simple values.
-        // But 'mixes' might.
+    const playSongNow = useCallback((song: JioSaavnSong, isHiRes: boolean = false) => {
+        if (isHiRes) {
+            setForceLossless(true);
+            console.log("[iPod] Forcing Hi-Res Lossless Mode");
+        }
 
-        // Ideally we shouldn't use useCallback here if dependencies change often, OR we accept it.
-        // Re-creating this function is fine if it doesn't cause child re-renders.
-        // But it's passed to map functions.
-        const otg = mixes.find(m => m.title === "On-the-Go");
-        if (otg) {
+        // Find or Create On-the-Go Mix
+        let otg = mixes.find(m => m.title === "On-the-Go");
+
+        if (!otg) {
+            console.log("[iPod] Creating On-the-Go mix for playback");
+            const newOtg: Mix = {
+                id: 'otg-temp',
+                title: "On-the-Go",
+                color: "white",
+                songs: [song],
+                currentSongIndex: 0
+            };
+            addMix(newOtg);
+            loadMix(newOtg.id);
+            // Immediately navigate after state update
+            setTimeout(() => {
+                play();
+                goToNowPlaying();
+            }, 100);
+        } else {
+            console.log("[iPod] Updating On-the-Go mix");
             updateMix(otg.id, { songs: [song], currentSongIndex: 0 });
             loadMix(otg.id);
             play();
-            // We can't call goToNowPlaying() here if it's memoized without adding it to deps
-            setViewStack(prev => [...prev, { id: 'now-playing', title: 'Now Playing', viewType: 'player', selectedIndex: 0 }]);
+            goToNowPlaying();
         }
-    }, [mixes, updateMix, loadMix, play]);
+    }, [mixes, updateMix, loadMix, play, addMix, setForceLossless, goToNowPlaying]);
 
 
     // Compute Menu Items Dynamically based on Current View ID & Context
@@ -310,16 +565,51 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
         switch (currentView.id) {
             case 'music': return MUSIC_MENU;
-            case 'games':
-                return [] as MenuItem[]; // Games unavailable
+            case 'extras': return [
+                { label: "Clock", type: 'navigation', target: 'clock' },
+                { label: "Calendar", type: 'navigation', target: 'calendar' },
+                { label: "Games", type: 'navigation', target: 'games' },
+                { label: "Themes", type: 'navigation', target: 'theme-settings' },
+                { label: "Sticker Collection", type: 'action', data: { id: 'sticker-collection' } },
+                { label: "Clean All Stickers (Cheat)", type: 'action', action: handleClearStickers },
+                { label: "Switch to Studio Deck", type: 'action', action: () => onSwitchToDesktop && onSwitchToDesktop() },
+                { label: "Switch to Discovery Mode", type: 'action', action: () => onSwitchToDesktop && onSwitchToDesktop('zen') }, // distinct from glass? logic says 'zen' or 'glass'
+            ];
+            case 'games': return GAMES_MENU;
+
+            case 'about':
+                const songCount = mixes.reduce((acc, m) => acc + m.songs.length, 0);
+                return [
+                    { label: "Melora iPod Classic", type: 'action', action: () => { } },
+                    { label: `Songs: ${songCount}`, type: 'action', action: () => { } },
+                    { label: "Capacity: 160 GB", type: 'action', action: () => { } },
+                    { label: "Available: 159 GB", type: 'action', action: () => { } },
+                    { label: "Version: 2.0.1", type: 'action', action: () => { } },
+                    { label: "Serial: A8G9H2J3K4L5", type: 'action', action: () => { } }
+                ] as MenuItem[];
+
+            case 'clock':
+                return [
+                    { label: new Date().toLocaleTimeString(), type: 'action', action: () => { } },
+                    { label: new Date().toLocaleDateString(), type: 'action', action: () => { } }
+                ] as MenuItem[];
+
+            case 'calendar':
+                // Handled by custom view overlay
+                return [] as MenuItem[];
 
             case 'settings':
-                // Dynamic Settings Menu
+                // Structured Settings Menu
                 return [
                     {
-                        label: `Volume: ${Math.round(volume * 100)}%`,
+                        label: `Audio Quality: ${bitrate === 'flac' ? 'Lossless' : bitrate + 'kbps'}`,
                         type: 'navigation',
-                        target: 'volume-settings'
+                        target: 'quality-settings'
+                    },
+                    {
+                        label: `Crossfade: ${crossfadeDuration === 0 ? 'Off' : crossfadeDuration + 's'}`,
+                        type: 'navigation',
+                        target: 'crossfade'
                     },
                     {
                         label: `Click Sounds: ${clickSounds ? 'On' : 'Off'}`,
@@ -331,32 +621,19 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         }
                     },
                     {
-                        label: sleepTimer
-                            ? `Sleep Timer: ${Math.ceil((sleepTimer.endTime - Date.now()) / 60000)}min`
-                            : "Sleep Timer: Off",
+                        label: "About",
                         type: 'navigation',
-                        target: 'sleep-timer'
+                        target: 'about'
                     },
                     {
-                        label: `Crossfade: ${crossfadeDuration === 0 ? 'Off' : crossfadeDuration + 's'}`,
+                        label: "System",
                         type: 'navigation',
-                        target: 'crossfade'
+                        target: 'system-settings'
                     },
-                    {
-                        label: `iPod Theme`,
-                        type: 'navigation',
-                        target: 'theme-settings'
-                    },
-                    {
-                        label: `Audio Quality: ${bitrate}kbps`,
-                        type: 'navigation',
-                        target: 'quality-settings'
-                    },
-                    ...(onSwitchToDesktop ? [{
-                        label: "Switch to Studio Deck",
-                        type: 'action',
-                        action: onSwitchToDesktop
-                    }] : []),
+                ] as MenuItem[];
+
+            case 'system-settings':
+                return [
                     {
                         label: "Backup Playlists",
                         type: 'action',
@@ -428,9 +705,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 })) as MenuItem[];
 
             case 'quality-settings':
-                const qualities = ['320', '160', '96', '48', '12'] as const;
+                const qualities = ['flac', '320', '160', '96', '48', '12'] as const;
                 return qualities.map(q => ({
-                    label: `${q} kbps ${q === '320' ? '(High)' : ''}${bitrate === q ? ' ✓' : ''}`,
+                    label: `${q === 'flac' ? 'Lossless (FLAC)' : q + ' kbps'} ${q === '320' ? '(High)' : ''}${bitrate === q ? ' ✓' : ''}`,
                     type: 'action',
                     action: () => {
                         setBitrate(q);
@@ -813,6 +1090,24 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         }
     }, [currentView.id, currentView.data, currentView.staticItems, mixes, volume, clickSounds, ipodTheme, shuffle, repeat, sleepTimer, crossfadeDuration]);
 
+    // Debounced fetch for Cover Flow tracks
+    useEffect(() => {
+        if (currentView.viewType === 'cover-flow') {
+            const albumData = currentMenuItems[currentView.selectedIndex]?.data;
+            if (albumData?.id) {
+                const timer = setTimeout(async () => {
+                    try {
+                        const songs = await getAlbumDetails(albumData.id);
+                        setCfTracks(songs);
+                    } catch (e) {
+                        console.error("CF Fetch Error", e);
+                    }
+                }, 500);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [currentView.viewType, currentView.selectedIndex, currentMenuItems]);
+
     // Actions
 
 
@@ -874,11 +1169,11 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                 setViewStack(prev => {
                     const newStack = [...prev];
-                    newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], trackIndex: newTrackIndex };
+                    const active = newStack[newStack.length - 1];
+                    newStack[newStack.length - 1] = { ...active, trackIndex: newTrackIndex };
                     return newStack;
                 });
             } else {
-                // Navigate through albums (existing logic)
                 const items = currentMenuItems;
                 const maxIndex = Math.max(0, items.length - 1);
                 if (maxIndex === 0 && items.length === 0) return;
@@ -889,12 +1184,12 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                 setViewStack(prev => {
                     const newStack = [...prev];
-                    newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], selectedIndex: newIndex };
+                    const active = newStack[newStack.length - 1];
+                    newStack[newStack.length - 1] = { ...active, selectedIndex: newIndex };
                     return newStack;
                 });
             }
         } else {
-            // Use Computed Items for scrolling (Results or Menu)
             const items = currentMenuItems;
             const maxIndex = Math.max(0, items.length - 1);
             if (maxIndex === 0 && items.length === 0) return;
@@ -905,16 +1200,12 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
             setViewStack(prev => {
                 const newStack = [...prev];
-                newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], selectedIndex: newIndex };
+                const active = newStack[newStack.length - 1];
+                newStack[newStack.length - 1] = { ...active, selectedIndex: newIndex };
                 return newStack;
             });
         }
     };
-
-    // --- Actions Actions ---
-
-    // Updated Navigation Handler
-
 
     const handleSearch = useCallback(async (query: string) => {
         // Reuse for Rename Logic
@@ -926,13 +1217,30 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         if (!query.trim()) return;
         setIsLoading(true);
         try {
-            const results = await searchSongs(query);
-            const songItems: MenuItem[] = results.map((song: JioSaavnSong) => ({
-                label: decodeHtml(song.name),
-                type: 'navigation',
-                target: `song-${song.id}`,
-                data: song
-            }));
+            // Updated to Unified Search
+            const results = await searchUnified(query, 'song');
+            const songItems: MenuItem[] = results.map((group: GroupedSong) => {
+                const bestQ = group.bestQuality;
+                const bestSong = group.qualities[bestQ as keyof typeof group.qualities] as JioSaavnSong;
+
+                // Inject the quality into the song object so it's accessible during playback and in UI
+                const songWithMeta = {
+                    ...bestSong,
+                    _quality: bestQ,
+                    _qualityTier: bestQ === '24-bit' ? 0 : bestQ === 'FLAC' ? 1 : bestQ === '320kbps' ? 2 : 3,
+                    source: group.source // Critical for playback provider
+                };
+
+                return {
+                    label: decodeHtml(group.name),
+                    type: 'action',
+                    action: () => {
+                        const isHiRes = bestQ === '24-bit' || bestQ === 'FLAC' || group.source === 'tidal';
+                        playSongNow(songWithMeta as any, isHiRes);
+                    },
+                    data: songWithMeta
+                };
+            });
 
             setViewStack(prev => {
                 const newStack = [...prev];
@@ -946,14 +1254,82 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             console.error("Search failed", e);
         } finally {
             setIsLoading(false);
-            inputRef.current?.blur();
         }
-    }, [currentView.id, handleRenameSubmit, setIsLoading, searchSongs, setViewStack, inputRef]);
+    }, [currentView.id, handleRenameSubmit, setIsLoading, setViewStack, inputRef, playSongNow, registerActivity]);
 
 
 
+
+    const handleLongSelect = useCallback(() => {
+        registerActivity();
+        const item = currentMenuItems[currentView.selectedIndex];
+        let songToAdd: JioSaavnSong | null = null;
+
+        if (currentView.viewType === 'player' && currentSong) {
+            // Context Menu Logic
+            const song = currentSong;
+            const contextMenu: MenuItem[] = [
+                {
+                    label: "Add to On-the-Go",
+                    type: 'action',
+                    action: () => {
+                        let otg = mixes.find(m => m.title === "On-the-Go");
+                        if (!otg) {
+                            const newOtg: Mix = { id: 'otg-temp', title: "On-the-Go", color: "white", songs: [song], currentSongIndex: 0 };
+                            addMix(newOtg);
+                        } else {
+                            updateMix(otg.id, { songs: [...otg.songs, song] });
+                        }
+                        handleBack(); // Close menu
+                        alert("Added to On-the-Go");
+                    }
+                },
+                {
+                    label: "Add to Playlist...",
+                    type: 'navigation',
+                    target: 'playlists' // Simplistic fallback for now, ideally shows playlist picker
+                },
+                {
+                    label: "Cancel",
+                    type: 'action',
+                    action: () => handleBack()
+                }
+            ];
+
+            setViewStack(prev => [...prev, {
+                id: 'context-menu',
+                title: cleanTrackTitle(song.name),
+                viewType: 'menu',
+                selectedIndex: 0,
+                staticItems: contextMenu
+            }]);
+            return;
+
+        } else if (item?.data?.id) {
+            // Check if it's a song data item
+            songToAdd = item.data;
+        }
+
+        if (songToAdd) {
+            let otg = mixes.find(m => m.title === "On-the-Go");
+            if (!otg) {
+                const newOtg: Mix = {
+                    id: 'otg-temp',
+                    title: "On-the-Go",
+                    color: "white",
+                    songs: [songToAdd],
+                    currentSongIndex: 0
+                };
+                addMix(newOtg);
+            } else {
+                updateMix(otg.id, { songs: [...otg.songs, songToAdd] });
+            }
+            alert("Added to On-the-Go");
+        }
+    }, [currentMenuItems, currentView, currentSong, mixes, addMix, updateMix, registerActivity]);
 
     const handleSelect = useCallback(() => {
+        registerActivity();
         // Special handling for Player View: Toggle Scrub/Volume
         if (currentView.viewType === 'player' || currentView.viewType === 'cinema') {
             if (controlMode === 'volume') {
@@ -964,78 +1340,133 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             return;
         }
 
-
-
         // Special handling for Cover Flow
         if (currentView.viewType === 'cover-flow') {
             if (currentView.isFlipped) {
                 // Play selected track from the flipped album
-                const activeAlbum = currentMenuItems[currentView.selectedIndex]?.data;
                 const trackIndex = currentView.trackIndex || 0;
-                if (activeAlbum?.songs && activeAlbum.songs[trackIndex]) {
-                    // Play whole album starting from track
-                    // Need to construct a Mix object or just play list
-                    // For now simplicity: just play song
-                    // Ideally we should play context.
-                    // Let's create a temporary mix for this album
-                    const albumMixId = `album-${activeAlbum.title}`;
-                    // Check if exists or create
-                    // Simplified: Just play song
-                    playSongNow(activeAlbum.songs[trackIndex]);
+
+                // Prioritize fetched tracks (Hi-Res/Details)
+                if (cfTracks.length > 0 && cfTracks[trackIndex]) {
+                    const song = cfTracks[trackIndex];
+                    const isHiRes = (song as any).quality === 'FLAC' || (song as any)._quality === 'FLAC';
+                    playSongNow(song, isHiRes || true);
+                } else {
+                    // Fallback to local album data if available
+                    const activeAlbum = currentMenuItems[currentView.selectedIndex]?.data;
+                    if (activeAlbum?.songs && activeAlbum.songs[trackIndex]) {
+                        playSongNow(activeAlbum.songs[trackIndex]);
+                    }
                 }
             } else {
-                // Flip the album
+                // Flip Album
                 setViewStack(prev => {
                     const newStack = [...prev];
                     const active = newStack[newStack.length - 1];
-                    newStack[newStack.length - 1] = { ...active, isFlipped: !active.isFlipped, trackIndex: 0 };
+                    newStack[newStack.length - 1] = { ...active, isFlipped: true, trackIndex: 0 };
                     return newStack;
                 });
             }
+            if (clickSounds) playClick();
             return;
         }
 
-        // Default Menu Selection
-        const selectedItem = currentMenuItems[currentView.selectedIndex];
-        if (selectedItem) {
-            // Special handling for Cinema Mode, Cover Flow and Now Playing from MAIN_MENU
-            if (selectedItem.data?.id === 'cinema') {
-                setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
-            } else if (selectedItem.data?.id === 'cover-flow') {
-                const albums = getLibraryAlbums(mixes);
-                // Find index of current song's album
-                const index = currentSong?.album?.id ? albums.findIndex(a => a.id === currentSong.album.id) : 0;
-                setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: index >= 0 ? index : 0 }]);
-            } else if (selectedItem.data?.id === 'now-playing') {
-                goToNowPlaying();
-            } else if (selectedItem.data?.id === 'lyrics') {
-                if (!currentSong) {
-                    alert("No song playing!");
-                    return;
-                }
-                setIsLoading(true);
-                getLyrics(currentSong.id).then(lyrics => {
-                    setIsLoading(false);
-                    setViewStack(prev => [...prev, {
-                        id: 'lyrics',
-                        title: 'Lyrics',
-                        viewType: 'lyrics',
-                        selectedIndex: 0,
-                        data: {
-                            id: 'lyrics',
-                            message: lyrics || "No lyrics found."
-                        }
-                    }]);
-                });
-            } else if (selectedItem.type === 'navigation' && selectedItem.target) {
-                handleNavigation(selectedItem.target, selectedItem.data, selectedItem.label);
+        // 2. Normal Menu Handling
+        const item = currentMenuItems[currentView.selectedIndex];
+        if (!item) return;
+
+        if (clickSounds) playClick();
+
+        // Special handling for Cinema Mode, Cover Flow and Now Playing from MAIN_MENU
+        if (item.data?.id === 'cinema') {
+            setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
+        } else if (item.data?.id === 'cover-flow') {
+            const albums = getLibraryAlbums(mixes);
+            // Find index of current song's album
+            const index = currentSong?.album?.id ? albums.findIndex(a => a.id === currentSong.album.id) : 0;
+            setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: index >= 0 ? index : 0 }]);
+        } else if (item.data?.id === 'now-playing') {
+            goToNowPlaying();
+        } else if (item.data?.id === 'lyrics') {
+            if (!currentSong) {
+                alert("No song playing!");
+                return;
             }
+            setIsLoading(true);
+            getLyrics(currentSong.id).then(lyrics => {
+                setIsLoading(false);
+                setViewStack(prev => [...prev, {
+                    id: 'lyrics',
+                    title: 'Lyrics',
+                    viewType: 'lyrics',
+                    selectedIndex: 0,
+                    data: {
+                        id: 'lyrics',
+                        message: lyrics || "No lyrics found."
+                    }
+                }]);
+            });
+        } else if (item.action) {
+            item.action();
+        } else if (item.type === 'navigation' && item.target) {
+            handleNavigation(item.target, item.data, item.label);
         }
-    }, [currentView, controlMode, currentMenuItems, mixes, currentSong, playSongNow, goToNowPlaying, handleNavigation]);
+    }, [currentView, controlMode, currentMenuItems, mixes, currentSong, playSongNow, goToNowPlaying, handleNavigation, cfTracks, clickSounds, playClick, registerActivity]);
 
 
+    // Keyboard handling
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (isLocked) return;
 
+            switch (event.key) {
+                case 'ArrowUp':
+                    handleScroll(-1);
+                    break;
+                case 'ArrowDown':
+                    handleScroll(1);
+                    break;
+                case 'Enter':
+                    handleSelect();
+                    break;
+                case 'Backspace':
+                    handleBack();
+                    break;
+                case ' ': // Spacebar for Play/Pause
+                    event.preventDefault(); // Prevent scrolling
+                    togglePlay();
+                    break;
+                case 'ArrowLeft':
+                    prev();
+                    break;
+                case 'ArrowRight':
+                    next();
+                    break;
+                case 'm': // 'm' for Menu (Back)
+                    handleBack();
+                    break;
+                case 'p': // 'p' for Play/Pause
+                    togglePlay();
+                    break;
+                case 'n': // 'n' for Next
+                    next();
+                    break;
+                case 'b': // 'b' for Previous
+                    prev();
+                    break;
+                case 's': // 's' for Select
+                    handleSelect();
+                    break;
+                default:
+                    break;
+            }
+        };
 
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isLocked, handleScroll, handleSelect, handleBack, togglePlay, prev, next]);
 
 
     // Theme-based styling
@@ -1083,162 +1514,303 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
     return (
         <div className={`flex flex-col items-center justify-center select-none w-full h-full min-h-screen ${ipodTheme === 'blue' ? 'font-jakarta' : 'font-vietnam'}`}>
+            {/* MAIN CONTAINER: Layout Wrapper */}
             <motion.div
-                className={`relative w-full max-w-[370px] aspect-[9/16] rounded-[3rem] ${getThemeClasses()} p-5 flex flex-col ring-1 ring-black/10 select-none touch-manipulation my-auto transition-all duration-500`}
-                style={{
-                    WebkitTapHighlightColor: 'transparent',
-                    WebkitTouchCallout: 'none',
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none'
-                }}
+                ref={iPodBodyRef}
+                className="relative w-[370px] h-[640px] select-none touch-manipulation my-auto transition-all duration-500"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
             >
-                {/* Metallic Sheen (CSS only, no heavy blends) */}
-                <div className="absolute inset-0 rounded-[2.6rem] bg-gradient-to-tr from-transparent via-white/40 to-transparent pointer-events-none" />
-
-                {/* Floral Decorations (Blush Theme Only) */}
-                {ipodTheme === 'blush' && (
-                    <>
-                        <div className="absolute top-0 left-0 w-32 h-32 opacity-60 pointer-events-none z-0">
-                            <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
-                                <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
-                                <circle cx="15" cy="45" fill="#f23684" fillOpacity="0.15" r="12"></circle>
-                            </svg>
-                        </div>
-                        <div className="absolute top-0 right-0 w-32 h-32 rotate-90 opacity-60 pointer-events-none z-0">
-                            <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
-                                <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
-                                <circle cx="15" cy="45" fill="#f23684" fillOpacity="0.15" r="12"></circle>
-                            </svg>
-                        </div>
-                        <div className="absolute bottom-[-10px] right-[-10px] w-24 h-24 rotate-180 opacity-40 pointer-events-none z-0">
-                            <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
-                                <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
-                            </svg>
-                        </div>
-                    </>
-                )}
-
-                {/* Screen Area (Top 48%) - Dynamic Border/Background */}
+                {/* 2. INNER MASK: The iPod Body (Clipped) */}
                 <div
-                    className={`w-full h-[48%] rounded-lg border-[3px] mb-4 overflow-hidden relative z-10 ${getScreenClasses()}`}
-                    onClick={() => {
-                        // If in search mode, tapping screen focuses input
-                        if (currentView.viewType === 'search') inputRef.current?.focus();
+                    className={`absolute inset-0 rounded-[3rem] overflow-hidden z-0 pointer-events-none ${getThemeClasses()}`}
+                    style={{
+                        WebkitTapHighlightColor: 'transparent',
+                        WebkitTouchCallout: 'none',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        boxShadow: 'inset 0 0 20px rgba(0,0,0,0.8), 0 25px 50px -12px rgba(0,0,0,0.5)'
                     }}
                 >
-                    <IpodScreen
-                        variant={currentView.viewType || 'menu'}
-                        title={currentView.title}
-                        menuItems={currentMenuItems.map(i => i.label)}
-                        itemsData={currentMenuItems}
-                        selectedIndex={currentView.selectedIndex}
-                        currentSong={currentSong}
-                        isPlaying={isPlaying}
-                        progress={progress}
-                        duration={duration}
-                        isLoading={isLoading}
-                        message={currentView.data?.message || ''}
-                        isFlipped={currentView.isFlipped}
-                        customHeader={currentView.customHeader}
-                        searchQuery={currentView.viewType === 'search' ? currentView.searchQuery : undefined}
-                        // Pass handlers for real input
-                        onSearchChange={(val) => {
-                            setSearchQuery(val);
-                            // Sync to viewstack for persistence if needed
-                            setViewStack(prev => {
-                                const newStack = [...prev];
-                                newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], searchQuery: val };
-                                return newStack;
-                            });
+                    {/* Glass Glare Reflection */}
+                    <div
+                        className="absolute inset-0 rounded-[2.6rem] pointer-events-none z-50"
+                        style={{
+                            background: 'linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%)'
                         }}
-                        onSearchSubmit={(val) => handleSearch(val)}
-                        inputRef={inputRef}
-                        onItemSelect={(index) => {
-                            setViewStack(prev => {
-                                const newStack = [...prev];
-                                newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], selectedIndex: index };
-                                return newStack;
-                            });
-                            setTimeout(() => {
-                                const item = currentMenuItems[index];
-
-                                // Special handling for Cover Flow Flip
-                                if (currentView.viewType === 'cover-flow') {
-                                    setViewStack(prev => {
-                                        const newStack = [...prev];
-                                        const active = newStack[newStack.length - 1];
-                                        newStack[newStack.length - 1] = { ...active, isFlipped: !active.isFlipped };
-                                        return newStack;
-                                    });
-                                    return;
-                                }
-
-                                if (item) {
-                                    // Special handling for Cinema Mode, Cover Flow and Now Playing from MAIN_MENU
-                                    if (item.data?.id === 'cinema') {
-                                        setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
-                                    } else if (item.data?.id === 'cover-flow') {
-                                        setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: 0 }]);
-                                    } else if (item.data?.id === 'now-playing') {
-                                        goToNowPlaying();
-                                    } else if (item.action) {
-                                        item.action();
-                                    } else if (item.type === 'navigation' && item.target) {
-                                        handleNavigation(item.target, item.data, item.label);
-                                    }
-                                }
-                            }, 0);
-                        }}
-                        onPlayPause={togglePlay}
-                        controlMode={controlMode} // Pass seek/volume state
-                        shuffle={shuffle}
-                        repeat={repeat}
-                        onBack={handleBack}
                     />
 
+                    {/* Floral Decorations (Blush Theme Only) */}
+                    {ipodTheme === 'blush' && (
+                        <>
+                            <div className="absolute top-0 left-0 w-32 h-32 opacity-60 pointer-events-none z-0">
+                                <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
+                                    <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
+                                    <circle cx="15" cy="45" fill="#f23684" fillOpacity="0.15" r="12"></circle>
+                                </svg>
+                            </div>
+                            <div className="absolute top-0 right-0 w-32 h-32 rotate-90 opacity-60 pointer-events-none z-0">
+                                <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
+                                    <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
+                                    <circle cx="15" cy="45" fill="#f23684" fillOpacity="0.15" r="12"></circle>
+                                </svg>
+                            </div>
+                            <div className="absolute bottom-[-10px] right-[-10px] w-24 h-24 rotate-180 opacity-40 pointer-events-none z-0">
+                                <svg fill="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="20" cy="20" fill="#f23684" fillOpacity="0.2" r="15"></circle>
+                                    <circle cx="45" cy="15" fill="#f23684" fillOpacity="0.1" r="10"></circle>
+                                </svg>
+                            </div>
+                        </>
+                    )}
 
-                    {/* Render Game View if Active - Lazy loaded for performance */}
-
+                    {/* Global Glass Reflection (Moved inside Mask) */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-50 pointer-events-none" />
+                    <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-white/5 to-transparent skew-x-12 pointer-events-none" />
                 </div>
 
-                {/* Branding */}
-                <div className="w-full flex justify-center items-center mb-6 relative z-10">
-                    <span className={`text-[10px] font-bold tracking-[0.2em] font-sans ${ipodTheme === 'black' || ipodTheme === 'dark' ? 'text-white/20' : 'text-zinc-500/80'}`}>MELORA</span>
-                </div>
-                {/* Glass Reflection */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-50 pointer-events-none" />
-                <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-white/5 to-transparent skew-x-12 pointer-events-none" />
+                {/* Toast Notification Overlay */}
+                {/* Toast Notification Overlay - Phone Style Banner */}
+                <AnimatePresence>
+                    {toastMessage && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -40, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                            className="absolute top-4 left-1/2 -translate-x-1/2 w-[92%] bg-zinc-900/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-2xl p-3 flex items-center gap-3 z-[120] pointer-events-none"
+                        >
+                            <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-inner ring-1 ring-white/10">
+                                <MessageSquare size={18} className="text-white fill-white/20" />
+                            </div>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+                                    MESSAGES <span className="text-zinc-600">•</span> NOW
+                                </span>
+                                <span className="text-[13px] font-medium text-white leading-tight truncate w-full drop-shadow-sm pr-1">
+                                    {toastMessage}
+                                </span>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
+                {/* Sticker Constraints Area (Hidden) - Only bottom 52% allowed */}
+                <div ref={stickerConstraintsRef} className="absolute top-[48%] left-0 right-0 bottom-4 pointer-events-none z-0" />
 
-                {/* Click Wheel Area (Bottom) */}
-                <div className="flex-1 w-full flex items-start justify-center relative z-10">
-                    <ClickWheel
-                        theme={ipodTheme}
-                        enableSounds={clickSounds}
-                        onScroll={(direction) => {
-                            handleScroll(direction);
+                {/* Sticker Layer - Unmasked (Siblings to Body) - Z-Index 60 (Above Glass) */}
+                <StickerLayer
+                    stickers={stickers}
+                    onUpdate={handleUpdateSticker}
+                    onRemove={handleRemoveSticker}
+                    isLocked={isLocked}
+                    constraintsRef={stickerConstraintsRef}
+                    iPodBodyRef={iPodBodyRef}
+                    onNotify={showToast}
+                />
+
+                {/* Sticker Layer - Masked Container - REMOVED WRAPPER to prevent clipping */}
+                {/* <div className="absolute inset-0 rounded-[2.6rem] overflow-hidden pointer-events-none z-[5]"> ... </div> */}
+                {/* 3. EXTERNAL ELEMENTS (Unclipped) */}
+                {/* Hold Switch Button */}
+                <button
+                    onClick={() => setIsLocked(!isLocked)}
+                    className="absolute -top-1 right-8 w-10 h-3 rounded-full bg-zinc-700/80 border border-zinc-600 flex items-center px-0.5 cursor-pointer z-20 shadow-inner"
+                    title={isLocked ? "Slide to Unlock" : "Hold Switch"}
+                >
+                    <div
+                        className={`w-4 h-2 rounded-full transition-all duration-200 ${isLocked ? 'ml-auto bg-orange-500' : 'ml-0 bg-zinc-400'}`}
+                    />
+                </button>
+
+                {/* 4. INTERFACE LAYER (Relative, on top) */}
+                <div className="relative z-10 w-full h-full flex flex-col p-5 pointer-events-none">
+                    {/* Screen Area (Top 48%) - Dynamic Border/Background */}
+                    <div
+                        className={`w-full h-[48%] rounded-lg border-[3px] mb-4 overflow-hidden relative z-10 pointer-events-auto ${getScreenClasses()}`}
+                        onClick={() => {
+                            // If in search mode, tapping screen focuses input
+                            if (currentView.viewType === 'search') inputRef.current?.focus();
                         }}
-                        onSelect={() => {
-                            handleSelect();
-                        }}
-                        onMenu={() => {
-                            handleBack();
-                        }}
-                        onPlayPause={togglePlay}
-                        onNext={next}
-                        onPrev={prev}
                     >
-                    </ClickWheel>
+                        <IpodScreen
+                            variant={currentView.viewType || 'menu'}
+                            title={currentView.title}
+                            menuItems={currentMenuItems.map(i => i.label)}
+                            itemsData={currentMenuItems}
+                            selectedIndex={currentView.selectedIndex}
+                            currentSong={currentSong}
+                            isPlaying={isPlaying}
+                            progress={progress}
+                            duration={duration}
+                            isLoading={isLoading}
+                            message={currentView.data?.message || ''}
+                            isFlipped={currentView.isFlipped}
+                            customHeader={currentView.customHeader}
+                            searchQuery={currentView.viewType === 'search' ? currentView.searchQuery : undefined}
+                            // Pass handlers for real input
+                            onSearchChange={(val) => {
+                                setSearchQuery(val);
+                                // Sync to viewstack for persistence if needed
+                                setViewStack(prev => {
+                                    const newStack = [...prev];
+                                    newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], searchQuery: val };
+                                    return newStack;
+                                });
+                            }}
+                            onSearchSubmit={(val) => handleSearch(val)}
+                            inputRef={inputRef}
+                            onAddSticker={handleAddSticker}
+                            onItemSelect={(index) => {
+                                if (isLocked) return;
+                                setViewStack(prev => {
+                                    const newStack = [...prev];
+                                    newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], selectedIndex: index };
+                                    return newStack;
+                                });
+                                setTimeout(() => {
+                                    const item = currentMenuItems[index];
+
+                                    // Special handling for Cover Flow Flip
+                                    if (currentView.viewType === 'cover-flow') {
+                                        setViewStack(prev => {
+                                            const newStack = [...prev];
+                                            const active = newStack[newStack.length - 1];
+                                            newStack[newStack.length - 1] = { ...active, isFlipped: !active.isFlipped };
+                                            return newStack;
+                                        });
+                                        return;
+                                    }
+
+                                    if (item) {
+                                        // Special handling for Cinema Mode, Cover Flow and Now Playing from MAIN_MENU
+                                        if (item.data?.id === 'cinema') {
+                                            setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
+                                        } else if (item.data?.id === 'cover-flow') {
+                                            setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: 0 }]);
+                                        } else if (item.data?.id === 'now-playing') {
+                                            goToNowPlaying();
+                                        } else if (item.data?.id === 'switch-studio') {
+                                            if (onSwitchToDesktop) onSwitchToDesktop();
+                                        } else if (item.data?.id === 'switch-discovery') {
+                                            if (onSwitchToDesktop) onSwitchToDesktop('GLASS');
+                                        } else if (item.data?.id === 'sticker-collection') {
+                                            setViewStack(prev => [...prev, { id: 'sticker-collection', title: 'Stickers', viewType: 'stickers', selectedIndex: 0 }]);
+                                        } else if (item.data?.id === 'brick-game') {
+                                            setViewStack(prev => [...prev, { id: 'game-brick', title: 'Brick', viewType: 'loading', selectedIndex: 0 }]);
+                                        } else if (item.data?.id === 'game-music-quiz') {
+                                            setViewStack(prev => [...prev, { id: 'game-music-quiz', title: 'Music Quiz', viewType: 'loading', selectedIndex: 0 }]);
+                                        } else if (item.action) {
+                                            item.action();
+                                        } else if (currentView.viewType === 'search') {
+                                            // FIX: Absolute Playback Force for Search
+                                            const song = item.data;
+                                            if (song && song.id) {
+                                                const q = (song as any)._quality;
+                                                const isHiRes = q === '24-bit' || q === 'FLAC' || (song as any).source === 'tidal';
+                                                playSongNow(song, isHiRes);
+                                            }
+                                        } else if (item.type === 'navigation' && item.target) {
+                                            handleNavigation(item.target, item.data, item.label);
+                                        }
+                                    }
+                                }, 0);
+                            }}
+                            onPlayPause={togglePlay}
+                            controlMode={controlMode}
+                            shuffle={shuffle}
+                            repeat={repeat}
+                            isLocked={isLocked}
+                            onBack={handleBack}
+                            // Pass hoisted tracks to Cover Flow
+                            externalTracks={cfTracks}
+                            // Now Playing enhancements
+                            isLiked={currentSong ? isLiked(currentSong.id) : false}
+                            onToggleLike={() => currentSong && toggleLike(currentSong)}
+                            audioQuality={bitrate}
+                            backlight={backlight}
+                        />
+
+                        {/* Render Game View if Active - Lazy loaded for performance */}
+                        <Suspense fallback={null}>
+                            {
+                                currentView.id === 'game-brick' && (
+                                    <div className="absolute inset-0 z-30 bg-black">
+                                        <BrickGame onBack={handleBack} />
+                                    </div>
+                                )
+                            }
+                            {
+                                currentView.id === 'game-music-quiz' && (
+                                    <div className="absolute inset-0 z-30 bg-black">
+                                        <MusicQuiz onBack={handleBack} />
+                                    </div>
+                                )
+                            }
+                            {
+                                currentView.id === 'calendar' && (
+                                    <div className="absolute inset-0 z-30 bg-white">
+                                        <Calendar onBack={handleBack} />
+                                    </div>
+                                )
+                            }
+                        </Suspense>
+                    </div>
+
+                    {/* Branding */}
+                    <div className="w-full flex justify-center items-center mb-6 relative z-10">
+                        <span className={`text-[10px] font-bold tracking-[0.2em] font-sans ${ipodTheme === 'black' || ipodTheme === 'dark' ? 'text-white/20' : 'text-zinc-500/80'}`}>MELORA</span>
+                    </div>
+
+                    {/* Click Wheel Area (Bottom) - Remove pointer-events-auto from container to allow clicking stickers on sides */}
+                    <div className="flex-1 w-full flex items-start justify-center relative z-10 pointer-events-none">
+                        <div className="pointer-events-auto">
+                            <ClickWheel
+                                theme={ipodTheme}
+                                enableSounds={clickSounds && !isLocked}
+                                onScroll={(direction) => {
+                                    if (isLocked) return;
+                                    handleScroll(direction);
+                                }}
+                                onSelect={() => {
+                                    if (isLocked) return;
+                                    if (currentView.id === 'game-brick' || currentView.id === 'game-music-quiz') return; // Game handles clicks
+                                    handleSelect();
+                                }}
+                                onLongSelect={() => {
+                                    if (isLocked) return;
+                                    handleLongSelect();
+                                }}
+                                onMenu={() => {
+                                    if (isLocked) return;
+                                    handleBack();
+                                }}
+                                onPlayPause={() => {
+                                    if (isLocked) return;
+                                    togglePlay();
+                                }}
+                                onNext={() => {
+                                    if (isLocked) return;
+                                    next();
+                                }}
+                                onPrev={() => {
+                                    if (isLocked) return;
+                                    prev();
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Sticker Drawer (Overlay) */}
+
+
                 </div>
             </motion.div>
         </div>
-
     );
 }
+
 

@@ -222,7 +222,7 @@ export function decryptUrl(encryptedUrl: string): string {
     return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
-export function getAudioUrl(song: JioSaavnSong, bitrate: '320' | '160' | '96' | '48' | '12' = '320'): string {
+export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' | '96' | '48' | '12' = '320'): string {
     if (!song.encryptedMediaUrl) {
         console.warn("No encrypted media URL found for song:", song.name);
         return '';
@@ -230,8 +230,10 @@ export function getAudioUrl(song: JioSaavnSong, bitrate: '320' | '160' | '96' | 
 
     try {
         const decryptedUrl = decryptUrl(song.encryptedMediaUrl);
-        // Replace suffix with requested bitrate
-        return decryptedUrl.replace(/_(160|96|48|12)\./g, `_${bitrate}.`);
+        // Map 'flac' to '320' for standard streaming URL generation (fallback)
+        const targetBitrate = bitrate === 'flac' ? '320' : bitrate;
+        // Replace suffix with requested bitrate. Inclusive of 320 source.
+        return decryptedUrl.replace(/_(320|160|96|48|12)\./g, `_${targetBitrate}.`);
     } catch (e) {
         console.warn('Failed to decrypt URL for song:', song.name, e);
         return '';

@@ -2,7 +2,7 @@ export interface AppSettings {
     volume: number;
     clickSounds: boolean;
     theme: 'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush';
-    bitrate: '320' | '160' | '96' | '48' | '12';
+    bitrate: 'flac' | '320' | '160' | '96' | '48' | '12';
     lastPlayedSongId: string | null;
     version: string;
 }

@@ -34,9 +34,10 @@ import { WelcomeScreen } from "@/components/windows/scenes/welcome-screen";
 
 interface StageProps {
     onSwitchToMobile?: () => void;
+    initialTheme?: string | null;
 }
 
-export function WindowsStage({ onSwitchToMobile }: StageProps) {
+export function WindowsStage({ onSwitchToMobile, initialTheme }: StageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -74,11 +75,16 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
 
     useEffect(() => {
         setIsMounted(true);
+        if (initialTheme && THEMES[initialTheme as ThemeKey]) {
+            setCurrentTheme(initialTheme as ThemeKey);
+            setIsWelcome(false);
+            return;
+        }
         const savedTheme = localStorage.getItem('melora-theme') as ThemeKey;
         if (savedTheme && THEMES[savedTheme]) {
             setCurrentTheme(savedTheme);
         }
-    }, []);
+    }, [initialTheme]);
 
     // THEME SWITCHER LOGIC
     const handleThemeChange = () => {
@@ -308,7 +314,7 @@ export function WindowsStage({ onSwitchToMobile }: StageProps) {
     if (!isMounted) return null; // Prevent hydration mismatch/flash
 
     if (isWelcome) {
-        return <WelcomeScreen onSelectMode={handleSelectMode} />;
+        return <WelcomeScreen onSelectMode={handleSelectMode} onSelectIpod={() => onSwitchToMobile?.()} />;
     }
 
     return (

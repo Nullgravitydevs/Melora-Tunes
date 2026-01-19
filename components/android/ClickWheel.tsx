@@ -9,6 +9,7 @@ interface ClickWheelProps {
     enableSounds?: boolean;
     onScroll: (direction: 1 | -1) => void;
     onSelect: () => void;
+    onLongSelect?: () => void;
     onMenu: () => void;
     onPlayPause: () => void;
     onNext: () => void;
@@ -16,7 +17,7 @@ interface ClickWheelProps {
     children?: React.ReactNode;
 }
 
-export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, onSelect, onMenu, onPlayPause, onNext, onPrev, children }: ClickWheelProps) {
+export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, onSelect, onLongSelect, onMenu, onPlayPause, onNext, onPrev, children }: ClickWheelProps) {
     const wheelRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const lastAngle = useRef<number | null>(null);
@@ -181,6 +182,7 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
 
     // Center Button Refs
     const isCenterPressed = useRef(false);
+    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
     // Theme-based colors (matching real iPod designs)
     const getThemeColors = () => {
@@ -234,14 +236,6 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
 
     const colors = getThemeColors();
 
-    // Helper for preventing scroll interference while allowing clicks
-    // Reverting to direct onPointerDown handler for instant mobile response
-    const createButtonHandler = (action: () => void) => (e: React.PointerEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        action();
-    };
-
     return (
         <div
             ref={wheelRef}
@@ -271,16 +265,39 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
                     e.stopPropagation(); // Stop propagation to wheel
                     e.preventDefault();
                     isCenterPressed.current = true;
+
+                    // Start Long Press Timer
+                    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                    longPressTimer.current = setTimeout(() => {
+                        if (isCenterPressed.current) {
+                            if (onLongSelect) {
+                                onLongSelect();
+                                if (navigator.vibrate) navigator.vibrate([15, 30, 15]); // Satisfying "double bump"
+                                playClickSound('select');
+                            }
+                            isCenterPressed.current = false; // Prevent normal select on up
+                        }
+                    }, 800); // 800ms for long press
                 }}
                 onPointerUp={(e) => {
                     e.stopPropagation();
+                    if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                        longPressTimer.current = null;
+                    }
                     if (isCenterPressed.current) {
                         onSelect();
                         if (navigator.vibrate) navigator.vibrate(10);
                     }
                     isCenterPressed.current = false;
                 }}
-                onPointerLeave={() => isCenterPressed.current = false}
+                onPointerLeave={() => {
+                    isCenterPressed.current = false;
+                    if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                        longPressTimer.current = null;
+                    }
+                }}
             />
         </div>
     );

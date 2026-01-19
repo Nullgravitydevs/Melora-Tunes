@@ -62,15 +62,7 @@ export function CinemaModeMobile({
                 />
             </AnimatePresence>
 
-            {/* Close Button - ONLY on Desktop (TFI Studio) */}
-            {!isMobile && (
-                <button
-                    onClick={onClose}
-                    className="absolute top-6 right-6 z-50 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-black/70 active:scale-90 transition-all"
-                >
-                    <X size={20} className="text-white" />
-                </button>
-            )}
+            {/* Close Button Removed - Exit via Menu Key */}
         </motion.div>
     );
 }

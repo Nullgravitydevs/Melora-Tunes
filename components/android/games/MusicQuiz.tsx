@@ -26,7 +26,9 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
     const [gameOver, setGameOver] = useState(false);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [totalSongs, setTotalSongs] = useState(0);
-    const [pointsPerQuestion, setPointsPerQuestion] = useState(10);
+    // Fixed stats
+    const POINTS_PER_Q = 5;
+    const MAX_QUESTIONS = 10;
 
     // Generate questions from user's mixes
     useEffect(() => {
@@ -40,24 +42,25 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
             index === self.findIndex(s => s.id === song.id)
         );
 
-        if (uniqueSongs.length < 4) {
+        const availableCount = uniqueSongs.length;
+        setTotalSongs(availableCount);
+
+        if (availableCount < 4) {
             // Not enough songs for quiz
             return;
         }
 
-        setTotalSongs(uniqueSongs.length);
-        const numQuestions = uniqueSongs.length; // One question per song
-        setPointsPerQuestion(10); // Fixed 10 points per question
+        const numQuestions = Math.min(availableCount, MAX_QUESTIONS);
 
         const generateQuestion = (usedSongs: Set<string>): Question | null => {
-            // Get songs not yet used
-            const availableSongs = uniqueSongs.filter(s => !usedSongs.has(s.id));
-            if (availableSongs.length === 0) return null;
+            // Get songs not yet used as the CORRECT answer
+            const availableForQuestion = uniqueSongs.filter(s => !usedSongs.has(s.id));
+            if (availableForQuestion.length === 0) return null;
 
-            const correctSong = availableSongs[Math.floor(Math.random() * availableSongs.length)];
+            const correctSong = availableForQuestion[Math.floor(Math.random() * availableForQuestion.length)];
             const options: JioSaavnSong[] = [correctSong];
 
-            // Add 3 random wrong answers
+            // Add 3 random wrong answers (can be any song except correct one)
             while (options.length < 4) {
                 const randomSong = uniqueSongs[Math.floor(Math.random() * uniqueSongs.length)];
                 if (!options.find(s => s.id === randomSong.id)) {
@@ -73,13 +76,13 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
         };
 
         const qs: Question[] = [];
-        const usedSongs = new Set<string>();
+        const usedAsAnswer = new Set<string>();
 
         for (let i = 0; i < numQuestions; i++) {
-            const question = generateQuestion(usedSongs);
+            const question = generateQuestion(usedAsAnswer);
             if (question) {
                 qs.push(question);
-                usedSongs.add(question.correctSong.id);
+                usedAsAnswer.add(question.correctSong.id);
             }
         }
 
@@ -112,7 +115,7 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
         setAnswered(true);
 
         if (isAnswerCorrect) {
-            setScore(prev => prev + pointsPerQuestion);
+            setScore(prev => prev + POINTS_PER_Q);
             if (navigator.vibrate) navigator.vibrate(10);
         } else {
             if (navigator.vibrate) navigator.vibrate([10, 50, 10]);
@@ -133,14 +136,16 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
     // Handle center button for answering
     useEffect(() => {
         const handleSelect = () => {
-            handleAnswer();
+            // Block extra inputs if already answering
+            if (!answered) handleAnswer();
         };
 
         window.addEventListener('ipod-select', handleSelect);
         return () => window.removeEventListener('ipod-select', handleSelect);
-    }, [handleAnswer]);
+    }, [handleAnswer, answered]);
 
     const currentQ = questions[currentQuestion];
+    const maxScore = questions.length * POINTS_PER_Q;
 
     if (questions.length === 0) {
         return (
@@ -149,89 +154,105 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
                     <p className="text-sm mb-2">You have {totalSongs} song{totalSongs !== 1 ? 's' : ''}</p>
                     <p className="text-sm mb-4">Need at least 4 songs in playlists to play!</p>
                     <button onClick={onBack} className="bg-white text-black text-xs px-3 py-1 rounded-full font-bold">Back</button>
+                    <div className="mt-4 text-[9px] text-zinc-500">Add songs to any playlist to start.</div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="w-full h-full relative bg-zinc-900 text-white overflow-hidden">
+        <div className="w-full h-full relative bg-zinc-900 text-white overflow-hidden font-sans">
             {!gameOver ? (
                 <>
                     {/* Header */}
-                    <div className="p-2 border-b border-zinc-700">
-                        <div className="flex justify-between text-[10px] font-mono mb-1">
-                            <span>Q {currentQuestion + 1}/{questions.length}</span>
-                            <span>SCORE: {score}</span>
+                    <div className="h-7 bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 flex items-center justify-between px-2 shrink-0">
+                        <span className="text-[10px] font-bold text-zinc-300">Music Quiz</span>
+                        <div className="flex gap-2 text-[10px] font-mono text-zinc-400">
+                            <span>{currentQuestion + 1} of {questions.length}</span>
+                            <span className="text-white font-bold">{score}</span>
                         </div>
                     </div>
 
-                    {/* Question */}
-                    <div className="p-3 border-b border-zinc-700">
-                        <p className="text-xs font-bold text-center mb-2">What song is this?</p>
+                    {/* Question Area */}
+                    <div className="p-4 border-b border-zinc-800 bg-black/30">
+                        <p className="text-[11px] font-bold text-center mb-1 text-zinc-300 uppercase tracking-widest">Identify The Track</p>
                         {currentQ && (
-                            <div className="text-center text-[10px] text-zinc-400">
-                                <p>Artist: {currentQ.correctSong.primaryArtists}</p>
+                            <div className="text-center mt-2">
+                                <p className="text-xs text-zinc-400 mb-1">Artist</p>
+                                <p className="text-sm font-bold text-white leading-tight">{currentQ.correctSong.primaryArtists.split(',')[0]}</p>
                             </div>
                         )}
                     </div>
 
-                    {/* Options */}
-                    <div className="flex-1 overflow-auto">
+                    {/* Options List */}
+                    <div className="flex-1 overflow-auto py-1">
                         {currentQ && currentQ.options.map((song, index) => {
                             const isSelected = index === selectedIndex;
                             const showResult = answered;
                             const isThisCorrect = index === currentQ.correctIndex;
 
-                            let bgColor = isSelected ? 'bg-blue-600' : 'bg-zinc-800';
+                            let bgColor = isSelected ? 'bg-blue-600' : 'transparent';
+                            let textColor = isSelected ? 'text-white' : 'text-zinc-300';
+
                             if (showResult) {
-                                if (isThisCorrect) bgColor = 'bg-green-600';
-                                else if (isSelected && !isThisCorrect) bgColor = 'bg-red-600';
+                                if (isThisCorrect) {
+                                    bgColor = 'bg-green-600 animate-pulse';
+                                    textColor = 'text-white';
+                                } else if (isSelected && !isThisCorrect) {
+                                    bgColor = 'bg-red-600';
+                                    textColor = 'text-white';
+                                }
                             }
 
                             return (
                                 <div
                                     key={song.id}
-                                    className={`p-3 border-b border-zinc-700 ${bgColor} transition-colors`}
+                                    className={`px-3 py-2 mx-1 rounded-md mb-1 flex flex-col justify-center ${bgColor} ${textColor} transition-all duration-200`}
                                 >
                                     <p className="text-xs font-semibold truncate">{decodeHtml(song.name)}</p>
-                                    <p className="text-[10px] text-zinc-300 truncate">{song.album?.name || ''}</p>
+                                    {/* <p className="text-[9px] opacity-70 truncate">{song.album?.name || ''}</p> */}
+                                    {/* Hide album to make it harder? Or keep it? Keeping it helps identify. */}
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* Instructions */}
-                    <div className="p-2 border-t border-zinc-700 text-center text-[9px] text-zinc-500">
-                        {!answered ? "Scroll to select • Press OK to answer" : (isCorrect ? "✓ Correct!" : "✗ Wrong!")}
-                    </div>
-
-                    {/* Handle center button press */}
-                    <div className="absolute inset-0 pointer-events-none">
-                        <button
-                            onClick={handleAnswer}
-                            className="sr-only"
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleAnswer(); }}
-                        />
+                    {/* Footer / Instructions */}
+                    <div className="p-1 border-t border-zinc-800 text-center bg-black/20">
+                        <p className="text-[9px] text-zinc-500">
+                            {!answered ? "Scroll to Select  •  Center to Guess" : (isCorrect ? "Correct!" : "Wrong Answer")}
+                        </p>
                     </div>
                 </>
             ) : (
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-black/95"
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 z-50"
                 >
-                    <h2 className="text-2xl font-bold text-blue-500 mb-3">Quiz Complete!</h2>
-                    <p className="text-lg mb-2">Final Score: {score}</p>
-                    <p className="text-sm text-zinc-400 mb-6">
-                        {Math.floor((score / (questions.length * pointsPerQuestion)) * 100)}% Correct
-                    </p>
-                    <button
-                        onClick={onBack}
-                        className="bg-white text-black text-xs px-4 py-2 rounded-full font-bold hover:bg-zinc-200 transition-colors"
-                    >
-                        Back to Menu
-                    </button>
+                    <div className="mb-4 text-center">
+                        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-br from-blue-400 to-purple-500 mb-1">Quiz Finished</h2>
+                        <div className="h-1 w-20 bg-zinc-800 mx-auto rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500" style={{ width: `${(score / maxScore) * 100}%` }} />
+                        </div>
+                    </div>
+
+                    <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 shadow-2xl flex flex-col items-center gap-2 mb-6 w-64">
+                        <span className="text-xs text-zinc-500 uppercase tracking-widest">Final Score</span>
+                        <div className="text-4xl font-mono font-bold text-white">
+                            {score} <span className="text-lg text-zinc-600">/ {maxScore}</span>
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-1">
+                            {score === maxScore ? "Perfect Score! 🏆" : score > maxScore / 2 ? "Great Job! 🎵" : "Keep Listening! 🎧"}
+                        </p>
+                    </div>
+
+                    <div onClick={onBack} className="group cursor-pointer">
+                        <div className="bg-white text-black text-xs px-6 py-2 rounded-full font-bold hover:scale-105 active:scale-95 transition-transform flex items-center gap-2">
+                            <span>Main Menu</span>
+                        </div>
+                        <p className="text-[9px] text-zinc-600 mt-2 text-center group-hover:text-zinc-500 transition-colors">Press menu to exit</p>
+                    </div>
                 </motion.div>
             )}
         </div>

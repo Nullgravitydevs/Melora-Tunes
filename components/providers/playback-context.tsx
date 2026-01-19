@@ -61,8 +61,12 @@ interface PlaybackContextType {
     setCrossfadeDuration: (duration: number) => void;
 
     // Audio Quality
-    bitrate: '320' | '160' | '96' | '48' | '12';
-    setBitrate: (bitrate: '320' | '160' | '96' | '48' | '12') => void;
+    bitrate: 'flac' | '320' | '160' | '96' | '48' | '12';
+    setBitrate: (bitrate: 'flac' | '320' | '160' | '96' | '48' | '12') => void;
+
+    // Hi-Res Override
+    forceLossless: boolean;
+    setForceLossless: (val: boolean) => void;
 
     // End of Song Timer
     stopAtEndOfSong: boolean;
@@ -99,7 +103,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [shuffle, setShuffle] = useState(false);
     const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
-    const [bitrate, setSelectBitrate] = useState<'320' | '160' | '96' | '48' | '12'>('320'); // Default 320 for init
+    const [bitrate, setSelectBitrate] = useState<'flac' | '320' | '160' | '96' | '48' | '12'>('320'); // Default 320 for init
+    const [forceLossless, setForceLossless] = useState(false);
     const [sleepTimer, setSleepTimer] = useState<{ endTime: number; duration: number } | null>(null);
     const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
     const [stopAtEndOfSong, setStopAtEndOfSong] = useState(false);
@@ -123,12 +128,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                // Sanitize: Remove mock songs from persistence
+                // Sanitize: Remove mock songs and unwanted default playlists
                 const sanitized = parsed.map((m: Mix) => ({
                     ...m,
                     songs: m.songs.filter(s => !s.id.startsWith('mock-') && !s.name.startsWith('Track '))
-                }));
-                setMixes(sanitized);
+                })).filter((m: Mix) => !['Pawan Kalyan Hits', 'DSP Hits', 'Megastar Hits', 'Yuvan Shankar Raja'].includes(m.title));
+
+                if (sanitized.length === 0) {
+                    setDefaults();
+                } else {
+                    setMixes(sanitized);
+                }
             } catch (e) {
                 console.error("Failed to parse mixes", e);
                 setDefaults();
@@ -147,7 +157,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     const setDefaults = () => {
         setMixes([
-            { id: "1", title: "My Tapes", color: "orange", songs: [], currentSongIndex: 0 }
+            { id: "1", title: "My Tape", color: "orange", songs: [], currentSongIndex: 0 }
         ]);
     };
 
@@ -434,8 +444,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            // Use provided bitrate or current state
-            const targetBitrate = overrideBitrate || bitrate;
+            // Use provided bitrate or current state.
+            // If forceLossless is true (Hi-Res track detected), prefer 'flac'.
+            // Otherwise respect user setting.
+            const targetBitrate = forceLossless ? 'flac' : (overrideBitrate || bitrate);
             const url = await getAudioUrl(song, targetBitrate as any);
             if (url) {
                 setCurrentSongUrl(url);
@@ -451,10 +463,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
     }, [bitrate]);
 
-    const setBitrate = useCallback((newBitrate: '320' | '160' | '96' | '48' | '12') => {
+    const setBitrate = useCallback((newBitrate: 'flac' | '320' | '160' | '96' | '48' | '12') => {
         setSelectBitrate(newBitrate);
         saveSettings({ bitrate: newBitrate });
         if (currentSong) {
+            // Check if we need to reload logic or just URL
+            // Simply re-loading URL with new bitrate preference
             loadSongUrl(currentSong, newBitrate);
         }
     }, [currentSong, loadSongUrl]);
@@ -523,6 +537,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [progress, duration, crossfadeDuration, volume, isPlaying]);
 
     const next = useCallback(() => {
+        setForceLossless(false); // Reset Hi-Res override on auto-play
         console.log("[NEXT] Called", {
             activeMix: activeMix?.title,
             songCount: activeMix?.songs?.length,
@@ -656,6 +671,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             crossfadeDuration, setCrossfadeDuration,
             stopAtEndOfSong, setStopAtEndOfSong,
             bitrate, setBitrate,
+            forceLossless, setForceLossless,
             notificationsEnabled, setNotificationsEnabled,
             likedSongs, toggleLike, isLiked,
             recentlyPlayed,

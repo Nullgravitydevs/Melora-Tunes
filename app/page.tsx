@@ -11,15 +11,17 @@ const AndroidEntry = dynamic(() => import("@/components/android/AndroidEntry").t
 export default function Home() {
   const isMobileSystem = useIsMobile();
   const [viewModeOverride, setViewModeOverride] = useState<'desktop' | 'mobile' | null>(null);
+  const [requestedTheme, setRequestedTheme] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Reset override on system change (rotation/resize)
+  // Reset override and requested theme on system change
   useEffect(() => {
     setViewModeOverride(null);
+    setRequestedTheme(null);
   }, [isMobileSystem]);
 
   if (!mounted) return null;
@@ -31,9 +33,17 @@ export default function Home() {
       <ErrorBoundary>
         <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center font-mono">LOADING SYSTEM...</div>}>
           {effectiveMode === 'mobile' ? (
-            <AndroidEntry onSwitchToDesktop={() => setViewModeOverride('desktop')} />
+            <AndroidEntry
+              onSwitchToDesktop={(theme?: string) => {
+                setViewModeOverride('desktop');
+                if (theme) setRequestedTheme(theme);
+              }}
+            />
           ) : (
-            <WindowsStage onSwitchToMobile={() => setViewModeOverride('mobile')} />
+            <WindowsStage
+              onSwitchToMobile={() => setViewModeOverride('mobile')}
+              initialTheme={requestedTheme}
+            />
           )}
         </Suspense>
       </ErrorBoundary>

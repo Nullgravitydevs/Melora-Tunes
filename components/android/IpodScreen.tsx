@@ -1,14 +1,16 @@
-import { motion } from "framer-motion";
-import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight, Star, Heart, Music, Zap, Smile, Ghost, Skull } from "lucide-react";
 import { useEffect, useState } from "react";
-import { JioSaavnSong } from "@/lib/jiosaavn";
+import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { CinemaModeMobile as CinemaMode } from "./cinema-mode-mobile";
-import { CoverFlowMobile as CoverFlow } from "./cover-flow-mobile";
+import { CoverFlow3D as CoverFlow } from "./CoverFlow3D";
+import { StickerType } from "./stickers/StickerLayer";
+
 
 
 interface IpodScreenProps {
-    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'lyrics';
+    variant?: 'menu' | 'player' | 'search' | 'loading' | 'message' | 'cinema' | 'cover-flow' | 'lyrics' | 'stickers';
     title: string;
     menuItems: string[]; // List of labels to display
     itemsData?: any[]; // Optional rich data for items (images etc)
@@ -36,6 +38,12 @@ interface IpodScreenProps {
     isLocked?: boolean;
     lyrics?: string | null;
     scrollDirection?: 'left' | 'right' | null;
+    externalTracks?: JioSaavnSong[];
+    isLiked?: boolean;
+    onToggleLike?: () => void;
+    audioQuality?: string; // e.g. 'FLAC', '320kbps'
+    backlight?: number; // 0 to 1
+    onAddSticker?: (type: StickerType, color: string) => void;
 }
 
 export function IpodScreen({
@@ -66,7 +74,13 @@ export function IpodScreen({
     repeat,
     isLocked,
     lyrics,
-    scrollDirection
+    scrollDirection,
+    externalTracks = [],
+    isLiked = false,
+    onToggleLike,
+    audioQuality,
+    backlight,
+    onAddSticker
 }: IpodScreenProps) {
 
     // Format helper
@@ -144,34 +158,51 @@ export function IpodScreen({
     }, [selectedIndex, variant]);
 
     return (
-        <div className="w-full h-full bg-black flex flex-col font-sans text-xs overflow-hidden text-white">
+        <div
+            className="w-full h-full bg-black flex flex-col font-sans text-xs overflow-hidden text-white transition-all duration-1000 relative"
+            style={{ filter: `brightness(${0.4 + (backlight ?? 1) * 0.6})` }}
+        >
+            {/* Lock Overlay */}
+            <AnimatePresence>
+                {isLocked && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+                    >
+                        <div className="bg-zinc-900/80 p-4 rounded-xl border border-white/10 shadow-2xl backdrop-blur-md flex flex-col items-center gap-2">
+                            <span className="text-2xl">🔒</span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Top Bar - Dark Glass */}
             <div className="h-6 bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 flex items-center justify-between px-2 shrink-0 z-20 shadow-sm relative">
 
                 {/* Left: Play Status / Back */}
-                <div className="flex items-center gap-1.5 min-w-[30%]" onClick={onBack}>
-                    <ChevronRight size={12} className="rotate-180 text-zinc-400" />
-                    {variant === 'player' && isPlaying ? (
-                        <Play size={10} className="fill-blue-400 text-blue-400 animate-pulse" />
-                    ) : variant === 'player' ? (
-                        <Pause size={10} className="fill-zinc-400 text-zinc-400" />
+                <div className="flex items-center gap-1.5 min-w-[30%] overflow-hidden" onClick={onBack}>
+                    <ChevronRight size={12} className="rotate-180 text-zinc-400 shrink-0" />
+                    {isPlaying ? (
+                        <Play size={10} className="fill-blue-400 text-blue-400 animate-pulse shrink-0" />
                     ) : (
-                        <span className="font-semibold text-zinc-100 text-[11px] tracking-tight drop-shadow-md truncate">{title}</span>
+                        <Pause size={10} className="fill-zinc-400 text-zinc-400 shrink-0" />
                     )}
                 </div>
 
-                {/* Center: Clock (The classic iPod header look) */}
-                <div className="absolute left-1/2 -translate-x-1/2 font-bold text-[10px] text-zinc-300 flex items-center gap-2">
-                    {/* Status Icons */}
-                    {isLocked && <span className="text-[9px] text-orange-500">🔒</span>}
-                    {shuffle && <span className="text-[9px] text-blue-400">🔀</span>}
-                    {repeat === 'one' && <span className="text-[9px] text-blue-400">🔂</span>}
-                    {repeat === 'all' && <span className="text-[9px] text-blue-400">🔁</span>}
-                    <span>{time}</span>
+                {/* Center: Title & Status Icons */}
+                <div className="absolute left-1/2 -translate-x-1/2 font-bold text-[10px] text-zinc-300 flex items-center gap-2 max-w-[40%]">
+                    <span className="font-semibold text-zinc-100 text-[11px] tracking-tight drop-shadow-md truncate">{title}</span>
+                    {isLocked && <span className="text-[9px] text-orange-500 shrink-0">🔒</span>}
+                    {shuffle && <span className="text-[9px] text-blue-400 shrink-0">🔀</span>}
+                    {repeat === 'one' && <span className="text-[9px] text-blue-400 shrink-0">🔂</span>}
+                    {repeat === 'all' && <span className="text-[9px] text-blue-400 shrink-0">🔁</span>}
                 </div>
 
-                {/* Right: Battery */}
+                {/* Right: Clock & Battery */}
                 <div className="flex items-center justify-end min-w-[30%] gap-1.5">
+                    <span className="text-[10px] text-zinc-400 font-mono mr-1">{time}</span>
                     {/* Signal Bars (Just visual decoration like original) */}
                     <div className="flex gap-0.5 items-end h-2 opacity-50">
                         <div className="w-0.5 h-1 bg-zinc-400 rounded-[0.5px]"></div>
@@ -219,12 +250,18 @@ export function IpodScreen({
                 ) : variant === 'cover-flow' ? (
                     <div className="w-full h-full bg-black">
                         <CoverFlow
-                            isOpen={true}
-                            onClose={onBack || (() => { })}
                             selectedIndex={selectedIndex}
-                            items={itemsData}
+                            items={itemsData.map((item: any) => ({
+                                id: item?.data?.id || item?.id || String(Math.random()),
+                                image: item?.data?.image || item?.image || '',
+                                title: item?.data?.title || item?.label || 'Unknown',
+                                artist: item?.data?.artist || ''
+                            }))}
                             isFlipped={isFlipped}
                             trackIndex={trackIndex}
+                            onSelect={onItemSelect || (() => { })}
+                            scrollDirection={scrollDirection}
+                            tracks={externalTracks}
                         />
                     </div>
 
@@ -235,6 +272,7 @@ export function IpodScreen({
                             <div className="w-full h-6 bg-zinc-800 border border-zinc-700 rounded-lg flex items-center px-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
                                 <span className="text-zinc-500 mr-2 opacity-70">🔍</span>
                                 <input
+                                    key="search-input"
                                     ref={inputRef}
                                     type="text"
                                     value={searchQuery || ""}
@@ -289,17 +327,36 @@ export function IpodScreen({
                                                     )}
                                                 </div>
                                                 <div className="flex flex-col min-w-0 flex-1">
-                                                    <span className={`truncate text-[11px] ${isSelected ? 'font-semibold text-white' : 'text-zinc-200'}`}>{item}</span>
-                                                    {/* Subtitle / Artist */}
-                                                    {isSelected && (
-                                                        <div className="flex flex-col">
-                                                            {itemsData[index]?.data?.primaryArtists && (
-                                                                <span className={`truncate text-[9px] ${isSelected ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                                                                    {itemsData[index].data.primaryArtists}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
+
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <span className={`truncate text-[11px] ${isSelected ? 'font-semibold text-white' : 'text-zinc-200'} flex-1`}>
+                                                            {item}
+                                                        </span>
+                                                        {/* Explicit Quality Badges - Matches Unified Search Logic */}
+                                                        {(itemsData[index]?.data?._quality === '24-bit' || itemsData[index]?.data?.source === 'tidal') && (
+                                                            <span className="shrink-0 text-[7px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded-sm font-bold border border-amber-500/30 shadow-[0_0_5px_rgba(245,158,11,0.2)]">
+                                                                Hi-Res
+                                                            </span>
+                                                        )}
+                                                        {itemsData[index]?.data?._quality === 'FLAC' && (
+                                                            <span className="shrink-0 text-[7px] bg-purple-500/20 text-purple-400 px-1 py-0.5 rounded-sm font-bold border border-purple-500/30">
+                                                                FLAC
+                                                            </span>
+                                                        )}
+                                                        {itemsData[index]?.data?._quality === '320kbps' && (
+                                                            <span className="shrink-0 text-[7px] bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded-sm font-bold border border-emerald-500/30">
+                                                                HQ
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {/* Subtitle / Artist - Always visible for modern feel */}
+                                                    <div className="flex flex-col">
+                                                        {itemsData[index]?.data?.primaryArtists && (
+                                                            <span className={`truncate text-[9px] ${isSelected ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                                                                {itemsData[index].data.primaryArtists}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <ChevronRight size={12} className={`shrink-0 ml-2 ${isSelected ? "text-blue-200" : "text-zinc-700"}`} />
@@ -384,6 +441,44 @@ export function IpodScreen({
                             </div>
                         )}
                     </div>
+                ) : variant === 'stickers' ? (
+                    // --- STICKER COLLECTION VIEW ---
+                    <div className="h-full w-full bg-zinc-900 flex flex-col p-2">
+                        {/* Header */}
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
+                            <span className="text-xs font-bold text-white">Sticker Collection</span>
+                            <span className="text-[10px] text-zinc-500 ml-auto">Select to Add</span>
+                        </div>
+                        {/* Grid */}
+                        <div className="grid grid-cols-3 gap-2 overflow-y-auto pb-4 no-scrollbar">
+                            {[
+                                { type: 'star', color: '#fbbf24', label: 'Star', bg: 'bg-amber-500/10', icon: Star },
+                                { type: 'heart', color: '#f43f5e', label: 'Heart', bg: 'bg-rose-500/10', icon: Heart },
+                                { type: 'music', color: '#a855f7', label: 'Tune', bg: 'bg-purple-500/10', icon: Music },
+                                { type: 'zap', color: '#f59e0b', label: 'Bolt', bg: 'bg-orange-500/10', icon: Zap },
+                                { type: 'smile', color: '#22c55e', label: 'Happy', bg: 'bg-green-500/10', icon: Smile },
+                                { type: 'ghost', color: '#e2e8f0', label: 'Boo', bg: 'bg-zinc-500/10', icon: Ghost },
+                                { type: 'skull', color: '#94a3b8', label: 'Edgy', bg: 'bg-slate-500/10', icon: Skull }
+                            ].map((s, i) => (
+                                <button
+                                    key={s.type}
+                                    className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${selectedIndex === i ? 'scale-110 drop-shadow-lg' : 'opacity-70 hover:opacity-100 hover:scale-105'}`}
+                                    onClick={() => onAddSticker && onAddSticker(s.type as StickerType, s.color)}
+                                >
+                                    <div className="relative">
+                                        {/* Shadow for realism */}
+                                        <s.icon size={32} className="text-black/20 absolute top-0.5 left-0.5 blur-[1px]" />
+                                        <s.icon size={32} fill={s.color} stroke={s.color} className="relative z-10" />
+                                    </div>
+                                    {selectedIndex === i && <span className="text-[9px] font-medium text-white/90 mt-1">{s.label}</span>}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Footer Hint */}
+                        <div className="mt-auto pt-2 text-[8px] text-center text-zinc-500 border-t border-white/5">
+                            Pro Tip: Peel stickers off slowly to avoid residue!
+                        </div>
+                    </div>
                 ) : (
                     // --- PLAYER VIEW ---
                     <div className="h-full w-full relative flex flex-col">
@@ -422,8 +517,35 @@ export function IpodScreen({
 
                             {/* Right: Metadata & Info */}
                             <div className="flex-1 flex flex-col justify-center text-left overflow-hidden min-w-0">
-                                <h2 className="text-white font-bold text-xs truncate leading-snug mb-0.5 drop-shadow-md">{decodeHtml(currentSong?.name || "No Music")}</h2>
-                                <p className="text-zinc-300 text-[10px] truncate mb-0.5">{decodeHtml(currentSong?.primaryArtists || "Unknown Artist")}</p>
+                                {/* Song Title with Quality Badge */}
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <h2 className="text-white font-bold text-xs truncate leading-snug drop-shadow-md flex-1 min-w-0">
+                                        {decodeHtml(currentSong?.name || "No Music")}
+                                    </h2>
+                                    {audioQuality === 'FLAC' || audioQuality === 'flac' ? (
+                                        <span className="shrink-0 text-[7px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded font-bold border border-amber-500/30">
+                                            Hi-Res
+                                        </span>
+                                    ) : audioQuality === '320kbps' || audioQuality === '320' ? (
+                                        <span className="shrink-0 text-[7px] bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded font-bold border border-emerald-500/30">
+                                            HQ
+                                        </span>
+                                    ) : null}
+                                </div>
+
+                                {/* Artist with Like Button */}
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <p className="text-zinc-300 text-[10px] truncate flex-1 min-w-0">
+                                        {decodeHtml(currentSong?.primaryArtists || "Unknown Artist")}
+                                    </p>
+                                    <button
+                                        onClick={onToggleLike}
+                                        className={`shrink-0 text-sm transition-all active:scale-90 ${isLiked ? 'text-red-500' : 'text-zinc-600'}`}
+                                    >
+                                        {isLiked ? '❤️' : '🤍'}
+                                    </button>
+                                </div>
+
                                 <p className="text-zinc-500 text-[9px] truncate mb-2">{decodeHtml(currentSong?.album?.name || "Melora")}</p>
 
                                 {/* Progress Bar */}
@@ -434,7 +556,7 @@ export function IpodScreen({
                                     </div>
                                     <div className="w-full h-1.5 bg-zinc-800/80 rounded-full border border-zinc-700 relative backdrop-blur-sm">
                                         <div
-                                            className={`h-full transition-colors duration-200 ${controlMode === 'seek' ? 'bg-gradient-to-r from-yellow-300 via-yellow-200 to-yellow-400' : 'bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500'}`}
+                                            className={`h-full rounded-full transition-colors duration-200 ${controlMode === 'seek' ? 'bg-gradient-to-r from-yellow-300 via-yellow-200 to-yellow-400' : 'bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500'}`}
                                             style={{ width: `${progress * 100}%` }}
                                         >
                                             <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-white/50 shadow-[0_0_5px_white]" />
