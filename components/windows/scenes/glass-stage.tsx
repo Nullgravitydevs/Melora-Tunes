@@ -98,6 +98,17 @@ const CUSTOM_STYLES = `
     }
     .floating-player {
         background: rgba(0, 0, 0, 0.60);
+    }
+    
+    @media (max-width: 768px) {
+        .glass-panel, .glass-card {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background: rgba(20, 20, 20, 0.95) !important; /* Solid fallback */
+            box-shadow: none !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+    }
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
         border: 1px solid rgba(255, 255, 255, 0.10);
@@ -1074,7 +1085,7 @@ export function GlassStage({
                                 </div>
 
                                 {/* Hero Section - 2 Cards */}
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Playlist of the Day */}
                                     {dailyMix && (
                                         <div
@@ -1213,7 +1224,7 @@ export function GlassStage({
                         {currentView.type === 'explore' && (
                             <motion.div key="explore" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
                                 <h2 className="text-2xl font-bold">Browse All</h2>
-                                <div className="grid grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {EXPLORE_CATEGORIES.map(cat => (
                                         <div
                                             key={cat.name}

@@ -54,7 +54,7 @@ export function OpenDeckStage({
         loadMix, togglePlay, next, prev, setVolume, isLoaded, seek
     } = usePlayback();
 
-    const { playClick, playEject, playClunk } = useAudio();
+    const { playClick, playEject, playClunk, playInsert } = useAudio();
     const activeMix = mixes.find(m => m.id === activeMixId) || null;
 
     const formatTime = (seconds: number) => {
@@ -90,7 +90,7 @@ export function OpenDeckStage({
 
     const handleDragEnd = () => {
         if (draggingMix && isOverPlayer) {
-            playClunk();
+            playInsert();
             loadMix(draggingMix.mix.id);
         }
         setDraggingMix(null);

@@ -168,7 +168,7 @@ export function BoomboxStage({
         shuffle, setShuffle, repeat, setRepeat
     } = usePlayback();
 
-    const { playClick, playClunk } = useAudio();
+    const { playClick, playClunk, playInsert } = useAudio();
     const activeMix = mixes.find(m => m.id === activeMixId) || null;
 
     // Initialize positions once
@@ -190,7 +190,7 @@ export function BoomboxStage({
     };
 
     const handleDropOnPlayer = (mix: Mix) => {
-        playClunk();
+        playInsert();
         loadMix(mix.id);
     };
 

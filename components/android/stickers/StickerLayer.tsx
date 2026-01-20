@@ -1,19 +1,28 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Heart, Music, Zap, Smile, Ghost, Skull, Trash2, ShoppingBag } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Assuming you have utils
+import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
+import { Trash2, ShoppingBag, CheckCircle, Star, Heart, Music, Zap, Smile, Ghost, Skull } from "lucide-react";
+import { ResidueItem } from "./ResidueItem";
+import { cn } from "@/lib/utils";
 
-export type StickerType = 'star' | 'heart' | 'music' | 'zap' | 'smile' | 'ghost' | 'skull';
+export type StickerType =
+    | "star"
+    | "heart"
+    | "music"
+    | "zap"
+    | "smile"
+    | "ghost"
+    | "skull";
 
 export interface Sticker {
     id: number;
     type: StickerType;
-    x: number;
-    y: number;
+    xPct: number;
+    yPct: number;
     rotation: number;
     color: string;
     isResidue?: boolean;
-    scrubOpacity?: number; // 0 to 1
+    scrubOpacity?: number;
+    isStuck?: boolean;
 }
 
 interface StickerLayerProps {
@@ -21,45 +30,134 @@ interface StickerLayerProps {
     onUpdate: (id: number, updates: Partial<Sticker>) => void;
     onRemove: (id: number) => void;
     isLocked: boolean;
-    constraintsRef: React.RefObject<HTMLDivElement | null>;
     iPodBodyRef: React.RefObject<HTMLDivElement | null>;
-    onNotify: (message: string) => void;
+    onNotify: (msg: string) => void;
+    constraintsRef?: React.RefObject<HTMLDivElement | null>; // Kept for compatibility if passed
 }
 
-export function StickerLayer({ stickers, onUpdate, onRemove, isLocked, constraintsRef, iPodBodyRef, onNotify }: StickerLayerProps) {
-    const [contextMenu, setContextMenu] = useState<{ id: number; x: number; y: number } | null>(null);
+// 1. Extracted Component to respect React Hook Rules
+const StickerItem = ({
+    sticker,
+    body,
+    isLocked,
+    onUpdate,
+    onNotify,
+    onContextMenu
+}: {
+    sticker: Sticker;
+    body: HTMLDivElement;
+    isLocked: boolean;
+    onUpdate: (id: number, updates: Partial<Sticker>) => void;
+    onNotify: (msg: string) => void;
+    onContextMenu: (e: React.MouseEvent) => void;
+}) => {
+    // 2. User's Logic: useMotionValue for source of truth
+    const x = useMotionValue(sticker.xPct * body.offsetWidth);
+    const y = useMotionValue(sticker.yPct * body.offsetHeight);
 
-    // Close context menu on click elsewhere
+    // 3. Sync: If properties update (e.g. refresh/load), update motion value
     useEffect(() => {
-        const closeMenu = (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            if (!target.closest('.sticker-context-menu')) {
-                setContextMenu(null);
-            }
-        };
+        x.set(sticker.xPct * body.offsetWidth);
+        y.set(sticker.yPct * body.offsetHeight);
+    }, [sticker.xPct, sticker.yPct, body.offsetWidth, body.offsetHeight, x, y]);
 
-        window.addEventListener('click', closeMenu);
-        return () => window.removeEventListener('click', closeMenu);
+    const Icon = {
+        star: Star, heart: Heart, music: Music, zap: Zap, smile: Smile, ghost: Ghost, skull: Skull
+    }[sticker.type] || Star;
+
+    return (
+        <motion.div
+            key={sticker.id}
+            drag={!isLocked && !sticker.isResidue && !sticker.isStuck}
+            // 4. Added Boundaries (Padded by 32px to avoid rounded corners/overflow)
+            dragConstraints={{
+                left: 32,
+                top: 32,
+                right: body.offsetWidth - 32,
+                bottom: body.offsetHeight - 32
+            }}
+            dragMomentum={false}
+            dragElastic={0}
+            style={{
+                x,
+                y,
+                rotate: sticker.rotation,
+                translateX: "-50%", // Center anchor
+                translateY: "-50%",
+                zIndex: 80,
+                position: "absolute",
+                top: 0, // Reset CSS positioning
+                left: 0
+            }}
+            onDragEnd={() => {
+                // 5. Save normalized percentage on drop
+                onUpdate(sticker.id, {
+                    xPct: x.get() / body.offsetWidth,
+                    yPct: y.get() / body.offsetHeight,
+                });
+            }}
+            onContextMenu={onContextMenu}
+            className={cn(
+                "w-12 h-12 flex items-center justify-center pointer-events-auto touch-none",
+                isLocked
+                    ? "cursor-not-allowed"
+                    : "cursor-grab active:cursor-grabbing"
+            )}
+        >
+            <div className="relative group">
+                <Icon
+                    size={48}
+                    className="absolute inset-0 text-black/20 blur-[2px] translate-x-[1px] translate-y-[2px]"
+                />
+                <Icon
+                    size={48}
+                    fill={sticker.color}
+                    stroke="white"
+                    strokeWidth={1.5}
+                    className="relative z-10 drop-shadow-sm transition-transform group-hover:scale-105 active:scale-95"
+                />
+
+                {!sticker.isStuck && !sticker.isResidue && !isLocked && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdate(sticker.id, { isStuck: true });
+                            onNotify("Stuck! 🧱");
+                        }}
+                        className="absolute -top-3 -right-3 bg-green-500 rounded-full p-1 shadow-md hover:bg-green-400 transition-colors z-20"
+                    >
+                        <CheckCircle size={14} className="text-white" />
+                    </button>
+                )}
+            </div>
+        </motion.div>
+    );
+};
+
+export function StickerLayer({
+    stickers,
+    onUpdate,
+    onRemove,
+    isLocked,
+    iPodBodyRef,
+    onNotify,
+}: StickerLayerProps) {
+    const [contextMenu, setContextMenu] = useState<{
+        id: number;
+        x: number;
+        y: number;
+    } | null>(null);
+
+    useEffect(() => {
+        const close = () => setContextMenu(null);
+        window.addEventListener("click", close);
+        return () => window.removeEventListener("click", close);
     }, []);
 
-    const handleContextMenu = (e: React.MouseEvent, id: number) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (isLocked) return;
-        setContextMenu({ id, x: e.clientX, y: e.clientY });
-    };
-
     const handlePeelOff = (id: number) => {
-        const sticker = stickers.find(s => s.id === id);
-        if (!sticker) return;
-
-        // Skip confirmation, just warn via toast
-        onNotify("⚠️ Cheap glue detected! Residue left behind.");
+        onNotify("Scrub to remove gum! 🧼");
         onUpdate(id, { isResidue: true, scrubOpacity: 0.8 });
-    };
-
-    const handleBuyNew = () => {
-        onNotify("Don't buy a new one! Just scrub it off. 🧼");
+        setContextMenu(null);
     };
 
     const handleScrub = (id: number) => {
@@ -67,121 +165,68 @@ export function StickerLayer({ stickers, onUpdate, onRemove, isLocked, constrain
         if (!sticker || !sticker.isResidue) return;
 
         const current = sticker.scrubOpacity ?? 0.8;
-        const newOpacity = current - 0.006; // slower + realistic
+        const newOpacity = current - 0.005; // Slower scrub speed
 
         if (newOpacity <= 0) {
             onRemove(id);
-            // TODO: play clean sound
         } else {
             onUpdate(id, { scrubOpacity: newOpacity });
         }
     };
 
-    // Simplified drag end - just passes final update
-    // Actual constraints handled by Framer Motion props
-    const handleUpdatePosition = (id: number, x: number, y: number) => {
-        onUpdate(id, { x, y });
-    };
-
-    const renderStickerContent = (sticker: Sticker) => {
-        const Icon = {
-            star: Star, heart: Heart, music: Music, zap: Zap, smile: Smile, ghost: Ghost, skull: Skull
-        }[sticker.type] || Star;
-
-        if (sticker.isResidue) {
-            return (
-                <motion.div
-                    initial={{ opacity: 0.6 }}
-                    animate={{ opacity: sticker.scrubOpacity }}
-                    transition={{ duration: 0.1 }}
-                    className="w-full h-full bg-[#e8e4c9] rounded-lg flex items-center justify-center border-2 border-[#dcd8bc] backdrop-blur-sm"
-                >
-                    <div className="w-3/4 h-3/4 bg-[#d4d0b0] rounded-sm blur-[1px]" />
-                </motion.div>
-            );
-        }
-
-        return (
-            <div className={`relative transition-transform ${isLocked ? '' : 'group-hover:scale-105 active:scale-95'}`}>
-                {/* Shadow/Edge for realism */}
-                <Icon size={48} className="absolute inset-0 text-black/20 blur-[2px] translate-x-[1px] translate-y-[2px]" strokeWidth={2.5} />
-                <Icon size={48} fill={sticker.color} stroke="white" strokeWidth={1.5} className="relative z-10 drop-shadow-sm" />
-            </div>
-        );
-    };
+    if (!iPodBodyRef.current) return null;
+    const body = iPodBodyRef.current;
 
     return (
         <div
             className="absolute inset-0 pointer-events-none"
             style={{
-                width: iPodBodyRef.current?.offsetWidth,
-                height: iPodBodyRef.current?.offsetHeight,
-                zIndex: 60
+                width: body.offsetWidth,
+                height: body.offsetHeight,
+                zIndex: 60,
             }}
         >
-            {/* Note: pointer-events-none on container so we can click through to body/wheel if no sticker.
-                 Stickers themselves will have pointer-events-auto */}
-
             <AnimatePresence>
-                {stickers.map(sticker => (
-                    <motion.div
-                        key={sticker.id}
-                        drag={!isLocked && !sticker.isResidue}
-                        dragConstraints={iPodBodyRef}
-                        dragMomentum={false}
-                        dragElastic={0}
-                        onDragEnd={(e, info) => {
-                            const target = e.currentTarget as HTMLElement;
-                            const rect = target.getBoundingClientRect();
-                            const parentRect = iPodBodyRef.current!.getBoundingClientRect();
-
-                            // Calculate position relative to container
-                            handleUpdatePosition(sticker.id,
-                                rect.left - parentRect.left,
-                                rect.top - parentRect.top
-                            );
-                        }}
-                        onContextMenu={(e) => handleContextMenu(e, sticker.id)}
-                        onMouseMove={() => {
-                            if (sticker.isResidue) handleScrub(sticker.id);
-                        }}
-                        className={cn(
-                            "absolute w-12 h-12 flex items-center justify-center pointer-events-auto group touch-none",
-                            sticker.isResidue
-                                ? "cursor-wait"
-                                : isLocked
-                                    ? "cursor-not-allowed pointer-events-none"
-                                    : "cursor-grab active:cursor-grabbing"
+                {stickers.map((sticker) => (
+                    <React.Fragment key={sticker.id}>
+                        {sticker.isResidue ? (
+                            <ResidueItem
+                                sticker={sticker}
+                                body={body}
+                                onScrub={() => handleScrub(sticker.id)}
+                            />
+                        ) : (
+                            <StickerItem
+                                sticker={sticker}
+                                body={body}
+                                isLocked={isLocked}
+                                onUpdate={onUpdate}
+                                onNotify={onNotify}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    // Always allow menu to open so we can "Peel Off" even if stuck/locked
+                                    setContextMenu({
+                                        id: sticker.id,
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                    });
+                                }}
+                            />
                         )}
-                        style={{
-                            left: sticker.x,
-                            top: sticker.y,
-                            rotate: sticker.rotation,
-                            zIndex: 80
-                        }}
-                    >
-                        {renderStickerContent(sticker)}
-                    </motion.div>
+                    </React.Fragment>
                 ))}
             </AnimatePresence>
 
-            {/* Context Menu Portal-like Behavior (Fixed position relative to viewport usually better, but simplified here) */}
             {contextMenu && (
                 <div
-                    className="fixed z-[100] bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 w-40 overflow-hidden pointer-events-auto sticker-context-menu"
+                    className="fixed z-[100] bg-zinc-900 border border-zinc-700/50 rounded-lg py-1 w-32 sticker-context-menu overflow-hidden shadow-2xl backdrop-blur-md pointer-events-auto"
                     style={{ left: contextMenu.x, top: contextMenu.y }}
                 >
                     <button
-                        onClick={() => { handlePeelOff(contextMenu.id); setContextMenu(null); }}
-                        className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 flex items-center gap-2"
+                        onClick={() => handlePeelOff(contextMenu.id)}
+                        className="w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-white/10 flex items-center gap-2 transition-colors"
                     >
-                        <Trash2 size={14} /> Peel Off
-                    </button>
-                    <button
-                        onClick={() => { handleBuyNew(); setContextMenu(null); }}
-                        className="w-full px-3 py-2 text-left text-sm text-amber-500 hover:bg-zinc-800 flex items-center gap-2"
-                    >
-                        <ShoppingBag size={14} /> Buy New iPod
+                        <Trash2 size={14} className="text-zinc-400" /> Peel Off
                     </button>
                 </div>
             )}

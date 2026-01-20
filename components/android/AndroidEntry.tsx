@@ -146,10 +146,58 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
     // Sticker State
     const [stickers, setStickers] = useState<Sticker[]>([]);
+    const [isStickersLoaded, setIsStickersLoaded] = useState(false);
+    const [isBodyReady, setIsBodyReady] = useState(false); // Track when iPodBodyRef is available
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
+
+    // Audio constants
+    const audioRefs = useRef<{ insert: HTMLAudioElement; eject: HTMLAudioElement; lock: HTMLAudioElement; tick: HTMLAudioElement; select: HTMLAudioElement } | null>(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            audioRefs.current = {
+                insert: new Audio('/sounds/insert.wav'),
+                eject: new Audio('/sounds/eject.wav'),
+                lock: new Audio('/sounds/click.wav'), // Reuse click for lock switch
+                tick: new Audio('/sounds/click.wav'),
+                select: new Audio('/sounds/clunk.wav')
+            };
+            audioRefs.current.insert.volume = 0.5;
+            audioRefs.current.eject.volume = 0.5;
+            audioRefs.current.lock.volume = 0.6;
+            audioRefs.current.tick.volume = 0.4;
+            audioRefs.current.select.volume = 0.6;
+
+            // Play Insert Sound on Mount (Startup)
+            if (clickSounds) {
+                // Short delay to ensure interaction? usually auto-play might block if no interaction.
+                // But this is mount. If user clicked to enter this mode, it should be fine.
+                audioRefs.current.insert.play().catch(() => { });
+            }
+        }
+    }, []); // Run once on mount
+
+    // Handlers
+    const handleSwitchToDesktop = (mode?: string) => { // Updated to accept string for 'GLASS'
+        if (clickSounds && audioRefs.current) {
+            audioRefs.current.eject.play().catch(() => { });
+        }
+        // Small delay to hear sound before unmount
+        setTimeout(() => {
+            if (onSwitchToDesktop) onSwitchToDesktop(mode);
+        }, 300);
+    };
+
+    const toggleLock = () => {
+        setIsLocked(!isLocked);
+        if (clickSounds && audioRefs.current) {
+            const clone = audioRefs.current.lock.cloneNode() as HTMLAudioElement;
+            clone.volume = 0.5;
+            clone.play().catch(() => { });
+        }
+    };
 
     const showToast = useCallback((msg: string) => {
         // Clear existing timer if any - preventing premature close of new toast
@@ -166,69 +214,95 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         }, 4500);
     }, []);
 
-    // Load stickers from localStorage
+    // Load stickers from localStorage on mount
     useEffect(() => {
         const saved = localStorage.getItem('ipod_stickers_v2');
         if (saved) {
-            try { setStickers(JSON.parse(saved)); } catch (e) { console.error(e); }
+            try {
+                const parsed = JSON.parse(saved);
+                console.log("[iPod] Loaded stickers:", parsed);
+                setStickers(parsed);
+            } catch (e) { console.error(e); }
+        } else {
+            console.log("[iPod] No saved stickers found.");
         }
-    }, []);
+        setIsStickersLoaded(true);
+    }, []); // Run once on mount
 
-    // Save stickers to localStorage
+    // Track when body ref is ready to force re-render for StickerLayer
     useEffect(() => {
-        localStorage.setItem('ipod_stickers_v2', JSON.stringify(stickers));
-    }, [stickers]);
+        if (iPodBodyRef.current && !isBodyReady) {
+            setIsBodyReady(true);
+        }
+    });
+
+
 
     // Add Sticker from Drawer
     const handleAddSticker = useCallback((type: StickerType, color: string) => {
-        if (stickers.length >= 3) {
-            showToast("No space left! Remove a sticker first.");
+        // Limit set to 5 as requested by user
+        const activeCount = stickers.filter(s => !s.isResidue).length;
+        if (activeCount >= 5) {
+            showToast("Max 5 stickers! Peel one off first.");
             return;
         }
-
-        // Random Zone Logic (Wheel Sides or Chin)
         const zone = Math.random();
         let x, y;
 
         if (zone < 0.4) {
-            // Left of Wheel
-            x = 20 + Math.random() * 30;
-            y = 400 + Math.random() * 100;
+            // Left of Wheel (Pct: x 0.05-0.15, y 0.6-0.8)
+            x = 0.05 + Math.random() * 0.1;
+            y = 0.6 + Math.random() * 0.2;
         } else if (zone < 0.8) {
-            // Right of Wheel
-            x = 280 + Math.random() * 30;
-            y = 400 + Math.random() * 100;
+            // Right of Wheel (Pct: x 0.75-0.85, y 0.6-0.8)
+            x = 0.75 + Math.random() * 0.1;
+            y = 0.6 + Math.random() * 0.2;
         } else {
-            // Chin Area - Keep safely inside constraints (Max Y ~570)
-            x = 50 + Math.random() * 200;
-            y = 530 + Math.random() * 30; // 530-560
+            // Chin Area (Pct: x 0.15-0.75, y 0.85-0.9)
+            x = 0.15 + Math.random() * 0.6;
+            y = 0.85 + Math.random() * 0.05;
         }
 
         const newSticker: Sticker = {
             id: Date.now() + Math.random(),
             type,
-            x,
-            y,
+            xPct: x,
+            yPct: y,
             rotation: Math.floor(Math.random() * 41) - 20,
             color,
             isResidue: false
         };
-        setStickers(prev => [...prev, newSticker]);
+
+
+        setStickers(prev => {
+            const next = [...prev, newSticker];
+            localStorage.setItem('ipod_stickers_v2', JSON.stringify(next));
+            return next;
+        });
         showToast("Sticker Added!");
     }, [stickers, showToast]);
 
     const handleUpdateSticker = useCallback((id: number, updates: Partial<Sticker>) => {
-        setStickers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+        setStickers(prev => {
+            const next = prev.map(s => s.id === id ? { ...s, ...updates } : s);
+            console.log("[iPod] Saving sticker update:", id, updates, "-> Full:", next.find(s => s.id === id));
+            localStorage.setItem('ipod_stickers_v2', JSON.stringify(next)); // Instant Save
+            return next;
+        });
     }, []);
 
     const handleRemoveSticker = useCallback((id: number) => {
-        setStickers(prev => prev.filter(s => s.id !== id));
+        setStickers(prev => {
+            const next = prev.filter(s => s.id !== id);
+            localStorage.setItem('ipod_stickers_v2', JSON.stringify(next));
+            return next;
+        });
     }, []);
 
     const handleClearStickers = useCallback(() => {
         // "Cheat" clean - no residue
-        // showToast("Cleaning all stickers...");
         setStickers([]);
+        localStorage.removeItem('ipod_stickers_v2'); // FORCE SYNC to disk
         showToast("Case is shiny new!");
     }, [showToast]);
 
@@ -270,40 +344,13 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     }, [registerActivity]);
 
     const playClick = useCallback(() => {
-        if (clickSounds) {
+        if (clickSounds && audioRefs.current) {
             try {
-                const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-                if (!AudioContext) return;
-
-                // Resume or Create Context
-                if (!audioContextRef.current) {
-                    audioContextRef.current = new AudioContext();
-                }
-
-                const ctx = audioContextRef.current;
-
-                if (ctx.state === 'suspended') {
-                    ctx.resume();
-                }
-
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-
-                // Short, sharp tick
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(800, ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.01);
-
-                gain.gain.setValueAtTime(0.05, ctx.currentTime); // Low volume
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.01);
-
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-
-                osc.start();
-                osc.stop(ctx.currentTime + 0.01);
+                const clone = audioRefs.current.tick.cloneNode() as HTMLAudioElement;
+                clone.volume = 0.4;
+                clone.play().catch(() => { });
             } catch (e) {
-                // Ignore audio context errors
+                // Ignore
             }
         }
     }, [clickSounds]);
@@ -541,8 +588,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 { label: "Themes", type: 'navigation', target: 'theme-settings' },
                 { label: "Sticker Collection", type: 'action', data: { id: 'sticker-collection' } },
                 { label: "Clean All Stickers (Cheat)", type: 'action', action: handleClearStickers },
-                { label: "Switch to Studio Deck", type: 'action', action: () => onSwitchToDesktop && onSwitchToDesktop() },
-                { label: "Switch to Discovery Mode", type: 'action', action: () => onSwitchToDesktop && onSwitchToDesktop('zen') }, // distinct from glass? logic says 'zen' or 'glass'
+                { label: "Switch to Discovery Mode", type: 'action', action: () => onSwitchToDesktop && onSwitchToDesktop('GLASS') }, // Update to 'GLASS' for consistency if 'zen' was old logic, but sticking to existing pattern is safer. Actually, let's keep it simply as removing the previous line.
             ];
             case 'games': return GAMES_MENU;
 
@@ -1382,6 +1428,44 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         }
     }, [currentView, controlMode, currentMenuItems, mixes, currentSong, playSongNow, goToNowPlaying, handleNavigation, cfTracks, clickSounds, playClick, registerActivity]);
 
+    // Auto-Rotation for Cover Flow
+    useEffect(() => {
+        const handleResize = () => {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const currentId = viewStack[viewStack.length - 1]?.id;
+
+            if (isLandscape) {
+                // Trigger Cover Flow if in a compatible view
+                // Only trigger from menus or player to avoid interrupting games/input
+                const compatibleViews = ['main', 'music', 'extras', 'settings', 'playlists', 'artists', 'albums', 'now-playing'];
+                if (compatibleViews.includes(currentId)) {
+                    // Find index of current song's album or default to 0
+                    const albums = getLibraryAlbums(mixes);
+                    const index = currentSong?.album?.id ? albums.findIndex(a => a.id === currentSong.album.id) : 0;
+
+                    setViewStack(prev => [...prev, {
+                        id: 'cover-flow',
+                        title: 'Cover Flow',
+                        viewType: 'cover-flow',
+                        selectedIndex: index >= 0 ? index : 0
+                    }]);
+                }
+            } else {
+                // Exit Cover Flow if rotating back to Portrait
+                if (currentId === 'cover-flow') {
+                    handleBack();
+                }
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        // Initial check? No, let's wait for user action or stability. 
+        // Actually, initial check is good if they open app in landscape.
+        // But might conflict with hydration. Let's stick to resize event for now.
+
+        return () => window.removeEventListener('resize', handleResize);
+    }, [viewStack, mixes, currentSong, handleBack]);
+
 
     // Keyboard handling
     useEffect(() => {
@@ -1410,6 +1494,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     break;
                 case 'ArrowRight':
                     next();
+                    break;
+                case 'Escape': // Escape for Back
+                    handleBack();
                     break;
                 case 'm': // 'm' for Menu (Back)
                     handleBack();
@@ -1486,14 +1573,14 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             {/* MAIN CONTAINER: Layout Wrapper */}
             <motion.div
                 ref={iPodBodyRef}
-                className="relative w-[370px] h-[640px] select-none touch-manipulation my-auto transition-all duration-500"
+                className="relative w-full h-full md:w-[370px] md:h-[640px] select-none touch-manipulation my-auto transition-all duration-500"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
             >
                 {/* 2. INNER MASK: The iPod Body (Clipped) */}
                 <div
-                    className={`absolute inset-0 rounded-[3rem] overflow-hidden z-0 pointer-events-none ${getThemeClasses()}`}
+                    className={`absolute inset-0 md:rounded-[3rem] overflow-hidden z-0 pointer-events-none ${getThemeClasses()}`}
                     style={{
                         WebkitTapHighlightColor: 'transparent',
                         WebkitTouchCallout: 'none',
@@ -1504,7 +1591,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 >
                     {/* Glass Glare Reflection */}
                     <div
-                        className="absolute inset-0 rounded-[2.6rem] pointer-events-none z-50"
+                        className="absolute inset-0 md:rounded-[2.6rem] pointer-events-none z-50"
                         style={{
                             background: 'linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%)'
                         }}
@@ -1562,13 +1649,18 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 {/* <div className="absolute inset-0 rounded-[2.6rem] overflow-hidden pointer-events-none z-[5]"> ... </div> */}
                 {/* 3. EXTERNAL ELEMENTS (Unclipped) */}
                 {/* Hold Switch Button */}
+                {/* Hold Switch Button - Realistic Metallic Design */}
                 <button
-                    onClick={() => setIsLocked(!isLocked)}
-                    className="absolute -top-1 right-8 w-10 h-3 rounded-full bg-zinc-700/80 border border-zinc-600 flex items-center px-0.5 cursor-pointer z-20 shadow-inner"
+                    onClick={toggleLock}
+                    className="absolute -top-[5px] right-6 w-10 h-[14px] rounded-full bg-gradient-to-b from-zinc-300 to-zinc-400 border border-zinc-500 shadow-[0_1px_3px_rgba(0,0,0,0.4)] flex items-center p-[1px] cursor-pointer z-30 overflow-hidden active:brightness-95 transition-all"
                     title={isLocked ? "Slide to Unlock" : "Hold Switch"}
                 >
+                    {/* Orange Underlay (Warning Color) */}
+                    <div className={`absolute inset-0 bg-[#ff3b30] transition-opacity duration-300 ${isLocked ? 'opacity-100 w-full' : 'opacity-0'}`} />
+
+                    {/* Metallic Toggle Nub */}
                     <div
-                        className={`w-4 h-2 rounded-full transition-all duration-200 ${isLocked ? 'ml-auto bg-orange-500' : 'ml-0 bg-zinc-400'}`}
+                        className={`relative z-10 w-5 h-full rounded-full bg-gradient-to-b from-zinc-100 to-zinc-300 border border-zinc-400 shadow-sm transition-all duration-300 ease-out ${isLocked ? 'translate-x-[18px]' : 'translate-x-0'}`}
                     />
                 </button>
 
@@ -1640,9 +1732,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                                         } else if (item.data?.id === 'now-playing') {
                                             goToNowPlaying();
                                         } else if (item.data?.id === 'switch-studio') {
-                                            if (onSwitchToDesktop) onSwitchToDesktop();
+                                            handleSwitchToDesktop();
                                         } else if (item.data?.id === 'switch-discovery') {
-                                            if (onSwitchToDesktop) onSwitchToDesktop('GLASS');
+                                            handleSwitchToDesktop('GLASS');
                                         } else if (item.data?.id === 'sticker-collection') {
                                             setViewStack(prev => [...prev, { id: 'sticker-collection', title: 'Stickers', viewType: 'stickers', selectedIndex: 0 }]);
                                         } else if (item.data?.id === 'brick-game') {
@@ -1678,6 +1770,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             onToggleLike={() => currentSong && toggleLike(currentSong)}
                             audioQuality={bitrate}
                             backlight={backlight}
+                            depth={viewStack.length}
                         />
 
                         {/* Render Game View if Active - Lazy loaded for performance */}
@@ -1704,25 +1797,31 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                                 )
                             }
                         </Suspense>
+                    </div>
 
-                        {/* In-Screen Toast Notification */}
+                    {/* Modern Dynamic Notification System */}
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[280px] pointer-events-none">
                         <AnimatePresence>
                             {toastMessage && (
                                 <motion.div
-                                    initial={{ opacity: 0, y: -40, scale: 0.9 }}
+                                    initial={{ opacity: 0, y: -20, scale: 0.9 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                                    className="absolute top-2 left-1/2 -translate-x-1/2 w-[95%] bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-xl p-2.5 flex items-center gap-3 z-[50] pointer-events-none"
+                                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                    className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl flex items-center gap-3 overflow-hidden"
                                 >
-                                    <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-inner ring-1 ring-white/10">
-                                        <MessageSquare size={14} className="text-white fill-white/20" />
+                                    {/* App Icon */}
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shrink-0">
+                                        <Music size={20} className="text-white fill-white/20" />
                                     </div>
-                                    <div className="flex flex-col gap-0.5 min-w-0">
-                                        <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
-                                            MELORA <span className="text-zinc-600">•</span> NOW
-                                        </span>
-                                        <span className="text-[11px] font-medium text-white leading-tight truncate w-full drop-shadow-sm pr-1">
+
+                                    {/* Content */}
+                                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">MELORA</span>
+                                            <span className="text-[9px] text-white/30">now</span>
+                                        </div>
+                                        <span className="text-[12px] font-medium text-white leading-tight truncate w-full drop-shadow-sm pr-1">
                                             {toastMessage}
                                         </span>
                                     </div>

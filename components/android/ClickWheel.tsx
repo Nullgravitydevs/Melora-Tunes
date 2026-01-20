@@ -64,83 +64,90 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
             hasMoved.current = true;
         }
 
+        processDelta();
+    };
+
+    // Helper to process accumulated rotation delta
+    const processDelta = () => {
         // Threshold for one "tick" of scrolling (approx 20 degrees)
         const TICK_THRESHOLD = 20;
 
         if (Math.abs(accumulatedDelta.current) >= TICK_THRESHOLD) {
             const direction = accumulatedDelta.current > 0 ? 1 : -1;
+
+            // Execute scroll
             onScroll(direction);
 
             // Audio Feedback (Click Sound)
             playClickSound('tick');
 
-            // Throttle Haptic Feedback (Prevent Android Lag)
+            // Throttle Haptic Feedback
             const now = Date.now();
             if (now - lastVibration.current > 40 && typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate(3); // Ultra short vibration for crispness
+                navigator.vibrate(3);
                 lastVibration.current = now;
             }
 
             // Reset accumulator but keep remainder for smoothness
             accumulatedDelta.current -= direction * TICK_THRESHOLD;
         }
+    }
+
+    // Mouse Wheel Support (Desktop)
+    const handleWheel = (e: React.WheelEvent) => {
+        // Prevent page scroll if inside the wheel
+        e.stopPropagation();
+
+        // Map scrollY to rotation delta
+        // Average mouse wheel notch is ~100px. Map that to 20deg (one tick).
+        // Momentum: Faster scroll = bigger delta.
+        // Cap momentum to avoid spinning out of control.
+
+        const SENSITIVITY = 0.3; // Tuned for natural feel
+        const MAX_SPEED = 60; // Max degrees per event
+
+        let delta = e.deltaY * SENSITIVITY;
+
+        // Clamp for safety/control
+        if (delta > MAX_SPEED) delta = MAX_SPEED;
+        if (delta < -MAX_SPEED) delta = -MAX_SPEED;
+
+        accumulatedDelta.current += delta;
+        processDelta();
     };
 
-    // Synthetic Click Sound helper
+    // Audio Preloading
+    const audioRefs = useRef<{ tick: HTMLAudioElement; select: HTMLAudioElement } | null>(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            audioRefs.current = {
+                tick: new Audio('/sounds/click.wav'),
+                select: new Audio('/sounds/clunk.wav')
+            };
+            // Preload
+            audioRefs.current.tick.load();
+            audioRefs.current.select.load();
+            // Lower volume slightly for tick
+            audioRefs.current.tick.volume = 0.4;
+            audioRefs.current.select.volume = 0.6;
+        }
+    }, []);
+
     const playClickSound = (type: 'tick' | 'select' = 'tick') => {
-        if (!enableSounds) return; // Respect user setting
+        if (!enableSounds || !audioRefs.current) return;
+
         try {
-            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-            if (!AudioContext) return;
+            const sound = type === 'tick' ? audioRefs.current.tick : audioRefs.current.select;
 
-            const ctx = new AudioContext();
-
-            if (type === 'tick') {
-                // Synthesize a mechanical "Click" (Piezo style)
-                // 1. Short burst of White Noise (Impact)
-                const bufferSize = ctx.sampleRate * 0.005; // 5ms click
-                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = Math.random() * 2 - 1;
-                }
-                const noise = ctx.createBufferSource();
-                noise.buffer = buffer;
-
-                // Filter to make it "plastic/mechanical"
-                const filter = ctx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(1000, ctx.currentTime);
-
-                const gain = ctx.createGain();
-                gain.gain.setValueAtTime(0.08, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.004); // Fast decay
-
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(ctx.destination);
-                noise.start();
-
-            } else {
-                // Thud / Select sound (Deeper, Sine-based)
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(250, ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.08); // Pitch drop
-
-                gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.1);
-            }
+            // Clone node to allow rapid overlapping plays (polymorphism)
+            // or just reset current time. Resetting current time is lighter but might clip.
+            // Cloning is safer for rapid scrolling.
+            const clone = sound.cloneNode() as HTMLAudioElement;
+            clone.volume = sound.volume;
+            clone.play().catch(() => { });
         } catch (e) {
-            // Ignore audio errors (e.g. user didn't interact yet)
+            // Ignore auto-play errors
         }
     };
 
@@ -245,6 +252,7 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
+            onWheel={handleWheel}
         >
             {children}
             {/* Visual Labels (Pointer Events None to let Wheel capture) */}

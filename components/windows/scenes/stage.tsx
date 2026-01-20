@@ -9,7 +9,8 @@ import { Plus, Maximize2, Pencil, Camera, Download, Upload, MoreHorizontal, Sett
 import { useAudio } from "@/hooks/use-audio";
 import { JioSaavnSong, getSongDetails } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
-import { DeckStage } from "./deck-stage";
+import dynamic from 'next/dynamic';
+const DeckStage = dynamic(() => import("./deck-stage").then(mod => mod.DeckStage), { ssr: false });
 import { ZenStage } from "./zen-stage";
 import { BauhausStage } from "./bauhaus-stage";
 import { NordicStage } from "./nordic-stage";
@@ -35,12 +36,27 @@ import { WelcomeScreen } from "@/components/windows/scenes/welcome-screen";
 interface StageProps {
     onSwitchToMobile?: () => void;
     initialTheme?: string | null;
+    isMobileDevice?: boolean;
 }
 
-export function WindowsStage({ onSwitchToMobile, initialTheme }: StageProps) {
+export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }: StageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
     const router = useRouter();
+
+    // Orientation Logic
+    const [showRotateOverlay, setShowRotateOverlay] = useState(false);
+
+    useEffect(() => {
+        if (!isMobileDevice) return;
+        const checkOrientation = () => {
+            const isPortrait = window.innerWidth < window.innerHeight;
+            setShowRotateOverlay(isPortrait);
+        };
+        checkOrientation();
+        window.addEventListener('resize', checkOrientation);
+        return () => window.removeEventListener('resize', checkOrientation);
+    }, [isMobileDevice]);
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
@@ -292,15 +308,20 @@ export function WindowsStage({ onSwitchToMobile, initialTheme }: StageProps) {
         addToast(exists ? "Removed from Favorites" : "Added to Favorites ❤️");
     };
 
-    const layout = THEMES[currentTheme]?.layout || 'zen';
+    // Strictly enforce NO DECK on mobile
+    const resolvedLayout = THEMES[currentTheme]?.layout || 'zen';
+    const effectiveLayout = (isMobileDevice && (resolvedLayout === 'deck' || resolvedLayout === 'opendeck' || resolvedLayout === 'boombox'))
+        ? 'glass'
+        : resolvedLayout;
+
     const StageComponent =
-        layout === 'zen' ? ZenStage :
-            layout === 'bauhaus' ? BauhausStage :
-                layout === 'nordic' ? NordicStage :
-                    layout === 'opendeck' ? OpenDeckStage :
-                        layout === 'boombox' ? BoomboxStage :
-                            layout === 'silverfrost' ? SilverFrostStage :
-                                layout === 'glass' ? GlassStage :
+        effectiveLayout === 'zen' ? ZenStage :
+            effectiveLayout === 'bauhaus' ? BauhausStage :
+                effectiveLayout === 'nordic' ? NordicStage :
+                    effectiveLayout === 'opendeck' ? OpenDeckStage :
+                        effectiveLayout === 'boombox' ? BoomboxStage :
+                            effectiveLayout === 'silverfrost' ? SilverFrostStage :
+                                effectiveLayout === 'glass' ? GlassStage :
                                     DeckStage;
 
     if (!isMounted) return null; // Prevent hydration mismatch/flash
@@ -320,9 +341,21 @@ export function WindowsStage({ onSwitchToMobile, initialTheme }: StageProps) {
     return (
         <>
             <ErrorBoundary>
+                {/* Rotate Overlay for Mobile Deck Mode */}
+                {isMobileDevice && THEMES[currentTheme]?.layout !== 'glass' && showRotateOverlay && (
+                    <div className="fixed inset-0 z-[99999] bg-black flex flex-col items-center justify-center p-8 text-center text-white">
+                        <Smartphone className="w-16 h-16 mb-4 animate-spin-slow text-purple-500" strokeWidth={1.5} />
+                        <h2 className="text-2xl font-bold mb-2">Please Rotate Device</h2>
+                        <p className="text-gray-400">Studio Deck requires a wider display.</p>
+                    </div>
+                )}
+
                 <StageComponent
                     currentTheme={currentTheme}
                     onThemeChange={handleThemeChange}
+                    // Pass isMobileDevice to DeckStage for Guardrails
+                    // @ts-ignore - Dynamic component prop
+                    isMobileDevice={isMobileDevice}
                     onSelectTheme={(theme: ThemeKey) => {
                         setCurrentTheme(theme);
                         localStorage.setItem('melora-theme', theme);

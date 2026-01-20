@@ -36,7 +36,12 @@ export interface HiFiSearchResult {
 /**
  * Search for HiFi music (Tidal + Qobuz)
  */
+import { Capacitor } from '@capacitor/core';
+
+// ... check imports
+
 export async function searchHiFi(query: string, source?: 'tidal' | 'qobuz'): Promise<HiFiSearchResult | null> {
+    if (Capacitor.isNativePlatform()) return null; // HiFi disabled on mobile for now
     if (!query.trim()) return null;
 
     try {
