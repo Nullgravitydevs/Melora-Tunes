@@ -5,7 +5,7 @@ import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-    Palette, Settings, Plus, Tv, Pencil, Camera, Search, Share2
+    Palette, Settings, Plus, Tv, Pencil, Camera, Search, Share2, LogOut
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -103,41 +103,38 @@ function DraggablePolaroid({
             whileDrag={{ scale: 1.1, zIndex: 100, rotate: 0 }}
             whileHover={{ scale: 1.05 }}
         >
-            <div className="bg-white p-2 pb-6 shadow-lg transition-all duration-300">
-                <div className="w-24 h-24 relative overflow-hidden">
-                    {albumArt ? (
-                        <img
-                            src={albumArt}
-                            alt={mix.title}
-                            className="w-full h-full object-cover filter sepia-[0.2] contrast-[1.1]"
-                            draggable={false}
-                        />
-                    ) : (
-                        <div className="bg-neutral-800 w-full h-full flex items-center justify-center">
-                            <div className="flex gap-4">
-                                <div className="w-4 h-4 rounded-full bg-white/20" />
-                                <div className="w-4 h-4 rounded-full bg-white/20" />
+            {!isInsidePlayer && (
+                <div className="bg-white p-2 pb-6 shadow-lg transition-all duration-300">
+                    <div className="w-24 h-24 relative overflow-hidden">
+                        {albumArt ? (
+                            <img
+                                src={albumArt}
+                                alt={mix.title}
+                                className="w-full h-full object-cover filter sepia-[0.2] contrast-[1.1]"
+                                draggable={false}
+                            />
+                        ) : (
+                            <div className="bg-neutral-800 w-full h-full flex items-center justify-center">
+                                <div className="flex gap-4">
+                                    <div className="w-4 h-4 rounded-full bg-white/20" />
+                                    <div className="w-4 h-4 rounded-full bg-white/20" />
+                                </div>
                             </div>
-                        </div>
-                    )}
-                    {isInsidePlayer && (
-                        <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
-                            <span className="text-[10px] text-white font-bold uppercase drop-shadow">▶ Playing</span>
-                        </div>
-                    )}
-                    {showButtons && !isInsidePlayer && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-1">
-                            <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Edit Mix"><Pencil size={12} className="text-gray-700" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Share"><Share2 size={12} className="text-gray-700" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
-                        </div>
-                    )}
+                        )}
+                        {showButtons && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-1">
+                                <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Edit Mix"><Pencil size={12} className="text-gray-700" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Share"><Share2 size={12} className="text-gray-700" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-gray-800 text-[9px] font-bold text-center mt-1 truncate max-w-[96px]" style={{ fontFamily: "'Permanent Marker', cursive" }}>
+                        {mix.title}
+                    </p>
                 </div>
-                <p className="text-gray-800 text-[9px] font-bold text-center mt-1 truncate max-w-[96px]" style={{ fontFamily: "'Permanent Marker', cursive" }}>
-                    {mix.title}
-                </p>
-            </div>
+            )}
         </motion.div>
     );
 }
@@ -326,6 +323,13 @@ export function BoomboxStage({
                                     <span className="text-[8px] font-bold uppercase text-zinc-500">Vol</span>
                                     <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer" />
                                 </div>
+                                {isLoaded && (
+                                    <button
+                                        onClick={() => { playClick(); loadMix(null as any); }}
+                                        className="w-8 h-8 rounded bg-red-900/80 border-b-4 border-black text-white/70 flex items-center justify-center shadow active:translate-y-1 hover:bg-red-800 hover:text-white ml-2"
+                                        title="Eject Tape"
+                                    ><LogOut size={14} /></button>
+                                )}
                             </div>
                         </div>
                         <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 font-black italic text-neutral-700/20 text-xs tracking-widest uppercase">Sport Edition</span>
