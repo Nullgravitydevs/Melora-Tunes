@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, Smartphone, X, Settings, Plus, Maximize2, FileDown, Share as ShareIcon, Volume1, Moon, Sun, Camera, Pencil, Disc, Mic2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, X, Settings, Plus, Maximize2, Share as ShareIcon, Volume1, Moon, Sun, Camera, Pencil, Disc, Mic2 } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
@@ -106,15 +106,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         dragConstraints={containerRef}
                         className="flex items-center gap-3 pointer-events-auto cursor-grab active:cursor-grabbing"
                     >
-                        {/* Logo Icon */}
-                        <div className={clsx("w-8 h-8 rounded flex items-center justify-center border transition-colors",
-                            isDark ? "bg-white/10 border-white/20" : "bg-black/10 border-black/20"
-                        )}>
-                            <div className="flex gap-0.5">
-                                <div className={clsx("w-1 h-3 rounded-full transition-colors", isDark ? "bg-white" : "bg-black")}></div>
-                                <div className={clsx("w-1 h-3 rounded-full transition-colors", isDark ? "bg-white" : "bg-black")}></div>
-                            </div>
-                        </div>
+                        {/* Logo Icon Removed */}
                         <h1 className={clsx("text-3xl tracking-normal select-none transition-colors",
                             "font-['Pacifico']",
                             isDark ? "text-white" : "text-black"
@@ -165,7 +157,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                     </motion.nav>
                 </header>
 
-                <main className="grid lg:grid-cols-12 gap-8 flex-grow items-start h-full relative">
+                <main className="grid lg:grid-cols-12 gap-4 flex-grow items-start h-full relative">
                     {/* Left Column: Grid of Mixtapes */}
                     <section className="lg:col-span-7 h-full flex flex-col relative z-50">
                         <motion.h2 drag dragConstraints={containerRef} className={clsx("font-mono text-xl uppercase tracking-widest mb-4 opacity-60 pl-2 cursor-grab active:cursor-grabbing w-fit transition-colors",

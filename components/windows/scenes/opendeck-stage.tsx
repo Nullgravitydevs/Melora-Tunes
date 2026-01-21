@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, LogOut,
-    Palette, Smartphone, Settings, Pencil, Camera, Search, Share2, Plus
+    Palette, Settings, Pencil, Camera, Share2, Plus
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -14,6 +14,7 @@ import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal } from "lucide-react";
+import { Visualizer } from "@/components/ui/visualizer";
 
 interface OpenDeckStageProps {
     currentTheme: ThemeKey;
@@ -120,10 +121,7 @@ export function OpenDeckStage({
             {/* Header - Fixed height */}
             <header className="flex items-center justify-between px-6 py-4 shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="size-5 text-[#2d8652]">
-                        <svg fill="none" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z" fill="currentColor" /></svg>
-                    </div>
-                    <h2 className="text-[#101814] text-base font-bold tracking-tight uppercase">Melora</h2>
+                    <h1 className="text-3xl font-['Pacifico'] tracking-tight text-[#101814]">Melora Tunes</h1>
                 </div>
                 <div className="flex items-center gap-4">
                     <nav className="hidden md:flex items-center gap-5">
@@ -168,7 +166,7 @@ export function OpenDeckStage({
                                             isDragging && "opacity-20"
                                         )}
                                     >
-                                        <div className={`w-36 h-24 bg-gradient-to-br ${style.bg} rounded shadow-lg relative overflow-hidden`}>
+                                        <div className={`w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-lg relative overflow-hidden`}>
                                             <div className="absolute inset-1 flex items-center justify-center">
                                                 <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
                                                     <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
@@ -201,7 +199,7 @@ export function OpenDeckStage({
                 </div>
 
                 {/* Center: Player */}
-                <div className="col-span-6 flex flex-col items-center justify-center min-h-0">
+                <div className="col-span-6 flex flex-col items-center justify-center min-h-0 relative">
                     <div className="mb-4 text-center shrink-0">
                         <h1 className="text-[#101814] tracking-[0.25em] text-xs font-bold uppercase">
                             {isLoaded ? (currentSong ? decodeHtml(currentSong.name) : activeMix?.title) : "Insert Cassette"}
@@ -211,10 +209,18 @@ export function OpenDeckStage({
                         </p>
                     </div>
 
-                    <div ref={playerRef} className="w-full max-w-[480px]">
+                    <motion.div
+                        ref={playerRef}
+                        drag
+                        dragConstraints={containerRef}
+                        dragMomentum={true}
+                        dragElastic={0.2}
+                        className="w-full max-w-[480px] cursor-grab active:cursor-grabbing"
+                    >
                         <div className={clsx(
                             "bg-white rounded-xl shadow-xl border border-neutral-200/50 flex flex-col transition-all duration-200",
-                            isOverPlayer && "ring-4 ring-[#2d8652]/40 scale-[1.01]"
+                            isOverPlayer && "ring-4 ring-[#2d8652]/40 scale-[1.01]",
+                            isPlaying && "ring-4 ring-[#2d8652]/20 animate-pulse shadow-[0_0_30px_rgba(45,134,82,0.3)]"
                         )}>
                             {/* Top Bar */}
                             <div className="h-10 border-b border-neutral-200 bg-gradient-to-b from-neutral-50 to-neutral-100 flex items-center justify-between px-4 rounded-t-xl">
@@ -240,11 +246,15 @@ export function OpenDeckStage({
                                         return (
                                             <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute inset-2">
                                                 <div className={`w-full h-full bg-gradient-to-br ${style.bg} rounded shadow-lg flex flex-col items-center justify-center relative`}>
-                                                    <div className="flex gap-10">
+                                                    {/* Internal Player Visualizer */}
+                                                    <div className="absolute inset-x-0 bottom-0 h-16 opacity-40 pointer-events-none z-0">
+                                                        <Visualizer isPlaying={isPlaying} accentColor="#ffffff" className="w-full h-full" />
+                                                    </div>
+                                                    <div className="flex gap-10 relative z-10">
                                                         <motion.div animate={isPlaying ? { rotate: 360 } : {}} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className={`size-9 rounded-full border-2 ${style.reelBorder} bg-black/30 flex items-center justify-center`}><div className="size-1 rounded-full bg-white/60" /></motion.div>
                                                         <motion.div animate={isPlaying ? { rotate: 360 } : {}} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className={`size-9 rounded-full border-2 ${style.reelBorder} bg-black/30 flex items-center justify-center`}><div className="size-1 rounded-full bg-white/60" /></motion.div>
                                                     </div>
-                                                    <div className="absolute bottom-2 left-3 right-3 text-center"><p className={`text-[8px] font-bold ${style.text} truncate`}>{activeMix.title.toUpperCase()}</p></div>
+                                                    <div className="absolute bottom-2 left-3 right-3 text-center z-10"><p className={`text-[10px] font-bold ${style.text} truncate`}>{activeMix.title.toUpperCase()}</p></div>
                                                 </div>
                                             </motion.div>
                                         );
@@ -278,7 +288,7 @@ export function OpenDeckStage({
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {isLoaded && (
                         <button onClick={() => { playEject(); loadMix(null as any); }} className="mt-4 flex items-center gap-1.5 text-[9px] font-bold tracking-widest text-neutral-400 hover:text-[#2d8652] uppercase"><LogOut size={12} /> Eject</button>
@@ -289,41 +299,50 @@ export function OpenDeckStage({
                 {/* Right: Status - Positioned to fit within viewport */}
                 <div className="col-span-3 flex flex-col justify-center items-end min-h-0">
                     <div className="text-right">
-                        <p className="text-[9px] font-bold tracking-widest text-[#2d8652] uppercase">Status</p>
-                        <p className="text-base font-light text-[#101814]">{isLoaded ? "Now Playing" : "Waiting"}</p>
-                        {activeMix && <p className="text-xs text-neutral-500 truncate max-w-[120px]">{activeMix.title}</p>}
-                        <div className="pt-3 space-y-1 text-neutral-400">
-                            <div className="flex items-center justify-end gap-2"><span className="text-[8px] font-bold uppercase">Time</span><span className="text-[9px] font-mono">{formatTime(progress * duration)}/{formatTime(duration || 0)}</span></div>
-                            <div className="flex items-center justify-end gap-2"><span className="text-[8px] font-bold uppercase">Vol</span><span className="text-[9px] font-mono">{Math.round(volume * 100)}%</span></div>
+                        <p className="text-xs font-bold tracking-widest text-[#2d8652] uppercase mb-2">Status</p>
+                        <p className="text-xl font-light text-[#101814]">{isLoaded ? "Now Playing" : "Waiting"}</p>
+                        {activeMix && <p className="text-base text-neutral-600 font-medium truncate max-w-[180px] mb-4">{activeMix.title}</p>}
+
+                        <div className="space-y-3 text-neutral-600">
+                            <div className="flex items-center justify-end gap-3">
+                                <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Time</span>
+                                <span className="text-sm font-mono font-bold">{formatTime(progress * duration)}/{formatTime(duration || 0)}</span>
+                            </div>
+                            <div className="flex items-center justify-end gap-3">
+                                <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Vol</span>
+                                <span className="text-sm font-mono font-bold">{Math.round(volume * 100)}%</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </main>
+            </main >
 
             {/* FLOATING DRAG GHOST - Always on top */}
-            {draggingMix && dragPosition && (
-                <div
-                    className="fixed pointer-events-none"
-                    style={{ left: dragPosition.x - 72, top: dragPosition.y - 48, zIndex: 99999, transform: 'rotate(5deg) scale(1.1)' }}
-                >
-                    {(() => {
-                        const style = getStyleForMix(draggingMix.index);
-                        return (
-                            <div className={`w-36 h-24 bg-gradient-to-br ${style.bg} rounded shadow-2xl relative overflow-hidden`}>
-                                <div className="absolute inset-1 flex items-center justify-center">
-                                    <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
-                                        <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
-                                        <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
+            {
+                draggingMix && dragPosition && (
+                    <div
+                        className="fixed pointer-events-none"
+                        style={{ left: dragPosition.x - 72, top: dragPosition.y - 48, zIndex: 99999, transform: 'rotate(5deg) scale(1.1)' }}
+                    >
+                        {(() => {
+                            const style = getStyleForMix(draggingMix.index);
+                            return (
+                                <div className={`w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-2xl relative overflow-hidden`}>
+                                    <div className="absolute inset-1 flex items-center justify-center">
+                                        <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
+                                            <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
+                                            <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
+                                        </div>
+                                    </div>
+                                    <div className="absolute bottom-1.5 left-2 right-2">
+                                        <p className={`text-[8px] font-bold tracking-tight ${style.text} truncate`}>{draggingMix.mix.title.toUpperCase()}</p>
                                     </div>
                                 </div>
-                                <div className="absolute bottom-1.5 left-2 right-2">
-                                    <p className={`text-[8px] font-bold tracking-tight ${style.text} truncate`}>{draggingMix.mix.title.toUpperCase()}</p>
-                                </div>
-                            </div>
-                        );
-                    })()}
-                </div>
-            )}
+                            );
+                        })()}
+                    </div>
+                )
+            }
             {/* Overlays */}
             <AnimatePresence>
                 {showLyrics && (
@@ -346,6 +365,6 @@ export function OpenDeckStage({
                     />
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 }
