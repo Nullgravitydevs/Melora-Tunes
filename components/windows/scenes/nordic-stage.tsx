@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Volume2, LogOut,
-    Download, Upload, Palette, Smartphone, Settings, Plus, Maximize2, Camera, Share2
+    Palette, Settings, Plus, Camera, Share2
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -78,15 +78,7 @@ export function NordicStage({
                 {/* Header */}
                 <header className="flex justify-between items-center mb-12">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full border border-slate-700 bg-slate-800 flex items-center justify-center">
-                            <div className="flex gap-1">
-                                <div className="w-1 h-3 rounded-full bg-slate-300"></div>
-                                <div className="w-1 h-3 rounded-full bg-slate-300"></div>
-                            </div>
-                        </div>
-                        <h1 className="font-mono text-2xl font-bold tracking-widest uppercase text-white">
-                            Melora <span className="text-xs align-top text-blue-400">NORDIC</span>
-                        </h1>
+                        <h1 className="text-3xl font-['Pacifico'] tracking-tight text-white">Melora Tunes</h1>
                     </div>
 
                     <nav className="flex items-center gap-6">
@@ -116,7 +108,7 @@ export function NordicStage({
                     <section className="lg:col-span-7 flex flex-col h-full overflow-hidden">
                         <h2 className="font-mono text-sm tracking-widest text-slate-500 mb-6 border-b border-slate-800 pb-2 inline-block uppercase">Your Mixtapes</h2>
 
-                        <div className="flex-1 overflow-y-auto pr-4 space-y-4">
+                        <div className="flex-1 overflow-y-auto pr-4 space-y-4 [&::-webkit-scrollbar]:hidden">
                             {mixes.map((mix) => (
                                 <div
                                     key={mix.id}
@@ -130,14 +122,38 @@ export function NordicStage({
                                 >
                                     <div className="flex items-center gap-4">
                                         {/* Mini Cassette Icon */}
-                                        <div className="w-12 h-8 bg-gradient-to-br from-slate-600 to-slate-700 rounded flex items-center justify-center border border-slate-500">
-                                            <div className="w-6 h-4 bg-slate-900 rounded-sm flex items-center justify-around">
-                                                <div className="w-1.5 h-1.5 rounded-full border border-slate-500"></div>
-                                                <div className="w-1.5 h-1.5 rounded-full border border-slate-500"></div>
-                                            </div>
-                                        </div>
+                                        {(() => {
+                                            const colorMap: Record<string, string> = {
+                                                orange: "from-orange-500 to-orange-600 border-orange-400",
+                                                purple: "from-purple-500 to-purple-600 border-purple-400",
+                                                white: "from-slate-200 to-slate-300 border-slate-400",
+                                                green: "from-green-500 to-green-600 border-green-400",
+                                                red: "from-red-500 to-red-600 border-red-400",
+                                                blue: "from-blue-500 to-blue-600 border-blue-400",
+                                                cyan: "from-cyan-500 to-cyan-600 border-cyan-400",
+                                                pink: "from-pink-500 to-pink-600 border-pink-400",
+                                                black: "from-slate-800 to-slate-900 border-slate-600",
+                                            };
+                                            const colorClass = colorMap[mix.color] || "from-slate-600 to-slate-700 border-slate-500";
+                                            const isWhite = mix.color === 'white';
+
+                                            return (
+                                                <div className={clsx(
+                                                    "w-12 h-8 bg-gradient-to-br rounded flex items-center justify-center border shadow-sm",
+                                                    colorClass
+                                                )}>
+                                                    <div className={clsx(
+                                                        "w-6 h-4 rounded-sm flex items-center justify-around",
+                                                        isWhite ? "bg-slate-300" : "bg-black/30"
+                                                    )}>
+                                                        <div className={clsx("w-1.5 h-1.5 rounded-full border", isWhite ? "border-slate-500" : "border-white/50")}></div>
+                                                        <div className={clsx("w-1.5 h-1.5 rounded-full border", isWhite ? "border-slate-500" : "border-white/50")}></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                         <div>
-                                            <h3 className="font-mono font-bold text-sm text-white">{mix.title}</h3>
+                                            <h3 className={clsx("font-mono font-bold text-sm", mix.id === activeMixId ? "text-blue-400" : "text-white")}>{mix.title}</h3>
                                             <p className="text-xs text-slate-400">{mix.songs.length} songs</p>
                                         </div>
                                     </div>
@@ -178,7 +194,14 @@ export function NordicStage({
 
                     {/* Right Column: Player */}
                     <section className="lg:col-span-5 w-full">
-                        <div className="bg-[#24272b] p-8 rounded-2xl shadow-2xl border border-slate-700/50">
+                        <motion.div
+                            drag
+                            dragConstraints={containerRef}
+                            dragMomentum={true}
+                            dragElastic={0.2}
+                            whileDrag={{ scale: 1.02, zIndex: 50 }}
+                            className="bg-[#24272b] p-8 rounded-2xl shadow-2xl border border-slate-700/50 cursor-grab active:cursor-grabbing"
+                        >
 
                             {/* Player Header */}
                             <div className="flex justify-between items-center mb-6">
@@ -290,7 +313,7 @@ export function NordicStage({
                                     />
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
                     </section>
                 </main>
             </div>

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Smartphone, Settings, Plus, Maximize2, Pencil, Camera } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Maximize2, Pencil, Camera } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
@@ -67,7 +67,6 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                 {/* Header */}
                 <header className="w-full p-4 flex flex-col md:flex-row justify-between items-center bg-white border-b-4 border-[#1a1a1a] relative z-20 gap-4 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] mb-4">
                     <div className="flex items-center gap-4 select-none">
-                        <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
                         <h1 className="text-3xl font-['Pacifico'] tracking-tight">Melora Tunes</h1>
                     </div>
 
@@ -101,7 +100,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                     {/* Left Column: Mixtapes Grid */}
                     <section className="w-full h-full p-4 lg:p-8 overflow-y-auto [&::-webkit-scrollbar]:hidden pb-32">
                         <div className="flex items-end gap-4 mb-8">
-                            <h2 className="text-4xl md:text-5xl font-black uppercase leading-none tracking-tighter">Your<br />Mixtapes</h2>
+                            <h2 className="text-2xl md:text-3xl font-black uppercase leading-none tracking-tighter">Your<br />Mixtapes</h2>
                             <div className="h-4 w-24 bg-[#ff3333] mb-2 hidden md:block"></div>
                             <div className="h-4 w-4 bg-[#0052cc] mb-2 rounded-full hidden md:block"></div>
                         </div>

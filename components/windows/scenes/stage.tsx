@@ -397,7 +397,35 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                         setIsSearchOpen(true);
                     }}
                     onCreateMix={() => {
-                        setNewMixTitle(`Mixtape Vol. ${mixes.length + 1}`);
+                        const existingNums = new Set<number>();
+                        let customCount = 0;
+
+                        mixes.forEach(m => {
+                            const match = m.title.match(/Mixtape Vol\. (\d+)/);
+                            if (match) {
+                                existingNums.add(parseInt(match[1]));
+                            } else {
+                                customCount++;
+                            }
+                        });
+
+                        // Assign hypothetical numbers to custom text titles
+                        // filling the lowest available gaps first
+                        for (let i = 0; i < customCount; i++) {
+                            let placeholder = 1;
+                            while (existingNums.has(placeholder)) {
+                                placeholder++;
+                            }
+                            existingNums.add(placeholder);
+                        }
+
+                        // Find first available slot for the NEW tape
+                        let nextNum = 1;
+                        while (existingNums.has(nextNum)) {
+                            nextNum++;
+                        }
+
+                        setNewMixTitle(`Mixtape Vol. ${nextNum}`);
                         setIsModalOpen(true);
                     }}
                     onCinemaMode={() => setIsCinemaMode(true)}
