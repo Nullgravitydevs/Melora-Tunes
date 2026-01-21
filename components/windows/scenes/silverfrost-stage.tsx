@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
@@ -12,6 +12,9 @@ import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { getThumbnailUrl } from "@/lib/jiosaavn";
+import { LyricsView } from "@/components/ui/lyrics-view";
+import { EqualizerView } from "@/components/ui/equalizer-view";
+import { Mic2, SlidersHorizontal } from "lucide-react";
 
 interface SilverFrostStageProps {
     currentTheme: ThemeKey;
@@ -37,12 +40,14 @@ export function SilverFrostStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, togglePlay, next, prev, setVolume, isLoaded, seek,
-        shuffle, setShuffle, repeat, setRepeat
+        shuffle, setShuffle, repeat, setRepeat, eq
     } = usePlayback();
 
     const { playClick, playClunk } = useAudio();
     const activeMix = mixes.find(m => m.id === activeMixId) || null;
     const [hoveredMix, setHoveredMix] = useState<string | null>(null);
+    const [showLyrics, setShowLyrics] = useState(false);
+    const [showEq, setShowEq] = useState(false);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -90,6 +95,8 @@ export function SilverFrostStage({
                     {/* Switch Mobile Removed */}
                     <button onClick={onOpenThemeSelector} className="size-10 rounded-full border-2 border-slate-300 flex items-center justify-center bg-white/50 hover:bg-white transition-colors"><Palette size={18} className="text-slate-600" /></button>
                     <button onClick={onOpenSettings} className="size-10 rounded-full border-2 border-slate-300 flex items-center justify-center bg-white/50 hover:bg-white transition-colors"><Settings size={18} className="text-slate-600" /></button>
+                    <button onClick={() => setShowLyrics(prev => !prev)} className={`size-10 rounded-full border-2 border-slate-300 flex items-center justify-center transition-colors ${showLyrics ? 'bg-[#00aaff] text-white border-[#00aaff]' : 'bg-white/50 text-slate-600 hover:bg-white'}`}><Mic2 size={18} /></button>
+                    <button onClick={() => setShowEq(prev => !prev)} className={`size-10 rounded-full border-2 border-slate-300 flex items-center justify-center transition-colors ${showEq ? 'bg-[#00aaff] text-white border-[#00aaff]' : 'bg-white/50 text-slate-600 hover:bg-white'}`}><SlidersHorizontal size={18} /></button>
                 </div>
             </header>
 
@@ -300,6 +307,28 @@ export function SilverFrostStage({
                     {isLoaded ? `Now Playing: ${currentSong ? decodeHtml(currentSong.name) : activeMix?.title}` : 'Ready'}
                 </div>
             </footer>
+            {/* Overlays */}
+            <AnimatePresence>
+                {showLyrics && (
+                    <LyricsView
+                        currentSong={currentSong}
+                        currentTime={progress * duration}
+                        onClose={() => setShowLyrics(false)}
+                    />
+                )}
+                {showEq && (
+                    <EqualizerView
+                        onClose={() => setShowEq(false)}
+                        bands={eq.bands}
+                        setBand={eq.setBand}
+                        isEnabled={eq.isEnabled}
+                        setIsEnabled={eq.setIsEnabled}
+                        currentPreset={eq.currentPreset}
+                        setPreset={eq.setPreset}
+                        presets={eq.presets}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

@@ -56,7 +56,7 @@ export const THEMES: Record<string, ThemeConfig> = {
     METAL: {
         name: "Realistic Metal Edition",
         layout: 'studio',
-        bodyGradient: "bg-zinc-950",
+        bodyGradient: "bg-black",
         screenBg: "bg-zinc-900",
         cassetteBg: "bg-zinc-800",
         labelBg: "bg-zinc-900",

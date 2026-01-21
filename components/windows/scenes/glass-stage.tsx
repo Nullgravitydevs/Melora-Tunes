@@ -17,8 +17,10 @@ import {
     Pause, Shuffle, Repeat, Info, X, Check, Play, SkipBack, SkipForward, Repeat1,
     Music, Disc, Zap, ListPlus, Radio, Share2,
     Maximize2, ChevronUp, ChevronDown, CheckCircle,
-    Star, Users, History, Heart
+    Star, Users, History, Heart, SlidersHorizontal, HardDrive
 } from "lucide-react";
+import { LyricsView } from "@/components/ui/lyrics-view";
+import { EqualizerView } from "@/components/ui/equalizer-view";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import Image from "next/image";
 
@@ -191,6 +193,7 @@ export function GlassStage({
     const [newPlaylistName, setNewPlaylistName] = useState("");
     const [showStickyHeader, setShowStickyHeader] = useState(false); // Sticky Header State
     const [showLyrics, setShowLyrics] = useState(false);
+    const [showEq, setShowEq] = useState(false);
 
     const mainContainerRef = useRef<HTMLDivElement>(null);
 
@@ -238,7 +241,8 @@ export function GlassStage({
         currentSong, isPlaying, togglePlay, next, prev, seek, volume, setVolume,
         progress, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, mixes, addMix,
         updateMix, deleteMix, activeMixId, play,
-        likedSongs, toggleLike, isLiked, recentlyPlayed
+        likedSongs, toggleLike, isLiked, recentlyPlayed, eq, isDownloaded,
+        downloadSong, removeDownload
     } = usePlayback();
 
     // --- Navigation State ---
@@ -1175,6 +1179,7 @@ export function GlassStage({
                                             onPlay={() => handleSongClick(song)}
                                             onLike={() => toggleLike(song)}
                                             onContextMenu={(e) => handleContextMenu(e, song)}
+                                            isOffline={isDownloaded(song.id)}
                                         />
                                     ))}
                                 </div>
@@ -1203,6 +1208,7 @@ export function GlassStage({
                                                 onPlay={() => handlePlayWithFallback(group, group.bestQuality)}
                                                 onLike={() => toggleLike(group.qualities[group.bestQuality as keyof typeof group.qualities] as JioSaavnSong)}
                                                 onContextMenu={(e) => handleContextMenu(e, group.qualities[group.bestQuality as keyof typeof group.qualities] as JioSaavnSong)}
+                                                isOffline={isDownloaded(group.id)}
                                             />
                                         ))}
                                         {groupedResults.length > 10 && !showAllResults && (
@@ -1260,6 +1266,7 @@ export function GlassStage({
                                             onPlay={() => handleSongClick(song)}
                                             onLike={() => toggleLike(song)}
                                             onContextMenu={(e) => handleContextMenu(e, song)}
+                                            isOffline={isDownloaded(song.id)}
                                         />
                                     ))}
                                 </div>
@@ -1290,6 +1297,7 @@ export function GlassStage({
                                                 }}
                                                 onLike={() => toggleLike(song)}
                                                 onContextMenu={(e) => handleContextMenu(e, song)}
+                                                isOffline={isDownloaded(song.id)}
                                             />
                                         ))}
                                     </div>
@@ -1356,6 +1364,7 @@ export function GlassStage({
                                                 onPlay={() => handleSongClick(song)}
                                                 onLike={() => toggleLike(song)}
                                                 onContextMenu={(e) => handleContextMenu(e, song)}
+                                                isOffline={isDownloaded(song.id)}
                                             />
                                         ))}
                                     </div>
@@ -1615,6 +1624,12 @@ export function GlassStage({
 
                     {/* Right Tools */}
                     <div className="flex items-center gap-3 w-[30%] justify-end">
+                        <button onClick={() => setShowLyrics(prev => !prev)} className={`transition-colors ${showLyrics ? 'text-white' : 'text-gray-500 hover:text-white'}`}>
+                            <Mic2 size={18} />
+                        </button>
+                        <button onClick={() => setShowEq(prev => !prev)} className={`transition-colors ${showEq ? 'text-white' : 'text-gray-500 hover:text-white'}`}>
+                            <SlidersHorizontal size={18} />
+                        </button>
                         <button onClick={() => navigateTo({ type: 'queue' })} className="text-gray-500 hover:text-white transition-colors">
                             <ListMusic size={18} />
                         </button>
@@ -1647,6 +1662,29 @@ export function GlassStage({
                 )}
             </AnimatePresence>
 
+            {/* Overlays */}
+            <AnimatePresence>
+                {showLyrics && (
+                    <LyricsView
+                        currentSong={currentSong}
+                        currentTime={progress * duration}
+                        onClose={() => setShowLyrics(false)}
+                    />
+                )}
+                {showEq && (
+                    <EqualizerView
+                        onClose={() => setShowEq(false)}
+                        bands={eq.bands}
+                        setBand={eq.setBand}
+                        isEnabled={eq.isEnabled}
+                        setIsEnabled={eq.setIsEnabled}
+                        currentPreset={eq.currentPreset}
+                        setPreset={eq.setPreset}
+                        presets={eq.presets}
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Context Menu */}
             <TrackContextMenu
                 visible={contextMenu.visible}
@@ -1659,6 +1697,9 @@ export function GlassStage({
                 onGoToArtist={(artistId) => { navigateTo({ type: 'artist', data: { id: artistId } }); }}
                 onGoToAlbum={(albumId) => { if (contextMenu.song?.album) navigateTo({ type: 'playlist', data: { ...contextMenu.song.album, type: 'album', image: contextMenu.song.image } }); }}
                 onStartRadio={(song) => handleStartRadio(song)}
+                isDownloaded={contextMenu.song ? isDownloaded(contextMenu.song.id) : false}
+                onDownload={(song) => downloadSong(song)}
+                onRemoveDownload={(songId) => removeDownload(songId)}
             />
 
             {/* Create Playlist Modal */}
@@ -1747,6 +1788,7 @@ function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onC
     onPlay: () => void;
     onLike: () => void;
     onContextMenu: (e: React.MouseEvent) => void;
+    isOffline?: boolean;
 }) {
     return (
         <div
@@ -1773,7 +1815,15 @@ function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onC
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium truncate ${isPlaying ? 'text-green-500' : 'text-white'}`}>{decodeHtml(song.name)}</p>
+                <div className="flex items-center gap-2">
+                    <p className={`text-sm font-medium truncate ${isPlaying ? 'text-green-500' : 'text-white'}`}>{decodeHtml(song.name)}</p>
+                    {isOffline && (
+                        <div title="Downloaded" className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[9px] font-bold border border-green-500/30">
+                            <HardDrive size={8} />
+                            <span>OFFLINE</span>
+                        </div>
+                    )}
+                </div>
                 <p className="text-xs text-gray-500 truncate">{decodeHtml(song.primaryArtists)}</p>
             </div>
 

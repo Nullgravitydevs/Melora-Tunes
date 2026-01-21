@@ -7,6 +7,8 @@ import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { recordPlay } from "@/lib/stats";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { getSkipSegments, SkipSegment } from "@/lib/sponsorblock";
+import { useEqualizer } from "@/hooks/useEqualizer";
+import { OfflineStore } from "@/lib/offline-store";
 
 export interface Mix {
     id: string;
@@ -82,11 +84,20 @@ interface PlaybackContextType {
     isLiked: (songId: string) => boolean;
 
     // Recently Played
+    // Recently Played
     recentlyPlayed: JioSaavnSong[];
 
     // Playback Speed
     playbackSpeed: number;
     setPlaybackSpeed: (speed: number) => void;
+
+    // Equalizer
+    eq: ReturnType<typeof useEqualizer>;
+
+    // Offline / Downloads
+    downloadSong: (song: JioSaavnSong) => Promise<boolean>;
+    removeDownload: (songId: string) => Promise<void>;
+    isDownloaded: (songId: string) => boolean;
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -114,6 +125,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     const [playbackSpeed, setPlaybackSpeed] = useState(1); // 0.5, 0.75, 1, 1.25, 1.5, 2
     const [skipSegments, setSkipSegments] = useState<SkipSegment[]>([]);
+    const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+
+    // EQ Hook
+    const eq = useEqualizer();
 
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
@@ -377,7 +392,52 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
     }, [isPlaying, pause, play]);
 
+    // --- Offline Management ---
+    useEffect(() => {
+        // Hydrate downloaded state on mount
+        OfflineStore.getAllDownloadedSongs().then(songs => {
+            setDownloadedIds(new Set(songs.map(s => s.id)));
+        });
+    }, []);
+
+    const isDownloaded = useCallback((songId: string) => downloadedIds.has(songId), [downloadedIds]);
+
+    const downloadSong = useCallback(async (song: JioSaavnSong) => {
+        try {
+            // Get URL - force 320 or best available
+            const url = await getAudioUrl(song, '320');
+            if (url) {
+                await OfflineStore.saveSong(song, url);
+                setDownloadedIds(prev => new Set(prev).add(song.id));
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error("Download failed", e);
+            return false;
+        }
+    }, []);
+
+    const removeDownload = useCallback(async (songId: string) => {
+        await OfflineStore.removeSong(songId);
+        setDownloadedIds(prev => {
+            const next = new Set(prev);
+            next.delete(songId);
+            return next;
+        });
+    }, []);
+
     const loadSongUrl = useCallback(async (song: JioSaavnSong, overrideBitrate?: string) => {
+        // 1. Check Offline Storage FIRST
+        if (downloadedIds.has(song.id)) {
+            console.log(`[Playback] Playing from Offline Storage: ${song.name}`);
+            const blobUrl = await OfflineStore.getSongUrl(song.id);
+            if (blobUrl) {
+                setCurrentSongUrl(blobUrl);
+                return;
+            }
+        }
+
         // Helper to detect YouTube ID (11 chars, alphanumeric + underscore/hyphen)
         const isYouTubeId = (id: string) => /^[a-zA-Z0-9_-]{11}$/.test(id);
 
@@ -407,6 +467,52 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 }
             } catch (err) {
                 console.warn(`[Playback] ${songSource} stream failed:`, err);
+                // FALLBACK LOGIC
+                // Check if we have a fallback ID injected by the smart engine
+                const fallbackId = (song as any).saavnFallbackId;
+                if (fallbackId) {
+                    console.log("[Playback] ⚠️ Falling back to JioSaavn 320kbps...", fallbackId);
+                    // Create a mock song object for the fallback request
+                    // We reuse the existing metadata but with the fallback ID
+                    const fallbackSong = { ...song, id: fallbackId, encryptedMediaUrl: "FETCH_REQUIRED" };
+                    // Fetch actual details to get encrypted url
+                    // But getAudioUrl expects the object to have it.
+                    // We need to fetch details first? 
+                    // Actually, we can just call loadSongUrl recursively if we had the full object
+                    // But we don't. We just have ID.
+                    // Quickest path: Call getSongDetails or just try to getAudioUrl if we have the MediaUrl (we don't)
+
+                    // Optimization: If we can, we should have injected the MediaURL too.
+                    // But for now, let's just fail gracefully to "Web Search" fallback 
+                    // OR better: Just skip to next if we can't play? 
+                    // No, "Smart Engine" promised fallback.
+
+                    // Let's rely on the native scraper to get the fallback link quickly?
+                    // Or just try to construct the URL if we had it?
+                    // We don't have encryptedURL.
+                    // So we must fetch it.
+
+                    // IMPLEMENTATION:
+                    // 1. Fetch JioSaavn Details for fallbackId
+                    // 2. Play that.
+                    try {
+                        // Import dynamically or assume global fetch to our API? 
+                        // We are in Context. We can use our /api/song route.
+                        const fbRes = await fetch(`/api/song?id=${fallbackId}`);
+                        const fbData = await fbRes.json();
+                        if (fbData.encrypted_media_url) {
+                            const { getAudioUrl } = require('@/lib/jiosaavn'); // Dynamic import to avoid cycles/issues? 
+                            // Or just use the imported one at top of file
+                            const fbUrl = await getAudioUrl({ ...fbData, encryptedMediaUrl: fbData.encrypted_media_url }, '320');
+                            if (fbUrl) {
+                                console.log("[Playback] Fallback success!");
+                                setCurrentSongUrl(fbUrl);
+                                return;
+                            }
+                        }
+                    } catch (e) { console.error("Fallback failed too", e); }
+                }
+
                 setCurrentSongUrl(null);
                 setIsPlaying(false);
                 return;
@@ -675,7 +781,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             notificationsEnabled, setNotificationsEnabled,
             likedSongs, toggleLike, isLiked,
             recentlyPlayed,
-            playbackSpeed, setPlaybackSpeed
+            playbackSpeed, setPlaybackSpeed,
+            eq,
+            downloadSong, removeDownload, isDownloaded
         }}>
             {children}
 
@@ -688,6 +796,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 volume={volume}
                 speed={playbackSpeed}
                 crossfadeDuration={crossfadeDuration}
+                eqBands={eq.isEnabled ? eq.bands : undefined} // Only pass bands if enabled
                 onEnded={() => {
                     if (currentSong) recordPlay(currentSong, duration);
                     next();

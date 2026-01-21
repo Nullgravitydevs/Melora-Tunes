@@ -1,13 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
 import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Smartphone, Settings, Plus, Maximize2, Pencil, Camera } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
+import { LyricsView } from "@/components/ui/lyrics-view";
+import { EqualizerView } from "@/components/ui/equalizer-view";
+import { Mic2, SlidersHorizontal } from "lucide-react";
 
 interface BauhausStageProps {
     currentTheme: ThemeKey;
@@ -30,10 +33,12 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded
+        isLoaded, eq
     } = usePlayback();
 
     const { playClick, playClunk, playEject } = useAudio();
+    const [showLyrics, setShowLyrics] = useState(false);
+    const [showEq, setShowEq] = useState(false);
     // const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
     const activeMix = mixes.find(m => m.id === activeMixId) || null;
@@ -413,6 +418,20 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                             </div>
 
                             <div className="flex flex-col items-center gap-2 h-full justify-end group">
+                                <button
+                                    onClick={() => setShowLyrics(prev => !prev)}
+                                    className={`mb-1 transition-colors ${showLyrics ? 'text-[#0052cc]' : 'text-gray-400 hover:text-[#0052cc]'}`}
+                                    title="Lyrics"
+                                >
+                                    <Mic2 size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setShowEq(prev => !prev)}
+                                    className={`mb-2 transition-colors ${showEq ? 'text-[#0052cc]' : 'text-gray-400 hover:text-[#0052cc]'}`}
+                                    title="Equalizer"
+                                >
+                                    <SlidersHorizontal size={16} />
+                                </button>
                                 <div className="w-3 h-20 bg-gray-100 border-2 border-[#1a1a1a] relative overflow-hidden flex items-end cursor-pointer rounded-full">
                                     <motion.div className="w-full bg-[#ffcc00] group-hover:bg-yellow-400" style={{ height: `${volume * 100}%` }} />
                                     <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer" />
@@ -422,6 +441,28 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                         </div>
                     </motion.section >
                 </main >
+                {/* Overlays */}
+                <AnimatePresence>
+                    {showLyrics && (
+                        <LyricsView
+                            currentSong={currentSong}
+                            currentTime={progress * duration}
+                            onClose={() => setShowLyrics(false)}
+                        />
+                    )}
+                    {showEq && (
+                        <EqualizerView
+                            onClose={() => setShowEq(false)}
+                            bands={eq.bands}
+                            setBand={eq.setBand}
+                            isEnabled={eq.isEnabled}
+                            setIsEnabled={eq.setIsEnabled}
+                            currentPreset={eq.currentPreset}
+                            setPreset={eq.setPreset}
+                            presets={eq.presets}
+                        />
+                    )}
+                </AnimatePresence>
             </div >
         </div >
     );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, LogOut,
@@ -11,6 +11,9 @@ import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
+import { LyricsView } from "@/components/ui/lyrics-view";
+import { EqualizerView } from "@/components/ui/equalizer-view";
+import { Mic2, SlidersHorizontal } from "lucide-react";
 
 interface OpenDeckStageProps {
     currentTheme: ThemeKey;
@@ -48,10 +51,12 @@ export function OpenDeckStage({
     const [isOverPlayer, setIsOverPlayer] = useState(false);
     const [dragPosition, setDragPosition] = useState<{ x: number, y: number } | null>(null);
     const [draggingMix, setDraggingMix] = useState<{ mix: Mix, index: number } | null>(null);
+    const [showLyrics, setShowLyrics] = useState(false);
+    const [showEq, setShowEq] = useState(false);
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek
+        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek, eq
     } = usePlayback();
 
     const { playClick, playEject, playClunk, playInsert } = useAudio();
@@ -129,6 +134,8 @@ export function OpenDeckStage({
                         {/* Switch Mobile Removed */}
                         <button onClick={onOpenThemeSelector} className="flex size-8 items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-[#2d8652]/10"><Palette size={14} className="text-neutral-600" /></button>
                         <button onClick={onOpenSettings} className="flex size-8 items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-[#2d8652]/10"><Settings size={14} className="text-neutral-600" /></button>
+                        <button onClick={() => setShowLyrics(prev => !prev)} className={`flex size-8 items-center justify-center rounded-full border border-neutral-200 transition-colors ${showLyrics ? 'bg-[#2d8652] text-white border-[#2d8652]' : 'bg-white text-neutral-600 hover:bg-[#2d8652]/10'}`}><Mic2 size={14} /></button>
+                        <button onClick={() => setShowEq(prev => !prev)} className={`flex size-8 items-center justify-center rounded-full border border-neutral-200 transition-colors ${showEq ? 'bg-[#2d8652] text-white border-[#2d8652]' : 'bg-white text-neutral-600 hover:bg-[#2d8652]/10'}`}><SlidersHorizontal size={14} /></button>
                     </div>
                 </div>
             </header>
@@ -317,6 +324,28 @@ export function OpenDeckStage({
                     })()}
                 </div>
             )}
+            {/* Overlays */}
+            <AnimatePresence>
+                {showLyrics && (
+                    <LyricsView
+                        currentSong={currentSong}
+                        currentTime={progress * duration}
+                        onClose={() => setShowLyrics(false)}
+                    />
+                )}
+                {showEq && (
+                    <EqualizerView
+                        onClose={() => setShowEq(false)}
+                        bands={eq.bands}
+                        setBand={eq.setBand}
+                        isEnabled={eq.isEnabled}
+                        setIsEnabled={eq.setIsEnabled}
+                        currentPreset={eq.currentPreset}
+                        setPreset={eq.setPreset}
+                        presets={eq.presets}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

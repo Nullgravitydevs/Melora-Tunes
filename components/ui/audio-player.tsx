@@ -20,6 +20,8 @@ interface AudioPlayerProps {
     onNext?: () => void;
     onPrev?: () => void;
     onPlayToggle?: () => void;
+    // EQ Props
+    eqBands?: number[]; // Array of 10 gains
 }
 
 export interface AudioPlayerRef {
@@ -28,6 +30,7 @@ export interface AudioPlayerRef {
     play: () => void;
     pause: () => void;
     setVolume: (vol: number) => void;
+    // initAudioContext: () => void; // Call on first interaction
 }
 
 export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
@@ -47,7 +50,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     onError,
     onNext,
     onPrev,
-    onPlayToggle: onPlayPause
+    onPlayToggle: onPlayPause,
+    eqBands
 }, ref) => {
     const primaryRef = useRef<HTMLAudioElement>(null);
     const secondaryRef = useRef<HTMLAudioElement>(null);
@@ -56,8 +60,91 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const crossfadeIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
     const isCrossfadingRef = useRef(false);
 
+    // Audio Graph Refs
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const filtersRef = useRef<BiquadFilterNode[]>([]);
+    const sourceRefs = useRef<Map<HTMLAudioElement, MediaElementAudioSourceNode>>(new Map());
+    const gainNodeRef = useRef<GainNode | null>(null);
+
     const getActive = useCallback(() => activeId === 'primary' ? primaryRef.current : secondaryRef.current, [activeId]);
     const getInactive = useCallback(() => activeId === 'primary' ? secondaryRef.current : primaryRef.current, [activeId]);
+
+    // Initialize Audio Graph (Idempotent)
+    const initAudioGraph = useCallback(() => {
+        if (audioContextRef.current) return;
+
+        try {
+            const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+            const ctx = new Ctx();
+            audioContextRef.current = ctx;
+
+            // Create Master Gain (for volume/crossfade if needed later, though native volume is cleaner for element)
+            // Actually, we process AFTER element volume usually, but element source takes raw output.
+            // Let's rely on element.volume for simple volume control, and use Graph purely for EQ.
+            // Source -> EQ -> Dest
+
+            // Create Filters
+            const freqs = [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000];
+            const filters = freqs.map((f, i) => {
+                const filter = ctx.createBiquadFilter();
+                if (i === 0) filter.type = 'lowshelf';
+                else if (i === freqs.length - 1) filter.type = 'highshelf';
+                else filter.type = 'peaking';
+                filter.frequency.value = f;
+                filter.Q.value = 1.0; // wider curve usually sounds better
+                filter.gain.value = 0;
+                return filter;
+            });
+
+            // Connect chain
+            for (let i = 0; i < filters.length - 1; i++) {
+                filters[i].connect(filters[i + 1]);
+            }
+            filters[filters.length - 1].connect(ctx.destination);
+            filtersRef.current = filters;
+
+            // Connect Elements if they exist
+            [primaryRef.current, secondaryRef.current].forEach(el => {
+                if (el && !sourceRefs.current.has(el)) {
+                    try {
+                        const source = ctx.createMediaElementSource(el);
+                        source.connect(filters[0]);
+                        sourceRefs.current.set(el, source);
+                    } catch (err) {
+                        console.warn("Source creation failed (maybe already connected):", err);
+                    }
+                }
+            });
+
+            console.log("🎛️ Audio Graph Initialized");
+        } catch (e) {
+            console.error("Audio API Error:", e);
+        }
+    }, []);
+
+    // Update EQ Bands
+    useEffect(() => {
+        if (!eqBands || !filtersRef.current.length) return;
+
+        eqBands.forEach((gain, i) => {
+            if (filtersRef.current[i]) {
+                filtersRef.current[i].gain.setTargetAtTime(gain, audioContextRef.current?.currentTime || 0, 0.1);
+            }
+        });
+    }, [eqBands]);
+
+    // Handle User Interaction to Unlock AudioContext
+    useEffect(() => {
+        const unlock = () => {
+            initAudioGraph();
+            if (audioContextRef.current?.state === 'suspended') {
+                audioContextRef.current.resume();
+            }
+            window.removeEventListener('click', unlock);
+        };
+        window.addEventListener('click', unlock);
+        return () => window.removeEventListener('click', unlock);
+    }, [initAudioGraph]);
 
     useImperativeHandle(ref, () => ({
         seekTo: (amount: number) => {
@@ -237,8 +324,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         }
     };
 
-    // Shared Props for audio elements
-    const audioProps = {
+    const audioProps: React.DetailedHTMLProps<React.AudioHTMLAttributes<HTMLAudioElement>, HTMLAudioElement> = {
+        crossOrigin: "anonymous", // CRITICAL for Web Audio API with external/proxy sources
         preload: "auto",
         style: { display: 'none' },
         onEnded: (e: any) => handleEvent(e, 'ended'),

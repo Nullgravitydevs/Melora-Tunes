@@ -18,7 +18,7 @@ import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume
 import { StickerLayer, Sticker, StickerType } from './stickers/StickerLayer';
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
-import { JioSaavnSong, getLyrics, getAlbumDetails } from "@/lib/jiosaavn";
+import { searchSongs, JioSaavnSong, getAlbumDetails, getLyricsWithFallback } from "@/lib/jiosaavn";
 import { searchUnified, GroupedSong } from "@/lib/unified-search";
 import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
@@ -143,6 +143,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const stickerConstraintsRef = useRef<HTMLDivElement>(null);
     const iPodBodyRef = useRef<HTMLDivElement>(null);
+    const scrollDirectionRef = useRef<'left' | 'right' | null>(null);
 
     // Sticker State
     const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -153,7 +154,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Audio constants
-    const audioRefs = useRef<{ insert: HTMLAudioElement; eject: HTMLAudioElement; lock: HTMLAudioElement; tick: HTMLAudioElement; select: HTMLAudioElement } | null>(null);
+    const [lyrics, setLyrics] = useState<string | null>(null);
+    const audioRefs = useRef<{ [key: string]: HTMLAudioElement } | null>(null);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -485,6 +487,11 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 return newStack;
             }
 
+            // Clear lyrics when backing out of lyrics view
+            if (current.viewType === 'lyrics') {
+                setLyrics(null);
+            }
+
             return prev.slice(0, prev.length - 1);
         });
     }, []);
@@ -573,6 +580,42 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         }
     }, [mixes, updateMix, loadMix, play, addMix, setForceLossless, goToNowPlaying]);
 
+    const handleShowLyrics = useCallback(async (song: JioSaavnSong) => {
+        if (!song) {
+            alert("No song selected for lyrics.");
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const fetchedLyrics = await getLyricsWithFallback(song);
+            setLyrics(fetchedLyrics);
+            setViewStack(prev => [...prev, {
+                id: 'lyrics',
+                title: 'Lyrics',
+                viewType: 'lyrics',
+                selectedIndex: 0,
+                data: {
+                    id: 'lyrics',
+                    message: fetchedLyrics || "No lyrics found."
+                }
+            }]);
+        } catch (error) {
+            console.error("Failed to fetch lyrics:", error);
+            setLyrics("Failed to load lyrics.");
+            setViewStack(prev => [...prev, {
+                id: 'lyrics',
+                title: 'Lyrics',
+                viewType: 'lyrics',
+                selectedIndex: 0,
+                data: {
+                    id: 'lyrics',
+                    message: "Failed to load lyrics."
+                }
+            }]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
     // Compute Menu Items Dynamically based on Current View ID & Context
     // Memoized to prevent heavy recalculation on scroll (selectedIndex change)
@@ -1141,6 +1184,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
 
     const handleScroll = (direction: number) => {
+        // Update Scroll Direction Ref for Animations
+        scrollDirectionRef.current = direction > 0 ? 'right' : 'left';
+
         // Volume Settings Screen
         if (currentView.id === 'volume-settings') {
             const newVol = Math.max(0, Math.min(1, volume + (direction * 0.05)));
@@ -1302,7 +1348,16 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 {
                     label: "Add to Playlist...",
                     type: 'navigation',
-                    target: 'playlists' // Simplistic fallback for now, ideally shows playlist picker
+                    target: `add-to-${song.id}`,
+                    data: song
+                },
+                {
+                    label: "Show Lyrics",
+                    type: 'action',
+                    action: () => {
+                        handleShowLyrics(song);
+                        handleBack(); // Close menu
+                    }
                 },
                 {
                     label: "Cancel",
@@ -1341,7 +1396,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             }
             alert("Added to On-the-Go");
         }
-    }, [currentMenuItems, currentView, currentSong, mixes, addMix, updateMix, registerActivity]);
+    }, [currentMenuItems, currentView, currentSong, mixes, addMix, updateMix, registerActivity, handleShowLyrics]);
 
     const handleSelect = useCallback(() => {
         registerActivity();
@@ -1407,26 +1462,13 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 alert("No song playing!");
                 return;
             }
-            setIsLoading(true);
-            getLyrics(currentSong.id).then(lyrics => {
-                setIsLoading(false);
-                setViewStack(prev => [...prev, {
-                    id: 'lyrics',
-                    title: 'Lyrics',
-                    viewType: 'lyrics',
-                    selectedIndex: 0,
-                    data: {
-                        id: 'lyrics',
-                        message: lyrics || "No lyrics found."
-                    }
-                }]);
-            });
+            handleShowLyrics(currentSong);
         } else if (item.action) {
             item.action();
         } else if (item.type === 'navigation' && item.target) {
             handleNavigation(item.target, item.data, item.label);
         }
-    }, [currentView, controlMode, currentMenuItems, mixes, currentSong, playSongNow, goToNowPlaying, handleNavigation, cfTracks, clickSounds, playClick, registerActivity]);
+    }, [currentView, controlMode, currentMenuItems, mixes, currentSong, playSongNow, goToNowPlaying, handleNavigation, cfTracks, clickSounds, playClick, registerActivity, handleShowLyrics]);
 
     // Auto-Rotation for Cover Flow
     useEffect(() => {
@@ -1676,101 +1718,40 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     >
                         <IpodScreen
                             variant={currentView.viewType || 'menu'}
+                            lyrics={lyrics}
                             title={currentView.title}
                             menuItems={currentMenuItems.map(i => i.label)}
-                            itemsData={currentMenuItems}
+                            itemsData={currentView.staticItems ? currentView.staticItems : currentMenuItems.map(i => i.data)}
                             selectedIndex={currentView.selectedIndex}
-                            currentSong={currentSong}
+                            currentSong={currentSong || undefined}
                             isPlaying={isPlaying}
                             progress={progress}
                             duration={duration}
                             isLoading={isLoading}
-                            message={currentView.data?.message || ''}
-                            isFlipped={currentView.isFlipped}
-                            customHeader={currentView.customHeader}
-                            searchQuery={currentView.viewType === 'search' ? currentView.searchQuery : undefined}
-                            // Pass handlers for real input
-                            onSearchChange={(val) => {
-                                setSearchQuery(val);
-                                // Sync to viewstack for persistence if needed
-                                setViewStack(prev => {
-                                    const newStack = [...prev];
-                                    newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], searchQuery: val };
-                                    return newStack;
-                                });
-                            }}
-                            onSearchSubmit={(val) => handleSearch(val)}
+                            searchQuery={currentView.searchQuery}
+                            onSearchChange={(q) => handleSearch(q)}
+                            onSearchSubmit={handleSearch}
                             inputRef={inputRef}
-                            onAddSticker={handleAddSticker}
-                            onItemSelect={(index) => {
-                                if (isLocked) return;
-                                setViewStack(prev => {
-                                    const newStack = [...prev];
-                                    newStack[newStack.length - 1] = { ...newStack[newStack.length - 1], selectedIndex: index };
-                                    return newStack;
-                                });
-                                setTimeout(() => {
-                                    const item = currentMenuItems[index];
-
-                                    // Special handling for Cover Flow Flip
-                                    if (currentView.viewType === 'cover-flow') {
-                                        setViewStack(prev => {
-                                            const newStack = [...prev];
-                                            const active = newStack[newStack.length - 1];
-                                            newStack[newStack.length - 1] = { ...active, isFlipped: !active.isFlipped };
-                                            return newStack;
-                                        });
-                                        return;
-                                    }
-
-                                    if (item) {
-                                        // Special handling for Cinema Mode, Cover Flow and Now Playing from MAIN_MENU
-                                        if (item.data?.id === 'cinema') {
-                                            setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
-                                        } else if (item.data?.id === 'cover-flow') {
-                                            setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: 0 }]);
-                                        } else if (item.data?.id === 'now-playing') {
-                                            goToNowPlaying();
-                                        } else if (item.data?.id === 'switch-studio') {
-                                            handleSwitchToDesktop();
-                                        } else if (item.data?.id === 'switch-discovery') {
-                                            handleSwitchToDesktop('GLASS');
-                                        } else if (item.data?.id === 'sticker-collection') {
-                                            setViewStack(prev => [...prev, { id: 'sticker-collection', title: 'Stickers', viewType: 'stickers', selectedIndex: 0 }]);
-                                        } else if (item.data?.id === 'brick-game') {
-                                            setViewStack(prev => [...prev, { id: 'game-brick', title: 'Brick', viewType: 'loading', selectedIndex: 0 }]);
-                                        } else if (item.data?.id === 'game-music-quiz') {
-                                            setViewStack(prev => [...prev, { id: 'game-music-quiz', title: 'Music Quiz', viewType: 'loading', selectedIndex: 0 }]);
-                                        } else if (item.action) {
-                                            item.action();
-                                        } else if (currentView.viewType === 'search') {
-                                            // FIX: Absolute Playback Force for Search
-                                            const song = item.data;
-                                            if (song && song.id) {
-                                                const q = (song as any)._quality;
-                                                const isHiRes = q === '24-bit' || q === 'FLAC' || (song as any).source === 'tidal';
-                                                playSongNow(song, isHiRes);
-                                            }
-                                        } else if (item.type === 'navigation' && item.target) {
-                                            handleNavigation(item.target, item.data, item.label);
-                                        }
-                                    }
-                                }, 0);
-                            }}
                             onPlayPause={togglePlay}
+                            onBack={handleBack}
+                            onItemSelect={() => {
+                                if (!isLocked) handleSelect();
+                            }}
+                            isFlipped={currentView.isFlipped}
+                            trackIndex={currentView.trackIndex}
+                            layout={controlMode === 'volume' ? 'split' : 'full'}
                             controlMode={controlMode}
                             shuffle={shuffle}
                             repeat={repeat}
                             isLocked={isLocked}
-                            onBack={handleBack}
-                            // Pass hoisted tracks to Cover Flow
+                            scrollDirection={scrollDirectionRef.current}
                             externalTracks={cfTracks}
-                            // Now Playing enhancements
                             isLiked={currentSong ? isLiked(currentSong.id) : false}
                             onToggleLike={() => currentSong && toggleLike(currentSong)}
                             audioQuality={bitrate}
                             backlight={backlight}
                             depth={viewStack.length}
+                            onAddSticker={handleAddSticker}
                         />
 
                         {/* Render Game View if Active - Lazy loaded for performance */}

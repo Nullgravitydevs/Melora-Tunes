@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { motion, useMotionValue } from "framer-motion";
+import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
@@ -12,6 +12,9 @@ import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { getThumbnailUrl } from "@/lib/jiosaavn";
+import { LyricsView } from "@/components/ui/lyrics-view";
+import { EqualizerView } from "@/components/ui/equalizer-view";
+import { Mic2, SlidersHorizontal } from "lucide-react";
 
 interface BoomboxStageProps {
     currentTheme: ThemeKey;
@@ -161,11 +164,13 @@ export function BoomboxStage({
     const playerRef = useRef<HTMLDivElement>(null);
     const [isOverPlayer, setIsOverPlayer] = useState(false);
     const [positions, setPositions] = useState<{ x: number, y: number, rotation: number }[]>([]);
+    const [showLyrics, setShowLyrics] = useState(false);
+    const [showEq, setShowEq] = useState(false);
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, togglePlay, next, prev, setVolume, isLoaded, seek,
-        shuffle, setShuffle, repeat, setRepeat
+        shuffle, setShuffle, repeat, setRepeat, eq
     } = usePlayback();
 
     const { playClick, playClunk, playInsert } = useAudio();
@@ -228,6 +233,8 @@ export function BoomboxStage({
                     {/* Switch Mobile Removed */}
                     <button onClick={onOpenThemeSelector} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Palette size={18} className="text-white" /></button>
                     <button onClick={onOpenSettings} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Settings size={18} className="text-white" /></button>
+                    <button onClick={() => setShowLyrics(prev => !prev)} className={`bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg ${showLyrics ? 'text-yellow-400 border-yellow-400' : 'text-white'}`}><Mic2 size={18} /></button>
+                    <button onClick={() => setShowEq(prev => !prev)} className={`bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg ${showEq ? 'text-yellow-400 border-yellow-400' : 'text-white'}`}><SlidersHorizontal size={18} /></button>
                 </div>
             </header>
 
@@ -342,6 +349,28 @@ export function BoomboxStage({
                     />
                 );
             })}
+            {/* Overlays */}
+            <AnimatePresence>
+                {showLyrics && (
+                    <LyricsView
+                        currentSong={currentSong}
+                        currentTime={progress * duration}
+                        onClose={() => setShowLyrics(false)}
+                    />
+                )}
+                {showEq && (
+                    <EqualizerView
+                        onClose={() => setShowEq(false)}
+                        bands={eq.bands}
+                        setBand={eq.setBand}
+                        isEnabled={eq.isEnabled}
+                        setIsEnabled={eq.setIsEnabled}
+                        currentPreset={eq.currentPreset}
+                        setPreset={eq.setPreset}
+                        presets={eq.presets}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

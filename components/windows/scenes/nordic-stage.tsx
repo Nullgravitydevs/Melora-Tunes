@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Volume2, LogOut,
@@ -11,6 +11,9 @@ import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
+import { LyricsView } from "@/components/ui/lyrics-view";
+import { EqualizerView } from "@/components/ui/equalizer-view";
+import { Mic2, SlidersHorizontal } from "lucide-react";
 
 interface NordicStageProps {
     currentTheme: ThemeKey;
@@ -49,10 +52,12 @@ export function NordicStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded
+        isLoaded, eq
     } = usePlayback();
 
     const { playClick, playEject } = useAudio();
+    const [showLyrics, setShowLyrics] = useState(false);
+    const [showEq, setShowEq] = useState(false);
     const activeMix = mixes.find(m => m.id === activeMixId) || null;
 
     const formatTime = (seconds: number) => {
@@ -255,6 +260,21 @@ export function NordicStage({
                                     Eject
                                 </button>
 
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setShowLyrics(prev => !prev)}
+                                        className={`flex items-center gap-2 text-xs font-mono font-bold transition-colors uppercase tracking-widest ${showLyrics ? 'text-blue-400' : 'text-slate-400 hover:text-blue-400'}`}
+                                    >
+                                        <Mic2 size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowEq(prev => !prev)}
+                                        className={`flex items-center gap-2 text-xs font-mono font-bold transition-colors uppercase tracking-widest ${showEq ? 'text-blue-400' : 'text-slate-400 hover:text-blue-400'}`}
+                                    >
+                                        <SlidersHorizontal size={16} />
+                                    </button>
+                                </div>
+
                                 <div className="flex items-center gap-3 relative">
                                     <Volume2 size={18} className="text-slate-400" />
                                     <div className="w-20 h-1 bg-slate-800 rounded-full relative overflow-hidden">
@@ -274,6 +294,28 @@ export function NordicStage({
                     </section>
                 </main>
             </div>
+            {/* Overlays */}
+            <AnimatePresence>
+                {showLyrics && (
+                    <LyricsView
+                        currentSong={currentSong}
+                        currentTime={progress * duration}
+                        onClose={() => setShowLyrics(false)}
+                    />
+                )}
+                {showEq && (
+                    <EqualizerView
+                        onClose={() => setShowEq(false)}
+                        bands={eq.bands}
+                        setBand={eq.setBand}
+                        isEnabled={eq.isEnabled}
+                        setIsEnabled={eq.setIsEnabled}
+                        currentPreset={eq.currentPreset}
+                        setPreset={eq.setPreset}
+                        presets={eq.presets}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

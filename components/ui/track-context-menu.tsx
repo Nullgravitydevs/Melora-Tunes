@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { JioSaavnSong, getArtistStation } from "@/lib/jiosaavn";
-import { Play, ListPlus, Radio, User, Disc, X } from "lucide-react";
+import { Play, ListPlus, Radio, User, Disc, X, HardDrive, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface TrackContextMenuProps {
@@ -16,6 +16,9 @@ interface TrackContextMenuProps {
     onGoToArtist: (artistId: string) => void;
     onGoToAlbum: (albumId: string) => void;
     onStartRadio: (song: JioSaavnSong) => void;
+    isDownloaded: boolean;
+    onDownload: (song: JioSaavnSong) => void;
+    onRemoveDownload: (songId: string) => void;
 }
 
 export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
@@ -28,7 +31,10 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
     onAddToQueue,
     onGoToArtist,
     onGoToAlbum,
-    onStartRadio
+    onStartRadio,
+    isDownloaded,
+    onDownload,
+    onRemoveDownload
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -85,6 +91,21 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
                     <MenuItem icon={<ListPlus size={14} />} label="Add to Queue" onClick={() => { onAddToQueue(song); onClose(); }} />
                     <MenuItem icon={<Radio size={14} />} label="Start Radio" onClick={() => { onStartRadio(song); onClose(); }} highlight />
 
+                    {isDownloaded ? (
+                        <MenuItem
+                            icon={<Trash2 size={14} />}
+                            label="Remove Download"
+                            onClick={() => { onRemoveDownload(song.id); onClose(); }}
+                            variant="danger"
+                        />
+                    ) : (
+                        <MenuItem
+                            icon={<HardDrive size={14} />}
+                            label="Download"
+                            onClick={() => { onDownload(song); onClose(); }}
+                        />
+                    )}
+
                     <div className="h-px bg-white/10 my-0.5" />
 
                     <MenuItem icon={<User size={14} />} label="Go to Artist" onClick={() => {
@@ -100,10 +121,13 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
     );
 };
 
-const MenuItem = ({ icon, label, onClick, highlight = false }: { icon: React.ReactNode, label: string, onClick: () => void, highlight?: boolean }) => (
+const MenuItem = ({ icon, label, onClick, highlight = false, variant = 'default' }: { icon: React.ReactNode, label: string, onClick: () => void, highlight?: boolean, variant?: 'default' | 'danger' }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-3 w-full px-2 py-2 rounded-lg text-xs font-medium transition-colors ${highlight ? 'bg-accent-pink/20 text-accent-pink hover:bg-accent-pink/30' : 'hover:bg-white/10 text-gray-200 hover:text-white'}`}
+        className={`flex items-center gap-3 w-full px-2 py-2 rounded-lg text-xs font-medium transition-colors ${variant === 'danger' ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300' :
+            highlight ? 'bg-accent-pink/20 text-accent-pink hover:bg-accent-pink/30' :
+                'hover:bg-white/10 text-gray-200 hover:text-white'
+            }`}
     >
         {icon}
         {label}

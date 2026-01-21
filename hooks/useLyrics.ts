@@ -1,0 +1,82 @@
+import { useState, useEffect } from 'react';
+import { JioSaavnSong, getSyncedLyrics } from '@/lib/jiosaavn';
+
+export interface LyricLine {
+    time: number;
+    text: string;
+}
+
+export function useLyrics(currentSong: JioSaavnSong | undefined) {
+    const [lyrics, setLyrics] = useState<LyricLine[]>([]);
+    const [plainLyrics, setPlainLyrics] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSynced, setIsSynced] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!currentSong) {
+            setLyrics([]);
+            setPlainLyrics(null);
+            return;
+        }
+
+        const fetchLyrics = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                // Use metadata for search
+                const { synced, text } = await getSyncedLyrics(
+                    currentSong.name,
+                    currentSong.primaryArtists,
+                    currentSong.album?.name || "",
+                    currentSong.duration
+                );
+
+                if (synced && text) {
+                    const parsed = parseLRC(text);
+                    setLyrics(parsed);
+                    setIsSynced(true);
+                    setPlainLyrics(null);
+                } else {
+                    setLyrics([]);
+                    setIsSynced(false);
+                    setPlainLyrics(text || "No lyrics available.");
+                }
+
+            } catch (err) {
+                console.error("Lyrics fetch failed", err);
+                setError("Failed to load lyrics");
+                setLyrics([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchLyrics();
+    }, [currentSong]);
+
+    return { lyrics, plainLyrics, isSynced, isLoading, error };
+}
+
+function parseLRC(lrc: string): LyricLine[] {
+    const regex = /^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)$/;
+    const lines = lrc.split('\n');
+    const result: LyricLine[] = [];
+
+    for (const line of lines) {
+        const match = line.match(regex);
+        if (match) {
+            const min = parseInt(match[1]);
+            const sec = parseInt(match[2]);
+            const ms = parseInt(match[3].padEnd(3, '0').substring(0, 3)); // Normalize ms to 3 digits
+            const text = match[4].trim();
+            const time = min * 60 + sec + ms / 1000;
+
+            if (text) {
+                result.push({ time, text });
+            }
+        }
+    }
+
+    return result;
+}

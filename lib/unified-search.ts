@@ -260,13 +260,22 @@ export async function searchUnified(query: string, type: SearchType = 'all'): Pr
             if (newIdx < currentBestIdx && newIdx !== -1) {
                 existing.bestQuality = item.quality as QualityType;
 
-                // Upgrade metadata if better source, but keep ID stable if it was already Saavn
                 if (item.source === 'tidal' || item.source === 'qobuz') {
+                    // Check if we already had a Saavn track to use as fallback
+                    const saavnFallback = existing.qualities['320kbps']?.id || existing.qualities['128kbps']?.id;
+
                     existing.name = item.data.name;
                     existing.image = item.data.image && item.data.image.length > 0 ? item.data.image : existing.image;
                     existing.primaryArtists = item.data.primaryArtists;
                     existing.id = item.data.id;
-                    existing.source = item.source; // Default click action to best source
+                    existing.source = item.source;
+
+                    // INJECT FALLBACK ID safely
+                    if (saavnFallback) {
+                        (item.data as any).saavnFallbackId = saavnFallback;
+                        existing.qualities[item.quality as QualityType] = item.data;
+                    }
+
                     existing.album = item.data.album;
                     if (item.data.year) existing.year = item.data.year;
                 }

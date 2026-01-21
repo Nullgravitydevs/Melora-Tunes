@@ -492,6 +492,33 @@ export function IpodScreen({
                                     </div>
                                 )}
                             </div>
+                        ) : variant === 'lyrics' ? (
+                            // --- LYRICS VIEW ---
+                            <div className="h-full w-full bg-black flex flex-col items-center">
+                                {/* Header (Song Name) */}
+                                <div className="w-full text-center py-1 mt-1 border-b border-zinc-800 bg-black z-10 shrink-0">
+                                    <h3 className="text-[10px] font-bold text-white truncate px-4">
+                                        {decodeHtml(currentSong?.name || "Lyrics")}
+                                    </h3>
+                                    <p className="text-[8px] text-zinc-500 truncate px-4">
+                                        {decodeHtml(currentSong?.primaryArtists || "")}
+                                    </p>
+                                </div>
+
+                                {/* Lyrics Content */}
+                                <div className="flex-1 w-full overflow-y-auto px-4 py-3 text-center no-scrollbar">
+                                    <div className="whitespace-pre-wrap font-medium text-[11px] leading-relaxed text-zinc-300">
+                                        {lyrics ? lyrics : (
+                                            <div className="h-full flex flex-col items-center justify-center gap-2 opacity-50 mt-12">
+                                                <span className="text-2xl">📝</span>
+                                                <span>No lyrics available</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="h-10"></div> {/* Padding bottom for scroll */}
+                                </div>
+                            </div>
+
                         ) : variant === 'stickers' ? (
                             // --- STICKER COLLECTION VIEW ---
                             <div className="h-full w-full bg-zinc-900 flex flex-col p-2">

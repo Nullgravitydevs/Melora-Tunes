@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
 import { usePlayback } from "@/components/providers/playback-context";
@@ -9,6 +9,9 @@ import { decodeHtml } from "@/lib/utils";
 import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc, Share2 } from "lucide-react";
 import { Visualizer } from "@/components/ui/visualizer";
 import { Mix } from "@/components/providers/playback-context";
+import { LyricsView } from "@/components/ui/lyrics-view";
+import { EqualizerView } from "@/components/ui/equalizer-view";
+import { Mic2, SlidersHorizontal } from "lucide-react";
 
 interface DeckStageProps {
     currentTheme: ThemeKey;
@@ -59,13 +62,33 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
     const [isEjecting, setIsEjecting] = useState(false);
+    const [showLyrics, setShowLyrics] = useState(false);
+    const [showEq, setShowEq] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded
+        isLoaded, eq
     } = usePlayback();
+
+    const isDraggingRef = useRef(false);
+
+    const handleDragStart = () => {
+        isDraggingRef.current = true;
+    };
+
+    const handleDragEndAction = () => {
+        setTimeout(() => {
+            isDraggingRef.current = false;
+        }, 50);
+    };
+
+    const handleClick = (callback: () => void) => {
+        if (!isDraggingRef.current) {
+            callback();
+        }
+    };
 
     const { playClick, playClunk, playEject, playInsert } = useAudio();
     const theme = THEMES[currentTheme];
@@ -126,34 +149,64 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                 ::-webkit-scrollbar { display: none; }
                 * { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
-            {/* Header */}
-            <header className="w-full px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4 z-10 relative">
-                <div className="flex items-center gap-3 select-none">
-                    {/* Logo - matching default theme */}
-                    <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
+            {/* Header - Consolidated Layout but Individually Draggable Items */}
+            <header className="w-full px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4 z-50 relative pointer-events-none">
+                {/* Title Section */}
+                <motion.div
+                    className="flex items-center gap-3 select-none pointer-events-auto transform-gpu cursor-move"
+                    drag
+                    dragMomentum={true}
+                    dragConstraints={containerRef}
+                    dragElastic={0.2}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEndAction}
+                >
+                    {currentTheme !== 'METAL' && (
+                        <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
+                    )}
                     <h1 className={clsx("font-display text-4xl tracking-tighter mt-1",
                         currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' || currentTheme === 'SILVERFROST' ? "text-gray-900" : "text-white"
                     )}>
-                        Melora
+                        Melora Tunes
                     </h1>
-                </div>
+                </motion.div>
 
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => { playClick(); onOpenSettings?.(); }}
-                        className={clsx("p-2 rounded-full transition-colors",
-                            currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-500 hover:bg-black/5" : "text-gray-400 hover:text-white hover:bg-white/10"
-                        )}
-                        title="Settings"
+                {/* Toolbar Section */}
+                <div className="flex items-center gap-4 pointer-events-auto">
+                    {/* Settings Button */}
+                    <motion.div
+                        drag
+                        dragMomentum={true}
+                        dragConstraints={containerRef}
+                        dragElastic={0.2}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEndAction}
+                        className="transform-gpu cursor-move"
                     >
-                        <Settings size={20} />
-                    </button>
-
-
-
-                    <div className="relative">
                         <button
-                            onClick={() => { playClick(); onOpenThemeSelector?.(); }}
+                            onClick={() => handleClick(() => { playClick(); onOpenSettings?.(); })}
+                            className={clsx("p-2 rounded-full transition-colors",
+                                currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-500 hover:bg-black/5" : "text-gray-400 hover:text-white hover:bg-white/10"
+                            )}
+                            title="Settings"
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            <Settings size={20} />
+                        </button>
+                    </motion.div>
+
+                    {/* Theme Palette Button */}
+                    <motion.div
+                        drag
+                        dragMomentum={true}
+                        dragConstraints={containerRef}
+                        dragElastic={0.2}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEndAction}
+                        className="relative transform-gpu cursor-move"
+                    >
+                        <button
+                            onClick={() => handleClick(() => { playClick(); onOpenThemeSelector?.(); })}
                             className={clsx("p-2 rounded-full transition-colors",
                                 currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-500 hover:bg-black/5" : "text-gray-400 hover:text-white hover:bg-white/10"
                             )}
@@ -161,22 +214,45 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                         >
                             <Palette size={20} />
                         </button>
-                    </div>
+                    </motion.div>
 
-                    <button
-                        onClick={() => { playClick(); onCinemaMode?.(); }}
-                        className="hidden md:flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded shadow-lg active:scale-95 transition-all uppercase text-sm tracking-wider"
+                    {/* Cinema Mode */}
+                    <motion.div
+                        drag
+                        dragMomentum={true}
+                        dragConstraints={containerRef}
+                        dragElastic={0.2}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEndAction}
+                        className="transform-gpu cursor-move"
                     >
-                        <Maximize2 size={16} />
-                        Cinema Mode
-                    </button>
-                    <button
-                        onClick={() => { playClick(); onCreateMix?.(); }}
-                        className="flex items-center gap-2 bg-gray-200 hover:bg-white text-black font-bold py-2 px-4 rounded shadow-lg active:scale-95 transition-all uppercase text-sm tracking-wider"
+                        <button
+                            onClick={() => handleClick(() => { playClick(); onCinemaMode?.(); })}
+                            className="hidden md:flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded shadow-lg active:scale-95 transition-all uppercase text-sm tracking-wider"
+                        >
+                            <Maximize2 size={16} />
+                            Cinema Mode
+                        </button>
+                    </motion.div>
+
+                    {/* Create Mix */}
+                    <motion.div
+                        drag
+                        dragMomentum={true}
+                        dragConstraints={containerRef}
+                        dragElastic={0.2}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEndAction}
+                        className="transform-gpu cursor-move"
                     >
-                        <Plus size={16} />
-                        Create Mix
-                    </button>
+                        <button
+                            onClick={() => handleClick(() => { playClick(); onCreateMix?.(); })}
+                            className="flex items-center gap-2 bg-gray-200 hover:bg-white text-black font-bold py-2 px-4 rounded shadow-lg active:scale-95 transition-all uppercase text-sm tracking-wider"
+                        >
+                            <Plus size={16} />
+                            Create Mix
+                        </button>
+                    </motion.div>
                 </div>
             </header>
 
@@ -215,11 +291,16 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                         viewMode === 'split' ? "lg:col-span-7" : "w-full"
                     )}>
                         {viewMode === 'split' && (
-                            <h2 className={clsx("font-display text-2xl md:text-3xl uppercase tracking-widest mb-4 opacity-80 pl-2",
-                                currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-800" : "text-gray-600"
-                            )}>
+                            <motion.h2
+                                className={clsx("font-display text-2xl md:text-3xl uppercase tracking-widest mb-4 opacity-80 pl-2 cursor-move transform-gpu inline-block",
+                                    currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-800" : "text-gray-600"
+                                )}
+                                drag
+                                dragMomentum={false}
+                                dragConstraints={containerRef}
+                            >
                                 Your Mixtapes
-                            </h2>
+                            </motion.h2>
                         )}
                         <div className={clsx(
                             "grid gap-4 pb-12",
@@ -248,9 +329,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                                 setToast(`Loading ${mix.title}...`);
                                             }
                                         }}
-                                        whileDrag={{ zIndex: 9999, scale: 1.1 }}
+                                        whileDrag={{ zIndex: 9999, scale: 1.1, cursor: "grabbing" }}
                                         className={clsx(
-                                            "group relative w-full aspect-[3/2] rounded-lg shadow-lg hover:shadow-xl p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing",
+                                            "group relative w-full aspect-[3/2] rounded-lg shadow-lg hover:shadow-xl p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing transform-gpu will-change-transform",
                                             bgColor
                                         )}
                                         id={`studio-mix-${mix.id}`}
@@ -380,14 +461,23 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
 
                 {/* Right Column: Player */}
                 {viewMode !== 'rack' && (
-                    <section className={clsx(
-                        "sticky top-8 z-50 transition-all",
-                        viewMode === 'split' ? "lg:col-span-5" : "w-full flex justify-center"
-                    )}>
+                    <motion.section
+                        className={clsx(
+                            "sticky top-8 z-40 transform-gpu will-change-transform",
+                            viewMode === 'split' ? "lg:col-span-5" : "w-full flex justify-center"
+                        )}
+                        drag
+                        dragConstraints={containerRef}
+                        dragMomentum={true}
+                        dragElastic={0.2}
+                        whileDrag={{ zIndex: 100, cursor: "grabbing" }}
+                        style={{ cursor: "grab" }}
+                        onPointerDown={(e) => e.stopPropagation()} // Prevent interfering with parent gestures if any
+                    >
                         <div
                             ref={playerRef}
                             className={clsx(
-                                "bg-[#f8fafc] text-gray-800 rounded-2xl p-4 md:p-5 shadow-2xl border-4 border-gray-300 relative overflow-hidden ring-1 ring-black/5",
+                                "bg-[#f8fafc] text-gray-800 rounded-2xl p-4 md:p-5 shadow-md border-4 border-gray-300 relative overflow-hidden",
                                 isCompact ? "max-w-full w-full" : "max-w-[340px]"
                             )}
                         >
@@ -408,7 +498,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             {/* Title */}
                             {!isCompact && (
                                 <div className="text-center mb-4">
-                                    <h2 className="font-display text-gray-300 text-lg uppercase tracking-tighter drop-shadow-md">
+                                    <h2 className="font-display text-gray-300 text-lg uppercase tracking-tighter">
                                         Stereo Cassette Player
                                     </h2>
                                     <p className="text-[10px] font-mono text-gray-400 tracking-[0.2em] mt-0.5">AUTO REVERSE</p>
@@ -457,7 +547,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                         </div>
 
                                         {/* Reels */}
-                                        <div className="mx-3 mb-0.5 h-6 bg-black/20 rounded-full flex items-center justify-between px-2 relative backdrop-blur-sm">
+                                        <div className="mx-3 mb-0.5 h-6 bg-black/20 rounded-full flex items-center justify-between px-2 relative">
                                             {/* Left Reel */}
                                             <motion.div
                                                 className="w-6 h-6 bg-white rounded-full border-2 border-gray-800 flex items-center justify-center relative"
@@ -527,19 +617,19 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     onClick={() => { playClick(); prev(); }}
                                     className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-2 border-blue-300"
                                 >
-                                    <SkipBack size={20} className="drop-shadow-md" />
+                                    <SkipBack size={20} />
                                 </button>
                                 <button
                                     onClick={() => { playClick(); togglePlay(); }}
                                     className="w-14 h-14 rounded-full bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-4 border-blue-300 z-10"
                                 >
-                                    {isPlaying ? <Pause size={28} className="drop-shadow-md" /> : <Play size={28} className="drop-shadow-md pl-0.5" />}
+                                    {isPlaying ? <Pause size={28} /> : <Play size={28} className="pl-0.5" />}
                                 </button>
                                 <button
                                     onClick={() => { playClick(); next(); }}
                                     className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-2 border-blue-300"
                                 >
-                                    <SkipForward size={20} className="drop-shadow-md" />
+                                    <SkipForward size={20} />
                                 </button>
                             </div>
 
@@ -552,7 +642,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                             <span>REC</span>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)] animate-pulse"></div>
+                                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
                                             <span>BATT</span>
                                         </div>
                                     </div>
@@ -576,6 +666,22 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     <span className="mt-0.5 tracking-widest text-[9px]">EJECT</span>
                                 </button>
 
+                                <button
+                                    onClick={() => setShowLyrics(prev => !prev)}
+                                    className={`flex flex-col items-center cursor-pointer transition-colors ${showLyrics ? 'text-blue-500' : 'hover:text-blue-600'}`}
+                                >
+                                    <Mic2 size={14} />
+                                    <span className="mt-0.5 tracking-widest text-[9px]">LYRICS</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setShowEq(prev => !prev)}
+                                    className={`flex flex-col items-center cursor-pointer transition-colors ${showEq ? 'text-blue-500' : 'hover:text-blue-600'}`}
+                                >
+                                    <SlidersHorizontal size={14} />
+                                    <span className="mt-0.5 tracking-widest text-[9px]">EQ</span>
+                                </button>
+
                                 <div className="flex items-center gap-2 w-24">
                                     <Volume2 size={14} className="text-gray-400" />
                                     <div
@@ -596,9 +702,31 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </motion.section>
                 )}
             </main>
+            {/* Overlays */}
+            <AnimatePresence>
+                {showLyrics && (
+                    <LyricsView
+                        currentSong={currentSong}
+                        currentTime={progress * songDuration} // DeckStage uses progress ratio * derived duration
+                        onClose={() => setShowLyrics(false)}
+                    />
+                )}
+                {showEq && (
+                    <EqualizerView
+                        onClose={() => setShowEq(false)}
+                        bands={eq.bands}
+                        setBand={eq.setBand}
+                        isEnabled={eq.isEnabled}
+                        setIsEnabled={eq.setIsEnabled}
+                        currentPreset={eq.currentPreset}
+                        setPreset={eq.setPreset}
+                        presets={eq.presets}
+                    />
+                )}
+            </AnimatePresence>
         </div >
     );
 }
