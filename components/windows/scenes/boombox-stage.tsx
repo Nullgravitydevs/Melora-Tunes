@@ -5,7 +5,7 @@ import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-    Palette, Smartphone, Settings, Plus, Tv, Pencil, Camera, Search, Share2
+    Palette, Settings, Plus, Tv, Pencil, Camera, Search, Share2
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -89,8 +89,8 @@ function DraggablePolaroid({
     return (
         <motion.div
             drag={!isInsidePlayer}
-            dragMomentum={false}
-            dragElastic={0}
+            dragMomentum={true}
+            dragElastic={0.2}
             onDrag={handleDrag}
             onDragEnd={handleDragEnd}
             onMouseEnter={() => setShowButtons(true)}
@@ -218,7 +218,7 @@ export function BoomboxStage({
                     style={{ clipPath: 'polygon(5% 0%, 100% 0%, 100% 85%, 95% 100%, 0% 100%, 0% 15%)' }}>
                     <div className="flex items-center gap-2">
                         <span className="text-yellow-300 text-2xl">📻</span>
-                        <h1 className="font-black tracking-tighter text-xl italic uppercase">Melora</h1>
+                        <h1 className="font-black tracking-tighter text-xl italic uppercase">Melora Tunes</h1>
                     </div>
                 </div>
                 <nav className="hidden md:flex gap-4 items-center">
@@ -233,8 +233,6 @@ export function BoomboxStage({
                     {/* Switch Mobile Removed */}
                     <button onClick={onOpenThemeSelector} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Palette size={18} className="text-white" /></button>
                     <button onClick={onOpenSettings} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Settings size={18} className="text-white" /></button>
-                    <button onClick={() => setShowLyrics(prev => !prev)} className={`bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg ${showLyrics ? 'text-yellow-400 border-yellow-400' : 'text-white'}`}><Mic2 size={18} /></button>
-                    <button onClick={() => setShowEq(prev => !prev)} className={`bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg ${showEq ? 'text-yellow-400 border-yellow-400' : 'text-white'}`}><SlidersHorizontal size={18} /></button>
                 </div>
             </header>
 
@@ -307,6 +305,16 @@ export function BoomboxStage({
                                         className={`w-8 h-8 rounded-full border-b-2 border-black flex items-center justify-center shadow active:translate-y-0.5 ${repeat !== 'off' ? 'bg-blue-500 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
                                         title={`Repeat: ${repeat.toUpperCase()}`}
                                     ><Repeat size={14} />{repeat === 'one' && <span className="absolute text-[8px] font-bold">1</span>}</button>
+                                    <button
+                                        onClick={() => { playClick(); setShowLyrics(!showLyrics); }}
+                                        className={`w-8 h-8 rounded-full border-b-2 border-black flex items-center justify-center shadow active:translate-y-0.5 ${showLyrics ? 'bg-blue-500 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                                        title="Lyrics"
+                                    ><Mic2 size={14} /></button>
+                                    <button
+                                        onClick={() => { playClick(); setShowEq(!showEq); }}
+                                        className={`w-8 h-8 rounded-full border-b-2 border-black flex items-center justify-center shadow active:translate-y-0.5 ${showEq ? 'bg-blue-500 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                                        title="Equalizer"
+                                    ><SlidersHorizontal size={14} /></button>
                                 </div>
                                 <div className="flex gap-2 items-center">
                                     <button onClick={() => { playClick(); prev(); }} className="w-10 h-10 rounded bg-zinc-600 border-b-4 border-zinc-900 text-white flex items-center justify-center shadow active:translate-y-1 hover:bg-zinc-500"><SkipBack size={18} className="fill-current" /></button>
