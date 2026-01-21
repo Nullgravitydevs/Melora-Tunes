@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight, Star, Heart, Music, Zap, Smile, Ghost, Skull } from "lucide-react";
+import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight, Star, Heart, Music, Zap, Smile, Ghost, Skull, HardDrive } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
@@ -45,6 +45,7 @@ interface IpodScreenProps {
     backlight?: number; // 0 to 1
     depth?: number;
     onAddSticker?: (type: StickerType, color: string) => void;
+    isDownloaded?: (id: string) => boolean;
 }
 
 const slideVariants = {
@@ -97,10 +98,9 @@ export function IpodScreen({
     externalTracks = [],
     isLiked = false,
     onToggleLike,
-    audioQuality,
-    backlight,
     onAddSticker,
-    depth = 0
+    depth = 0,
+    isDownloaded = () => false
 }: IpodScreenProps) {
 
     // ... (Existing Hook Logic) ...
@@ -399,6 +399,13 @@ export function IpodScreen({
                                                                         HQ
                                                                     </span>
                                                                 )}
+                                                                {/* OFFLINE TAG */}
+                                                                {itemsData[index]?.data?.id && isDownloaded(itemsData[index].data.id) && (
+                                                                    <span className="shrink-0 text-[7px] flex items-center gap-0.5 bg-green-500/20 text-green-400 px-1 py-0.5 rounded-sm font-bold border border-green-500/30">
+                                                                        <HardDrive size={6} />
+                                                                        OFFLINE
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             {/* Subtitle / Artist - Always visible for modern feel */}
                                                             <div className="flex flex-col">
@@ -609,6 +616,13 @@ export function IpodScreen({
                                                     HQ
                                                 </span>
                                             ) : null}
+                                            {/* Offline Tag (Player) */}
+                                            {currentSong && isDownloaded(currentSong.id) && (
+                                                <span className="shrink-0 text-[7px] flex items-center gap-0.5 bg-green-500/20 text-green-400 px-1 py-0.5 rounded font-bold border border-green-500/30 ml-1.5">
+                                                    <HardDrive size={6} />
+                                                    OFFLINE
+                                                </span>
+                                            )}
                                         </div>
 
                                         {/* Artist with Like Button */}

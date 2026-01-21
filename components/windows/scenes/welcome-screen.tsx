@@ -7,9 +7,10 @@ import { Disc, CassetteTape, Smartphone, Zap, ArrowRight } from "lucide-react";
 interface WelcomeScreenProps {
     onSelectMode: (mode: ThemeKey) => void;
     onSelectIpod?: () => void;
+    onSelectDeck?: () => void;
 }
 
-export function WelcomeScreen({ onSelectMode, onSelectIpod }: WelcomeScreenProps) {
+export function WelcomeScreen({ onSelectMode, onSelectIpod, onSelectDeck }: WelcomeScreenProps) {
     return (
         <div className="relative w-full h-screen bg-black text-white overflow-hidden flex flex-col items-center justify-center font-sans selection:bg-white selection:text-black">
             {/* Minimal Grid Background */}
@@ -47,7 +48,7 @@ export function WelcomeScreen({ onSelectMode, onSelectIpod }: WelcomeScreenProps
                         title="DECK STUDIO"
                         subtitle="Analog Warmth & Cassettes"
                         icon={<CassetteTape size={24} />}
-                        onClick={() => onSelectMode('METAL')}
+                        onClick={() => onSelectDeck ? onSelectDeck() : onSelectMode('METAL')}
                         delay={0.2}
                     />
                     <ModeItem

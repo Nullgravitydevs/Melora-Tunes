@@ -48,6 +48,7 @@ export interface ThemeConfig {
     lcdBg: string;
     buttonBg: string;
     playButtonBg: string;
+    previewImage?: string; // URL for the theme preview image
 }
 
 export const THEMES: Record<string, ThemeConfig> = {
@@ -62,7 +63,8 @@ export const THEMES: Record<string, ThemeConfig> = {
         labelBg: "bg-zinc-900",
         lcdBg: "bg-orange-500",
         buttonBg: "bg-zinc-800",
-        playButtonBg: "bg-orange-600"
+        playButtonBg: "bg-orange-600",
+        previewImage: "/themes/theme-metal.png"
     },
     ZEN: {
         name: "Zen Minimalist Edition",
@@ -73,7 +75,8 @@ export const THEMES: Record<string, ThemeConfig> = {
         labelBg: "bg-[#F0EFEB]",
         lcdBg: "bg-white",
         buttonBg: "bg-white",
-        playButtonBg: "bg-stone-900"
+        playButtonBg: "bg-stone-900",
+        previewImage: "/themes/theme-zen.png"
     },
     BAUHAUS: {
         name: "Bauhaus Aesthetic Edition",
@@ -84,7 +87,8 @@ export const THEMES: Record<string, ThemeConfig> = {
         labelBg: "bg-white",
         lcdBg: "bg-neutral-900",
         buttonBg: "bg-white",
-        playButtonBg: "bg-[#0052cc]"
+        playButtonBg: "bg-[#0052cc]",
+        previewImage: "/themes/theme-bauhaus.png"
     },
     NORDIC: {
         name: "Nordic Noir Minimal",
@@ -95,7 +99,8 @@ export const THEMES: Record<string, ThemeConfig> = {
         labelBg: "bg-[#f0f2f5]",
         lcdBg: "bg-[#7b8577]",
         buttonBg: "bg-[#24272b]",
-        playButtonBg: "bg-[#3b82f6]"
+        playButtonBg: "bg-[#3b82f6]",
+        previewImage: "/themes/theme-nordic.png"
     },
     OPENDECK: {
         name: "Zen Open Deck Edition",
@@ -106,7 +111,8 @@ export const THEMES: Record<string, ThemeConfig> = {
         labelBg: "bg-neutral-100",
         lcdBg: "bg-neutral-200",
         buttonBg: "bg-white",
-        playButtonBg: "bg-[#2d8652]"
+        playButtonBg: "bg-[#2d8652]",
+        previewImage: "/themes/theme-opendeck.png"
     },
     BOOMBOX: {
         name: "Sport Boombox Edition",
@@ -117,7 +123,8 @@ export const THEMES: Record<string, ThemeConfig> = {
         labelBg: "bg-yellow-100",
         lcdBg: "bg-[#9ea792]",
         buttonBg: "bg-zinc-700",
-        playButtonBg: "bg-blue-500"
+        playButtonBg: "bg-blue-500",
+        previewImage: "/themes/theme-boombox.png"
     },
     SILVERFROST: {
         name: "Silver Frost Lab Edition",
@@ -128,7 +135,8 @@ export const THEMES: Record<string, ThemeConfig> = {
         labelBg: "bg-white",
         lcdBg: "bg-black",
         buttonBg: "bg-white/40",
-        playButtonBg: "bg-[#00aaff]"
+        playButtonBg: "bg-[#00aaff]",
+        previewImage: "/themes/theme-silverfrost.png"
     },
     GLASS: {
         name: "Glass OS (Discovery Mode)",
@@ -158,7 +166,8 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
     const { playClick, playClunk, playEject } = useAudio();
 
     const cassetteColors: Record<string, string> = {
-        orange: "#ff6600", purple: "#9933ff", white: "#e0e0e0", green: "#00cc66", red: "#ff0055"
+        orange: "#ff6600", purple: "#9933ff", white: "#e0e0e0", green: "#00cc66", red: "#ff0055",
+        blue: "#2563eb", yellow: "#eab308", cyan: "#06b6d4", pink: "#db2777", black: "#27272a"
     };
     const displayColor = cassetteColors[cassetteColor] || cassetteColor || "#ff6600";
 

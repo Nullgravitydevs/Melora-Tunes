@@ -42,9 +42,22 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
     const { playClick, playClunk, playEject } = useAudio();
     // const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
-    // Default to LIGHT mode as requested by user ("Zen Minimalist" implies light). 
-    // In a real app, we might persist this or respect system pref.
-    const [isDark, setIsDark] = useState(false);
+    // Zen Mode Persistence
+    const [isDark, setIsDark] = useState(true);
+
+    useEffect(() => {
+        const savedMode = localStorage.getItem('melora-zen-mode');
+        if (savedMode) {
+            setIsDark(savedMode === 'dark');
+        }
+    }, [currentTheme]);
+
+    const toggleZenMode = () => {
+        const newMode = !isDark;
+        setIsDark(newMode);
+        localStorage.setItem('melora-zen-mode', newMode ? 'dark' : 'light');
+        playClick();
+    };
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
 
@@ -70,7 +83,10 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
     };
 
     return (
-        <div ref={containerRef} className="w-full h-screen font-sans overflow-hidden relative bg-[#0a0a0a] text-white selection:bg-white selection:text-black cursor-default"
+        <div ref={containerRef} className={clsx(
+            "w-full h-screen font-sans overflow-hidden relative transition-colors duration-500 cursor-default",
+            isDark ? "bg-[#0a0a0a] text-white selection:bg-white selection:text-black" : "bg-[#f4f4f5] text-black selection:bg-black selection:text-white"
+        )}
         >
             <style jsx global>{`
                 ::-webkit-scrollbar { display: none; }
@@ -78,7 +94,9 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
             `}</style>
 
             {/* Subtle gradient overlay for depth */}
-            <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-br from-white/[0.02] via-transparent to-transparent" />
+            <div className={clsx("fixed inset-0 pointer-events-none z-0 bg-gradient-to-br transition-colors duration-500",
+                isDark ? "from-white/[0.02] via-transparent to-transparent" : "from-black/[0.02] via-transparent to-transparent"
+            )} />
 
             <div className="w-full h-full px-4 py-6 relative z-10 flex flex-col">
                 {/* Header */}
@@ -89,13 +107,18 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         className="flex items-center gap-3 pointer-events-auto cursor-grab active:cursor-grabbing"
                     >
                         {/* Logo Icon */}
-                        <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center border border-white/20">
+                        <div className={clsx("w-8 h-8 rounded flex items-center justify-center border transition-colors",
+                            isDark ? "bg-white/10 border-white/20" : "bg-black/10 border-black/20"
+                        )}>
                             <div className="flex gap-0.5">
-                                <div className="w-1 h-3 rounded-full bg-white"></div>
-                                <div className="w-1 h-3 rounded-full bg-white"></div>
+                                <div className={clsx("w-1 h-3 rounded-full transition-colors", isDark ? "bg-white" : "bg-black")}></div>
+                                <div className={clsx("w-1 h-3 rounded-full transition-colors", isDark ? "bg-white" : "bg-black")}></div>
                             </div>
                         </div>
-                        <h1 className="text-2xl font-mono font-bold tracking-tighter uppercase select-none">Melora <span className="text-xs align-top text-white/60">ZEN</span></h1>
+                        <h1 className={clsx("text-3xl tracking-normal select-none transition-colors",
+                            "font-['Pacifico']",
+                            isDark ? "text-white" : "text-black"
+                        )}>Melora Tunes</h1>
                     </motion.div>
 
                     <motion.nav
@@ -103,26 +126,39 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         dragConstraints={containerRef}
                         className="flex items-center gap-6 pointer-events-auto cursor-grab active:cursor-grabbing"
                     >
-                        <button onClick={onCinemaMode} className="hidden md:block font-mono text-sm tracking-widest uppercase text-white/50 hover:text-white transition-colors border-b border-transparent hover:border-white/30 pb-1">
+                        <button onClick={onCinemaMode} className={clsx("hidden md:block font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1",
+                            isDark ? "text-white/50 hover:text-white hover:border-white/30" : "text-black/50 hover:text-black hover:border-black/30"
+                        )}>
                             Cinema Mode
                         </button>
-                        <button onClick={onCreateMix} className="font-mono text-sm tracking-widest uppercase text-white/50 hover:text-white transition-colors border-b border-transparent hover:border-white/30 pb-1">
+                        <button onClick={onCreateMix} className={clsx("font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1",
+                            isDark ? "text-white/50 hover:text-white hover:border-white/30" : "text-black/50 hover:text-black hover:border-black/30"
+                        )}>
                             + Create Mix
                         </button>
 
-                        <div className="flex gap-4 ml-4 border-l border-white/10 pl-6">
+                        <div className={clsx("flex gap-4 ml-4 border-l pl-6 transition-colors", isDark ? "border-white/10" : "border-black/10")}>
                             {/* Theme Dropdown */}
                             <div className="relative">
                                 <button
                                     onClick={() => onOpenThemeSelector?.()}
-                                    className="p-2 text-white/40 hover:text-white transition-colors"
+                                    className={clsx("p-2 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}
                                     title="Change Theme"
                                 >
                                     <Palette size={20} />
                                 </button>
                             </div>
 
-                            <button onClick={onOpenSettings} className="p-2 text-white/40 hover:text-white transition-colors">
+                            {/* Dark/Light Toggle */}
+                            <button
+                                onClick={toggleZenMode}
+                                className={clsx("p-2 transition-colors", isDark ? "text-white/40 hover:text-yellow-300" : "text-black/40 hover:text-purple-600")}
+                                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                            >
+                                {isDark ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+
+                            <button onClick={onOpenSettings} className={clsx("p-2 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
                                 <Settings size={20} />
                             </button>
                         </div>
@@ -132,7 +168,9 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                 <main className="grid lg:grid-cols-12 gap-8 flex-grow items-start h-full relative">
                     {/* Left Column: Grid of Mixtapes */}
                     <section className="lg:col-span-7 h-full flex flex-col relative z-50">
-                        <motion.h2 drag dragConstraints={containerRef} className="font-mono text-xl uppercase tracking-widest mb-4 opacity-60 text-white pl-2 cursor-grab active:cursor-grabbing w-fit">Your Mixtapes</motion.h2>
+                        <motion.h2 drag dragConstraints={containerRef} className={clsx("font-mono text-xl uppercase tracking-widest mb-4 opacity-60 pl-2 cursor-grab active:cursor-grabbing w-fit transition-colors",
+                            isDark ? "text-white" : "text-black"
+                        )}>Your Mixtapes</motion.h2>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pb-4">
                             {mixes.map((mix) => {
                                 if (mix.id === activeMixId) return null;
@@ -167,16 +205,20 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                             playClunk();
                                             loadMix(mix.id);
                                         })}
-                                        className="group relative w-full aspect-[3/2] bg-[#111] rounded-lg shadow-lg border border-white/10 p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing overflow-visible z-0"
+                                        className={clsx("group relative w-full aspect-[3/2] rounded-lg shadow-lg border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing overflow-visible z-0 transition-colors",
+                                            isDark ? "bg-[#111] border-white/10" : "bg-white border-black/10 shadow-xl"
+                                        )}
                                     >
                                         {/* Screws */}
-                                        <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-white/10 flex items-center justify-center"><div className="w-1 h-[0.5px] bg-white/30 rotate-45"></div></div>
-                                        <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-white/10 flex items-center justify-center"><div className="w-1 h-[0.5px] bg-white/30 rotate-45"></div></div>
-                                        <div className="absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full bg-white/10 flex items-center justify-center"><div className="w-1 h-[0.5px] bg-white/30 rotate-45"></div></div>
-                                        <div className="absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full bg-white/10 flex items-center justify-center"><div className="w-1 h-[0.5px] bg-white/30 rotate-45"></div></div>
+                                        <div className={clsx("absolute top-2 left-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+                                        <div className={clsx("absolute top-2 right-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+                                        <div className={clsx("absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+                                        <div className={clsx("absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
 
                                         {/* Label */}
-                                        <div className="relative bg-white mx-1 mt-1 h-3/5 rounded-sm shadow-sm p-1 transform rotate-0 group-hover:rotate-[0.5deg] transition-transform duration-500 flex flex-col justify-center items-center overflow-hidden z-10">
+                                        <div className={clsx("relative mx-1 mt-1 h-3/5 rounded-sm shadow-sm p-1 transform rotate-0 group-hover:rotate-[0.5deg] transition-all duration-500 flex flex-col justify-center items-center overflow-hidden z-10",
+                                            isDark ? "bg-white" : "bg-zinc-100 border border-zinc-200"
+                                        )}>
                                             <div className="absolute top-1 left-1 font-mono font-bold text-black text-xs opacity-60">A</div>
                                             <h3 className="font-hand font-bold text-sm text-black tracking-tight text-center line-clamp-2 w-full px-1">
                                                 {mix.title}
@@ -185,26 +227,34 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                         </div>
 
                                         {/* Reels */}
-                                        <div className="mx-2 mb-1 h-8 bg-white/5 rounded-full flex items-center justify-between px-2 relative border border-white/5">
+                                        <div className={clsx("mx-2 mb-1 h-8 rounded-full flex items-center justify-between px-2 relative border",
+                                            isDark ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"
+                                        )}>
                                             {/* Left Reel */}
-                                            <div className="w-6 h-6 bg-transparent rounded-full border-2 border-white/40 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700">
-                                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                                <div className="absolute inset-0 border border-white/20 rounded-full border-dashed"></div>
+                                            <div className={clsx("w-6 h-6 bg-transparent rounded-full border-2 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700",
+                                                isDark ? "border-white/40" : "border-black/40"
+                                            )}>
+                                                <div className={clsx("w-1.5 h-1.5 rounded-full", isDark ? "bg-white" : "bg-black")}></div>
+                                                <div className={clsx("absolute inset-0 border rounded-full border-dashed", isDark ? "border-white/20" : "border-black/20")}></div>
                                             </div>
 
                                             <div className="flex-grow h-3 mx-1 flex items-center justify-center">
-                                                <span className="text-[5px] text-white/30 font-mono">TYPE I</span>
+                                                <span className={clsx("text-[5px] font-mono", isDark ? "text-white/30" : "text-black/30")}>TYPE I</span>
                                             </div>
 
                                             {/* Right Reel */}
-                                            <div className="w-6 h-6 bg-transparent rounded-full border-2 border-white/40 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700">
-                                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                                <div className="absolute inset-0 border border-white/20 rounded-full border-dashed"></div>
+                                            <div className={clsx("w-6 h-6 bg-transparent rounded-full border-2 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700",
+                                                isDark ? "border-white/40" : "border-black/40"
+                                            )}>
+                                                <div className={clsx("w-1.5 h-1.5 rounded-full", isDark ? "bg-white" : "bg-black")}></div>
+                                                <div className={clsx("absolute inset-0 border rounded-full border-dashed", isDark ? "border-white/20" : "border-black/20")}></div>
                                             </div>
                                         </div>
 
                                         {/* Song Count Badge */}
-                                        <div className="absolute -right-1 top-2/3 bg-white text-black text-[8px] font-bold py-0.5 px-1.5 rounded-l-sm shadow-md">
+                                        <div className={clsx("absolute -right-1 top-2/3 text-[8px] font-bold py-0.5 px-1.5 rounded-l-sm shadow-md",
+                                            isDark ? "bg-white text-black" : "bg-black text-white"
+                                        )}>
                                             {mix.songs.length} SONGS
                                         </div>
 
@@ -220,12 +270,14 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                             })}
                             <div
                                 onClick={onCreateMix}
-                                className="w-full aspect-[3/2] rounded-lg border-2 border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 flex flex-col items-center justify-center cursor-pointer transition-all group gap-2"
+                                className={clsx("w-full aspect-[3/2] rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group gap-2",
+                                    isDark ? "border-white/10 hover:border-white/30 hover:bg-white/5" : "border-black/10 hover:border-black/30 hover:bg-black/5"
+                                )}
                             >
-                                <div className="p-3 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors">
-                                    <Plus className="text-white/40 group-hover:text-white" />
+                                <div className={clsx("p-3 rounded-full transition-colors", isDark ? "bg-white/5 group-hover:bg-white/10" : "bg-black/5 group-hover:bg-black/10")}>
+                                    <Plus className={clsx("transition-colors", isDark ? "text-white/40 group-hover:text-white" : "text-black/40 group-hover:text-black")} />
                                 </div>
-                                <span className="font-mono text-xs text-white/40 group-hover:text-white uppercase tracking-widest">Create Mix</span>
+                                <span className={clsx("font-mono text-xs uppercase tracking-widest transition-colors", isDark ? "text-white/40 group-hover:text-white" : "text-black/40 group-hover:text-black")}>Create Mix</span>
                             </div>
                         </div>
                     </section>
@@ -245,15 +297,19 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, delay: 0.2 }}
                     >
-                        <div className="bg-[#0a0a0a] w-full max-w-[340px] p-5 rounded-2xl shadow-2xl border border-white/10 relative overflow-hidden backdrop-blur-xl">
+                        <div className={clsx("w-full max-w-[340px] p-5 rounded-2xl shadow-2xl border relative overflow-hidden backdrop-blur-xl transition-colors",
+                            isDark ? "bg-[#0a0a0a] border-white/10" : "bg-white border-black/10 text-black shadow-zinc-300"
+                        )}>
                             {/* Decorative Screws */}
-                            <div className="absolute top-4 left-4 text-white/10"><Plus size={14} /></div>
-                            <div className="absolute top-4 right-4 text-white/10"><Plus size={14} /></div>
-                            <div className="absolute bottom-4 left-4 text-white/10"><Plus size={14} /></div>
-                            <div className="absolute bottom-4 right-4 text-white/10"><Plus size={14} /></div>
+                            <div className={clsx("absolute top-4 left-4", isDark ? "text-white/10" : "text-black/10")}><Plus size={14} /></div>
+                            <div className={clsx("absolute top-4 right-4", isDark ? "text-white/10" : "text-black/10")}><Plus size={14} /></div>
+                            <div className={clsx("absolute bottom-4 left-4", isDark ? "text-white/10" : "text-black/10")}><Plus size={14} /></div>
+                            <div className={clsx("absolute bottom-4 right-4", isDark ? "text-white/10" : "text-black/10")}><Plus size={14} /></div>
 
                             <div className="flex justify-between items-center mb-6 px-4">
-                                <h2 className="font-mono text-xs font-bold tracking-[0.2em] uppercase text-white/40 text-center w-full">Stereo Cassette Player</h2>
+                                <h2 className={clsx("font-mono text-xs font-bold tracking-[0.2em] uppercase text-center w-full",
+                                    isDark ? "text-white/40" : "text-black/40"
+                                )}>Stereo Cassette Player</h2>
                             </div>
 
                             {/* Player Screen / Window - Shows Cassette Inside */}
@@ -306,23 +362,25 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                             </div>
 
                             {/* Digital Display */}
-                            <div className="bg-[#111] h-8 w-full rounded border border-white/10 flex items-center px-3 mb-4 shadow-inner">
-                                <span className="font-mono text-white/80 text-xs tracking-wider truncate">
+                            <div className={clsx("h-8 w-full rounded border flex items-center px-3 mb-4 shadow-inner transition-colors",
+                                isDark ? "bg-[#111] border-white/10" : "bg-zinc-100 border-black/10"
+                            )}>
+                                <span className={clsx("font-mono text-xs tracking-wider truncate", isDark ? "text-white/80" : "text-black/80")}>
                                     {currentSong ? `▶ ${decodeHtml(currentSong.name)}` : "READY"}
                                 </span>
                             </div>
 
                             {/* Visualizer */}
-                            <Visualizer isPlaying={isPlaying} accentColor="#ffffff" className="w-full h-8 rounded mb-4 opacity-50" />
+                            <Visualizer isPlaying={isPlaying} accentColor={isDark ? "#ffffff" : "#000000"} className="w-full h-8 rounded mb-4 opacity-50" />
 
                             {/* Time & Progress */}
                             <div className="mb-6 px-1">
-                                <div className="flex justify-between text-[10px] font-mono text-white/40 mb-1">
+                                <div className={clsx("flex justify-between text-[10px] font-mono mb-1", isDark ? "text-white/40" : "text-black/40")}>
                                     <span>{formatTime(progress * duration)}</span>
                                     <span>{formatTime(duration || 0)}</span>
                                 </div>
                                 <div
-                                    className="h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer group"
+                                    className={clsx("h-1 rounded-full overflow-hidden cursor-pointer group", isDark ? "bg-white/10" : "bg-black/10")}
                                     onClick={(e) => {
                                         if (duration && isLoaded) {
                                             const rect = e.currentTarget.getBoundingClientRect();
@@ -332,7 +390,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                     }}
                                 >
                                     <motion.div
-                                        className="h-full bg-white group-hover:bg-white/80 transition-colors"
+                                        className={clsx("h-full transition-colors", isDark ? "bg-white group-hover:bg-white/80" : "bg-black group-hover:bg-black/80")}
                                         style={{ width: `${progress * 100}%` }}
                                     ></motion.div>
                                 </div>
@@ -340,49 +398,57 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
 
                             {/* Main Controls */}
                             <div className="flex items-center justify-center gap-6 mb-8">
-                                <button onClick={() => handleClick(() => { playClick(); prev(); })} className="p-3 text-white/40 hover:text-white transition-colors">
+                                <button onClick={() => handleClick(() => { playClick(); prev(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
                                     <SkipBack size={20} className="fill-current" />
                                 </button>
                                 <button
                                     onClick={() => handleClick(() => { playClick(); togglePlay(); })}
-                                    className="w-14 h-14 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                                    className={clsx("w-14 h-14 flex items-center justify-center rounded-full hover:scale-105 active:scale-95 transition-all shadow-lg",
+                                        isDark ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]" : "bg-black text-white shadow-[0_0_20px_rgba(0,0,0,0.1)]"
+                                    )}
                                 >
                                     {isPlaying ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current pl-1" />}
                                 </button>
-                                <button onClick={() => handleClick(() => { playClick(); next(); })} className="p-3 text-white/40 hover:text-white transition-colors">
+                                <button onClick={() => handleClick(() => { playClick(); next(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
                                     <SkipForward size={20} className="fill-current" />
                                 </button>
                             </div>
 
-                            <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                            <div className={clsx("flex justify-between items-center pt-4 border-t", isDark ? "border-white/5" : "border-black/5")}>
                                 <div className="flex items-center gap-4">
                                     <button
                                         onClick={() => handleClick(() => { playEject(); loadMix(null as any); })}
-                                        className="flex items-center gap-2 text-[10px] font-mono font-bold text-white/30 hover:text-white transition-colors uppercase tracking-widest"
+                                        className={clsx("flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest",
+                                            isDark ? "text-white/30 hover:text-white" : "text-black/30 hover:text-black"
+                                        )}
                                     >
                                         <LogOut size={12} /> Eject
                                     </button>
 
                                     <button
                                         onClick={() => setShowLyrics(prev => !prev)}
-                                        className={`flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest ${showLyrics ? 'text-white' : 'text-white/30 hover:text-white'}`}
+                                        className={clsx("flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest",
+                                            showLyrics ? (isDark ? "text-white" : "text-black") : (isDark ? "text-white/30 hover:text-white" : "text-black/30 hover:text-black")
+                                        )}
                                     >
                                         <Mic2 size={12} /> Lyrics
                                     </button>
 
                                     <button
                                         onClick={() => setShowEq(prev => !prev)}
-                                        className={`flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest ${showEq ? 'text-white' : 'text-white/30 hover:text-white'}`}
+                                        className={clsx("flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest",
+                                            showEq ? (isDark ? "text-white" : "text-black") : (isDark ? "text-white/30 hover:text-white" : "text-black/30 hover:text-black")
+                                        )}
                                     >
                                         <SlidersHorizontal size={12} /> EQ
                                     </button>
                                 </div>
 
                                 <div className="flex items-center gap-2 group cursor-pointer relative" onPointerDown={(e) => e.stopPropagation()}>
-                                    <Volume2 size={14} className="text-white/30 group-hover:text-white" />
-                                    <div className="w-16 h-1 bg-white/10 rounded-full relative overflow-hidden">
+                                    <Volume2 size={14} className={clsx("transition-colors", isDark ? "text-white/30 group-hover:text-white" : "text-black/30 group-hover:text-black")} />
+                                    <div className={clsx("w-16 h-1 rounded-full relative overflow-hidden", isDark ? "bg-white/10" : "bg-black/10")}>
                                         <div
-                                            className="absolute left-0 top-0 bottom-0 bg-white/50 group-hover:bg-white transition-colors"
+                                            className={clsx("absolute left-0 top-0 bottom-0 transition-colors", isDark ? "bg-white/50 group-hover:bg-white" : "bg-black/50 group-hover:bg-black")}
                                             style={{ width: `${volume * 100}%` }}
                                         ></div>
                                     </div>
@@ -420,9 +486,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                 </main>
 
                 <footer className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                    <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center mx-auto bg-white/5 text-white/30 font-mono text-xs font-bold">
-                        N
-                    </div>
+                    {/* Removed N button based on user request */}
                 </footer>
             </div>
         </div>

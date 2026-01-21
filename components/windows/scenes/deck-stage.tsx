@@ -6,7 +6,7 @@ import { useAudio } from "@/hooks/use-audio";
 import { ThemeConfig, ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useState, useRef, useEffect } from "react";
 import { decodeHtml } from "@/lib/utils";
-import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc, Share2 } from "lucide-react";
+import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc, Share2, Sun, Moon } from "lucide-react";
 import { Visualizer } from "@/components/ui/visualizer";
 import { Mix } from "@/components/providers/playback-context";
 import { LyricsView } from "@/components/ui/lyrics-view";
@@ -41,7 +41,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     useEffect(() => {
         const checkGuardrail = () => {
             const width = window.innerWidth;
-            const isSmall = width < 780; // Small Monitor / standard phone landscape
+            const isSmall = width < 780; // Small Monitor
 
             if (isSmall) {
                 // Safety: Force view mode if too small
@@ -59,6 +59,25 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
         return () => window.removeEventListener('resize', checkGuardrail);
     }, [viewMode]);
 
+    // Metal Theme Specific State
+    const [isDarkMode, setIsDarkMode] = useState(true);
+
+    useEffect(() => {
+        if (currentTheme === 'METAL') {
+            const savedMode = localStorage.getItem('melora-metal-mode');
+            if (savedMode) {
+                setIsDarkMode(savedMode === 'dark');
+            }
+        }
+    }, [currentTheme]);
+
+    const toggleMetalMode = () => {
+        const newMode = !isDarkMode;
+        setIsDarkMode(newMode);
+        localStorage.setItem('melora-metal-mode', newMode ? 'dark' : 'light');
+        playClick();
+    };
+
     const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
     const [isEjecting, setIsEjecting] = useState(false);
@@ -69,7 +88,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq
+        isLoaded, eq, isDownloaded
     } = usePlayback();
 
     const isDraggingRef = useRef(false);
@@ -129,7 +148,12 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
         orange: "bg-orange-500",
         green: "bg-green-600",
         red: "bg-red-600",
-        white: "bg-gray-200"
+        white: "bg-zinc-200",
+        blue: "bg-blue-600",
+        yellow: "bg-yellow-500",
+        cyan: "bg-cyan-500",
+        pink: "bg-pink-500",
+        black: "bg-zinc-800"
     };
 
     const accentColors: Record<string, string> = {
@@ -137,13 +161,20 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
         orange: "bg-orange-300",
         green: "bg-green-300",
         red: "bg-red-300",
-        white: "bg-gray-400"
+        white: "bg-zinc-400",
+        blue: "bg-blue-300",
+        yellow: "bg-yellow-300",
+        cyan: "bg-cyan-300",
+        pink: "bg-pink-300",
+        black: "bg-zinc-600"
     };
 
     return (
         <div ref={containerRef} className={clsx(
-            "min-h-screen flex flex-col font-sans overflow-x-hidden selection:bg-purple-500 selection:text-white",
-            theme.bodyGradient // Use theme background
+            "min-h-screen flex flex-col font-sans overflow-x-hidden selection:bg-purple-500 selection:text-white transition-colors duration-500",
+            currentTheme === 'METAL'
+                ? (isDarkMode ? "bg-black" : "bg-zinc-200")
+                : theme.bodyGradient
         )}>
             <style jsx global>{`
                 ::-webkit-scrollbar { display: none; }
@@ -164,8 +195,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                     {currentTheme !== 'METAL' && (
                         <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
                     )}
-                    <h1 className={clsx("font-display text-4xl tracking-tighter mt-1",
-                        currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' || currentTheme === 'SILVERFROST' ? "text-gray-900" : "text-white"
+                    <h1 className={clsx("text-4xl tracking-tighter mt-1 transition-colors",
+                        currentTheme === 'METAL' ? "font-['Pacifico'] tracking-normal text-3xl" : "font-display",
+                        currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' || currentTheme === 'SILVERFROST' || (currentTheme === 'METAL' && !isDarkMode) ? "text-gray-900" : "text-white"
                     )}>
                         Melora Tunes
                     </h1>
@@ -208,13 +240,36 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                         <button
                             onClick={() => handleClick(() => { playClick(); onOpenThemeSelector?.(); })}
                             className={clsx("p-2 rounded-full transition-colors",
-                                currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-500 hover:bg-black/5" : "text-gray-400 hover:text-white hover:bg-white/10"
+                                currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' || (currentTheme === 'METAL' && !isDarkMode) ? "text-gray-500 hover:bg-black/5" : "text-gray-400 hover:text-white hover:bg-white/10"
                             )}
                             title="Change Theme"
                         >
                             <Palette size={20} />
                         </button>
                     </motion.div>
+
+                    {/* Metal Mode Toggle */}
+                    {currentTheme === 'METAL' && (
+                        <motion.div
+                            drag
+                            dragMomentum={true}
+                            dragConstraints={containerRef}
+                            dragElastic={0.2}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEndAction}
+                            className="relative transform-gpu cursor-move"
+                        >
+                            <button
+                                onClick={() => handleClick(toggleMetalMode)}
+                                className={clsx("p-2 rounded-full transition-colors",
+                                    !isDarkMode ? "text-yellow-600 hover:bg-black/5" : "text-blue-300 hover:text-white hover:bg-white/10"
+                                )}
+                                title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                            >
+                                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+                        </motion.div>
+                    )}
 
                     {/* Cinema Mode */}
                     <motion.div
@@ -293,7 +348,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                         {viewMode === 'split' && (
                             <motion.h2
                                 className={clsx("font-display text-2xl md:text-3xl uppercase tracking-widest mb-4 opacity-80 pl-2 cursor-move transform-gpu inline-block",
-                                    currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' ? "text-gray-800" : "text-gray-600"
+                                    currentTheme === 'ZEN' || currentTheme === 'BAUHAUS' || (currentTheme === 'METAL' && !isDarkMode) ? "text-gray-800" : "text-gray-600"
                                 )}
                                 drag
                                 dragMomentum={false}
@@ -526,7 +581,13 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                             backgroundColor: activeMix.color === 'purple' ? '#9333ea' :
                                                 activeMix.color === 'orange' ? '#f97316' :
                                                     activeMix.color === 'green' ? '#16a34a' :
-                                                        activeMix.color === 'red' ? '#dc2626' : '#e5e7eb',
+                                                        activeMix.color === 'red' ? '#dc2626' :
+                                                            activeMix.color === 'blue' ? '#2563eb' :
+                                                                activeMix.color === 'yellow' ? '#eab308' :
+                                                                    activeMix.color === 'cyan' ? '#06b6d4' :
+                                                                        activeMix.color === 'pink' ? '#db2777' :
+                                                                            activeMix.color === 'black' ? '#27272a' :
+                                                                                '#e5e7eb',
                                             backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px, transparent 2px, transparent 4px)'
                                         }}
                                     >
@@ -584,14 +645,21 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             </div>
 
                             {/* LCD Display */}
-                            <div className="bg-[#9ca3af] h-10 w-full rounded-md shadow-inner mb-3 flex items-center px-3 border border-gray-400/30">
-                                <span className="font-mono text-black font-bold tracking-widest text-sm">
-                                    {currentSong ? `▶ ${decodeHtml(currentSong.name).substring(0, 16)}...` : "READY"}
+                            <div className="bg-[#9ca3af] h-10 w-full rounded-md shadow-inner mb-3 flex items-center px-3 border border-gray-400/30 overflow-hidden whitespace-nowrap">
+                                <span className="font-mono text-black font-bold tracking-widest text-sm flex items-center gap-2">
+                                    {currentSong ? (
+                                        <>
+                                            {isDownloaded(currentSong.id) && <span className="bg-black/10 px-1 rounded text-[10px]">OFFLINE</span>}
+                                            <span className="truncate">▶ {decodeHtml(currentSong.name)}</span>
+                                        </>
+                                    ) : (
+                                        "READY"
+                                    )}
                                 </span>
                             </div>
 
                             {/* Visualizer */}
-                            <Visualizer isPlaying={isPlaying} accentColor="#22c55e" className="w-full h-6 rounded mb-4" />
+                            <Visualizer isPlaying={isPlaying} accentColor="#22c55e" className="w-full h-8 rounded mb-4 opacity-90" />
 
                             {/* Progress Bar */}
                             <div className="mb-6 px-1">
@@ -663,7 +731,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     className={`flex flex-col items-center cursor-pointer hover:text-blue-600 transition-colors ${isEjecting ? 'opacity-50' : ''}`}
                                 >
                                     <Disc size={14} />
-                                    <span className="mt-0.5 tracking-widest text-[9px]">EJECT</span>
+                                    <span className="mt-0.5 tracking-widest text-[9px] font-bold">EJECT</span>
                                 </button>
 
                                 <button
@@ -671,7 +739,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     className={`flex flex-col items-center cursor-pointer transition-colors ${showLyrics ? 'text-blue-500' : 'hover:text-blue-600'}`}
                                 >
                                     <Mic2 size={14} />
-                                    <span className="mt-0.5 tracking-widest text-[9px]">LYRICS</span>
+                                    <span className="mt-0.5 tracking-widest text-[9px] font-bold">LYRICS</span>
                                 </button>
 
                                 <button
@@ -679,13 +747,13 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     className={`flex flex-col items-center cursor-pointer transition-colors ${showEq ? 'text-blue-500' : 'hover:text-blue-600'}`}
                                 >
                                     <SlidersHorizontal size={14} />
-                                    <span className="mt-0.5 tracking-widest text-[9px]">EQ</span>
+                                    <span className="mt-0.5 tracking-widest text-[9px] font-bold">EQ</span>
                                 </button>
 
-                                <div className="flex items-center gap-2 w-24">
-                                    <Volume2 size={14} className="text-gray-400" />
+                                <div className="flex items-center gap-2 w-28 ml-4">
+                                    <Volume2 size={16} className="text-gray-400 shrink-0" />
                                     <div
-                                        className="h-1 flex-grow bg-gray-300 rounded-full relative cursor-pointer z-50"
+                                        className="h-1.5 flex-grow bg-gray-300 rounded-full relative cursor-pointer z-50 group hover:h-2 transition-all"
                                         onPointerDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                             const rect = e.currentTarget.getBoundingClientRect();
@@ -693,10 +761,10 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                             setVolume(Math.min(Math.max(p, 0), 1));
                                         }}
                                     >
-                                        <div className="absolute top-0 left-0 bottom-0 bg-blue-500 rounded-full pointer-events-none" style={{ width: `${volume * 100}%` }}></div>
+                                        <div className="absolute top-0 left-0 bottom-0 bg-blue-500 rounded-full pointer-events-none transition-all group-hover:bg-blue-400" style={{ width: `${volume * 100}%` }}></div>
                                         <div
-                                            className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-white border border-gray-400 rounded-full shadow-sm pointer-events-none"
-                                            style={{ left: `calc(${volume * 100}% - 4px)` }}
+                                            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border border-gray-400 rounded-full shadow-sm pointer-events-none transition-transform group-hover:scale-110"
+                                            style={{ left: `calc(${volume * 100}% - 6px)` }}
                                         ></div>
                                     </div>
                                 </div>

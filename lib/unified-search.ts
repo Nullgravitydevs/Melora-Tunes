@@ -138,19 +138,21 @@ function hifiAlbumToSaavn(album: HiFiAlbum): JioSaavnSong {
 // --- Main Search Function ---
 
 export async function searchUnified(query: string, type: SearchType = 'all'): Promise<GroupedSong[]> {
-    console.log(`[UnifiedSearch] Query: "${query}" Type: ${type}`);
+    // Strip quality keywords to improve search results (User might type "Song FLAC")
+    const cleanQuery = query.replace(/\b(flac|lossless|hi-res|high quality|320kbps|320|128kbps|128)\b/gi, '').trim();
+    console.log(`[UnifiedSearch] Query: "${query}" -> Clean: "${cleanQuery}" Type: ${type}`);
 
     // 1. Parallel Fetch
     const promises: Promise<any>[] = [];
 
     // Always fetch JioSaavn
     if (type === 'album') {
-        promises.push(searchAlbums(query));
+        promises.push(searchAlbums(cleanQuery));
     } else {
-        promises.push(searchSongs(query));
+        promises.push(searchSongs(cleanQuery));
     }
 
-    promises.push(searchHiFi(query));
+    promises.push(searchHiFi(cleanQuery));
 
     const [saavnResults, hifiResult] = await Promise.all(promises);
 

@@ -99,6 +99,15 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
         const savedTheme = localStorage.getItem('melora-theme') as ThemeKey;
         if (savedTheme && THEMES[savedTheme]) {
             setCurrentTheme(savedTheme);
+            // Sync deck theme preference on load if applicable
+            if (THEMES[savedTheme].layout !== 'glass') {
+                localStorage.setItem('melora-deck-theme', savedTheme);
+            }
+        } else {
+            // If no saved theme, ensure default (Boombox) is recorded as deck theme
+            if (THEMES['BOOMBOX']) {
+                localStorage.setItem('melora-deck-theme', 'BOOMBOX');
+            }
         }
     }, [initialTheme]);
 
@@ -160,7 +169,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
             return;
         }
         playClick();
-        const colors: Mix["color"][] = ["orange", "purple", "white", "green", "red"];
+        const colors: Mix["color"][] = ["orange", "purple", "white", "green", "red", "blue", "cyan", "pink", "black"];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
         const newMix: Mix = {
@@ -310,7 +319,15 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
 
     // Strictly enforce NO DECK on mobile
     const resolvedLayout = THEMES[currentTheme]?.layout || 'zen';
-    const effectiveLayout = (isMobileDevice && (resolvedLayout === 'deck' || resolvedLayout === 'opendeck' || resolvedLayout === 'boombox'))
+    const effectiveLayout = (isMobileDevice && (
+        resolvedLayout === 'studio' ||
+        resolvedLayout === 'opendeck' ||
+        resolvedLayout === 'boombox' ||
+        resolvedLayout === 'zen' ||
+        resolvedLayout === 'bauhaus' ||
+        resolvedLayout === 'nordic' ||
+        resolvedLayout === 'silverfrost'
+    ))
         ? 'glass'
         : resolvedLayout;
 
@@ -335,20 +352,29 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
     if (!isMounted) return null; // Prevent hydration mismatch/flash
 
     if (isWelcome) {
-        return <WelcomeScreen onSelectMode={handleSelectMode} onSelectIpod={() => onSwitchToMobile?.()} />;
+        return (
+            <WelcomeScreen
+                onSelectMode={handleSelectMode}
+                onSelectIpod={() => onSwitchToMobile?.()}
+                onSelectDeck={() => {
+                    // Logic to load PREVIOUS deck theme
+                    const savedDeckTheme = localStorage.getItem('melora-deck-theme') as ThemeKey;
+                    const targetTheme = (savedDeckTheme && THEMES[savedDeckTheme] && THEMES[savedDeckTheme].layout !== 'glass')
+                        ? savedDeckTheme
+                        : 'ZEN'; // Default backup
+
+                    setIsWelcome(false);
+                    setCurrentTheme(targetTheme);
+                    localStorage.setItem('melora-theme', targetTheme);
+                }}
+            />
+        );
     }
 
     return (
         <>
             <ErrorBoundary>
-                {/* Rotate Overlay for Mobile Deck Mode */}
-                {isMobileDevice && THEMES[currentTheme]?.layout !== 'glass' && showRotateOverlay && (
-                    <div className="fixed inset-0 z-[99999] bg-black flex flex-col items-center justify-center p-8 text-center text-white">
-                        <Smartphone className="w-16 h-16 mb-4 animate-spin-slow text-purple-500" strokeWidth={1.5} />
-                        <h2 className="text-2xl font-bold mb-2">Please Rotate Device</h2>
-                        <p className="text-gray-400">Studio Deck requires a wider display.</p>
-                    </div>
-                )}
+                {/* Rotate Overlay Removed - Decks are Desktop Only now */}
 
                 <StageComponent
                     currentTheme={currentTheme}
@@ -457,7 +483,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                                         const newMix: Mix = {
                                             id: Date.now().toString(),
                                             title: newMixTitle,
-                                            color: (['orange', 'purple', 'green', 'red'] as const)[Math.floor(Math.random() * 4)],
+                                            color: (['orange', 'purple', 'green', 'red', 'blue', 'cyan', 'pink', 'black'] as const)[Math.floor(Math.random() * 8)],
                                             songs: [],
                                             currentSongIndex: 0
                                         };

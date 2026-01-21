@@ -128,7 +128,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         crossfadeDuration, setCrossfadeDuration,
         stopAtEndOfSong, setStopAtEndOfSong,
         bitrate, setBitrate, setForceLossless,
-        likedSongs, toggleLike, isLiked, recentlyPlayed
+        likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
@@ -1748,10 +1748,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             externalTracks={cfTracks}
                             isLiked={currentSong ? isLiked(currentSong.id) : false}
                             onToggleLike={() => currentSong && toggleLike(currentSong)}
-                            audioQuality={bitrate}
-                            backlight={backlight}
                             depth={viewStack.length}
                             onAddSticker={handleAddSticker}
+                            isDownloaded={(id) => isDownloaded(id)}
                         />
 
                         {/* Render Game View if Active - Lazy loaded for performance */}

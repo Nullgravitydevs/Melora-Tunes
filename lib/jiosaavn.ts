@@ -230,9 +230,14 @@ export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' 
 
     try {
         const decryptedUrl = decryptUrl(song.encryptedMediaUrl);
-        // Map 'flac' to '320' for standard streaming URL generation (fallback)
-        const targetBitrate = bitrate === 'flac' ? '320' : bitrate;
-        // Replace suffix with requested bitrate. Inclusive of 320 source.
+        // If FLAC is requested, try to generate the FLAC URL (usually ends in _flac. or _lossless. depending on provider quirks)
+        // For JioSaavn, standard encrypted URLs are usually MP4/AAC.
+        // However, if we are in "Native Mode", we might want to try forcing the bitrate.
+        // Fix: Use 'flac' as target if requested.
+        const targetBitrate = bitrate;
+
+        // Replace suffix with requested bitrate. 
+        // Note: This relies on the file actually existing on the server with that suffix.
         return decryptedUrl.replace(/_(320|160|96|48|12)\./g, `_${targetBitrate}.`);
     } catch (e) {
         console.warn('Failed to decrypt URL for song:', song.name, e);

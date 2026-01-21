@@ -13,7 +13,7 @@ import { OfflineStore } from "@/lib/offline-store";
 export interface Mix {
     id: string;
     title: string;
-    color: "orange" | "purple" | "white" | "green" | "red" | "blue" | "cyan" | "pink" | "teal" | "yellow";
+    color: "orange" | "purple" | "white" | "green" | "red" | "blue" | "cyan" | "pink" | "teal" | "yellow" | "black";
     songs: JioSaavnSong[];
     currentSongIndex: number;
 }

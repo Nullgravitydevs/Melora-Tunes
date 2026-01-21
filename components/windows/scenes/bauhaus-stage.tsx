@@ -68,7 +68,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                 <header className="w-full p-4 flex flex-col md:flex-row justify-between items-center bg-white border-b-4 border-[#1a1a1a] relative z-20 gap-4 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] mb-4">
                     <div className="flex items-center gap-4 select-none">
                         <img src="/cassette-icon.png" alt="Cassette" className="w-10 h-10 pointer-events-none" />
-                        <h1 className="text-3xl font-black uppercase tracking-tighter">Melora</h1>
+                        <h1 className="text-3xl font-['Pacifico'] tracking-tight">Melora Tunes</h1>
                     </div>
 
                     <div className="flex items-center gap-4 flex-wrap justify-center font-bold">
@@ -107,7 +107,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                         </div>
 
 
-                        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4 max-w-full pb-32 pr-[400px]">
+                        <div className="grid grid-cols-3 md:grid-cols-4 gap-3 max-w-full pb-32 pr-[360px]">
                             {mixes.map((mix, index) => {
                                 // Assign colors cyclically
                                 const mixColors = [
@@ -124,7 +124,8 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                                         drag
                                         dragConstraints={containerRef}
                                         whileDrag={{ scale: 1.05, zIndex: 100, rotate: 2 }}
-                                        dragMomentum={false}
+                                        dragMomentum={true}
+                                        dragElastic={0.2}
                                         onDragEnd={(e, info) => {
                                             const player = document.getElementById('stereo-player');
                                             if (player) {
@@ -144,7 +145,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                                         <div
                                             id={`mix-card-${mix.id}`}
                                             className={clsx(
-                                                "relative p-3 border-2 border-[#1a1a1a] transition-transform transform group-hover:scale-[1.02] h-42 flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
+                                                "relative p-3 border-2 border-[#1a1a1a] transition-transform transform group-hover:scale-[1.02] aspect-[3/2] flex flex-col justify-between shadow-[6px_6px_0px_0px_#1a1a1a]",
                                                 color.bg
                                             )}
                                         >
@@ -247,10 +248,11 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                     <motion.section
                         id="stereo-player"
                         drag
-                        dragMomentum={false}
+                        dragMomentum={true}
+                        dragElastic={0.2}
                         dragConstraints={containerRef}
-                        whileDrag={{ scale: 1.02 }}
-                        className="fixed right-6 top-24 w-[380px] bg-white border-4 border-[#1a1a1a] p-4 flex flex-col gap-4 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-80px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
+                        whileDrag={{ scale: 1.02, zIndex: 100 }}
+                        className="fixed right-6 top-24 w-full max-w-[340px] bg-white border-4 border-[#1a1a1a] p-4 flex flex-col gap-2 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] z-50 max-h-[calc(100vh-80px)] overflow-y-auto [&::-webkit-scrollbar]:hidden cursor-move"
                     >
                         {/* Screws */}
                         <div className="absolute top-2 left-2 text-gray-300 font-mono text-xl">+</div>
@@ -281,9 +283,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                                         const color = activeIndex >= 0 ? mixColors[activeIndex % mixColors.length] : mixColors[0];
 
                                         return (
-                                            <div className="relative w-[380px]">
+                                            <div className="relative w-full">
                                                 <div className={clsx(
-                                                    "relative p-3 border-2 border-[#1a1a1a] h-42 flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
+                                                    "relative p-3 border-2 border-[#1a1a1a] aspect-[3/2] flex flex-col justify-between shadow-[8px_8px_0px_0px_#1a1a1a]",
                                                     color.bg
                                                 )}>
                                                     <div className={clsx("flex justify-between items-start", activeIndex % 3 === 2 ? "text-[#1a1a1a]" : "text-white/90")}>
@@ -391,52 +393,61 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                             </div>
                         </div>
 
-                        <hr className="border-gray-200" />
+                        <hr className="border-gray-200 my-1" />
 
-                        {/* Controls */}
-                        <div className="flex items-end justify-between px-2 pb-4">
-                            <div className="flex flex-col gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className={clsx("w-3 h-3 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]", isLoaded ? "bg-red-500" : "bg-gray-400")}></div>
-                                    <span className="text-[10px] uppercase font-bold text-gray-400">PWR</span>
-                                </div>
-                                <button onClick={() => { playEject(); loadMix(null as any); }} className="w-10 h-10 bg-gray-200 border-2 border-[#1a1a1a] flex items-center justify-center hover:bg-[#ff3333] hover:text-white transition-colors group">
-                                    <LogOut size={20} className="group-hover:-translate-y-0.5 transition-transform" />
-                                </button>
+                        {/* Playback Controls - Compact like Metal */}
+                        <div className="flex justify-center items-center gap-3 mb-2">
+                            <button onClick={() => { playClick(); prev(); }} className="w-10 h-10 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none">
+                                <SkipBack size={18} className="fill-current" />
+                            </button>
+                            <button onClick={() => { playClick(); togglePlay(); }} className="w-14 h-14 bg-[#0052cc] text-white rounded-full border-4 border-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none transition-all flex items-center justify-center">
+                                {isPlaying ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-1" />}
+                            </button>
+                            <button onClick={() => { playClick(); next(); }} className="w-10 h-10 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none">
+                                <SkipForward size={18} className="fill-current" />
+                            </button>
+                        </div>
+
+                        {/* Footer Controls - Horizontal like Metal */}
+                        <div className="flex items-center justify-between px-2 text-xs font-mono text-gray-500 font-bold">
+                            <div className="flex items-center gap-2">
+                                <div className={clsx("w-2 h-2 rounded-full animate-pulse", isLoaded ? "bg-red-500" : "bg-gray-400")}></div>
+                                <span className="text-[9px]">PWR</span>
                             </div>
 
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => { playClick(); prev(); }} className="w-14 h-14 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none">
-                                    <SkipBack size={24} className="fill-current" />
-                                </button>
-                                <button onClick={() => { playClick(); togglePlay(); }} className="w-24 h-24 bg-[#0052cc] text-white rounded-full border-4 border-white shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center">
-                                    {isPlaying ? <Pause size={48} className="fill-current" /> : <Play size={48} className="fill-current ml-2" />}
-                                </button>
-                                <button onClick={() => { playClick(); next(); }} className="w-14 h-14 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none">
-                                    <SkipForward size={24} className="fill-current" />
-                                </button>
-                            </div>
+                            <button onClick={() => { playEject(); loadMix(null as any); }} className="flex flex-col items-center cursor-pointer hover:text-[#ff3333] transition-colors">
+                                <LogOut size={14} />
+                                <span className="mt-0.5 tracking-widest text-[9px] font-bold">EJECT</span>
+                            </button>
 
-                            <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                <button
-                                    onClick={() => setShowLyrics(prev => !prev)}
-                                    className={`mb-1 transition-colors ${showLyrics ? 'text-[#0052cc]' : 'text-gray-400 hover:text-[#0052cc]'}`}
-                                    title="Lyrics"
+                            <button
+                                onClick={() => setShowLyrics(prev => !prev)}
+                                className={`flex flex-col items-center cursor-pointer transition-colors ${showLyrics ? 'text-[#0052cc]' : 'hover:text-[#0052cc]'}`}
+                            >
+                                <Mic2 size={14} />
+                                <span className="mt-0.5 tracking-widest text-[9px] font-bold">LYRICS</span>
+                            </button>
+
+                            <button
+                                onClick={() => setShowEq(prev => !prev)}
+                                className={`flex flex-col items-center cursor-pointer transition-colors ${showEq ? 'text-[#0052cc]' : 'hover:text-[#0052cc]'}`}
+                            >
+                                <SlidersHorizontal size={14} />
+                                <span className="mt-0.5 tracking-widest text-[9px] font-bold">EQ</span>
+                            </button>
+
+                            <div className="flex items-center gap-1.5">
+                                <Volume2 size={14} className="text-gray-400" />
+                                <div
+                                    className="h-1.5 w-16 bg-gray-200 rounded-full relative cursor-pointer border border-[#1a1a1a]"
+                                    onClick={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const p = (e.clientX - rect.left) / rect.width;
+                                        setVolume(Math.min(Math.max(p, 0), 1));
+                                    }}
                                 >
-                                    <Mic2 size={16} />
-                                </button>
-                                <button
-                                    onClick={() => setShowEq(prev => !prev)}
-                                    className={`mb-2 transition-colors ${showEq ? 'text-[#0052cc]' : 'text-gray-400 hover:text-[#0052cc]'}`}
-                                    title="Equalizer"
-                                >
-                                    <SlidersHorizontal size={16} />
-                                </button>
-                                <div className="w-3 h-20 bg-gray-100 border-2 border-[#1a1a1a] relative overflow-hidden flex items-end cursor-pointer rounded-full">
-                                    <motion.div className="w-full bg-[#ffcc00] group-hover:bg-yellow-400" style={{ height: `${volume * 100}%` }} />
-                                    <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                    <div className="absolute top-0 left-0 bottom-0 bg-[#ffcc00] rounded-full" style={{ width: `${volume * 100}%` }}></div>
                                 </div>
-                                <Volume2 size={16} className="text-gray-400" />
                             </div>
                         </div>
                     </motion.section >

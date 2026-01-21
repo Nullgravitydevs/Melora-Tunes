@@ -48,7 +48,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Press+Start+2P&family=Share+Tech+Mono&family=Pacifico&family=Playwrite+England:wght@400&family=Caveat:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body
         className={`${inter.variable} ${pressStart2P.variable} font-sans bg-black text-white`}

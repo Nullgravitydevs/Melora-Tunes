@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { Check, Monitor, X, Palette, Smartphone, Disc, Radio } from "lucide-react";
@@ -13,6 +14,13 @@ interface DesktopThemeSelectorProps {
 }
 
 export function DesktopThemeSelector({ isOpen, onClose, currentTheme, onSelectTheme }: DesktopThemeSelectorProps) {
+    const [selectedTheme, setSelectedTheme] = useState<ThemeKey>(currentTheme);
+
+    // Sync local state when modal opens or prop changes
+    useEffect(() => {
+        if (isOpen) setSelectedTheme(currentTheme);
+    }, [isOpen, currentTheme]);
+
     if (!isOpen) return null;
 
     return (
@@ -63,68 +71,107 @@ export function DesktopThemeSelector({ isOpen, onClose, currentTheme, onSelectTh
                                     return !isThemeGlass;
                                 })
                                 .map(([key, theme]) => {
-                                    const isActive = currentTheme === key;
+                                    const isPreview = selectedTheme === key;
+                                    const isActuallyActive = currentTheme === key;
 
                                     return (
                                         <button
                                             key={key}
-                                            onClick={() => {
-                                                onSelectTheme(key as ThemeKey);
-                                                // Auto-save on click for seamless feel
-                                                localStorage.setItem('melora-theme', key);
-                                            }}
+                                            onClick={() => setSelectedTheme(key as ThemeKey)}
                                             className={clsx(
                                                 "relative group text-left rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col h-full",
-                                                isActive
-                                                    ? "border-white/20 bg-white/5 ring-1 ring-white/10"
-                                                    : "border-white/5 bg-black hover:bg-white/5 hover:border-white/10 hover:-translate-y-1"
+                                                isPreview
+                                                    ? "border-white/40 ring-2 ring-white/20 bg-white/5"
+                                                    : "border-white/5 bg-black hover:bg-white/5 hover:border-white/10"
                                             )}
                                         >
                                             {/* Preview Area */}
                                             <div className={clsx("h-32 w-full relative overflow-hidden", theme.bodyGradient)}>
-                                                {/* Overlay Gradient */}
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                                                {/* Image Preview (if available) */}
+                                                {theme.previewImage ? (
+                                                    <>
+                                                        <img
+                                                            src={theme.previewImage}
+                                                            alt={theme.name}
+                                                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100"
+                                                        />
+                                                        {/* Subtle gradient overlay for text readability */}
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                                    </>
+                                                ) : (
+                                                    /* Abstract Fallback Logic */
+                                                    <>
+                                                        {/* Overlay Gradient */}
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
 
-                                                {/* Active Badge */}
+                                                        {/* Abstract UI Representation */}
+                                                        <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+                                                            <div className="flex gap-2 items-end opacity-90">
+                                                                <div className={clsx("w-10 h-10 rounded-full shadow-lg border-2 border-white/20 flex items-center justify-center", theme.buttonBg)}>
+                                                                    <div className="w-2 h-2 rounded-full bg-white/50" />
+                                                                </div>
+                                                                <div className={clsx("h-8 rounded-lg flex-grow shadow-lg border border-white/10 flex items-center px-2", theme.screenBg)}>
+                                                                    <div className="w-12 h-1 bg-white/20 rounded-full" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+
+                                                {/* Current Active Indicator */}
                                                 <div className="absolute top-3 right-3 z-10">
-                                                    {isActive && (
-                                                        <span className="w-6 h-6 bg-white text-black rounded-full shadow-lg flex items-center justify-center">
-                                                            <Check size={14} strokeWidth={4} />
-                                                        </span>
+                                                    {isActuallyActive && (
+                                                        <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.8)]" title="Current Active Theme" />
                                                     )}
                                                 </div>
 
-                                                {/* Abstract UI Representation */}
-                                                <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
-                                                    <div className="flex gap-2 items-end opacity-90">
-                                                        <div className={clsx("w-10 h-10 rounded-full shadow-lg border-2 border-white/20 flex items-center justify-center", theme.buttonBg)}>
-                                                            <div className="w-2 h-2 rounded-full bg-white/50" />
+                                                {/* Selection Checkmark */}
+                                                <div className="absolute top-3 left-3 z-10">
+                                                    {isPreview && (
+                                                        <div className="bg-white text-black rounded-full p-1 shadow-lg">
+                                                            <Check size={12} strokeWidth={4} />
                                                         </div>
-                                                        <div className={clsx("h-8 rounded-lg flex-grow shadow-lg border border-white/10 flex items-center px-2", theme.screenBg)}>
-                                                            <div className="w-12 h-1 bg-white/20 rounded-full" />
-                                                        </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             {/* Content */}
                                             <div className="p-5 flex flex-col gap-2 flex-grow bg-black">
                                                 <div className="flex justify-between items-start">
-                                                    <h3 className={clsx("font-bold text-lg transition-colors tracking-tight", isActive ? "text-white" : "text-neutral-400 group-hover:text-white")}>
+                                                    <h3 className={clsx("font-bold text-lg transition-colors tracking-tight", isPreview ? "text-white" : "text-neutral-400 group-hover:text-white")}>
                                                         {theme.name}
                                                     </h3>
-                                                    {theme.layout === 'glass' ? <Disc size={16} className="text-neutral-500" /> : <Radio size={16} className="text-neutral-500" />}
-                                                </div>
-
-                                                <div className="flex items-center gap-2 mt-auto pt-2">
-                                                    <span className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest border border-white/5 rounded px-1.5 py-0.5">
-                                                        {theme.layout}
-                                                    </span>
                                                 </div>
                                             </div>
                                         </button>
                                     );
                                 })}
+                        </div>
+
+                        {/* Footer with Main Action Button */}
+                        <div className="p-6 border-t border-white/10 bg-black flex justify-end gap-3 items-center">
+                            <div className="text-xs text-neutral-500 font-mono mr-auto uppercase tracking-wider">
+                                {selectedTheme === currentTheme ? "Current Theme Selected" : "Previewing Selection"}
+                            </div>
+
+                            <button
+                                onClick={onClose}
+                                className="px-6 py-3 rounded-full font-bold text-sm text-white/50 hover:text-white hover:bg-white/10 transition-all"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    onSelectTheme(selectedTheme);
+                                    localStorage.setItem('melora-theme', selectedTheme);
+                                    onClose();
+                                }}
+                                className="px-8 py-3 bg-white text-black rounded-full font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2"
+                            >
+                                <Check size={16} />
+                                Set Default
+                            </button>
                         </div>
                     </motion.div>
                 </div>
