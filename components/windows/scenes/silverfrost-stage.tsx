@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-    Palette, Smartphone, Settings, Plus, Tv, Pencil, Camera, Search, Share2
+    Palette, Settings, Plus, Tv, Pencil, Camera, Search, Share2
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -75,12 +75,9 @@ export function SilverFrostStage({
             <header className="flex items-center justify-between px-10 py-4 border-b border-white/20 bg-[#f8fbfc]/80 backdrop-blur-md z-50">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
-                        <div className="size-8 flex items-center justify-center bg-[#00aaff] rounded-lg text-white">
-                            <Settings size={18} />
-                        </div>
                         <div>
-                            <h2 className="text-lg font-bold leading-tight tracking-tight uppercase text-slate-800">Melora</h2>
-                            <p className="text-[10px] font-medium text-[#00aaff] tracking-[0.2em] uppercase">Silver Frost Lab Edition</p>
+                            <h2 className="text-2xl font-['Pacifico'] leading-tight tracking-tight text-[#00aaff]">Melora Tunes</h2>
+                            <p className="text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase">Silver Frost Lab</p>
                         </div>
                     </div>
                     <nav className="hidden md:flex items-center gap-8 ml-10">
@@ -102,7 +99,7 @@ export function SilverFrostStage({
 
             <main className="flex flex-1 overflow-hidden">
                 {/* Sidebar - Brushed Metal */}
-                <aside className="w-72 border-r border-white/30 flex flex-col p-5 relative overflow-hidden shrink-0"
+                <aside className="w-72 border-r border-white/30 flex flex-col p-5 relative overflow-hidden shrink-0 shadow-[inset_-10px_0_20px_rgba(0,0,0,0.05)]"
                     style={{ background: 'linear-gradient(135deg, #e0e6eb 0%, #b6bec5 50%, #e0e6eb 100%)' }}>
                     <div className="mb-6">
                         <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.2em] mb-1">Mixtape Rack</h3>
@@ -175,11 +172,25 @@ export function SilverFrostStage({
                     </div>
 
                     {/* Glass Player */}
-                    <div className="w-full max-w-[750px] bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl p-6 md:p-8 relative z-10 shadow-lg">
-                        <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+                    <motion.div
+                        drag
+                        dragMomentum={true}
+                        dragElastic={0.1}
+                        className="w-full max-w-[750px] bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl p-6 md:p-8 relative z-10 shadow-lg cursor-grab active:cursor-grabbing overflow-hidden"
+                    >
+                        {/* Screws */}
+                        <div className="absolute top-3 left-3 w-2 h-2 rounded-full bg-slate-400/30 flex items-center justify-center"><div className="w-1.5 h-0.5 bg-slate-500/40 rotate-45" /></div>
+                        <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-slate-400/30 flex items-center justify-center"><div className="w-1.5 h-0.5 bg-slate-500/40 rotate-45" /></div>
+                        <div className="absolute bottom-3 left-3 w-2 h-2 rounded-full bg-slate-400/30 flex items-center justify-center"><div className="w-1.5 h-0.5 bg-slate-500/40 rotate-45" /></div>
+                        <div className="absolute bottom-3 right-3 w-2 h-2 rounded-full bg-slate-400/30 flex items-center justify-center"><div className="w-1.5 h-0.5 bg-slate-500/40 rotate-45" /></div>
+
+                        {/* Reflection */}
+                        <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-white/10 to-transparent skew-x-12 opacity-50 pointer-events-none" />
+
+                        <div className="flex flex-col lg:flex-row gap-6 items-stretch relative z-10">
                             {/* Reel Window */}
-                            <div className="flex-1 bg-slate-200/30 backdrop-blur-sm rounded-xl p-6 relative min-h-[250px] flex items-center justify-center border-2 border-white/30">
-                                <div className="relative w-36 h-36 border-[10px] border-slate-300 rounded-full flex items-center justify-center shadow-xl">
+                            <div className="flex-1 bg-slate-200/30 backdrop-blur-sm rounded-xl p-6 relative min-h-[250px] flex items-center justify-center border-2 border-white/30 shadow-inner">
+                                <div className="relative w-36 h-36 border-[10px] border-slate-300 rounded-full flex items-center justify-center shadow-[inset_0_4px_10px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.1)]">
                                     <motion.div
                                         className="absolute inset-2 border-4 border-dashed border-slate-400/30 rounded-full"
                                         animate={isPlaying ? { rotate: 360 } : {}}
@@ -265,7 +276,7 @@ export function SilverFrostStage({
                                 <span className="text-[10px] font-bold text-slate-400 w-10 text-right">{formatTime(duration)}</span>
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Status Grid */}
                     <div className="mt-8 w-full max-w-[750px] grid grid-cols-2 md:grid-cols-4 gap-3 z-10">
