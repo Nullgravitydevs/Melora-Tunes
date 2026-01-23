@@ -90,42 +90,22 @@ function PlaylistItem({ icon, title, subtitle, active, colors, onClick }: any) {
 }
 
 function MoodPill({ label, active, onClick, colors }: any) {
-    // Mood Colors & Icons (Hardcoded for demo, could be dynamic)
-    const moodConfig: any = {
-        energize: { color: '#F59E0B', icon: '⚡' },
-        feelgood: { color: '#EC4899', icon: '✨' },
-        relax: { color: '#10B981', icon: '🍃' },
-        workout: { color: '#EF4444', icon: '💪' },
-        sad: { color: '#6366F1', icon: '🌧️' },
-        party: { color: '#8B5CF6', icon: '🎉' },
-    };
-
-    const key = label.toLowerCase().replace(' ', '');
-    const config = moodConfig[key] || { color: colors.accent, icon: '🎵' };
-
     return (
         <motion.button
             onClick={onClick}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border transition-all"
+            className="px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border transition-all"
             style={{
-                backgroundColor: active
-                    ? config.color
-                    : 'transparent',
-                borderColor: active
-                    ? config.color
-                    : colors.border,
-                color: active
-                    ? '#fff'
-                    : colors.textMuted,
-                boxShadow: active
-                    ? `0 4px 12px ${config.color}60`
-                    : 'none'
+                backgroundColor: active ? '#fff' : 'transparent',
+                borderColor: active ? '#fff' : 'rgba(255,255,255,0.2)',
+                color: active ? '#000' : 'rgba(255,255,255,0.6)',
             }}
-            whileHover={{ scale: 1.05, borderColor: config.color, color: active ? '#fff' : colors.text }}
+            whileHover={{
+                borderColor: '#fff',
+                color: active ? '#000' : '#fff'
+            }}
             whileTap={{ scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            transition={{ duration: 0.15 }}
         >
-            <span>{config.icon}</span>
             {label}
         </motion.button>
     );
@@ -137,18 +117,17 @@ function FeatureCard({ title, subtitle, isNew, colors, image, onClick }: any) {
 
     return (
         <motion.div
-            className="flex-1 h-44 rounded-2xl cursor-pointer relative overflow-hidden group"
+            className="flex-1 h-48 rounded-xl cursor-pointer relative overflow-hidden group"
             style={{
-                backgroundColor: hasImage ? 'transparent' : colors.card,
-                border: hasImage ? 'none' : `1px solid ${colors.border}`
+                backgroundColor: hasImage ? 'transparent' : '#0f0f0f',
+                border: hasImage ? 'none' : '1px solid rgba(255,255,255,0.06)'
             }}
             onClick={onClick}
             whileHover={{
-                y: -4,
-                boxShadow: hasImage ? '0 10px 40px rgba(0,0,0,0.5)' : 'none',
-                borderColor: hasImage ? 'none' : colors.text
+                y: -6,
+                boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
             }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            transition={{ duration: 0.2 }}
         >
             {/* Background Image */}
             {hasImage && (
@@ -156,10 +135,10 @@ function FeatureCard({ title, subtitle, isNew, colors, image, onClick }: any) {
                     <img
                         src={image}
                         alt={title}
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+                    {/* Clean Dark Overlay */}
+                    <div className="absolute inset-0 bg-black/50" />
                 </>
             )}
 
@@ -218,14 +197,13 @@ function FeatureCard({ title, subtitle, isNew, colors, image, onClick }: any) {
 function TrackRow({ index, track, colors, isPlaying, onPlay }: any) {
     return (
         <motion.div
-            className="flex items-center px-3 py-2.5 rounded-xl cursor-pointer group relative"
-            style={{ backgroundColor: isPlaying ? colors.accentSoft : 'transparent' }}
+            className="flex items-center px-4 py-3 rounded-lg cursor-pointer group relative transition-colors"
+            style={{ backgroundColor: isPlaying ? 'rgba(29, 185, 84, 0.1)' : 'transparent' }}
             whileHover={{
-                backgroundColor: colors.accentSoft,
-                x: 2
+                backgroundColor: 'rgba(255,255,255,0.04)',
             }}
             onClick={onPlay}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            transition={{ duration: 0.15 }}
         >
             {/* Index / Playing Indicator */}
             <span
@@ -253,8 +231,8 @@ function TrackRow({ index, track, colors, isPlaying, onPlay }: any) {
 
             {/* Album Art Thumbnail */}
             <div
-                className="w-10 h-10 rounded-lg mr-3 overflow-hidden flex-shrink-0 shadow-md"
-                style={{ backgroundColor: colors.border }}
+                className="w-12 h-12 rounded-md mr-4 overflow-hidden flex-shrink-0 shadow-lg"
+                style={{ backgroundColor: '#1a1a1a' }}
             >
                 {track.art ? (
                     <img
@@ -680,14 +658,14 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 return (
                     <>
                         {/* Header: Search + Mood Pills */}
-                        <header className="p-4 flex items-center gap-4" style={{ backgroundColor: c.bg }}>
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border flex-1 max-w-md" style={{ backgroundColor: c.card, borderColor: c.border }}>
-                                <Search size={14} style={{ color: c.textMuted }} />
+                        <header className="p-4 flex items-center gap-6" style={{ backgroundColor: 'transparent' }}>
+                            <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border flex-1 max-w-md transition-colors" style={{ backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' }}>
+                                <Search size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
                                 <input
                                     type="text"
-                                    placeholder="Search by artists, songs or albums"
-                                    className="bg-transparent border-none outline-none text-xs w-full"
-                                    style={{ color: c.text }}
+                                    placeholder="Search songs, artists, albums..."
+                                    className="bg-transparent border-none outline-none text-sm w-full placeholder:text-white/30"
+                                    style={{ color: '#fff' }}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onKeyDown={handleSearchKeyDown}
@@ -788,14 +766,15 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                 </div>
                             </div>
                         ) : (
-                            /* Fallback Hero */
-                            <div className="relative mx-4 mb-5 h-64 rounded-2xl overflow-hidden group cursor-pointer shadow-2xl">
-                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black" />
-                                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=2670')] bg-cover bg-center opacity-40 mix-blend-overlay" />
-                                <div className="relative z-10 h-full flex flex-col justify-center px-10 items-start">
-                                    <h1 className="text-5xl font-black text-white mb-2 drop-shadow-lg">Welcome to Melora</h1>
-                                    <p className="text-xl text-white/80 mb-6">Discover your next favorite track.</p>
-                                    <button className="px-8 py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform">
+                            /* Fallback Hero - Clean Dark */
+                            <div className="relative mx-4 mb-5 h-56 rounded-2xl overflow-hidden group cursor-pointer border border-white/10">
+                                {/* Pure Dark with subtle noise */}
+                                <div className="absolute inset-0 bg-[#0a0a0a]" />
+                                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }} />
+                                <div className="relative z-10 h-full flex flex-col justify-center px-12 items-start">
+                                    <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">Welcome to Melora</h1>
+                                    <p className="text-base text-white/50 mb-6">Discover your next favorite track.</p>
+                                    <button className="px-6 py-2.5 bg-white text-black text-sm font-semibold rounded-full hover:bg-white/90 transition-colors">
                                         Start Listening
                                     </button>
                                 </div>
@@ -875,16 +854,16 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
                 {/* --- LEFT SIDEBAR (GLASS) --- */}
                 <aside
-                    className="w-56 flex-shrink-0 flex flex-col border-r p-4 transition-colors"
+                    className="w-60 flex-shrink-0 flex flex-col border-r p-5 transition-colors"
                     style={{
                         backgroundColor: c.surface,
                         borderColor: c.border
                     }}
                 >
                     {/* Logo */}
-                    <div className="flex items-center gap-2 mb-6">
-                        <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ backgroundColor: c.accent }}></div>
-                        <span className="text-lg font-bold tracking-tight">Melora</span>
+                    <div className="flex items-center gap-2.5 mb-8">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#1DB954', boxShadow: '0 0 8px rgba(29, 185, 84, 0.5)' }}></div>
+                        <span className="text-xl font-bold tracking-tight">Melora</span>
                     </div>
 
                     {/* Nav */}
@@ -1030,18 +1009,17 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 </aside>
             </div>
 
-            {/* === BOTTOM PLAYER BAR (GLASS) === */}
+            {/* === BOTTOM PLAYER BAR === */}
             <footer
-                className="h-20 border-t flex items-center justify-between px-6 z-20 relative"
+                className="h-24 border-t flex items-center justify-between px-8 z-20 relative"
                 style={{
-                    backgroundColor: c.surface, // Solid black
-                    borderColor: c.border,
-                    boxShadow: 'none' // Remove floaty shadow
+                    backgroundColor: '#000000',
+                    borderColor: 'rgba(255,255,255,0.06)',
                 }}
             >
                 {/* Now Playing */}
-                <div className="flex items-center gap-4 w-72">
-                    <div className="w-14 h-14 rounded-xl overflow-hidden shadow-lg relative group transition-transform hover:scale-105" style={{ backgroundColor: c.border }}>
+                <div className="flex items-center gap-5 w-80">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden relative group transition-transform hover:scale-105" style={{ backgroundColor: '#1a1a1a' }}>
                         {currentSong && getArt(currentSong) && (
                             <>
                                 <img src={getArt(currentSong)} alt={currentSong.name} className="w-full h-full object-cover" />
@@ -1052,8 +1030,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold truncate hover:underline cursor-pointer">{currentSong?.name || 'Not Playing'}</p>
-                        <p className="text-xs truncate opacity-70 hover:opacity-100 cursor-pointer">{currentSong?.primaryArtists || '--'}</p>
+                        <p className="text-sm font-semibold truncate hover:underline cursor-pointer">{currentSong?.name || 'Not Playing'}</p>
+                        <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{currentSong?.primaryArtists || '--'}</p>
                     </div>
                     {currentSong && (
                         <Heart
