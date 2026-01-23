@@ -7,11 +7,65 @@ import { HistoryStore } from "@/lib/history-store";
 import { OfflineStore } from "@/lib/offline-store";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
-import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Shuffle, Repeat, MoreHorizontal, ChevronRight, Loader2, Download } from "lucide-react";
+import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, Loader2, Download } from "lucide-react";
 
 interface DesktopDiscoveryProps {
     theme: DiscoveryTheme;
     onThemeChange: (t: DiscoveryTheme) => void;
+}
+
+// --- Audio Quality Badge ---
+const qualityTooltips: any = {
+    'hires': { title: '🔥 Hi-Res Studio Quality', desc: 'LOSSLESS · HI-RES · 24-bit / 96kHz' },
+    'flac': { title: '💿 CD Quality Lossless', desc: 'LOSSLESS · CD · 16-bit / 44.1kHz' },
+    '320': { title: '🎶 High-Quality Streaming', desc: 'HQ · 320 kbps' },
+    '160': { title: '🎵 Standard Streaming', desc: 'MQ · 160 kbps' },
+    '96': { title: '📻 Data Saver', desc: 'LQ · 96 kbps' },
+};
+
+function QualityBadge({ quality }: { quality: string }) {
+    const q = quality === 'hires' ? 'hires' : quality === 'flac' ? 'flac' : quality === '320' ? '320' : quality === '96' ? '96' : '160';
+    const info = qualityTooltips[q];
+    const [show, setShow] = useState(false);
+
+    return (
+        <div className="relative flex items-center" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded cursor-help ${q === 'hires' || q === 'flac' ? 'bg-[#1DB954] text-black' : 'bg-white/10 text-white/70'}`}>
+                {q === 'hires' ? 'HI-RES' : q === 'flac' ? 'FLAC' : q === '320' ? 'HQ' : 'MQ'}
+            </span>
+            {/* Tooltip */}
+            {show && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-gray-900 border border-white/10 rounded-xl p-3 shadow-2xl z-50 backdrop-blur-xl"
+                >
+                    <p className="text-white font-bold text-xs mb-1">{info.title}</p>
+                    <p className="text-[10px] text-gray-400 font-mono">{info.desc}</p>
+                </motion.div>
+            )}
+        </div>
+    );
+}
+
+// --- Custom Waveform Loader ---
+// --- Custom Loader (New Concept) ---
+function WaveLoader() {
+    return (
+        <div className="flex items-center gap-1.5 h-6">
+            {[1, 2, 3].map(i => (
+                <motion.div
+                    key={i}
+                    className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                    animate={{
+                        scale: [1, 1.5, 1],
+                        opacity: [0.5, 1, 0.5],
+                        boxShadow: ['0 0 0px rgba(255,255,255,0)', '0 0 10px rgba(255,255,255,0.8)', '0 0 0px rgba(255,255,255,0)']
+                    }}
+                    transition={{ repeat: Infinity, duration: 1, delay: i * 0.2, ease: "easeInOut" }}
+                />
+            ))}
+        </div>
+    );
 }
 
 // Animation Config
@@ -211,12 +265,23 @@ function TrackRow({ index, track, colors, isPlaying, onPlay }: any) {
                 style={{ color: isPlaying ? '#1DB954' : colors.textMuted }}
             >
                 {isPlaying ? (
-                    <motion.span
-                        animate={{ opacity: [1, 0.5, 1] }}
-                        transition={{ repeat: Infinity, duration: 1.2 }}
-                    >
-                        ▶
-                    </motion.span>
+                    <div className="flex items-end justify-center gap-[2px] h-4">
+                        <motion.div
+                            className="w-[3px] bg-[#1DB954] rounded-sm"
+                            animate={{ height: ['40%', '100%', '60%', '100%', '40%'] }}
+                            transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut' }}
+                        />
+                        <motion.div
+                            className="w-[3px] bg-[#1DB954] rounded-sm"
+                            animate={{ height: ['100%', '40%', '100%', '60%', '100%'] }}
+                            transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut', delay: 0.2 }}
+                        />
+                        <motion.div
+                            className="w-[3px] bg-[#1DB954] rounded-sm"
+                            animate={{ height: ['60%', '100%', '40%', '100%', '60%'] }}
+                            transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut', delay: 0.4 }}
+                        />
+                    </div>
                 ) : (
                     <span className="group-hover:hidden">{index}</span>
                 )}
@@ -491,7 +556,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         </div>
                         {isSearching ? (
                             <div className="flex-1 flex flex-col items-center justify-center gap-2">
-                                <Loader2 size={32} className="animate-spin text-green-500" />
+                                <WaveLoader />
                                 <p className="text-sm opacity-50">Searching...</p>
                             </div>
                         ) : searchResults.length > 0 ? (
@@ -861,17 +926,40 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     }}
                 >
                     {/* Logo */}
-                    <div className="flex items-center gap-2.5 mb-8">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#1DB954', boxShadow: '0 0 8px rgba(29, 185, 84, 0.5)' }}></div>
-                        <span className="text-xl font-bold tracking-tight">Melora</span>
+                    <div className="flex items-center gap-2.5 mb-8 pl-1">
+                        <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                            <span className="text-black font-bold text-lg">M</span>
+                        </div>
+                        <span className="text-xl font-bold tracking-tighter uppercase font-display">Melora Tunes</span>
                     </div>
 
                     {/* Nav */}
                     <nav className="flex flex-col gap-1">
-                        <NavItem icon={<Home size={18} />} label="Home" active={activeView === 'home'} colors={c} onClick={() => setActiveView('home')} />
-                        <NavItem icon={<Search size={18} />} label="Search" active={activeView === 'search'} colors={c} onClick={() => setActiveView('search')} />
-                        <NavItem icon={<Library size={18} />} label="Explore" active={activeView === 'explore'} colors={c} onClick={() => setActiveView('explore')} />
-                        <NavItem icon={<Download size={18} />} label="Downloads" active={activeView === 'library'} colors={c} onClick={() => setActiveView('library')} />
+                        <NavItem icon={<Home size={20} />} label="Home" active={activeView === 'home'} colors={c} onClick={() => setActiveView('home')} />
+                        <NavItem icon={<Search size={20} />} label="Search" active={activeView === 'search'} colors={c} onClick={() => setActiveView('search')} />
+                        <NavItem icon={<Library size={20} />} label="Explore" active={activeView === 'explore'} colors={c} onClick={() => setActiveView('explore')} />
+
+                        {/* New Library Button Concept */}
+                        <div className="mt-4 pt-4 border-t border-white/5">
+                            <motion.button
+                                className="w-full relative overflow-hidden rounded-xl aspect-[4/3] group shadow-lg"
+                                onClick={() => setActiveView('library')}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center mix-blend-overlay opacity-60" />
+                                <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+
+                                <div className="absolute bottom-3 left-3 text-left">
+                                    <div className="w-8 h-8 mb-2 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                                        <Library size={16} className="text-white" />
+                                    </div>
+                                    <p className="text-lg font-bold text-white leading-none">My Library</p>
+                                    <p className="text-[10px] text-white/70 mt-1 font-medium tracking-wide">COLLECTION</p>
+                                </div>
+                            </motion.button>
+                        </div>
                     </nav>
 
                     <div className="mt-8 mb-3 flex items-center justify-between px-2">
@@ -1010,128 +1098,103 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
             </div>
 
             {/* === BOTTOM PLAYER BAR === */}
-            <footer
-                className="h-24 border-t flex items-center justify-between px-8 z-20 relative"
-                style={{
-                    backgroundColor: '#000000',
-                    borderColor: 'rgba(255,255,255,0.06)',
-                }}
-            >
-                {/* Now Playing */}
-                <div className="flex items-center gap-5 w-80">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden relative group transition-transform hover:scale-105" style={{ backgroundColor: '#1a1a1a' }}>
-                        {currentSong && getArt(currentSong) && (
-                            <>
-                                <img src={getArt(currentSong)} alt={currentSong.name} className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center cursor-pointer" onClick={() => setActiveView('home')}>
-                                    <ChevronRight className="-rotate-90 text-white" size={20} />
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate hover:underline cursor-pointer">{currentSong?.name || 'Not Playing'}</p>
-                        <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{currentSong?.primaryArtists || '--'}</p>
-                    </div>
-                    {currentSong && (
-                        <Heart
-                            size={16}
-                            style={{ color: isLiked(currentSong.id) ? '#F43F5E' : c.textMuted }}
-                            fill={isLiked(currentSong.id) ? '#F43F5E' : 'transparent'}
-                            className="cursor-pointer hover:scale-110 transition-transform ml-2"
-                            onClick={() => toggleLike(currentSong)}
-                        />
-                    )}
-                </div>
-
-                {/* Controls */}
-                <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-center gap-6 blocks">
-                        <Shuffle
-                            size={16}
-                            style={{ color: shuffle ? '#1DB954' : c.textMuted }}
-                            className="cursor-pointer hover:scale-110 transition-transform"
-                            onClick={() => setShuffle(!shuffle)}
-                        />
-                        <SkipBack
-                            size={20}
-                            style={{ color: c.text }}
-                            className="cursor-pointer hover:scale-110 transition-transform hover:text-white"
-                            onClick={prev}
-                        />
-                        <motion.button
-                            className="w-10 h-10 rounded-full flex items-center justify-center"
-                            style={{ backgroundColor: '#fff', color: '#000' }}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={togglePlay}
-                        >
-                            {isPlaying ? <Pause size={18} fill="#000" /> : <Play size={18} fill="#000" className="ml-0.5" />}
-                        </motion.button>
-                        <SkipForward
-                            size={20}
-                            style={{ color: c.text }}
-                            className="cursor-pointer hover:scale-110 transition-transform hover:text-white"
-                            onClick={next}
-                        />
-                        <Repeat
-                            size={16}
-                            style={{ color: repeat !== 'off' ? '#1DB954' : c.textMuted }}
-                            className="cursor-pointer hover:scale-110 transition-transform"
-                            onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
-                        />
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="flex items-center gap-2 w-[32rem]">
-                        <span className="text-[10px] w-8 text-right font-medium opacity-60">
-                            {Math.floor(progress / 60)}:{(Math.floor(progress) % 60).toString().padStart(2, '0')}
-                        </span>
-                        <div
-                            className="flex-1 h-1 rounded-full cursor-pointer relative group flex items-center"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
-                            onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const pct = (e.clientX - rect.left) / rect.width;
-                                seek(pct);
-                            }}
-                        >
-                            <div
-                                className="h-full rounded-full transition-all group-hover:bg-[#1DB954]"
-                                style={{ backgroundColor: isMidnight ? '#fff' : c.accent, width: `${duration > 0 ? (progress / duration) * 100 : 0}%` }}
-                            />
-                            {/* Thumb on hover */}
-                            <div
-                                className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ left: `${duration > 0 ? (progress / duration) * 100 : 0}%`, transform: 'translateX(-50%)' }}
-                            />
+            {/* === FLOATING GLASS PLAYER === */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-4 pointer-events-none">
+                <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="pointer-events-auto h-20 rounded-full border border-white/10 bg-black/40 backdrop-blur-2xl shadow-2xl flex items-center px-2 pr-8 gap-4 overflow-visible"
+                    style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}
+                >
+                    {/* Art & Info */}
+                    <div className="flex items-center gap-4 w-1/3">
+                        <div className="w-16 h-16 rounded-full overflow-hidden relative group flex-shrink-0 border border-white/5 ml-1">
+                            {currentSong && getArt(currentSong) ? (
+                                <img src={getArt(currentSong)} alt={currentSong.name} className="w-full h-full object-cover animate-[spin_10s_linear_infinite]" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
+                            ) : (
+                                <div className="w-full h-full bg-white/5 flex items-center justify-center"><Disc className="opacity-20" /></div>
+                            )}
+                            {/* Center Dot for Vinyl Look */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-4 h-4 rounded-full bg-black/80 backdrop-blur-sm" />
+                            </div>
                         </div>
-                        <span className="text-[10px] w-8 font-medium opacity-60">
-                            {Math.floor(duration / 60)}:{(Math.floor(duration) % 60).toString().padStart(2, '0')}
-                        </span>
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold text-white truncate cursor-pointer hover:underline" onClick={() => setActiveView('home')}>{currentSong?.name || 'Not Playing'}</p>
+                                {/* Quality Badge */}
+                                {currentSong && <QualityBadge quality={currentSong.quality || currentSong.preferredQuality || (currentSong as any).sources?.[0]?.quality || '320'} />}
+                            </div>
+                            <p className="text-xs text-white/50 truncate hover:text-white transition-colors cursor-pointer">{currentSong?.primaryArtists || 'Select a song'}</p>
+                        </div>
                     </div>
-                </div>
 
-                {/* Volume */}
-                <div className="flex items-center gap-2 w-32 justify-end">
-                    <Volume2 size={16} style={{ color: c.textMuted }} />
-                    <div
-                        className="w-24 h-1 rounded-full cursor-pointer relative group"
-                        style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
-                        onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const vol = (e.clientX - rect.left) / rect.width;
-                            setVolume(Math.max(0, Math.min(1, vol)));
-                        }}
-                    >
-                        <div className="h-full rounded-full group-hover:bg-[#1DB954]" style={{ backgroundColor: isMidnight ? '#fff' : c.accent, width: `${volume * 100}%` }}></div>
-                        <div
-                            className="absolute top-1/2 -translate-y-1/2 h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ left: `${volume * 100}%`, transform: 'translateX(-50%)' }}
-                        />
+                    {/* Controls (Center) */}
+                    <div className="flex flex-col items-center justify-center gap-1 flex-1">
+                        <div className="flex items-center gap-6">
+                            <SkipBack size={20} className="text-white/70 hover:text-white cursor-pointer transition-colors" onClick={prev} />
+
+                            {/* White Play Button */}
+                            <motion.button
+                                className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] transition-shadow"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={togglePlay}
+                            >
+                                {isPlaying ? <Pause size={20} fill="black" className="text-black" /> : <Play size={20} fill="black" className="text-black ml-0.5" />}
+                            </motion.button>
+
+                            <SkipForward size={20} className="text-white/70 hover:text-white cursor-pointer transition-colors" onClick={next} />
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-64 flex items-center gap-2 group">
+                            <span className="text-[9px] text-white/40 font-mono w-6 text-right">{Math.floor(progress / 60)}:{(Math.floor(progress) % 60).toString().padStart(2, '0')}</span>
+                            <div
+                                className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer relative overflow-hidden"
+                                onClick={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const pct = (e.clientX - rect.left) / rect.width;
+                                    seek(pct);
+                                }}
+                            >
+                                <div className="absolute inset-0 rounded-full bg-white w-full origin-left transform" style={{ transform: `scaleX(${duration > 0 ? progress / duration : 0})` }} />
+                            </div>
+                            <span className="text-[9px] text-white/40 font-mono w-6">{Math.floor(duration / 60)}:{(Math.floor(duration) % 60).toString().padStart(2, '0')}</span>
+                        </div>
                     </div>
-                </div>
-            </footer>
+
+                    {/* Volume (Right) */}
+                    <div className="w-1/3 flex justify-end items-center gap-3 pr-2">
+                        <div className="flex items-center gap-2 group">
+                            <button onClick={() => setVolume(volume === 0 ? 1 : 0)} className="text-white/60 hover:text-white transition-colors">
+                                {volume === 0 ? <VolumeX size={16} /> : volume < 0.5 ? <Volume1 size={16} /> : <Volume2 size={16} />}
+                            </button>
+                            <div
+                                className="w-20 h-1 bg-white/10 rounded-full cursor-pointer relative"
+                                onClick={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const vol = (e.clientX - rect.left) / rect.width;
+                                    setVolume(Math.max(0, Math.min(1, vol)));
+                                }}
+                            >
+                                <div className="h-full bg-white rounded-full relative" style={{ width: `${volume * 100}%` }}>
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                            </div>
+                        </div>
+                        {currentSong && (
+                            <Heart
+                                size={18}
+                                className={`cursor-pointer transition-all ${isLiked(currentSong.id) ? 'text-[#e91e63] fill-[#e91e63]' : 'text-white/40 hover:text-white'}`}
+                                onClick={() => toggleLike(currentSong)}
+                            />
+                        )}
+                        <MoreHorizontal size={18} className="text-white/40 hover:text-white cursor-pointer" />
+                    </div>
+                </motion.div>
+            </div>
+            {/* End of Floating Player */}
         </div>
     );
 }

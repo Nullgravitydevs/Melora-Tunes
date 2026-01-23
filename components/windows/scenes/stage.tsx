@@ -26,7 +26,7 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { PlayableTrack, isPlayableTrack } from "@/lib/types";
 import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { EditMixModal } from "@/components/ui/edit-mix-modal";
-import { InstallPrompt } from "@/components/ui/install-prompt";
+// import { InstallPrompt } from "@/components/ui/install-prompt";
 import { toPng } from "html-to-image";
 import { CinemaModeDesktop } from "../cinema-mode-desktop";
 import { QueueModal } from "@/components/ui/queue-modal";
