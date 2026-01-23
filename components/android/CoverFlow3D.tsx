@@ -10,6 +10,7 @@ interface CoverFlow3DProps {
     trackIndex?: number;
     scrollDirection?: 'left' | 'right' | null;
     tracks?: any[]; // JioSaavnSong[]
+    onScanLibrary?: () => void;
 }
 
 export function CoverFlow3D({
@@ -19,7 +20,8 @@ export function CoverFlow3D({
     isFlipped = false,
     trackIndex = 0,
     scrollDirection,
-    tracks = []
+    tracks = [],
+    onScanLibrary
 }: CoverFlow3DProps) {
     if (!items || items.length === 0) {
         return (
@@ -33,9 +35,8 @@ export function CoverFlow3D({
                 </div>
                 <button
                     onClick={() => {
-                        // Ideally checking for a callback, but for now just visual guidance
-                        // logic to redirect would require prop drilling
-                        alert("Go to Music > Search to add songs!");
+                        if (onScanLibrary) onScanLibrary();
+                        else alert("Please add music to your library.");
                     }}
                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-medium rounded-full transition-colors shadow-lg shadow-blue-900/20"
                 >
@@ -45,7 +46,22 @@ export function CoverFlow3D({
         );
     }
 
-    const activeItem = items[selectedIndex];
+    // Safety Bounds
+    const safeIndex = Math.max(0, Math.min(selectedIndex, items.length - 1));
+    const activeItem = items[safeIndex];
+    if (!activeItem) return null; // Should not happen with check above
+
+    // Performance: Only render visible window (+/- 5 items)
+    // We map only the indices around selectedIndex
+    const VISIBLE_RANGE = 5;
+    const startIndex = Math.max(0, safeIndex - VISIBLE_RANGE);
+    const endIndex = Math.min(items.length - 1, safeIndex + VISIBLE_RANGE);
+
+    // Create array of indices to map
+    const visibleIndices = [];
+    for (let i = startIndex; i <= endIndex; i++) {
+        visibleIndices.push(i);
+    }
 
     return (
         <div className="relative w-full h-full bg-gradient-to-b from-zinc-900 to-black overflow-hidden">
@@ -54,13 +70,10 @@ export function CoverFlow3D({
                 className="absolute inset-0 flex items-center justify-center"
                 style={{ perspective: '1000px' }}
             >
-                {/* Render visible albums (5 on each side + center) */}
-                {items.map((item, index) => {
-                    const offset = index - selectedIndex;
-
-                    // Only render items within view range
-                    if (Math.abs(offset) > 5) return null;
-
+                {/* Render only visible albums */}
+                {visibleIndices.map((index) => {
+                    const item = items[index];
+                    const offset = index - safeIndex;
                     const isCenter = offset === 0;
                     const isLeft = offset < 0;
 
@@ -69,11 +82,11 @@ export function CoverFlow3D({
                     const rotateY = isCenter ? 0 : (isLeft ? 45 : -45);
                     const scale = isCenter ? 1 : 0.75 - Math.abs(offset) * 0.05;
                     const opacity = isCenter ? 1 : 0.7 - Math.abs(offset) * 0.1;
-                    const zIndex = 10 - Math.abs(offset);
+                    const zIndex = 100 - Math.abs(offset); // Higher zIndex ensures proper stacking
 
                     return (
                         <motion.div
-                            key={item.id}
+                            key={`${item.id}-${index}`} // Composite key for stability
                             className="absolute cursor-pointer"
                             style={{
                                 width: '140px',
@@ -93,15 +106,23 @@ export function CoverFlow3D({
                                 damping: 30,
                                 mass: 0.8
                             }}
-                            onClick={() => onSelect(index)}
+                            onClick={() => {
+                                // Block clicks on side items? 
+                                // Standard iPod behavior: Clicking side item scrolls to it. Clicking center selects it.
+                                // Implementation: Call onSelect. The parent can decide if it's a "Select" or "Scroll" based on index diff.
+                                // Actually, for click safety during scroll, we could throttle this.
+                                // But simpler is: Just pass index.
+                                onSelect(index);
+                            }}
                         >
                             {/* Album Cover */}
-                            <div className="w-full h-full rounded-lg overflow-hidden shadow-2xl border border-white/10">
+                            <div className="w-full h-full rounded-lg overflow-hidden shadow-2xl border border-white/10 relative bg-zinc-900">
                                 {item.image ? (
                                     <img
                                         src={item.image}
                                         alt={item.title}
                                         className="w-full h-full object-cover"
+                                        loading="eager"
                                     />
                                 ) : (
                                     <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
@@ -112,10 +133,10 @@ export function CoverFlow3D({
                                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent pointer-events-none" />
                             </div>
 
-                            {/* Floor Reflection (only for center and adjacent, with valid image) */}
+                            {/* Floor Reflection (Optimized: Only immediate neighbors) */}
                             {Math.abs(offset) <= 1 && item.image && (
                                 <div
-                                    className="absolute top-full left-0 right-0 h-20 opacity-30"
+                                    className="absolute top-full left-0 right-0 h-20 opacity-30 pointer-events-none"
                                     style={{
                                         transform: 'scaleY(-1)',
                                         background: `url(${item.image})`,
@@ -132,28 +153,28 @@ export function CoverFlow3D({
             </div>
 
             {/* Title Bar at Bottom */}
-            <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center justify-end pb-4 px-4">
+            <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center justify-end pb-4 px-4 pointer-events-none">
                 <motion.h3
-                    key={activeItem?.id}
+                    key={`title-${activeItem.id}`}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-white font-bold text-sm truncate max-w-full text-center"
                 >
-                    {activeItem?.title || 'Unknown Album'}
+                    {activeItem.title || 'Unknown Album'}
                 </motion.h3>
                 <motion.p
-                    key={`artist-${activeItem?.id}`}
+                    key={`artist-${activeItem.id}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="text-zinc-400 text-xs truncate max-w-full text-center"
                 >
-                    {activeItem?.artist || 'Unknown Artist'}
+                    {activeItem.artist || 'Unknown Artist'}
                 </motion.p>
             </div>
 
             {/* Scroll Direction Indicator */}
             {scrollDirection && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 text-zinc-500 text-lg animate-pulse">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 text-zinc-500 text-lg animate-pulse z-20">
                     {scrollDirection === 'left' ? '◀' : '▶'}
                 </div>
             )}
@@ -185,15 +206,16 @@ export function CoverFlow3D({
                             <div className="flex flex-col pb-4">
                                 {tracks.map((track, i) => {
                                     const isSelected = i === trackIndex;
+                                    const trackName = track.name || track.title || "Unknown Track"; // Safe Access
                                     return (
                                         <div
-                                            key={track.id}
+                                            key={track.id || i}
                                             className={`px-4 py-2.5 flex items-center gap-3 text-xs border-b border-white/5 ${isSelected ? 'bg-blue-600 text-white' : 'text-zinc-400'}`}
                                         >
                                             <span className={`w-4 text-right ${isSelected ? 'text-blue-200' : 'text-zinc-600'}`}>{i + 1}</span>
                                             <div className="flex-1 min-w-0">
                                                 <p className={`truncate font-medium ${isSelected ? 'text-white' : 'text-zinc-300'}`}>
-                                                    {track.name
+                                                    {trackName
                                                         .replace(/&quot;/g, '"')
                                                         .replace(/&amp;/g, '&')
                                                         .replace(/&#039;/g, "'")}
@@ -209,7 +231,7 @@ export function CoverFlow3D({
                             </div>
                         ) : (
                             <div className="flex items-center justify-center h-32">
-                                <div className="w-5 h-5 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+                                <span className="text-zinc-500 text-xs">No tracks available</span>
                             </div>
                         )}
                     </div>

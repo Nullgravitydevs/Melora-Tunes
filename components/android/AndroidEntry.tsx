@@ -18,11 +18,13 @@ import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume
 import { StickerLayer, Sticker, StickerType } from './stickers/StickerLayer';
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { PlayableTrack, PlayableSource } from "@/lib/types";
 import { searchSongs, JioSaavnSong, getAlbumDetails, getLyricsWithFallback } from "@/lib/jiosaavn";
-import { searchUnified, GroupedSong } from "@/lib/unified-search";
+import { searchUnified } from "@/lib/unified-search";
 import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useIpodAudio } from "@/hooks/use-ipod-audio";
 
 interface MenuItem {
     label: string;
@@ -128,13 +130,14 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         crossfadeDuration, setCrossfadeDuration,
         stopAtEndOfSong, setStopAtEndOfSong,
         bitrate, setBitrate, setForceLossless,
-        likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded
+        likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded,
+        playInstantMix
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [viewStack, setViewStack] = useState<ViewState[]>([
-        { id: 'main', title: "Melora", viewType: 'menu', selectedIndex: 0, staticItems: MAIN_MENU }
+        { id: 'main', title: "Melora Tunes", viewType: 'menu', selectedIndex: 0, staticItems: MAIN_MENU }
     ]);
     const [clickSounds, setClickSounds] = useState(true);
     const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush'>('classic');
@@ -144,6 +147,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const stickerConstraintsRef = useRef<HTMLDivElement>(null);
     const iPodBodyRef = useRef<HTMLDivElement>(null);
     const scrollDirectionRef = useRef<'left' | 'right' | null>(null);
+    const accumulatedWheelDelta = useRef(0); // Global wheel accumulator
 
     // Sticker State
     const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -152,40 +156,14 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Audio constants
     const [lyrics, setLyrics] = useState<string | null>(null);
-    const audioRefs = useRef<{ [key: string]: HTMLAudioElement } | null>(null);
+    // Audio Hook
+    const { playLock, playClick, playScroll } = useIpodAudio();
 
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            audioRefs.current = {
-                insert: new Audio('/sounds/insert.wav'),
-                eject: new Audio('/sounds/eject.wav'),
-                lock: new Audio('/sounds/click.wav'), // Reuse click for lock switch
-                tick: new Audio('/sounds/click.wav'),
-                select: new Audio('/sounds/clunk.wav')
-            };
-            audioRefs.current.insert.volume = 0.5;
-            audioRefs.current.eject.volume = 0.5;
-            audioRefs.current.lock.volume = 0.6;
-            audioRefs.current.tick.volume = 0.4;
-            audioRefs.current.select.volume = 0.6;
-
-            // Play Insert Sound on Mount (Startup)
-            if (clickSounds) {
-                // Short delay to ensure interaction? usually auto-play might block if no interaction.
-                // But this is mount. If user clicked to enter this mode, it should be fine.
-                audioRefs.current.insert.play().catch(() => { });
-            }
-        }
-    }, []); // Run once on mount
-
-    // Handlers
     const handleSwitchToDesktop = (mode?: string) => { // Updated to accept string for 'GLASS'
-        if (clickSounds && audioRefs.current) {
-            audioRefs.current.eject.play().catch(() => { });
-        }
         // Small delay to hear sound before unmount
         setTimeout(() => {
             if (onSwitchToDesktop) onSwitchToDesktop(mode);
@@ -194,11 +172,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
     const toggleLock = () => {
         setIsLocked(!isLocked);
-        if (clickSounds && audioRefs.current) {
-            const clone = audioRefs.current.lock.cloneNode() as HTMLAudioElement;
-            clone.volume = 0.5;
-            clone.play().catch(() => { });
-        }
+        playLock();
     };
 
     const showToast = useCallback((msg: string) => {
@@ -236,7 +210,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         if (iPodBodyRef.current && !isBodyReady) {
             setIsBodyReady(true);
         }
-    });
+    }, [isBodyReady]); // Added dependency array
 
 
 
@@ -336,26 +310,19 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         window.addEventListener('mousemove', handleInteraction);
         window.addEventListener('keydown', handleInteraction);
         window.addEventListener('click', handleInteraction);
-        window.addEventListener('click', handleInteraction);
 
         return () => {
             window.removeEventListener('mousemove', handleInteraction);
             window.removeEventListener('keydown', handleInteraction);
             window.removeEventListener('click', handleInteraction);
+
+            // Cleanup timeouts
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         };
     }, [registerActivity]);
 
-    const playClick = useCallback(() => {
-        if (clickSounds && audioRefs.current) {
-            try {
-                const clone = audioRefs.current.tick.cloneNode() as HTMLAudioElement;
-                clone.volume = 0.4;
-                clone.play().catch(() => { });
-            } catch (e) {
-                // Ignore
-            }
-        }
-    }, [clickSounds]);
+    // playClick removed - ClickWheel handles its own audio via hook
 
     // Load settings on mount
     useEffect(() => {
@@ -404,24 +371,28 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const getLibraryAlbums = (currentMixes: typeof mixes) => {
         const albumMap = new Map<string, any>();
         currentMixes
-            .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
-            .forEach(m => m.songs.forEach(s => {
-                if (!s.album?.id) return;
+            // .filter(m => m.title !== "On-the-Go") // REMOVED: Include On-the-Go so it shows in Cover Flow
+            .forEach(m => m.songs.forEach(item => {
+                const s = 'song' in item ? item.song : item; // Normalize PlayableTrack
+                if (!s.album?.id && !s.id) return;
 
-                if (!albumMap.has(s.album.id)) {
+                const albumId = s.album?.id || `unknown-${s.id}`;
+                const albumName = s.album?.name || "Unknown Album";
+
+                if (!albumMap.has(albumId)) {
                     // Create Album Entry
                     const albumImage = s.image?.find((img: any) => img.quality === '500x500')?.link ||
                         s.image?.[0]?.link || '';
-                    albumMap.set(s.album.id, {
-                        id: s.album.id,
-                        title: decodeHtml(s.album.name),
+                    albumMap.set(albumId, {
+                        id: albumId,
+                        title: decodeHtml(albumName),
                         artist: decodeHtml(s.primaryArtists),
                         image: albumImage,
                         songs: []
                     });
                 }
                 // Add Song to Album
-                const album = albumMap.get(s.album.id);
+                const album = albumMap.get(albumId);
                 if (!album.songs.some((existing: any) => existing.id === s.id)) {
                     album.songs.push({
                         id: s.id,
@@ -472,9 +443,14 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const handleBack = useCallback(() => {
         // We need access to current state, but using functional updates or refs might be cleaner
         // However, viewStack is state.
-        // To avoid stale closures without adding viewStack to dependency (which changes often),
-        // we can use the callback form of setViewStack carefully,
-        // BUT we need to check 'currentView'. which is derived from viewStack.
+
+        // Fix: Side-effects (setLyrics) must be outside state setter, but we don't have access to prev state here safely.
+        // We will read the closure state which is acceptable if handleBack is re-generated on viewStack change, 
+        // BUT viewStack is not in deps. 
+        // IMPROVEMENT: Use a Ref or simply ensure setLyrics is safe to call. 
+        // Better yet: Just update the stack and use a useEffect to sync lyrics state? 
+        // No, simplest fix for now: Check state *inside* setViewStack but don't setLyrics there.
+        // Wait! We can peek at the stack before setting it if we trust the closure, but we don't.
 
         setViewStack(prev => {
             if (prev.length <= 1) return prev;
@@ -487,9 +463,16 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 return newStack;
             }
 
-            // Clear lyrics when backing out of lyrics view
+            // Side-effect moved? We can't move `setLyrics` out easily without double-render.
+            // Actually, we can just let `useEffect` handle lyrics cleanup if viewType changes?
+            // Or just use `setTimeout` to push it to next tick? No, that's hacky.
+            // Correct approach: Check if we are exiting lyrics view based on `current`.
             if (current.viewType === 'lyrics') {
-                setLyrics(null);
+                // We are inside the setter, we CANNOT call another setter here synchronously safely in all React versions.
+                // However, in React 18 event handlers, updates are batched. 
+                // But this is an updater function. 
+                // Let's defer it.
+                setTimeout(() => setLyrics(null), 0);
             }
 
             return prev.slice(0, prev.length - 1);
@@ -511,8 +494,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             // Immediately trigger Rename
             setTimeout(() => goToRename(newMix), 100);
         } else {
-            // Native alert is acceptable here as Android interface uses them primarily
-            alert("Maximum limit of 8 tapes reached. Please delete a tape.");
+            showToast("Maximum limit of 8 tapes reached!");
         }
     };
 
@@ -520,9 +502,10 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         setSearchQuery(mix.title); // Pre-fill with current name
         setViewStack(prev => [...prev, {
             id: 'rename',
-            title: 'Rename Playlist',
+            title: 'Rename Tape',
             viewType: 'search', // Reuse search layout for input
             selectedIndex: 0,
+            searchQuery: mix.title, // Initialize with mix name
             data: mix.id,
             staticItems: [{ label: "Press Enter to Save", type: 'action', action: () => { } }]
         }]);
@@ -543,46 +526,88 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     };
 
     // Play single song immediate (e.g. from songs list)
-    const playSongNow = useCallback((song: JioSaavnSong, isHiRes: boolean = false) => {
+    // Play single song immediate (e.g. from songs list)
+    const playSongNow = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack, isHiRes: boolean = false) => {
         if (isHiRes) {
             setForceLossless(true);
             console.log("[iPod] Forcing Hi-Res Lossless Mode");
         }
 
+        let playableSong: JioSaavnSong | PlayableTrack;
+        let isTrack = 'song' in songOrTrack;
+
+        if (isTrack) {
+            // Already a PlayableTrack (Unified Search Result)
+            playableSong = songOrTrack as PlayableTrack;
+            // No need for JIT resolution as sources are already populated
+            console.log("[iPod] Playing Unified Track:", playableSong.song.name);
+        } else {
+            // Legacy / Standard Song
+            let song = songOrTrack as JioSaavnSong;
+            playableSong = { ...song };
+            const songData = song as any;
+
+            // JUST-IN-TIME RESOLUTION FOR HIFI TRACKS (Legacy data shim)
+            // If track is from Tidal/Qobuz and has no URL, find a fallback stream
+            if ((songData.source === 'tidal' || songData.source === 'qobuz') && !song.url && !song.encryptedMediaUrl) {
+                try {
+                    // showToast("Resolving Hi-Res Stream..."); // Silent resolution
+                    console.log("[iPod] JIT Resolving stream for:", song.name);
+                    const fallbackResults = await searchUnified(`${song.name} ${song.primaryArtists}`, 'song');
+
+                    // Prefer best match (Unified Search returns merged tracks)
+                    const bestMatch = fallbackResults[0];
+
+                    if (bestMatch) {
+                        const isNameSimilar = bestMatch.song.name.toLowerCase().includes(song.name.toLowerCase()) ||
+                            song.name.toLowerCase().includes(bestMatch.song.name.toLowerCase());
+
+                        if (isNameSimilar) {
+                            console.log("[iPod] Resolved fallback track for", song.name);
+                            // UPGRADE to PlayableTrack!
+                            playableSong = bestMatch;
+                        } else {
+                            console.warn("[iPod] Fallback mismatch");
+                            showToast("Stream Unavailable");
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to resolve Hi-Res stream", e);
+                    showToast("Stream Unavailable");
+                    return; // Abort
+                }
+            }
+        }
+
         // Find or Create On-the-Go Mix
         let otg = mixes.find(m => m.title === "On-the-Go");
+        let targetMix: Mix;
 
         if (!otg) {
             console.log("[iPod] Creating On-the-Go mix for playback");
-            const newOtg: Mix = {
+            targetMix = {
                 id: 'otg-temp',
                 title: "On-the-Go",
                 color: "white",
-                songs: [song],
+                songs: [playableSong],
                 currentSongIndex: 0
             };
-            addMix(newOtg);
-            loadMix(newOtg.id);
-            // Immediately navigate after state update
-            setTimeout(() => {
-                play();
-                goToNowPlaying();
-            }, 100);
         } else {
             console.log("[iPod] Appending to On-the-Go mix");
-            // Check if song already exists to avoid duplicates (optional, but good UX)
-            // For now, allow duplicates as it's a queue
-            const newSongs = [...otg.songs, song];
-            updateMix(otg.id, { songs: newSongs, currentSongIndex: newSongs.length - 1 });
-            loadMix(otg.id);
-            play();
-            goToNowPlaying();
+            // Append and set index to last
+            const newSongs = [...otg.songs, playableSong];
+            targetMix = { ...otg, songs: newSongs, currentSongIndex: newSongs.length - 1 };
         }
-    }, [mixes, updateMix, loadMix, play, addMix, setForceLossless, goToNowPlaying]);
+
+        // ATOMIC PLAYBACK - No Race Conditions
+        playInstantMix(targetMix);
+        goToNowPlaying();
+    }, [mixes, playInstantMix, setForceLossless, goToNowPlaying]);
 
     const handleShowLyrics = useCallback(async (song: JioSaavnSong) => {
         if (!song) {
-            alert("No song selected for lyrics.");
+            showToast("No song selected!");
             return;
         }
         setIsLoading(true);
@@ -693,7 +718,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             case 'system-settings':
                 return [
                     {
-                        label: "Backup Playlists",
+                        label: "Backup Tapes",
                         type: 'action',
                         action: () => {
                             // Export all playlists as JSON
@@ -717,7 +742,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             link.click();
                             URL.revokeObjectURL(url);
 
-                            alert('Playlists exported successfully!');
+                            alert('Tapes exported successfully!');
                         }
                     },
                     {
@@ -763,7 +788,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 })) as MenuItem[];
 
             case 'quality-settings':
-                const qualities = ['flac', '320', '160', '96', '48', '12'] as const;
+                const qualities = ['flac', '320', '160', '96'] as const;
                 return qualities.map(q => ({
                     label: `${q === 'flac' ? 'Lossless (FLAC)' : q + ' kbps'} ${q === '320' ? '(High)' : ''}${bitrate === q ? ' ✓' : ''}`,
                     type: 'action',
@@ -846,7 +871,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     data: mix.id
                 }));
                 playlistItems.unshift({
-                    label: "[Create New Playlist]",
+                    label: "[Create New Tape]",
                     type: 'action',
                     action: () => createNewPlaylist()
                 });
@@ -883,7 +908,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 const artists = new Set<string>();
                 mixes
                     .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
-                    .forEach(m => m.songs.forEach(s => {
+                    .forEach(m => m.songs.forEach(item => {
+                        const s = 'song' in item ? item.song : item;
                         // Split multiple artists and clean up
                         s.primaryArtists.split(',').forEach(a => artists.add(a.trim()));
                     }));
@@ -921,7 +947,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 const albums = new Map<string, { id: string, name: string }>();
                 mixes
                     .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
-                    .forEach(m => m.songs.forEach(s => {
+                    .forEach(m => m.songs.forEach(item => {
+                        const s = 'song' in item ? item.song : item;
                         if (s.album?.id) {
                             albums.set(s.album.id, { id: s.album.id, name: s.album.name });
                         }
@@ -942,7 +969,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 // Songs View - Flat list of all songs from all mixes (EXCEPT On-the-Go/Queue)
                 const allSongs = mixes
                     .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
-                    .flatMap(m => m.songs);
+                    .flatMap(m => m.songs)
+                    .map(item => 'song' in item ? item.song : item);
 
                 // Unique by ID
                 const uniqueSongs = Array.from(new Map(allSongs.map(s => [s.id, s])).values())
@@ -1006,12 +1034,15 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                     if (!mix) return [{ label: "(Playlist Deleted)", type: 'action', action: () => handleBack() }];
 
-                    const songItems: MenuItem[] = mix.songs.map((s: JioSaavnSong, idx: number) => ({
-                        label: decodeHtml(s.name),
-                        type: 'action',
-                        data: s,
-                        action: () => playMixSong(mix.id, idx)
-                    }));
+                    const songItems: MenuItem[] = mix.songs.map((item: JioSaavnSong | PlayableTrack, idx: number) => {
+                        const s = 'song' in item ? item.song : item;
+                        return {
+                            label: decodeHtml(s.name),
+                            type: 'action',
+                            data: s,
+                            action: () => playMixSong(mix.id, idx)
+                        }
+                    });
 
                     songItems.push({
                         label: "[Share Playlist]",
@@ -1054,6 +1085,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     const artistSongs = mixes
                         .filter(m => m.title !== "On-the-Go")
                         .flatMap(m => m.songs)
+                        .map(item => 'song' in item ? item.song : item)
                         .filter(s =>
                             s.primaryArtists.toLowerCase().includes(artistName.toLowerCase())
                         );
@@ -1098,7 +1130,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 // Album Drill-down
                 if (currentView.id.startsWith('album-')) {
                     const albumId = currentView.id.replace('album-', '');
-                    const songs = mixes.flatMap(m => m.songs).filter(s => s.album?.id === albumId);
+                    const songs = mixes.flatMap(m => m.songs)
+                        .map(item => 'song' in item ? item.song : item)
+                        .filter(s => s.album?.id === albumId);
                     const uniqueSongs = Array.from(new Map(songs.map(s => [s.id, s])).values());
 
                     return uniqueSongs.map(s => ({
@@ -1150,20 +1184,30 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
     // Debounced fetch for Cover Flow tracks
     useEffect(() => {
-        if (currentView.viewType === 'cover-flow') {
-            const albumData = currentMenuItems[currentView.selectedIndex]?.data;
-            if (albumData?.id) {
-                const timer = setTimeout(async () => {
-                    try {
-                        const songs = await getAlbumDetails(albumData.id);
-                        setCfTracks(songs);
-                    } catch (e) {
-                        console.error("CF Fetch Error", e);
-                    }
-                }, 500);
-                return () => clearTimeout(timer);
+        if (currentView.viewType !== 'cover-flow') return;
+
+        const albumData = currentMenuItems[currentView.selectedIndex]?.data;
+        if (!albumData?.id) return;
+
+        const controller = new AbortController();
+        const signal = controller.signal;
+
+        const timer = setTimeout(async () => {
+            if (signal.aborted) return;
+            try {
+                const songs = await getAlbumDetails(albumData.id);
+                if (!signal.aborted) {
+                    setCfTracks(songs);
+                }
+            } catch (e) {
+                if (!signal.aborted) console.error("CF Fetch Error", e);
             }
-        }
+        }, 500);
+
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
     }, [currentView.viewType, currentView.selectedIndex, currentMenuItems]);
 
     // Actions
@@ -1269,45 +1313,66 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     };
 
     const handleSearch = useCallback(async (query: string) => {
-        // Reuse for Rename Logic
-        if (currentView.id === 'rename') {
-            handleRenameSubmit(query);
-            return;
-        }
-
+        // Validation moved to caller or handled here
         if (!query.trim()) return;
+
+        // Don't rename here, rename is handled by submit handlers now.
+        if (currentView.id === 'rename') return;
+
         setIsLoading(true);
         try {
             // Updated to Unified Search
             const results = await searchUnified(query, 'song');
-            const songItems: MenuItem[] = results.map((group: GroupedSong) => {
-                const bestQ = group.bestQuality;
-                const bestSong = group.qualities[bestQ as keyof typeof group.qualities] as JioSaavnSong;
+            const songItems: MenuItem[] = results.map((track: PlayableTrack) => {
+                // Determine best badge for UI
+                let badge: string | undefined = undefined;
+                let sourceProvider: string = 'jiosaavn';
 
-                // Inject the quality into the song object so it's accessible during playback and in UI
-                const songWithMeta = {
-                    ...bestSong,
-                    _quality: bestQ,
-                    _qualityTier: bestQ === '24-bit' ? 0 : bestQ === 'FLAC' ? 1 : bestQ === '320kbps' ? 2 : 3,
-                    source: group.source // Critical for playback provider
+                // Check highest quality source
+                if (track.sources.some(s => s.quality === 'hires')) {
+                    badge = '24-bit';
+                    sourceProvider = 'qobuz';
+                } else if (track.sources.some(s => s.quality === 'flac')) {
+                    badge = 'FLAC';
+                    sourceProvider = 'qobuz';
+                } else if (track.sources.some(s => s.quality === '320')) {
+                    badge = '320kbps';
+                }
+
+                const isTidal = track.sources.some(s => s.provider === 'tidal');
+
+                // Inject metadata for IpodScreen badges
+                const shimmedData = {
+                    ...track,
+                    name: track.song.name,
+                    primaryArtists: track.song.primaryArtists,
+                    image: track.song.image,
+                    _quality: badge,
+                    _qualityTier: badge === '24-bit' ? 0 : badge === 'FLAC' ? 1 : badge === '320kbps' ? 2 : 3,
+                    source: isTidal ? 'tidal' : sourceProvider
                 };
 
                 return {
-                    label: decodeHtml(group.name),
+                    label: decodeHtml(track.song.name),
                     type: 'action',
                     action: () => {
-                        const isHiRes = bestQ === '24-bit' || bestQ === 'FLAC' || group.source === 'tidal';
-                        playSongNow(songWithMeta as any, isHiRes);
+                        const isHiRes = badge === '24-bit' || badge === 'FLAC';
+                        playSongNow(track, isHiRes);
                     },
-                    data: songWithMeta
+                    data: shimmedData
                 };
             });
 
             setViewStack(prev => {
+                // GUARD: If user navigated away, don't update stack (Fixes Freeze/Crash)
+                const current = prev[prev.length - 1];
+                if (current.viewType !== 'search') return prev;
+
                 const newStack = [...prev];
                 const active = newStack[newStack.length - 1];
+                // Only update items, query is already updated by input handler
                 if (active.viewType === 'search') {
-                    newStack[newStack.length - 1] = { ...active, staticItems: songItems, searchQuery: query };
+                    newStack[newStack.length - 1] = { ...active, staticItems: songItems };
                 }
                 return newStack;
             });
@@ -1448,6 +1513,11 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         if (clickSounds) playClick();
 
         // Special handling for Cinema Mode, Cover Flow and Now Playing from MAIN_MENU
+        if (currentView.id === 'rename') {
+            handleRenameSubmit(currentView.searchQuery || "");
+            return;
+        }
+
         if (item.data?.id === 'cinema') {
             setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
         } else if (item.data?.id === 'cover-flow') {
@@ -1459,7 +1529,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             goToNowPlaying();
         } else if (item.data?.id === 'lyrics') {
             if (!currentSong) {
-                alert("No song playing!");
+                showToast("No song playing!");
                 return;
             }
             handleShowLyrics(currentSong);
@@ -1469,6 +1539,24 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             handleNavigation(item.target, item.data, item.label);
         }
     }, [currentView, controlMode, currentMenuItems, mixes, currentSong, playSongNow, goToNowPlaying, handleNavigation, cfTracks, clickSounds, playClick, registerActivity, handleShowLyrics]);
+
+    // Global Wheel Handler (For Scrolling over Screen)
+    const handleGlobalWheel = (e: React.WheelEvent) => {
+        if (isLocked) return;
+
+        const DELTA_THRESHOLD = 50; // Sensitivity
+        accumulatedWheelDelta.current += e.deltaY;
+
+        if (Math.abs(accumulatedWheelDelta.current) > DELTA_THRESHOLD) {
+            const direction = accumulatedWheelDelta.current > 0 ? 1 : -1;
+            handleScroll(direction);
+
+            // Audio Feedback
+            if (clickSounds) playScroll();
+
+            accumulatedWheelDelta.current = 0;
+        }
+    };
 
     // Auto-Rotation for Cover Flow
     useEffect(() => {
@@ -1619,6 +1707,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                onWheel={handleGlobalWheel}
             >
                 {/* 2. INNER MASK: The iPod Body (Clipped) */}
                 <div
@@ -1729,13 +1818,85 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             duration={duration}
                             isLoading={isLoading}
                             searchQuery={currentView.searchQuery}
-                            onSearchChange={(q) => handleSearch(q)}
-                            onSearchSubmit={handleSearch}
                             inputRef={inputRef}
                             onPlayPause={togglePlay}
                             onBack={handleBack}
-                            onItemSelect={() => {
-                                if (!isLocked) handleSelect();
+                            onSearchChange={(q) => {
+                                // 1. Immediate UI Update (Fixes Lag)
+                                setViewStack(prev => {
+                                    const newStack = [...prev];
+                                    const active = newStack[newStack.length - 1];
+                                    // Only update if changed to avoid ref thrashing
+                                    if (active.searchQuery !== q) {
+                                        newStack[newStack.length - 1] = { ...active, searchQuery: q };
+                                    }
+                                    return newStack;
+                                });
+
+                                // 2. Debounced API Call (Only if not Rename)
+                                if (currentView.id !== 'rename') {
+                                    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                                    searchTimeoutRef.current = setTimeout(() => {
+                                        handleSearch(q);
+                                    }, 500); // 500ms debounce
+                                }
+                            }}
+                            onSearchSubmit={(q) => {
+                                if (currentView.id === 'rename') {
+                                    handleRenameSubmit(q);
+                                } else {
+                                    // Immediate trigger on Enter
+                                    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                                    handleSearch(q);
+                                }
+                            }}
+                            // Props continue below...
+                            onItemSelect={(index) => {
+                                if (isLocked) return;
+                                // Update selection first
+                                setViewStack(prev => {
+                                    const newStack = [...prev];
+                                    const active = newStack[newStack.length - 1];
+                                    newStack[newStack.length - 1] = { ...active, selectedIndex: index };
+                                    return newStack;
+                                });
+                                // Then Select (Need a slight delay or effect? handleSelect uses currentView state...)
+                                // handleSelect uses currentView from CLOSE, but React state updates act async.
+                                // BETTER: Just call handleSelect *with* the index override?
+                                // handleSelect doesn't take args. 
+                                // Let's set index, then setTimeout to select? Or refactor handleSelect?
+                                // Refactoring handleSelect is risky.
+                                // Let's try: set state, then rely on user to click again? NO.
+                                // The user expects ONE click.
+                                // I will invoke the logic directly.
+
+                                // Direct Logic:
+                                if (clickSounds) playClick();
+                                const item = currentMenuItems[index];
+                                if (!item) return;
+
+                                // Copied Basic Logic from handleSelect but using 'item' directly
+                                if (currentView.id === 'rename') {
+                                    handleRenameSubmit(currentView.searchQuery || "");
+                                    return;
+                                }
+
+                                if (item.data?.id === 'cinema') {
+                                    setViewStack(prev => [...prev, { id: 'cinema', title: 'Cinema Mode', viewType: 'cinema', selectedIndex: 0 }]);
+                                } else if (item.data?.id === 'cover-flow') {
+                                    const albums = getLibraryAlbums(mixes);
+                                    const albIndex = currentSong?.album?.id ? albums.findIndex(a => a.id === currentSong.album.id) : 0;
+                                    setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: albIndex >= 0 ? albIndex : 0 }]);
+                                } else if (item.data?.id === 'now-playing') {
+                                    goToNowPlaying();
+                                } else if (item.data?.id === 'lyrics') {
+                                    if (!currentSong) { showToast("No song playing!"); return; }
+                                    handleShowLyrics(currentSong);
+                                } else if (item.action) {
+                                    item.action();
+                                } else if (item.type === 'navigation' && item.target) {
+                                    handleNavigation(item.target, item.data, item.label);
+                                }
                             }}
                             isFlipped={currentView.isFlipped}
                             trackIndex={currentView.trackIndex}

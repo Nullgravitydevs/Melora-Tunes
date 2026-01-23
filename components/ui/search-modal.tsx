@@ -2,43 +2,57 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { searchUnified, GroupedSong } from '@/lib/unified-search';
-import { JioSaavnSong, getThumbnailUrl } from '@/lib/jiosaavn';
-import { X, Search, Plus, Check, Music, Loader2, Disc3, Headphones, PlayCircle } from 'lucide-react';
+import { searchUnified } from '@/lib/unified-search'; // GroupedSong is gone
+import { JioSaavnSong } from '@/lib/jiosaavn';
+import { X, Search, Check, Music, Loader2, Disc3, Headphones, PlayCircle } from 'lucide-react';
 import { decodeHtml } from '@/lib/utils';
 import Image from 'next/image';
+import { PlayableTrack, AudioQuality } from '@/lib/types'; // Import core types
 
 interface SearchModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAddSong: (song: JioSaavnSong) => void;
+    onAddSong: (song: JioSaavnSong | PlayableTrack) => void;
     favorites: Set<string>;
     onToggleFavorite: (song: JioSaavnSong) => void;
+    existingAssets?: Set<string>; // New prop for Asset Identity: `${id}_${quality}`
 }
 
-// Quality badge colors - same as UnifiedSearch
+// Quality badge colors
 const QUALITY_COLORS: Record<string, string> = {
-    '24-bit': 'bg-amber-500 text-black',
-    'FLAC': 'bg-purple-500 text-white',
-    '320kbps': 'bg-green-500 text-white',
-    '128kbps': 'bg-gray-500 text-white'
+    'hires': 'bg-amber-500 text-black',
+    'flac': 'bg-purple-500 text-white',
+    '320': 'bg-green-500 text-white',
+    '160': 'bg-gray-500 text-white',
+    '96': 'bg-gray-600 text-white'
 };
 
-const QUALITY_ORDER = ['24-bit', 'FLAC', '320kbps', '128kbps'] as const;
 const QUALITY_LABELS: Record<string, string> = {
-    '24-bit': 'Hi-Res',
-    'FLAC': 'FLAC',
-    '320kbps': 'HQ',
-    '128kbps': 'SD'
+    'hires': 'Hi-Res',
+    'flac': 'FLAC',
+    '320': 'HQ',
+    '160': 'SD',
+    '96': 'Low'
 };
 
-export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFavorite }: SearchModalProps) {
+const QUALITY_ORDER: AudioQuality[] = ['hires', 'flac', '320', '160', '96'];
+
+export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFavorite, existingAssets }: SearchModalProps) {
     const [query, setQuery] = useState('');
-    const [results, setResults] = useState<GroupedSong[]>([]);
+    const [results, setResults] = useState<PlayableTrack[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [addedSongs, setAddedSongs] = useState<Set<string>>(new Set());
+    const [addedAssets, setAddedAssets] = useState<Set<string>>(new Set());
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+
+    // Merge existingAssets into addedAssets when modal opens
+    useEffect(() => {
+        if (isOpen && existingAssets) {
+            setAddedAssets(new Set([...existingAssets]));
+        } else if (!isOpen) {
+            setAddedAssets(new Set());
+        }
+    }, [isOpen, existingAssets]);
 
     // Load history
     useEffect(() => {
@@ -52,27 +66,30 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
         localStorage.setItem('melora-search-history', JSON.stringify(newHistory));
     };
 
-    const handleAdd = (song: JioSaavnSong) => {
-        onAddSong(song);
-        setAddedSongs(prev => new Set(prev).add(song.id));
+    const handleAddBest = (track: PlayableTrack) => {
+        handleTrackSelect(track, track.preferredQuality);
+    };
+
+    const handleTrackSelect = (track: PlayableTrack, quality: AudioQuality) => {
+        // Asset Identity Check
+        const assetId = `${track.id}_${quality}`;
+        if (addedAssets.has(assetId)) return;
+
+        // Create a new track object with the SELECTED quality as preferred
+        const trackToAdd: PlayableTrack = {
+            ...track,
+            preferredQuality: quality
+        };
+
+        onAddSong(trackToAdd);
+        setAddedAssets(prev => new Set(prev).add(assetId));
         if (query.trim()) saveHistory(query.trim());
     };
 
-    const handleQualityClick = (group: GroupedSong, quality: string) => {
-        const song = group.qualities[quality as keyof typeof group.qualities];
-        if (song) {
-            // Add quality tag to song so it shows in UI
-            const songWithQuality = {
-                ...song,
-                _quality: quality,
-                _qualityTier: quality === '24-bit' ? 0 : quality === 'FLAC' ? 1 : quality === '320kbps' ? 2 : 3
-            };
-            handleAdd(songWithQuality as JioSaavnSong);
-        }
-    };
-
-    const getAvailableQualities = (group: GroupedSong): string[] => {
-        return QUALITY_ORDER.filter(q => group.qualities[q]);
+    const getAvailableQualities = (track: PlayableTrack): AudioQuality[] => {
+        const available = new Set(track.sources.map(s => s.quality));
+        // Filter based on global strict order
+        return QUALITY_ORDER.filter(q => available.has(q));
     };
 
     // Debounced unified search
@@ -87,10 +104,12 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
         setIsLoading(true);
         searchTimeout.current = setTimeout(async () => {
             try {
+                // Ensure searchUnified returns PlayableTrack[]
                 const data = await searchUnified(query, 'song');
                 setResults(data);
             } catch (e) {
                 console.error("Search error:", e);
+                setResults([]);
             } finally {
                 setIsLoading(false);
             }
@@ -106,7 +125,7 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
         if (!isOpen) {
             setQuery('');
             setResults([]);
-            setAddedSongs(new Set());
+            setAddedAssets(new Set());
         }
     }, [isOpen]);
 
@@ -268,18 +287,31 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
 
                         {!isLoading && results.length > 0 && (
                             <div className="space-y-1">
-                                {results.map((group, idx) => {
-                                    const imageUrl = group.image?.[0]?.link || '';
-                                    const qualities = getAvailableQualities(group);
-                                    const bestSong = group.qualities[group.bestQuality as keyof typeof group.qualities];
-                                    const isAdded = bestSong && addedSongs.has(bestSong.id);
+                                {results.map((track, idx) => {
+                                    const imageUrl = track.song.image?.[0]?.link || '';
+                                    const qualities = getAvailableQualities(track);
+                                    // isAdded check now depends on specific quality buttons, but we can check if preferred is added for row highlighting if needed
+                                    // or just allow the specific buttons to handle it.
+                                    // The variable 'isAdded' needs to be removed or replaced.
+                                    // Let's remove the variable declaration if it creates reference error.
+                                    // But wait, look down at line 357 (in previous view), I saw: const isBestAdded = addedAssets.has(...)
+                                    // So 'isAdded' variable at line 293 might be just vestigial?
+                                    // Ah, I need to see where 'isAdded' is used.
+                                    // I see in previous diffs I replaced usages of 'isAdded' with 'isBestAdded' or similar.
+                                    // So this declaration is likely unused or I missed a usage.
+                                    // Safest is to remove it, but I must check if it's used in the returned JSX.
+                                    // The error is ReferenceError at 293. I will replace it with a dummy false or the correct check.
+                                    // Better yet, I'll delete the line if I can verify it's not used. 
+                                    // But I can't see lines 300+.
+                                    // I'll assume it might be used. I'll define it as checking the preferred quality.
+                                    const isAdded = addedAssets.has(`${track.id}_${track.preferredQuality}`);
 
                                     return (
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: idx * 0.03 }}
-                                            key={group.key}
+                                            key={track.id}
                                             className="group flex items-center gap-4 p-3 rounded-2xl hover:bg-white/5 border border-transparent hover:border-white/5 transition-all duration-300"
                                         >
                                             {/* Album Art */}
@@ -287,7 +319,7 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
                                                 {imageUrl && (
                                                     <Image
                                                         src={imageUrl}
-                                                        alt={group.name}
+                                                        alt={track.song.name}
                                                         width={56}
                                                         height={56}
                                                         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
@@ -301,63 +333,60 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
 
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-bold text-zinc-200 group-hover:text-white truncate transition-colors text-[15px]">{decodeHtml(group.name)}</h3>
-                                                <p className="text-xs text-zinc-500 group-hover:text-zinc-400 truncate mt-0.5 font-medium">{decodeHtml(group.primaryArtists)}</p>
+                                                <h3 className="font-bold text-zinc-200 group-hover:text-white truncate transition-colors text-[15px]">{decodeHtml(track.song.name)}</h3>
+                                                <p className="text-xs text-zinc-500 group-hover:text-zinc-400 truncate mt-0.5 font-medium">{decodeHtml(track.song.primaryArtists)}</p>
                                             </div>
 
                                             {/* Quality Badges */}
                                             <div className="flex gap-1 flex-shrink-0">
-                                                {qualities.map(q => (
-                                                    <button
-                                                        key={q}
-                                                        onClick={() => handleQualityClick(group, q)}
-                                                        className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider ${QUALITY_COLORS[q]} hover:brightness-110 active:scale-95 transition-all shadow-lg`}
-                                                        title={`Add in ${q}`}
-                                                    >
-                                                        {QUALITY_LABELS[q]}
-                                                    </button>
-                                                ))}
+                                                {qualities.map(q => {
+                                                    const isAssetAdded = addedAssets.has(`${track.id}_${q}`);
+                                                    return (
+                                                        <button
+                                                            key={q}
+                                                            onClick={() => handleTrackSelect(track, q)}
+                                                            disabled={isAssetAdded}
+                                                            className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider ${isAssetAdded ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : (QUALITY_COLORS[q] || 'bg-gray-700') + ' hover:brightness-110 active:scale-95'} transition-all shadow-lg`}
+                                                            title={isAssetAdded ? `Already added as ${q}` : `Add in ${q}`}
+                                                        >
+                                                            {QUALITY_LABELS[q]} {isAssetAdded && '✓'}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
 
                                             {/* Actions */}
                                             <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                {bestSong && (
-                                                    <button
-                                                        onClick={() => onToggleFavorite(bestSong)}
-                                                        className={`p-2 rounded-full transition-all hover:bg-white/10 ${favorites.has(bestSong.id)
-                                                            ? 'text-red-500 scale-110'
-                                                            : 'text-zinc-500 hover:text-white'
-                                                            }`}
-                                                    >
-                                                        <span className="text-sm">{favorites.has(bestSong.id) ? '❤️' : '♡'}</span>
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={() => onToggleFavorite(track.song)}
+                                                    className={`p-2 rounded-full transition-all hover:bg-white/10 ${favorites.has(track.song.id)
+                                                        ? 'text-red-500 scale-110'
+                                                        : 'text-zinc-500 hover:text-white'
+                                                        }`}
+                                                >
+                                                    <span className="text-sm">{favorites.has(track.song.id) ? '❤️' : '♡'}</span>
+                                                </button>
 
                                                 {/* Add Best Quality Button */}
-                                                {bestSong && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const bestQ = group.bestQuality;
-                                                            const songWithQuality = {
-                                                                ...bestSong,
-                                                                _quality: bestQ,
-                                                                _qualityTier: bestQ === '24-bit' ? 0 : bestQ === 'FLAC' ? 1 : bestQ === '320kbps' ? 2 : 3
-                                                            };
-                                                            handleAdd(songWithQuality as JioSaavnSong);
-                                                        }}
-                                                        disabled={isAdded}
-                                                        className={`h-9 px-4 rounded-xl flex items-center gap-2 text-xs font-bold transition-all shadow-lg ${isAdded
-                                                            ? 'bg-zinc-800 text-zinc-500 cursor-default'
-                                                            : 'bg-white text-black hover:bg-zinc-200 hover:scale-105 active:scale-95'
-                                                            }`}
-                                                    >
-                                                        {isAdded ? (
-                                                            <>Added <Check size={14} /></>
-                                                        ) : (
-                                                            <>Add ✨</>
-                                                        )}
-                                                    </button>
-                                                )}
+                                                {(() => {
+                                                    const isBestAdded = addedAssets.has(`${track.id}_${track.preferredQuality}`);
+                                                    return (
+                                                        <button
+                                                            onClick={() => handleAddBest(track)}
+                                                            disabled={isBestAdded}
+                                                            className={`h-9 px-4 rounded-xl flex items-center gap-2 text-xs font-bold transition-all shadow-lg ${isBestAdded
+                                                                ? 'bg-zinc-800 text-zinc-500 cursor-default'
+                                                                : 'bg-white text-black hover:bg-zinc-200 hover:scale-105 active:scale-95'
+                                                                }`}
+                                                        >
+                                                            {isBestAdded ? (
+                                                                <>Added ✓</>
+                                                            ) : (
+                                                                <>Add ✨</>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })()}
                                             </div>
                                         </motion.div>
                                     );

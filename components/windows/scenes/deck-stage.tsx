@@ -86,9 +86,11 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const {
-        mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq, isDownloaded
+        currentSong, currentTrack, isPlaying, togglePlay, next, prev, seek, volume, setVolume,
+        progress, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, mixes, addMix,
+        updateMix, deleteMix, activeMixId, play,
+        likedSongs, toggleLike, isLiked, recentlyPlayed, eq, isDownloaded,
+        downloadSong, removeDownload
     } = usePlayback();
 
     const isDraggingRef = useRef(false);
@@ -649,7 +651,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                 <span className="font-mono text-black font-bold tracking-widest text-sm flex items-center gap-2">
                                     {currentSong ? (
                                         <>
-                                            {isDownloaded(currentSong.id) && <span className="bg-black/10 px-1 rounded text-[10px]">OFFLINE</span>}
+                                            {isDownloaded(currentTrack?.id || currentSong.id) && <span className="bg-black/10 px-1 rounded text-[10px]">OFFLINE</span>}
                                             <span className="truncate">▶ {decodeHtml(currentSong.name)}</span>
                                         </>
                                     ) : (

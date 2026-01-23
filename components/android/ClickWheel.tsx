@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Play, Pause, FastForward, Rewind } from "lucide-react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useIpodAudio } from "@/hooks/use-ipod-audio";
 
 interface ClickWheelProps {
     theme?: 'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush';
@@ -18,12 +19,25 @@ interface ClickWheelProps {
 }
 
 export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, onSelect, onLongSelect, onMenu, onPlayPause, onNext, onPrev, children }: ClickWheelProps) {
+    const { playClick, playScroll } = useIpodAudio();
     const wheelRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const lastAngle = useRef<number | null>(null);
     const accumulatedDelta = useRef(0);
+    const activePointerId = useRef<number | null>(null);
     const lastVibration = useRef(0);
+    const lastScrollSound = useRef(0);
     const hasMoved = useRef(false);
+
+    // Feedback Helpers
+    const triggerHaptic = (duration: number | number[]) => {
+        if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+        const now = Date.now();
+        if (now - lastVibration.current > 50) { // Global throttle 50ms
+            navigator.vibrate(duration);
+            lastVibration.current = now;
+        }
+    };
 
     const getAngle = (clientX: number, clientY: number) => {
         if (!wheelRef.current) return 0;
@@ -38,7 +52,12 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
     const handlePointerDown = (e: React.PointerEvent) => {
         // Prevent default touch actions like scrolling the page
         e.preventDefault();
+        e.stopPropagation(); // Ensure we claim it
+
+        if (activePointerId.current !== null) return; // Ignore multi-touch
+
         wheelRef.current?.setPointerCapture(e.pointerId);
+        activePointerId.current = e.pointerId;
         setIsDragging(true);
         lastAngle.current = getAngle(e.clientX, e.clientY);
         accumulatedDelta.current = 0;
@@ -46,7 +65,7 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
     };
 
     const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isDragging || lastAngle.current === null) return;
+        if (!isDragging || activePointerId.current !== e.pointerId || lastAngle.current === null) return;
         e.preventDefault();
 
         const currentAngle = getAngle(e.clientX, e.clientY);
@@ -59,8 +78,8 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
         accumulatedDelta.current += delta;
         lastAngle.current = currentAngle;
 
-        // Mark as moved if threshold passed
-        if (Math.abs(accumulatedDelta.current) > 6) {
+        // Mark as moved if threshold passed (increased to 10 deg to avoid jitter)
+        if (Math.abs(accumulatedDelta.current) > 10) {
             hasMoved.current = true;
         }
 
@@ -78,15 +97,17 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
             // Execute scroll
             onScroll(direction);
 
-            // Audio Feedback (Click Sound)
-            playClickSound('tick');
-
-            // Throttle Haptic Feedback
-            const now = Date.now();
-            if (now - lastVibration.current > 40 && typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate(3);
-                lastVibration.current = now;
+            // Audio Feedback (Throttled)
+            if (enableSounds) {
+                const now = Date.now();
+                if (now - lastScrollSound.current > 40) {
+                    playScroll();
+                    lastScrollSound.current = now;
+                }
             }
+
+            // Haptic Feedback
+            triggerHaptic(3);
 
             // Reset accumulator but keep remainder for smoothness
             accumulatedDelta.current -= direction * TICK_THRESHOLD;
@@ -95,16 +116,17 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
 
     // Mouse Wheel Support (Desktop)
     const handleWheel = (e: React.WheelEvent) => {
-        // Prevent page scroll if inside the wheel
         e.stopPropagation();
 
-        // Map scrollY to rotation delta
-        // Average mouse wheel notch is ~100px. Map that to 20deg (one tick).
-        // Momentum: Faster scroll = bigger delta.
-        // Cap momentum to avoid spinning out of control.
+        // Reset pointer-based state to avoid conflicts
+        if (isDragging) {
+            setIsDragging(false);
+            activePointerId.current = null;
+        }
 
-        const SENSITIVITY = 0.3; // Tuned for natural feel
-        const MAX_SPEED = 60; // Max degrees per event
+        // Map scrollY to rotation delta
+        const SENSITIVITY = 0.35;
+        const MAX_SPEED = 60;
 
         let delta = e.deltaY * SENSITIVITY;
 
@@ -116,74 +138,43 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
         processDelta();
     };
 
-    // Audio Preloading
-    const audioRefs = useRef<{ tick: HTMLAudioElement; select: HTMLAudioElement } | null>(null);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            audioRefs.current = {
-                tick: new Audio('/sounds/click.wav'),
-                select: new Audio('/sounds/clunk.wav')
-            };
-            // Preload
-            audioRefs.current.tick.load();
-            audioRefs.current.select.load();
-            // Lower volume slightly for tick
-            audioRefs.current.tick.volume = 0.4;
-            audioRefs.current.select.volume = 0.6;
-        }
-    }, []);
-
-    const playClickSound = (type: 'tick' | 'select' = 'tick') => {
-        if (!enableSounds || !audioRefs.current) return;
-
-        try {
-            const sound = type === 'tick' ? audioRefs.current.tick : audioRefs.current.select;
-
-            // Clone node to allow rapid overlapping plays (polymorphism)
-            // or just reset current time. Resetting current time is lighter but might clip.
-            // Cloning is safer for rapid scrolling.
-            const clone = sound.cloneNode() as HTMLAudioElement;
-            clone.volume = sound.volume;
-            clone.play().catch(() => { });
-        } catch (e) {
-            // Ignore auto-play errors
-        }
-    };
-
     const handlePointerUp = (e: React.PointerEvent) => {
+        if (activePointerId.current !== e.pointerId) return;
+
         if (isDragging && !hasMoved.current) {
             // It was a TAP! Determine button by Angle.
-            const angle = lastAngle.current || getAngle(e.clientX, e.clientY);
-            playClickSound('select'); // Sound for Tap
+            // Recalculate angle to be safe, or use last known
+            const angle = getAngle(e.clientX, e.clientY);
 
-            // Normalize angle to -180 to 180
-            // Top (-90 range), Right (0 range), Bottom (90 range), Left (180 range)
+            if (enableSounds) playClick();
 
+            // Normalize angle logic
             // Menu (Top): -135 to -45
             if (angle > -135 && angle < -45) {
                 onMenu();
-                if (navigator.vibrate) navigator.vibrate(10);
+                triggerHaptic(10);
             }
             // Play (Bottom): 45 to 135
             else if (angle > 45 && angle < 135) {
                 onPlayPause();
-                if (navigator.vibrate) navigator.vibrate(10);
+                triggerHaptic(10);
             }
             // Next (Right): -45 to 45
             else if (angle >= -45 && angle <= 45) {
                 onNext();
-                if (navigator.vibrate) navigator.vibrate(10);
+                triggerHaptic(10);
             }
             // Prev (Left): <-135 or >135
             else {
                 onPrev();
-                if (navigator.vibrate) navigator.vibrate(10);
+                triggerHaptic(10);
             }
         }
 
+        // Reset
         setIsDragging(false);
         lastAngle.current = null;
+        activePointerId.current = null;
         wheelRef.current?.releasePointerCapture(e.pointerId);
     };
 
@@ -270,22 +261,24 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
                 style={{ contain: 'layout', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
                 whileTap={{ scale: 0.95 }}
                 onPointerDown={(e) => {
-                    e.stopPropagation(); // Stop propagation to wheel
+                    e.stopPropagation();
                     e.preventDefault();
                     isCenterPressed.current = true;
+                    // Reset consumed flag
+                    // We need a ref for consumed state if we want to block the UP event
+                    // However, we are setting isCenterPressed to false in the timeout, so that should block UP action.
 
-                    // Start Long Press Timer
                     if (longPressTimer.current) clearTimeout(longPressTimer.current);
                     longPressTimer.current = setTimeout(() => {
                         if (isCenterPressed.current) {
                             if (onLongSelect) {
                                 onLongSelect();
-                                if (navigator.vibrate) navigator.vibrate([15, 30, 15]); // Satisfying "double bump"
-                                playClickSound('select');
+                                triggerHaptic([15, 30, 15]);
+                                if (enableSounds) playClick();
                             }
-                            isCenterPressed.current = false; // Prevent normal select on up
+                            isCenterPressed.current = false; // Mark as consumed so release doesn't trigger select
                         }
-                    }, 800); // 800ms for long press
+                    }, 800);
                 }}
                 onPointerUp={(e) => {
                     e.stopPropagation();
@@ -293,9 +286,11 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
                         clearTimeout(longPressTimer.current);
                         longPressTimer.current = null;
                     }
+                    // Only trigger if still pressed (not consumed by long press)
                     if (isCenterPressed.current) {
                         onSelect();
-                        if (navigator.vibrate) navigator.vibrate(10);
+                        triggerHaptic(10);
+                        if (enableSounds) playClick();
                     }
                     isCenterPressed.current = false;
                 }}

@@ -183,40 +183,8 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                     </div>
 
                                     <div className="space-y-6">
-                                        {/* Quality */}
-                                        <div className="bg-zinc-900/30 border border-white/5 rounded-3xl p-8 backdrop-blur-sm">
-                                            <div className="flex justify-between items-center mb-6">
-                                                <div>
-                                                    <div className="font-bold text-xl text-white mb-1">Stream Quality</div>
-                                                    <div className="text-xs text-zinc-500 uppercase tracking-widest">Select Bitrate</div>
-                                                </div>
-                                                <div className="px-3 py-1 bg-white text-black rounded-lg text-xs font-bold">
-                                                    {bitrate === '320' ? 'Lossless FLAC' : 'Standard'}
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-5 gap-3">
-                                                {[
-                                                    { value: '12', label: '12k', emoji: '🌑' },
-                                                    { value: '48', label: '48k', emoji: '🌘' },
-                                                    { value: '96', label: '96k', emoji: '🌗' },
-                                                    { value: '160', label: '160k', emoji: '🌖' },
-                                                    { value: '320', label: '320k', emoji: '🌕' }
-                                                ].map((q) => (
-                                                    <button
-                                                        key={q.value}
-                                                        onClick={() => setBitrate(q.value as any)}
-                                                        className={`py-4 rounded-2xl flex flex-col items-center gap-2 transition-all duration-300 ${bitrate === q.value
-                                                            ? 'bg-white text-black shadow-lg scale-105'
-                                                            : 'bg-black/40 text-zinc-500 hover:bg-black/60 hover:text-white'
-                                                            }`}
-                                                    >
-                                                        <span className="text-lg">{q.emoji}</span>
-                                                        <span className="text-xs font-bold">{q.label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
+                                        {/* Quality - REMOVED per user request */}
+                                        {/* <div className="bg-zinc-900/30 border border-white/5 rounded-3xl p-8 backdrop-blur-sm">...</div> */}
 
                                         {/* Toggles */}
                                         <div className="grid grid-cols-2 gap-4">

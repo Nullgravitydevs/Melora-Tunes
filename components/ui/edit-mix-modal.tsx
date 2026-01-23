@@ -7,6 +7,7 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 
 import { Mix } from "@/components/providers/playback-context";
+import { PlayableTrack, isPlayableTrack } from "@/lib/types";
 
 interface EditMixModalProps {
     isOpen: boolean;
@@ -18,7 +19,7 @@ interface EditMixModalProps {
 }
 
 export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, onDeleteMix }: EditMixModalProps) {
-    const [editedSongs, setEditedSongs] = useState<JioSaavnSong[]>([]);
+    const [editedSongs, setEditedSongs] = useState<(JioSaavnSong | PlayableTrack)[]>([]);
     const [editedTitle, setEditedTitle] = useState("");
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -52,10 +53,34 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
 
     const handleSave = () => {
         if (mix) {
+            // Rule 5: Defensive Deduplication (Within Mix)
+            // Ensure no duplicate IDs exist before saving.
+            // We use a Map to keep the *first* occurrence or last? 
+            // Usually first occurrence is preferred order.
+            const uniqueSongs: (JioSaavnSong | PlayableTrack)[] = [];
+            const seenIds = new Set<string>();
+
+            for (const s of editedSongs) {
+                // Strict Asset Deduplication: Check ID + Quality
+                const id = 'id' in s ? s.id : (s as any).id;
+                const quality = isPlayableTrack(s) ? s.preferredQuality : '320';
+                const assetId = `${id}_${quality}`;
+
+                if (!seenIds.has(assetId)) {
+                    seenIds.add(assetId);
+                    uniqueSongs.push(s);
+                }
+            }
+
+            if (uniqueSongs.length < editedSongs.length) {
+                // If we removed something, maybe warn? or just silent fix?
+                // Spec says "Remove duplicate track.id within same mix". Silent is fine/better UX than error.
+            }
+
             onUpdateMix({
                 ...mix,
                 title: editedTitle,
-                songs: editedSongs
+                songs: uniqueSongs
             });
             onClose();
         }
@@ -76,15 +101,28 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
         }
     };
 
-    const getQualityBadge = (song: any) => {
-        const quality = song._quality;
+    const getQualityBadge = (item: any) => {
+        let quality = item._quality; // Legacy support
+        if (isPlayableTrack(item)) {
+            quality = item.preferredQuality;
+        }
+
         if (!quality) return null;
 
         let colorClass = "bg-zinc-800 text-zinc-400";
-        if (quality === "Hi-Res" || quality === "Master") colorClass = "bg-yellow-500/20 text-yellow-300 border border-yellow-500/20";
-        else if (quality === "FLAC" || quality === "Lossless") colorClass = "bg-purple-500/20 text-purple-300 border border-purple-500/20";
-        else if (quality === "320kbps") colorClass = "bg-blue-500/20 text-blue-300 border border-blue-500/20";
-        else if (quality === "160kbps") colorClass = "bg-green-500/20 text-green-300 border border-green-500/20";
+        if (quality === "hires" || quality === "HI_RES_LOSSLESS") {
+            quality = "Hi-Res";
+            colorClass = "bg-yellow-500/20 text-yellow-300 border border-yellow-500/20";
+        } else if (quality === "flac" || quality === "LOSSLESS") {
+            quality = "FLAC";
+            colorClass = "bg-purple-500/20 text-purple-300 border border-purple-500/20";
+        } else if (quality === "320") {
+            quality = "320kbps";
+            colorClass = "bg-blue-500/20 text-blue-300 border border-blue-500/20";
+        } else if (quality === "160") {
+            quality = "160kbps";
+            colorClass = "bg-green-500/20 text-green-300 border border-green-500/20";
+        }
 
         return (
             <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider ml-2 ${colorClass}`}>
@@ -148,50 +186,53 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
                                     <p className="text-xs mt-1">Add songs from search</p>
                                 </div>
                             ) : (
-                                editedSongs.map((song, index) => (
-                                    <div
-                                        key={`${song.id}-${index}`}
-                                        className="group flex items-center justify-between p-3 rounded-lg hover:bg-zinc-900 transition-colors border border-transparent hover:border-zinc-800/50"
-                                    >
-                                        <div className="flex items-center flex-1 min-w-0 mr-4">
-                                            <span className="text-xs font-mono text-zinc-600 w-6 text-right mr-4 opacity-50">{index + 1}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center">
-                                                    <p className="font-medium text-sm truncate text-zinc-200">{decodeHtml(song.name)}</p>
-                                                    {getQualityBadge(song)}
+                                editedSongs.map((item, index) => {
+                                    const song = isPlayableTrack(item) ? item.song : item;
+                                    return (
+                                        <div
+                                            key={`${song.id}-${index}`}
+                                            className="group flex items-center justify-between p-3 rounded-lg hover:bg-zinc-900 transition-colors border border-transparent hover:border-zinc-800/50"
+                                        >
+                                            <div className="flex items-center flex-1 min-w-0 mr-4">
+                                                <span className="text-xs font-mono text-zinc-600 w-6 text-right mr-4 opacity-50">{index + 1}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center">
+                                                        <p className="font-medium text-sm truncate text-zinc-200">{decodeHtml(song.name)}</p>
+                                                        {getQualityBadge(item)}
+                                                    </div>
+                                                    <p className="text-[11px] text-zinc-500 truncate mt-0.5">{decodeHtml(song.primaryArtists)}</p>
                                                 </div>
-                                                <p className="text-[11px] text-zinc-500 truncate mt-0.5">{decodeHtml(song.primaryArtists)}</p>
+                                            </div>
+
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => handleMoveUp(index)}
+                                                    disabled={index === 0}
+                                                    className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
+                                                    title="Move Up"
+                                                >
+                                                    <ArrowUp size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleMoveDown(index)}
+                                                    disabled={index === editedSongs.length - 1}
+                                                    className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
+                                                    title="Move Down"
+                                                >
+                                                    <ArrowDown size={14} />
+                                                </button>
+                                                <div className="w-px h-3 bg-zinc-800 mx-1" />
+                                                <button
+                                                    onClick={() => handleDelete(index)}
+                                                    className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors"
+                                                    title="Remove Song"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => handleMoveUp(index)}
-                                                disabled={index === 0}
-                                                className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
-                                                title="Move Up"
-                                            >
-                                                <ArrowUp size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleMoveDown(index)}
-                                                disabled={index === editedSongs.length - 1}
-                                                className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
-                                                title="Move Down"
-                                            >
-                                                <ArrowDown size={14} />
-                                            </button>
-                                            <div className="w-px h-3 bg-zinc-800 mx-1" />
-                                            <button
-                                                onClick={() => handleDelete(index)}
-                                                className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors"
-                                                title="Remove Song"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
 

@@ -83,7 +83,7 @@ export async function searchSongs(query: string, page: number = 1, limit: number
                 return {
                     id: item.id,
                     name: title,
-                    type: item.type,
+                    type: item.type || 'song', // Default to song if missing to prevents filtering issues
                     album: {
                         id: item.more_info?.album_id || '',
                         name: item.more_info?.album || '',
@@ -222,7 +222,7 @@ export function decryptUrl(encryptedUrl: string): string {
     return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
-export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' | '96' | '48' | '12' = '320'): string {
+export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' | '96' = '320'): string {
     if (!song.encryptedMediaUrl) {
         console.warn("No encrypted media URL found for song:", song.name);
         return '';
@@ -236,8 +236,12 @@ export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' 
         // Fix: Use 'flac' as target if requested.
         const targetBitrate = bitrate;
 
-        // Replace suffix with requested bitrate. 
-        // Note: This relies on the file actually existing on the server with that suffix.
+        if (targetBitrate === 'flac') {
+            // For FLAC, we usually need to change the extension from .mp4 to .flac as well
+            return decryptedUrl.replace(/_(320|160|96|48|12)\.(mp4|m4a)/g, '_flac.flac');
+        }
+
+        // Standard bitrate change (keeps extension)
         return decryptedUrl.replace(/_(320|160|96|48|12)\./g, `_${targetBitrate}.`);
     } catch (e) {
         console.warn('Failed to decrypt URL for song:', song.name, e);

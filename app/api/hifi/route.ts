@@ -1,112 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// 🕵️ MIDDLEMAN ENDPOINTS (From SpotiFLAC Analysis)
-const TIDAL_BASE = 'https://tidal.kinoplus.online';
-const QOBUZ_BASE = 'https://dab.yeet.su';
+import { searchHiFi } from '@/lib/hifi';
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type');
-    const source = searchParams.get('source') || 'tidal'; // functional default
     const query = searchParams.get('q');
-    const id = searchParams.get('id');
 
-    if (!type) {
-        return NextResponse.json({ success: false, error: 'Missing type parameter' }, { status: 400 });
-    }
+    if (!type) return NextResponse.json({ success: false, error: 'Missing type' }, { status: 400 });
 
     try {
-        let result = null;
-
-        // --- 1. SEARCH HANDLER ---
         if (type === 'search' && query) {
-            if (source === 'tidal') {
-                // Tidal Search (Reverse Engineered)
-                const target = `${TIDAL_BASE}/api/search?q=${encodeURIComponent(query)}`;
-                const res = await fetch(target, { headers: { 'User-Agent': 'Melora/1.0' } });
-                const data = await res.json();
+            console.log(`[API/HiFi] God Mode Search: ${query}`);
 
-                // transform to common format
-                result = {
-                    tracks: data.tracks?.map((t: any) => ({
-                        id: t.id,
-                        title: t.title,
-                        artist: t.artist?.name,
-                        artistId: t.artist?.id,
-                        album: t.album?.title,
-                        albumId: t.album?.id,
-                        duration: t.duration,
-                        coverArt: t.album?.cover,
-                        quality: 'HI_RES_LOSSLESS', // Assuming proxy returns high
-                        source: 'tidal'
-                    })) || [],
-                    albums: [], // TODO: map albums if needed
-                    source: 'tidal'
-                };
+            // Execute Parallel Search (Client Logic running on Server)
+            const results = await searchHiFi(query);
 
-            } else {
-                // Qobuz Search
-                const target = `${QOBUZ_BASE}/api/search?q=${encodeURIComponent(query)}`;
-                const res = await fetch(target, { headers: { 'User-Agent': 'Melora/1.0' } });
-                const data = await res.json();
-
-                result = {
-                    tracks: data.tracks?.map((t: any) => ({
-                        id: t.id,
-                        title: t.title,
-                        artist: t.performer?.name,
-                        artistId: t.performer?.id,
-                        album: t.album?.title,
-                        albumId: t.album?.id,
-                        duration: t.duration,
-                        coverArt: t.album?.image?.large,
-                        quality: 'LOSSLESS',
-                        source: 'qobuz'
-                    })) || [],
-                    albums: [],
-                    source: 'qobuz'
-                };
+            if (!results) {
+                return NextResponse.json({ success: false, error: 'No results' });
             }
+
+            return NextResponse.json({
+                success: true,
+                source: results.source,
+                tracks: results.tracks,
+                albums: results.albums
+            });
         }
 
-        // --- 2. STREAM HANDLER ---
-        else if (type === 'stream' && id) {
-            if (source === 'tidal') {
-                const target = `${TIDAL_BASE}/api/track/stream?id=${id}`;
-                const res = await fetch(target);
-                const data = await res.json();
+        // Note: Streams are handled CLIENT-SIDE by hifi-client.ts calling hifi.ts directly.
+        // This API is primarily for Search Proxying to avoid CORS on search endpoints if needed,
+        // or just to centralize logic.
 
-                // Middleman usually returns { url: "...", quality: "..." }
-                if (data.url) {
-                    result = { url: data.url, quality: data.quality || 'HI_RES' };
-                }
-            } else {
-                const target = `${QOBUZ_BASE}/api/track/stream?id=${id}`;
-                const res = await fetch(target);
-                const data = await res.json();
+        return NextResponse.json({ success: false, error: 'Not implemented or Invalid Parameters' });
 
-                if (data.url) {
-                    result = { url: data.url, quality: data.quality || 'LOSSLESS' };
-                }
-            }
-        }
-
-        // --- 3. ALBUM HANDLER ---
-        else if (type === 'album' && id) {
-            // Basic implementation for album tracks
-            // This depends on the exact proxy API which we'd need to verify dynamically
-            // For now return empty or implement similar to search
-            result = { success: false, error: 'Album fetching not fully mapped yet' };
-        }
-
-        if (result) {
-            return NextResponse.json({ success: true, ...result });
-        } else {
-            return NextResponse.json({ success: false, error: 'No data found' }, { status: 404 });
-        }
-
-    } catch (error) {
-        console.error("HiFi Proxy Error:", error);
-        return NextResponse.json({ success: false, error: 'Proxy Error' }, { status: 500 });
+    } catch (error: any) {
+        console.error("HiFi API Error:", error);
+        return NextResponse.json({ success: false, error: error.message || 'Internal Error' }, { status: 500 });
     }
 }

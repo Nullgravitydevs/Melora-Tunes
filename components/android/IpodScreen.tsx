@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight, Star, Heart, Music, Zap, Smile, Ghost, Skull, HardDrive } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { CinemaModeMobile as CinemaMode } from "./cinema-mode-mobile";
@@ -100,7 +100,9 @@ export function IpodScreen({
     onToggleLike,
     onAddSticker,
     depth = 0,
-    isDownloaded = () => false
+    isDownloaded = () => false,
+    backlight,
+    audioQuality // Added missing prop
 }: IpodScreenProps) {
 
     // ... (Existing Hook Logic) ...
@@ -124,11 +126,12 @@ export function IpodScreen({
 
 
     // Format helper
-    const formatTime = (seconds: number) => {
-        const min = Math.floor(seconds / 60);
-        const sec = Math.floor(seconds % 60);
-        return `${min}:${sec.toString().padStart(2, '0')}`;
-    };
+    const formatTime = useMemo(() => (seconds: number) => {
+        if (!seconds || isNaN(seconds)) return "0:00";
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }, []);
 
     // Helper to get image from item data if available
     const getItemImage = (index: number) => {
@@ -269,26 +272,16 @@ export function IpodScreen({
             <div className="flex-1 overflow-hidden relative bg-black">
                 <AnimatePresence mode="popLayout" custom={direction} initial={false}>
                     <motion.div
-                        key={title + variant + depth} // Use depth to ensure unique Key for same-title transitions if needed
-                        custom={direction}
-                        variants={slideVariants}
-                        initial="enter"
-                        animate="center"
-                        exit="exit"
-                        transition={{ type: "tween", ease: "easeInOut", duration: 0.25 }}
-                        className="absolute inset-0 w-full h-full bg-black overflow-hidden flex flex-col"
+                        key={variant + (title || "view")} // Use Variant + Title as ID instead of full hierarchy for smoother/stable transitions
+                        initial={{ x: 300, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: -300, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className="flex-1 w-full h-full overflow-hidden relative"
                     >
                         {variant === 'message' ? (
                             <div className="w-full h-full flex items-center justify-center p-6 text-center">
                                 <p className="text-sm font-medium text-zinc-400 leading-relaxed">{message}</p>
-                            </div>
-                        ) : variant === 'lyrics' ? (
-                            <div className="w-full h-full bg-black overflow-y-auto scrollbar-hide">
-                                <div className="p-4 min-h-full flex items-center justify-center">
-                                    <pre className="whitespace-pre-wrap font-sans text-center text-xs text-zinc-300 leading-loose">
-                                        {lyrics || "No lyrics available."}
-                                    </pre>
-                                </div>
                             </div>
                         ) : variant === 'cinema' ? (
                             <div className="w-full h-full bg-black">
@@ -330,10 +323,10 @@ export function IpodScreen({
                                             onChange={(e) => onSearchChange?.(e.target.value)}
                                             placeholder="Search Music..."
                                             className="bg-transparent w-full text-white text-[11px] font-medium focus:outline-none placeholder:text-zinc-600 caret-blue-500"
-                                            autoFocus
                                             onKeyDown={(e) => {
+                                                e.stopPropagation(); // Prevent global listeners
                                                 if (e.key === 'Enter') {
-                                                    onSearchSubmit?.(searchQuery);
+                                                    onSearchSubmit?.(e.currentTarget.value);
                                                 }
                                             }}
                                         />
@@ -475,7 +468,31 @@ export function IpodScreen({
                                         {/* If we had "focused item" metadata, we could show it here. For now static or current song art */}
                                         {/* Reflection Effect */}
                                         <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-
+                                        {/* Top Bar: Status */}
+                                        <div className="h-6 flex items-center justify-between px-1.5 bg-gradient-to-b from-white/20 to-transparent shrink-0 relative z-20">
+                                            <div className="flex items-center gap-1">
+                                                {/* Back Button - Visible & Interactive */}
+                                                {variant !== 'menu' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onBack?.();
+                                                        }}
+                                                        className="p-0.5 hover:bg-white/20 rounded cursor-pointer active:scale-95 transition-transform"
+                                                    >
+                                                        <div className="flex items-center gap-0.5 text-[9px] font-medium opacity-90">
+                                                            <span className="text-[10px]">‹</span>
+                                                            <span>Menu</span>
+                                                        </div>
+                                                    </button>
+                                                )}
+                                                {variant === 'menu' && (
+                                                    <div className="flex items-center gap-1">
+                                                        {isPlaying ? <Play size={8} fill="currentColor" /> : <Pause size={8} fill="currentColor" />}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                         {currentSong?.image ? (
                                             <motion.div
                                                 initial={{ opacity: 0, scale: 0.9 }}

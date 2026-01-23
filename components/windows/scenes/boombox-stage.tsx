@@ -187,7 +187,11 @@ export function BoomboxStage({
     };
 
     const getMixImage = (mix: Mix): string | null => {
-        if (mix.songs.length > 0) return getThumbnailUrl(mix.songs[0]);
+        if (mix.songs.length > 0) {
+            const item = mix.songs[0];
+            const song = 'song' in item ? item.song : item;
+            return getThumbnailUrl(song);
+        }
         return null;
     };
 

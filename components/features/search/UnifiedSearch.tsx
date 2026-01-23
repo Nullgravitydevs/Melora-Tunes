@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
-import { searchUnified, GroupedSong, SearchType } from '@/lib/unified-search';
+import { searchUnified, SearchType } from '@/lib/unified-search';
+import { PlayableTrack, PlayableSource, AudioQuality } from '@/lib/types';
 import { JioSaavnSong } from '@/lib/jiosaavn';
 import { decodeHtml } from '@/lib/utils';
 import Image from 'next/image';
 
 interface UnifiedSearchProps {
-    onSongSelect: (song: JioSaavnSong, quality: string) => void;
-    onAlbumSelect?: (album: GroupedSong) => void;
+    onSongSelect: (track: PlayableTrack) => void; // Changed to accept full track
+    onAlbumSelect?: (album: any) => void;
     onArtistSelect?: (artistName: string) => void;
     placeholder?: string;
     className?: string;
@@ -19,13 +20,14 @@ interface UnifiedSearchProps {
 
 // Quality badge colors
 const QUALITY_COLORS: Record<string, string> = {
-    '24-bit': 'bg-amber-500 text-black',
-    'FLAC': 'bg-purple-500 text-white',
-    '320kbps': 'bg-green-500 text-white',
-    '128kbps': 'bg-gray-500 text-white'
+    'hires': 'bg-amber-500 text-black',
+    'flac': 'bg-purple-500 text-white',
+    '320': 'bg-green-500 text-white',
+    '160': 'bg-gray-500 text-white',
+    '96': 'bg-gray-500 text-white'
 };
 
-const QUALITY_ORDER = ['24-bit', 'FLAC', '320kbps', '128kbps'] as const;
+const QUALITY_ORDER: AudioQuality[] = ['hires', 'flac', '320', '160', '96'];
 
 export function UnifiedSearch({
     onSongSelect,
@@ -37,7 +39,7 @@ export function UnifiedSearch({
     autoFocus = false
 }: UnifiedSearchProps) {
     const [query, setQuery] = useState("");
-    const [results, setResults] = useState<GroupedSong[]>([]);
+    const [results, setResults] = useState<PlayableTrack[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [filter, setFilter] = useState<SearchType>('all');
     const searchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -62,6 +64,7 @@ export function UnifiedSearch({
         setIsSearching(true);
         searchTimeout.current = setTimeout(async () => {
             try {
+                // Return type is Promise<PlayableTrack[]>
                 const data = await searchUnified(query, filter);
                 setResults(data);
             } catch (e) {
@@ -76,15 +79,23 @@ export function UnifiedSearch({
         };
     }, [query, filter]);
 
-    const handleSongClick = useCallback((group: GroupedSong, quality: string) => {
-        const song = group.qualities[quality as keyof typeof group.qualities];
-        if (song) {
-            onSongSelect(song, quality);
+    const handleSongClick = useCallback((track: PlayableTrack, overrideQuality?: AudioQuality) => {
+        // If user clicks a specific badge, we might want to override the preferred quality
+        // But for simplicity in this architecture, we pass the track. 
+        // We can clone the track with new preferredQuality if needed.
+        if (overrideQuality) {
+            const newTrack = { ...track, preferredQuality: overrideQuality, isExplicitPreference: true };
+            onSongSelect(newTrack);
+        } else {
+            onSongSelect(track);
         }
     }, [onSongSelect]);
 
-    const getAvailableQualities = (group: GroupedSong): string[] => {
-        return QUALITY_ORDER.filter(q => group.qualities[q]);
+    const getAvailableQualities = (track: PlayableTrack): AudioQuality[] => {
+        // Get unique qualities available in sources
+        const unique = new Set(track.sources.map(s => s.quality));
+        // Sort by order
+        return QUALITY_ORDER.filter(q => unique.has(q));
     };
 
     return (
@@ -121,8 +132,8 @@ export function UnifiedSearch({
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${filter === f
-                                    ? 'bg-white text-black'
-                                    : 'bg-white/10 text-white hover:bg-white/20'
+                                ? 'bg-white text-black'
+                                : 'bg-white/10 text-white hover:bg-white/20'
                                 }`}
                         >
                             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -133,17 +144,18 @@ export function UnifiedSearch({
 
             {/* Results */}
             <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
-                {results.map((group) => (
+                {results.map((track) => (
                     <div
-                        key={group.key}
+                        key={track.id}
                         className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors cursor-pointer group"
+                        onClick={() => handleSongClick(track)}
                     >
                         {/* Album Art */}
                         <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-800">
-                            {group.image?.[0]?.link && (
+                            {track.song.image?.[0]?.link && (
                                 <Image
-                                    src={group.image[0].link}
-                                    alt={group.name}
+                                    src={track.song.image[0].link}
+                                    alt={track.song.name}
                                     width={48}
                                     height={48}
                                     className="w-full h-full object-cover"
@@ -153,23 +165,23 @@ export function UnifiedSearch({
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                            <p className="text-white font-medium truncate">{decodeHtml(group.name)}</p>
-                            <p className="text-gray-400 text-sm truncate">{decodeHtml(group.primaryArtists)}</p>
+                            <p className="text-white font-medium truncate">{decodeHtml(track.song.name)}</p>
+                            <p className="text-gray-400 text-sm truncate">{decodeHtml(track.song.primaryArtists)}</p>
                         </div>
 
                         {/* Quality Badges */}
                         <div className="flex gap-1 flex-shrink-0">
-                            {getAvailableQualities(group).map(q => (
+                            {getAvailableQualities(track).map(q => (
                                 <button
                                     key={q}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleSongClick(group, q);
+                                        handleSongClick(track, q);
                                     }}
                                     className={`px-2 py-0.5 rounded text-[10px] font-bold ${QUALITY_COLORS[q]} hover:scale-105 transition-transform`}
                                     title={`Play in ${q}`}
                                 >
-                                    {q === '24-bit' ? 'Hi-Res' : q === 'FLAC' ? 'FLAC' : q === '320kbps' ? 'HQ' : 'SD'}
+                                    {q === 'hires' ? 'Hi-Res' : q === 'flac' ? 'FLAC' : q === '320' ? 'HQ' : 'SD'}
                                 </button>
                             ))}
                         </div>

@@ -17,11 +17,13 @@ import { NordicStage } from "./nordic-stage";
 import { OpenDeckStage } from "./opendeck-stage";
 import { BoomboxStage } from "./boombox-stage";
 import { SilverFrostStage } from "./silverfrost-stage";
-import { GlassStage } from "./glass-stage";
+// import { GlassStage } from "./glass-stage"; // REMOVED
+import { DiscoveryLayout } from "@/components/discovery/DiscoveryLayout";
 
 import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { PlayableTrack, isPlayableTrack } from "@/lib/types";
 import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { EditMixModal } from "@/components/ui/edit-mix-modal";
 import { InstallPrompt } from "@/components/ui/install-prompt";
@@ -191,14 +193,33 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
         }
     };
 
-    const handleAddSong = (song: JioSaavnSong) => {
+    const handleAddSong = (song: JioSaavnSong | PlayableTrack) => {
         const targetMixId = searchTargetMixId || activeMixId;
         if (targetMixId) {
             const current = mixes.find(m => m.id === targetMixId);
             if (current) {
+                // Strict Asset Deduplication: Check ID + Quality
+                const newId = 'id' in song ? song.id : (song as JioSaavnSong).id;
+                const newQuality = isPlayableTrack(song) ? song.preferredQuality : '320';
+                const newAssetId = `${newId}_${newQuality}`;
+
+                const isDuplicate = current.songs.some((s: any) => {
+                    const id = s.id || (s as any).song?.id;
+                    const quality = isPlayableTrack(s) ? s.preferredQuality : '320';
+                    return `${id}_${quality}` === newAssetId;
+                });
+
+                if (isDuplicate) {
+                    const name = 'song' in song ? song.song.name : song.name;
+                    // Show WHICH quality is duplicate
+                    addToast(`"${decodeHtml(name)}" (${newQuality}) is already in this mix`, "error");
+                    return;
+                }
+
                 updateMix(targetMixId, { songs: [...current.songs, song] });
                 playClick();
-                addToast(`Added "${decodeHtml(song.name)}" to mix`);
+                const songName = isPlayableTrack(song) ? song.song.name : song.name;
+                addToast(`Added "${decodeHtml(songName)}" (${newQuality})`);
             }
         }
     };
@@ -280,7 +301,12 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                     const validMixes = importedMixes.filter(m => {
                         const hasBasicProps = m.id && typeof m.title === 'string' && Array.isArray(m.songs);
                         if (!hasBasicProps) return false;
-                        return m.songs.every((s: any) => s.id && typeof s.name === 'string' && typeof s.url === 'string');
+                        return m.songs.every((s: any) => {
+                            if (isPlayableTrack(s)) {
+                                return s.id && s.song && s.song.name;
+                            }
+                            return s.id && typeof s.name === 'string' && typeof s.url === 'string';
+                        });
                     }).map((m: any) => ({ ...m, title: m.title.slice(0, 50) }));
 
                     if (validMixes.length === 0) {
@@ -338,7 +364,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                     effectiveLayout === 'opendeck' ? OpenDeckStage :
                         effectiveLayout === 'boombox' ? BoomboxStage :
                             effectiveLayout === 'silverfrost' ? SilverFrostStage :
-                                effectiveLayout === 'glass' ? GlassStage :
+                                effectiveLayout === 'glass' ? DiscoveryLayout :
                                     DeckStage;
 
     if (!isMounted) return null; // Prevent hydration mismatch/flash
@@ -593,10 +619,24 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                 isSearchOpen && (
                     <SearchModal
                         isOpen={isSearchOpen}
-                        onClose={() => setIsSearchOpen(false)}
+                        onClose={() => { setIsSearchOpen(false); setSearchTargetMixId(null); }}
                         onAddSong={handleAddSong}
                         favorites={new Set(likedSongs.map(s => s.id))}
-                        onToggleFavorite={handleToggleFavorite}
+                        onToggleFavorite={toggleLike}
+                        existingAssets={(() => {
+                            const targetId = searchTargetMixId || activeMixId;
+                            const mix = mixes.find(m => m.id === targetId);
+                            if (!mix) return undefined;
+
+                            // Create set of "id_quality" assets
+                            return new Set(mix.songs.map(s => {
+                                const id = 'id' in s ? s.id : (s as any).id;
+                                // For JioSaavnSong (legacy), default to 320 if wrapper not present, but usually we care about PlayableTrack here
+                                // If it's a PlayableTrack, it has preferredQuality
+                                const quality = isPlayableTrack(s) ? s.preferredQuality : '320';
+                                return `${id}_${quality}`;
+                            }));
+                        })()}
                     />
                 )
             }

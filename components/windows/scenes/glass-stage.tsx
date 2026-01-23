@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getStation, getTrending, searchSongs, getLyrics, getSyncedLyrics, getArtistDetails, getAlbumDetails, getPlaylistDetails, getTopCharts, JioSaavnSong, searchAlbums, getArtistStation } from '@/lib/jiosaavn';
 import { getHiFiAlbum } from '@/lib/hifi-client';
-import { searchUnified, GroupedSong, SearchType } from '@/lib/unified-search';
+import { searchUnified, SearchType } from '@/lib/unified-search';
+import { PlayableTrack, isPlayableTrack } from '@/lib/types';
 import { SearchFilters } from "@/components/ui/search-filters";
 import { ArtistView } from "./artist-view";
 import { TrackContextMenu } from '@/components/ui/track-context-menu';
@@ -238,7 +239,7 @@ export function GlassStage({
         }
     };
     const {
-        currentSong, isPlaying, togglePlay, next, prev, seek, volume, setVolume,
+        currentSong, currentTrack, isPlaying, togglePlay, next, prev, seek, volume, setVolume,
         progress, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, mixes, addMix,
         updateMix, deleteMix, activeMixId, play,
         likedSongs, toggleLike, isLiked, recentlyPlayed, eq, isDownloaded,
@@ -272,7 +273,7 @@ export function GlassStage({
     // --- Search State ---
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<JioSaavnSong[]>([]);
-    const [groupedResults, setGroupedResults] = useState<GroupedSong[]>([]);
+    const [groupedResults, setGroupedResults] = useState<PlayableTrack[]>([]);
     const [showAllResults, setShowAllResults] = useState(false);
     const [searchFilter, setSearchFilter] = useState<SearchType>('all');
     const [isSearching, setIsSearching] = useState(false);
@@ -336,7 +337,7 @@ export function GlassStage({
     }, [progress, lyricsData, activeLine]);
 
 
-    const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, song: JioSaavnSong | null }>({ visible: false, x: 0, y: 0, song: null });
+    const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, song: JioSaavnSong | PlayableTrack | null }>({ visible: false, x: 0, y: 0, song: null });
 
     // --- Context Menu Handler ---
     useEffect(() => {
@@ -345,7 +346,7 @@ export function GlassStage({
         return () => window.removeEventListener('click', handleClick);
     }, []);
 
-    const handleContextMenu = (e: React.MouseEvent, song: JioSaavnSong) => {
+    const handleContextMenu = (e: React.MouseEvent, song: JioSaavnSong | PlayableTrack) => {
         e.preventDefault();
         setContextMenu({ visible: true, x: e.clientX, y: e.clientY, song });
     };
@@ -506,9 +507,10 @@ export function GlassStage({
 
     // --- Global Handlers ---
 
-    const handleSongClick = (song: JioSaavnSong) => {
+    const handleSongClick = (song: JioSaavnSong | PlayableTrack) => {
+        const songId = 'song' in song ? song.song.id : song.id;
         // If clicked song is already playing, just toggle play/pause
-        if (currentSong?.id === song.id) {
+        if (currentSong?.id === songId) {
             togglePlay();
             return;
         }
@@ -520,9 +522,9 @@ export function GlassStage({
         // BUT if we are separately clicking a song in search, we might want to just play it + recommendations
         // For now, simple logic: Play song, and ensure mix exists
         const existingMix = mixes.find(m => m.id === activeMixId);
-        if (existingMix && existingMix.songs.some(s => s.id === song.id)) {
+        if (existingMix && existingMix.songs.some(s => ('song' in s ? s.song.id : s.id) === songId)) {
             // Song is in current mix, just jump to it
-            updateMix(activeMixId!, { currentSongIndex: existingMix.songs.findIndex(s => s.id === song.id) });
+            updateMix(activeMixId!, { currentSongIndex: existingMix.songs.findIndex(s => ('song' in s ? s.song.id : s.id) === songId) });
             play();
         } else {
             // New Session Mix
@@ -760,8 +762,11 @@ export function GlassStage({
                 setGroupedResults(results);
 
                 // For backward compatibility / flat list if needed
-                const flatResults = results.map(g => g.qualities[g.bestQuality as keyof typeof g.qualities]!);
-                setSearchResults(flatResults as JioSaavnSong[]);
+                // Map PlayableTrack back to basic metadata for searchResults if strictly needed
+                // But generally we should use groupedResults (PlayableTrack[]) for display.
+                // If searchResults is used elsewhere, we shim it:
+                const flatResults = results.map(t => t.song);
+                setSearchResults(flatResults);
 
                 setShowAllResults(false);
             } catch (e) {
@@ -796,100 +801,9 @@ export function GlassStage({
     };
 
 
-    const handleHybridPlay = async (item: any) => {
-        // 0. If it has HiFi source (Tidal/Qobuz), play directly with quality preserved
-        if (item.source === 'tidal' || item.source === 'qobuz') {
-            handleSongClick(item);
-            return;
-        }
 
-        // 1. If it's already a playable JioSaavn song, just play it.
-        if (item.url || item.encrypted_media_url) {
-            handleSongClick(item);
-            return;
-        }
 
-        // 2. Try to find on JioSaavn for high quality & lyrics
-        let bestMatch: JioSaavnSong | null = null;
-        try {
-            const title = item.title || item.name;
-            const artist = item.subtitle || item.primaryArtists;
-            const query = `${title} ${artist}`;
-            const results = await searchSongs(query);
 
-            if (results && results.length > 0) {
-                const first = results[0];
-                // Simple check: Exact title match (case-insensitive) OR fuzzy artist match
-                const titleMatch = first.name.toLowerCase().trim() === title.toLowerCase().trim();
-
-                // If title matches, we trust it.
-                if (titleMatch) {
-                    bestMatch = { ...first, _quality: '320kbps' as const, _qualityTier: 2 } as any;
-                }
-            }
-        } catch (e) {
-            console.warn("Hybrid search failed, falling back to YTMS", e);
-        }
-
-        if (bestMatch) {
-            handleSongClick(bestMatch);
-        } else {
-            // 3. Play YTMS version (Normalized)
-            handleSongClick({
-                id: item.id,
-                name: item.title || item.name,
-                primaryArtists: item.subtitle || item.primaryArtists,
-                image: Array.isArray(item.image) ? item.image : [{ link: item.image || "", quality: "high" }],
-                duration: 0,
-                _quality: '128kbps',
-                _qualityTier: 3
-            } as any);
-        }
-    };
-
-    // Smart fallback: Play with quality fallback chain
-    const handlePlayWithFallback = async (group: GroupedSong, clickedQuality: string) => {
-        const qualityOrder = ['24-bit', 'FLAC', '320kbps', '128kbps'] as const;
-        type QualityKey = typeof qualityOrder[number];
-
-        // Type guard or cast
-        if (!qualityOrder.includes(clickedQuality as QualityKey)) {
-            console.warn("Invalid quality clicked:", clickedQuality);
-            return;
-        }
-
-        const startIndex = qualityOrder.indexOf(clickedQuality as QualityKey);
-
-        // Build fallback chain starting from clicked quality
-        const fallbackChain = qualityOrder.slice(startIndex).filter(q => group.qualities[q]);
-
-        if (fallbackChain.length === 0) {
-            showToast("No playable version found 😢");
-            return;
-        }
-
-        // Try to play the clicked quality first
-        // @ts-ignore - we know clickedQuality is a key due to check above, but TS struggles with the GroupedSong dynamic keys sometimes
-        const songToPlay = group.qualities[clickedQuality];
-        if (songToPlay) {
-            handleHybridPlay(songToPlay);
-            return;
-        }
-
-        // If clicked quality not available, try fallback
-        for (const fallbackQuality of fallbackChain) {
-            const fallbackSong = group.qualities[fallbackQuality];
-            if (fallbackSong) {
-                if (fallbackQuality !== clickedQuality) {
-                    showToast(`${clickedQuality} unavailable, playing ${fallbackQuality} instead 🎵`);
-                }
-                handleHybridPlay(fallbackSong);
-                return;
-            }
-        }
-
-        showToast("Oops! This song isn't playing nice 🎵");
-    };
 
 
 
@@ -1017,7 +931,7 @@ export function GlassStage({
                         {mixes.filter(m => m.id.startsWith('playlist-')).map(mix => (
                             <LibraryCard
                                 key={mix.id}
-                                image={mix.songs[0]?.image}
+                                image={mix.songs[0] ? ('song' in mix.songs[0] ? mix.songs[0].song.image : mix.songs[0].image) : undefined}
                                 title={mix.title}
                                 subtitle={`Playlist • ${mix.songs.length} songs`}
                                 onClick={() => {
@@ -1197,20 +1111,28 @@ export function GlassStage({
                                     </div>
                                 ) : searchQuery ? (
                                     <div className="space-y-2">
-                                        {groupedResults.slice(0, showAllResults ? undefined : 10).map((group, i) => (
-                                            <SongRow
-                                                key={group.id}
-                                                song={group.qualities[group.bestQuality as keyof typeof group.qualities] as JioSaavnSong}
-                                                index={i + 1}
-                                                isPlaying={currentSong?.id === group.id && isPlaying}
-                                                isLiked={isLiked(group.id)}
-                                                quality={group.bestQuality}
-                                                onPlay={() => handlePlayWithFallback(group, group.bestQuality)}
-                                                onLike={() => toggleLike(group.qualities[group.bestQuality as keyof typeof group.qualities] as JioSaavnSong)}
-                                                onContextMenu={(e) => handleContextMenu(e, group.qualities[group.bestQuality as keyof typeof group.qualities] as JioSaavnSong)}
-                                                isOffline={isDownloaded(group.id)}
-                                            />
-                                        ))}
+                                        {groupedResults.slice(0, showAllResults ? undefined : 10).map((track, i) => {
+                                            // Derive Quality Badge
+                                            let badge = undefined;
+                                            if (track.sources.some(s => s.quality === 'hires')) badge = '24-BIT';
+                                            else if (track.sources.some(s => s.quality === 'flac')) badge = 'FLAC';
+                                            else if (track.sources.some(s => s.quality === '320')) badge = '320';
+
+                                            return (
+                                                <SongRow
+                                                    key={track.id}
+                                                    song={track}
+                                                    index={i + 1}
+                                                    isPlaying={currentSong?.id === track.id && isPlaying}
+                                                    isLiked={isLiked(track.id)}
+                                                    quality={badge}
+                                                    onPlay={() => handleSongClick(track)}
+                                                    onLike={() => toggleLike(track.song)}
+                                                    onContextMenu={(e) => handleContextMenu(e, track.song)}
+                                                    isOffline={isDownloaded(track.id)}
+                                                />
+                                            );
+                                        })}
                                         {groupedResults.length > 10 && !showAllResults && (
                                             <button onClick={() => setShowAllResults(true)} className="w-full py-3 text-center text-sm text-gray-400 hover:text-white transition-colors">
                                                 Show all {groupedResults.length} results
@@ -1592,9 +1514,12 @@ export function GlassStage({
                             <p className="text-sm font-medium text-white truncate">{decodeHtml(currentSong.name)}</p>
                             <p className="text-xs text-gray-400 truncate">{decodeHtml(currentSong.primaryArtists)}</p>
                         </div>
-                        <button className={`ml-2 ${isLiked(currentSong.id) ? 'text-green-500' : 'text-gray-500 hover:text-white'}`} onClick={(e) => { e.stopPropagation(); toggleLike(currentSong); }}>
+                        <button className={`ml-2 ${isLiked(currentSong.id) ? 'text-green-500' : 'text-gray-500 hover:text-white'}`} onClick={(e) => { e.stopPropagation(); toggleLike(currentTrack || currentSong); }}>
                             <CheckCircle size={20} fill={isLiked(currentSong.id) ? "currentColor" : "none"} />
                         </button>
+                        {isDownloaded(currentTrack?.id || currentSong.id) && (
+                            <span className="ml-2 text-[10px] font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">OFFLINE</span>
+                        )}
                     </div>
 
                     {/* Controls */}
@@ -1690,16 +1615,31 @@ export function GlassStage({
                 visible={contextMenu.visible}
                 x={contextMenu.x}
                 y={contextMenu.y}
-                song={contextMenu.song}
+                song={contextMenu.song ? ('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song) : null}
                 onClose={() => setContextMenu(prev => ({ ...prev, visible: false }))}
-                onPlay={(song) => handleSongClick(song)}
-                onAddToQueue={(song) => handleAddToQueue(song)}
+                onPlay={(songArg) => {
+                    // Use scope song which might be PlayableTrack
+                    const song = contextMenu.song!;
+                    // handleSongClick handles both types
+                    handleSongClick(song);
+                }}
+                onAddToQueue={(songArg) => {
+                    const song = contextMenu.song!;
+                    if (activeMixId) {
+                        updateMix(activeMixId, { songs: [...mixes.find(m => m.id === activeMixId)!.songs, song] });
+                        const name = 'song' in song ? song.song.name : song.name;
+                        showToast(`Added "${decodeHtml(name)}" to queue`);
+                    }
+                }}
                 onGoToArtist={(artistId) => { navigateTo({ type: 'artist', data: { id: artistId } }); }}
-                onGoToAlbum={(albumId) => { if (contextMenu.song?.album) navigateTo({ type: 'playlist', data: { ...contextMenu.song.album, type: 'album', image: contextMenu.song.image } }); }}
-                onStartRadio={(song) => handleStartRadio(song)}
-                isDownloaded={contextMenu.song ? isDownloaded(contextMenu.song.id) : false}
-                onDownload={(song) => downloadSong(song)}
-                onRemoveDownload={(songId) => removeDownload(songId)}
+                onGoToAlbum={(albumId) => {
+                    const s = contextMenu.song ? ('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song) : null;
+                    if (s?.album) navigateTo({ type: 'playlist', data: { ...s.album, type: 'album', image: s.image } });
+                }}
+                onStartRadio={(songArg) => contextMenu.song && handleStartRadio('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song)}
+                isDownloaded={contextMenu.song ? isDownloaded(('song' in contextMenu.song ? contextMenu.song.song.id : contextMenu.song.id)) : false}
+                onDownload={() => contextMenu.song && downloadSong(contextMenu.song)}
+                onRemoveDownload={() => contextMenu.song && removeDownload('song' in contextMenu.song ? contextMenu.song.song.id : contextMenu.song.id)}
             />
 
             {/* Create Playlist Modal */}
@@ -1779,8 +1719,8 @@ function LibraryCard({ image, title, subtitle, gradient, icon, onClick }: { imag
     );
 }
 
-function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onContextMenu }: {
-    song: JioSaavnSong;
+function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onContextMenu, isOffline }: {
+    song: JioSaavnSong | PlayableTrack;
     index: number;
     isPlaying?: boolean;
     isLiked?: boolean;
@@ -1790,6 +1730,16 @@ function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onC
     onContextMenu: (e: React.MouseEvent) => void;
     isOffline?: boolean;
 }) {
+    const displaySong = 'song' in song ? song.song : song;
+
+    // Auto-derive quality if not explicitly provided
+    let displayQuality = quality;
+    if (!displayQuality && isPlayableTrack(song)) {
+        if (song.sources.some(s => s.quality === 'hires')) displayQuality = '24-BIT';
+        else if (song.sources.some(s => s.quality === 'flac')) displayQuality = 'FLAC';
+        else if (song.sources.some(s => s.quality === '320')) displayQuality = '320';
+    }
+
     return (
         <div
             onClick={onPlay}
@@ -1805,7 +1755,7 @@ function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onC
             {/* Cover */}
             <div className="w-10 h-10 rounded overflow-hidden shrink-0 relative">
                 <Image
-                    src={(Array.isArray(song.image) ? (song.image[1]?.link || song.image[0]?.link) : song.image) || ""}
+                    src={(Array.isArray(displaySong.image) ? (displaySong.image[1]?.link || displaySong.image[0]?.link) : displaySong.image) || ""}
                     alt=""
                     fill
                     className="object-cover"
@@ -1816,7 +1766,7 @@ function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onC
             {/* Info */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <p className={`text-sm font-medium truncate ${isPlaying ? 'text-green-500' : 'text-white'}`}>{decodeHtml(song.name)}</p>
+                    <p className={`text-sm font-medium truncate ${isPlaying ? 'text-green-500' : 'text-white'}`}>{decodeHtml(displaySong.name)}</p>
                     {isOffline && (
                         <div title="Downloaded" className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[9px] font-bold border border-green-500/30">
                             <HardDrive size={8} />
@@ -1824,18 +1774,18 @@ function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onC
                         </div>
                     )}
                 </div>
-                <p className="text-xs text-gray-500 truncate">{decodeHtml(song.primaryArtists)}</p>
+                <p className="text-xs text-gray-500 truncate">{decodeHtml(displaySong.primaryArtists)}</p>
             </div>
 
             {/* Quality Badge */}
-            {quality && (
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${quality.includes('24') ? 'bg-amber-500/20 text-amber-400' : quality.includes('FLAC') ? 'bg-purple-500/20 text-purple-400' : 'bg-white/10 text-gray-400'}`}>
-                    {quality.replace('kbps', '')}
+            {displayQuality && (
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${displayQuality.includes('24') || displayQuality.includes('hires') ? 'bg-amber-500/20 text-amber-400' : displayQuality.includes('FLAC') || displayQuality.includes('flac') ? 'bg-purple-500/20 text-purple-400' : 'bg-white/10 text-gray-400'}`}>
+                    {displayQuality.replace('kbps', '')}
                 </span>
             )}
 
             {/* Duration */}
-            <span className="text-xs text-gray-500 w-12 text-right">{formatTime(song.duration)}</span>
+            <span className="text-xs text-gray-500 w-12 text-right">{formatTime(displaySong.duration)}</span>
 
             {/* Like */}
             <button onClick={(e) => { e.stopPropagation(); onLike(); }} className={`p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${isLiked ? 'text-accent-pink opacity-100' : 'text-gray-500 hover:text-white'}`}>
@@ -1856,3 +1806,4 @@ function formatTime(seconds: number) {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
+
