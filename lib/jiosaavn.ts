@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import CryptoJS from 'crypto-js';
+import { musixmatch } from '@/lib/musixmatch';
 
 export interface JioSaavnSong {
     id: string;
@@ -666,37 +667,102 @@ function mapToSong(item: any): JioSaavnSong {
     };
 }
 
-export async function getSyncedLyrics(trackName: string, artistName: string, albumName: string, duration: number): Promise<{ synced: boolean, text: string }> {
-    try {
-        const query = `track_name=${encodeURIComponent(trackName)}&artist_name=${encodeURIComponent(artistName)}&album_name=${encodeURIComponent(albumName)}&duration=${duration}`;
-        const res = await fetch(`https://lrclib.net/api/get?${query}`);
+// Enhanced Lyrics Fetcher
+export async function getSyncedLyrics(song: JioSaavnSong): Promise<{ synced: boolean, text: string }> {
+    const trackName = song.name;
+    const artistName = song.primaryArtists;
+    const albumName = song.album?.name || "";
+    const duration = song.duration;
 
-        if (!res.ok) {
-            // Try search fallback if direct match fails
-            const searchRes = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(trackName + " " + artistName)}`);
+    // CLEANING LOGIC (Inspired by SuvMusic/TheMusicApp)
+    const cleanString = (str: string) => {
+        return str
+            .replace(/\s*\(.*?\)\s*/g, " ")
+            .replace(/\s*\[.*?\]\s*/g, " ")
+            .replace(/\s*-\s*.*$/g, "")
+            .replace(/[^\w\s\u00C0-\u00FF'-]/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    };
+
+    const cleanTrackName = cleanString(trackName);
+    const cleanArtistName = artistName.split(',')[0].trim();
+
+    console.log(`[Lyrics] Fetching for: "${cleanTrackName}" by "${cleanArtistName}"`);
+
+    // --- PARALLEL FETCHING STRATEGY ---
+    const searchTerms = [cleanTrackName];
+    // If original is different, try it as fallback (e.g. for Japanese/Complex titles)
+    if (cleanTrackName !== trackName) searchTerms.push(trackName);
+
+    // Define Fetchers (now accepting term argument cleanly)
+    const fetchLrcLib = async (term: string) => {
+        try {
+            const query = `track_name=${encodeURIComponent(term)}&artist_name=${encodeURIComponent(cleanArtistName)}&duration=${duration}`;
+            const res = await fetch(`https://lrclib.net/api/get?${query}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.syncedLyrics) return { source: 'lrclib', type: 'synced', text: data.syncedLyrics };
+                if (data.plainLyrics) return { source: 'lrclib', type: 'plain', text: data.plainLyrics };
+            }
+            // Search Fallback
+            const searchRes = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(term + " " + cleanArtistName)}`);
             if (searchRes.ok) {
                 const searchData = await searchRes.json();
                 if (Array.isArray(searchData) && searchData.length > 0) {
-                    // Pick the best match (closest duration)
-                    const best = searchData.sort((a, b) => Math.abs(a.duration - duration) - Math.abs(b.duration - duration))[0];
-                    if (Math.abs(best.duration - duration) < 10) { // Tolerance 10s
-                        return {
-                            synced: !!best.syncedLyrics,
-                            text: best.syncedLyrics || best.plainLyrics || "No lyrics found."
-                        };
+                    const best = searchData.sort((a: any, b: any) => Math.abs(a.duration - duration) - Math.abs(b.duration - duration))[0];
+                    if (Math.abs(best.duration - duration) < 15) {
+                        if (best.syncedLyrics) return { source: 'lrclib', type: 'synced', text: best.syncedLyrics };
+                        if (best.plainLyrics) return { source: 'lrclib', type: 'plain', text: best.plainLyrics };
                     }
                 }
             }
-            throw new Error("Lyrics not found");
-        }
+        } catch (e) { /* Quiet fail */ }
+        return null; // Return null if nothing useful found
+    };
 
-        const data = await res.json();
+    const fetchMusixmatch = async (term: string) => {
+        try {
+            const mxRes = await musixmatch.getSyncedLyrics(term, cleanArtistName, duration);
+            if (mxRes) return { source: 'musixmatch', type: mxRes.synced ? 'synced' : 'plain', text: mxRes.text };
+        } catch (e) { /* Quiet fail */ }
+        return null;
+    };
 
-        if (data.syncedLyrics) {
-            return { synced: true, text: data.syncedLyrics };
-        }
-        return { synced: false, text: data.plainLyrics || "No lyrics found" };
-    } catch (e) {
-        return { synced: false, text: "Lyrics not available" };
+    // --- "RACE TO SYNCED" LOGIC ---
+    // We launch ALL requests at once. The moment ANY source returns SYNCED lyrics, we abort/return immediately.
+    // If no synced found after all finish, we return the best Plain lyrics.
+
+    const allPromises = searchTerms.flatMap(term => [
+        fetchLrcLib(term),
+        fetchMusixmatch(term)
+    ]);
+
+    let bestPlain: { synced: boolean, text: string } | null = null;
+
+    // We wrap promises to ensure they don't reject (already handled inside, but extra safety)
+    const safePromises = allPromises.map(p => p.catch(() => null));
+
+    // Custom Race Loop
+    const results = await Promise.all(safePromises);
+
+    // Prioritize Synced
+    for (const res of results) {
+        if (res?.type === 'synced') return { synced: true, text: res.text };
+        if (res?.type === 'plain' && !bestPlain) bestPlain = { synced: false, text: res.text };
     }
+
+    if (bestPlain) return bestPlain;
+
+    // 4. Fallback: JioSaavn Native
+    try {
+        const nativeAmt = await getLyrics(song.id);
+        if (nativeAmt && nativeAmt.trim().length > 0) {
+            return { synced: false, text: nativeAmt };
+        }
+    } catch (e) {
+        // Quiet fail
+    }
+
+    return { synced: false, text: "" };
 }

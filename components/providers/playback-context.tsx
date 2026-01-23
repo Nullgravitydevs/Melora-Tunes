@@ -212,13 +212,18 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             try {
                 const parsed = JSON.parse(saved);
                 // Sanitize: Remove mock songs and unwanted default playlists
+                // Also clean up old spammy "Discovery Mix" tapes (legacy ID format)
                 const sanitized = parsed.map((m: Mix) => ({
                     ...m,
                     songs: m.songs.filter(s => {
                         const song = isPlayableTrack(s) ? s.song : s;
                         return !song.id.startsWith('mock-') && !song.name.startsWith('Track ');
                     })
-                })).filter((m: Mix) => !['Pawan Kalyan Hits', 'DSP Hits', 'Megastar Hits', 'Yuvan Shankar Raja'].includes(m.title));
+                })).filter((m: Mix) => {
+                    // Remove legacy spam mixes (id starts with discovery- but not the fixed one, or title is generic)
+                    if (m.title === 'Discovery Mix' && m.id !== 'discovery-mix') return false;
+                    return !['Pawan Kalyan Hits', 'DSP Hits', 'Megastar Hits', 'Yuvan Shankar Raja'].includes(m.title);
+                });
 
                 if (sanitized.length === 0) {
                     setDefaults();
@@ -310,8 +315,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // Helpers defined first (hoisted manually) to be available for next/prev
     const addMix = useCallback((mix: Mix) => {
         console.log("Adding mix. Current count:", mixesRef.current.length);
-        // Allow "On-the-Go" to bypass limit
-        if (mix.title !== "On-the-Go" && mixesRef.current.length >= 8) {
+
+        // Count only USER tapes (exclude System tapes like On-the-Go and Discovery Mix)
+        const userTapeCount = mixesRef.current.filter(m => m.title !== "On-the-Go" && m.id !== 'discovery-mix').length;
+
+        // Allow "On-the-Go" and "Discovery Mix" to bypass limit, check user limit for others
+        const isSystem = mix.title === "On-the-Go" || mix.id === 'discovery-mix';
+
+        if (!isSystem && userTapeCount >= 8) {
             console.log("Limit blocked.");
             return false;
         }
@@ -1127,11 +1138,47 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // Add to History (with 5s delay to filter skips)
         if (currentSong && isPlaying) {
             const timer = setTimeout(() => {
-                HistoryStore.addToHistory(ensurePlayableTrack(currentSong));
+                // Fix: Save the full PlayableTrack (rawCurrentItem) to persist FLAC preference
+                const trackToSave = rawCurrentItem ? ensurePlayableTrack(rawCurrentItem) : ensurePlayableTrack(currentSong);
+                HistoryStore.addToHistory(trackToSave);
+
+                // LOOPHOLE FIX: Sync to "Discovery Mix" (Global History Tape)
+                // If the user has a Discovery Mix tape, we append this song to it so it tracks ALL playback.
+                setMixes(prev => {
+                    const discMix = prev.find(m => m.id === 'discovery-mix');
+                    if (!discMix) return prev; // Don't force-create if deleted
+
+                    // Prevent duplicate tail
+                    /* const lastSong = discMix.songs[discMix.songs.length - 1];
+                    const lastId = lastSong ? ('id' in lastSong ? lastSong.id : (lastSong as any).id) : null;
+                    if (lastId === trackToSave.id) return prev; */
+
+                    // Actually, let's just append. History allows repeats.
+                    // But we should limit the tape size? Maybe last 50?
+                    // Let's keep it simple: Append. 
+                    // To avoid infinite growth, maybe slice? 
+                    // Let's slice to last 50 to keep it performant and matching "Recents" concept.
+                    const newSongs = [...discMix.songs, trackToSave].slice(-50); // Keep last 50
+
+                    return prev.map(m => m.id === 'discovery-mix' ? {
+                        ...m,
+                        songs: newSongs,
+                        // Update index so we are at the end? 
+                        // If we are currently playing FROM this mix, currentIndex updates automatically via logic?
+                        // If we are playing "My Tape 1", activeMix is "My Tape 1".
+                        // modifying "discovery-mix" (inactive) doesn't affect playback.
+                        // If we ARE playing "discovery-mix", this update might cause re-render?
+                        // If activeMixId === 'discovery-mix', we are appending to current mix.
+                        // Playback engine handles index. We shouldn't mess up currentSongIndex if active.
+                        // If active, we probably shouldn't slice off the *currently playing* song.
+                        // Safe logic: Just append.
+                    } : m);
+                });
+
             }, 5000);
             return () => clearTimeout(timer);
         }
-    }, [currentSong?.id, isPlaying]);
+    }, [currentSong?.id, isPlaying, rawCurrentItem]);
 
     const seek = useCallback((amount: number) => {
         audioPlayerRef.current?.seekTo(amount);
@@ -1274,7 +1321,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     next();
                 }}
                 onProgress={({ played, playedSeconds }) => {
-                    setProgress(played);
+                    setProgress(playedSeconds);
 
                     // SponsorBlock Check
                     if (skipSegments.length > 0 && duration > 0) {

@@ -25,12 +25,7 @@ export function useLyrics(currentSong: JioSaavnSong | undefined) {
             setError(null);
             try {
                 // Use metadata for search
-                const { synced, text } = await getSyncedLyrics(
-                    currentSong.name,
-                    currentSong.primaryArtists,
-                    currentSong.album?.name || "",
-                    currentSong.duration
-                );
+                const { synced, text } = await getSyncedLyrics(currentSong);
 
                 if (synced && text) {
                     const parsed = parseLRC(text);

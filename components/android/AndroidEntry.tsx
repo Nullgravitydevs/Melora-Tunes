@@ -129,7 +129,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         sleepTimer, setSleepTimer,
         crossfadeDuration, setCrossfadeDuration,
         stopAtEndOfSong, setStopAtEndOfSong,
-        bitrate, setBitrate, setForceLossless,
+        bitrate, setBitrate,
         likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded,
         playInstantMix
     } = usePlayback();
@@ -529,7 +529,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     // Play single song immediate (e.g. from songs list)
     const playSongNow = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack, isHiRes: boolean = false) => {
         if (isHiRes) {
-            setForceLossless(true);
+            setBitrate('flac');
             console.log("[iPod] Forcing Hi-Res Lossless Mode");
         }
 
@@ -603,7 +603,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         // ATOMIC PLAYBACK - No Race Conditions
         playInstantMix(targetMix);
         goToNowPlaying();
-    }, [mixes, playInstantMix, setForceLossless, goToNowPlaying]);
+    }, [mixes, playInstantMix, setBitrate, goToNowPlaying]);
 
     const handleShowLyrics = useCallback(async (song: JioSaavnSong) => {
         if (!song) {
