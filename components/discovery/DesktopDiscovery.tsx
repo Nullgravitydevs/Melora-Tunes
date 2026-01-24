@@ -1374,7 +1374,10 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
                     <div className="pt-4 mt-2 border-t flex justify-center gap-3 opacity-50 hover:opacity-100 transition-opacity" style={{ borderColor: c.border }}>
                         <button
-                            onClick={() => window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'WELCOME' }))}
+                            onClick={() => {
+                                localStorage.removeItem('melora-setup-complete');
+                                window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'WELCOME' }));
+                            }}
                             className="w-4 h-4 rounded flex items-center justify-center border border-gray-500 hover:border-white text-gray-500 hover:text-white transition-colors"
                             title="Switch Mode"
                         >

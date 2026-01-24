@@ -101,6 +101,7 @@ const SYSTEM_MENU: MenuItem[] = [
         type: 'action',
         action: () => {
             if (confirm('Re-run the Setup Wizard?')) {
+                localStorage.removeItem('melora-setup-complete');
                 window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'WELCOME' }));
             }
         }
