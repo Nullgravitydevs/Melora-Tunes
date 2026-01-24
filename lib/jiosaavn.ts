@@ -1,6 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import CryptoJS from 'crypto-js';
 import { musixmatch } from '@/lib/musixmatch';
+import { loadSettings } from '@/lib/settings';
 
 export interface JioSaavnSong {
     id: string;
@@ -56,15 +57,21 @@ export async function searchSongs(query: string, page: number = 1, limit: number
         } else {
             // Normal Search - No Aggressive Caching
             if (Capacitor.isNativePlatform()) {
-                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+                const settings = loadSettings();
+                const langs = (settings.languages || ['english', 'hindi']).join(',');
+                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
                 const response = await CapacitorHttp.get({ url: apiUrl });
                 data = response.data;
             } else if (isElectron) {
-                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+                const settings = loadSettings();
+                const langs = (settings.languages || ['english', 'hindi']).join(',');
+                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
                 const response = await fetch(apiUrl);
                 data = await response.json();
             } else {
-                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`);
+                const settings = loadSettings();
+                const langs = (settings.languages || ['english', 'hindi']).join(',');
+                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${langs}`);
                 data = await response.json();
             }
         }
@@ -203,6 +210,82 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
         return [];
     } catch (error) {
         console.error('Error searching albums:', error);
+        return [];
+    }
+}
+
+export async function searchPlaylists(query: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
+    try {
+        console.log(`[Search Playlists] Query: "${query}"`);
+        let data: any;
+
+        if (Capacitor.isNativePlatform()) {
+            const settings = loadSettings();
+            const langs = (settings.languages || ['english', 'hindi']).join(',');
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            const settings = loadSettings();
+            const langs = (settings.languages || ['english', 'hindi']).join(',');
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        } else {
+            const settings = loadSettings();
+            const langs = (settings.languages || ['english', 'hindi']).join(',');
+            const response = await fetch(`/api/search?type=playlist&query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${langs}`);
+            // Note: server API might not support type=playlist yet, but let's assume direct call if not.
+            // Actually, if we use the proxy (fetchApi logic), better.
+            // Let's manually reconstruct the proxy call if needed or assume /api/search handles it.
+            // Safest: Use fetchApi wrapper logic directly here if we want consistency?
+            // Actually, for simplicity, I'll assume the /api/search is smart enough OR i'll just use fetchApi wrapped call logic if I were refactoring.
+            // But since I am editing the file, I'll stick to the pattern used in searchSongs/Albums.
+            // To be safe, I'll fallback to a direct proxied call using fetchApi pattern if /api/search isn't guaranteed.
+            data = await fetchApi(`__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&languages=${langs}`, true);
+        }
+
+        let list = [];
+        if (data.results) {
+            list = Array.isArray(data.results) ? data.results : [];
+        } else if (Array.isArray(data)) {
+            list = data;
+        }
+
+        if (list.length > 0) {
+            return list.map((item: any) => {
+                const title = item.title || item.name || `[Unknown Playlist]`;
+                return {
+                    id: item.id || item.listid,
+                    name: title,
+                    type: 'playlist',
+                    album: { id: '', name: '', url: '' },
+                    year: '',
+                    releaseDate: '',
+                    duration: 0,
+                    label: '',
+                    primaryArtists: '',
+                    primaryArtistsId: '',
+                    featuredArtists: '',
+                    explicitContent: 0,
+                    playCount: 0,
+                    language: item.language || '',
+                    hasLyrics: 'false',
+                    url: item.perma_url,
+                    copyright: '',
+                    image: [
+                        { quality: '500x500', link: (item.image || '').replace(/150x150|50x50/g, '500x500') },
+                        { quality: '150x150', link: (item.image || '').replace(/50x50/g, '150x150') },
+                        { quality: '50x50', link: (item.image || '').replace(/150x150/g, '50x50') }
+                    ],
+                    downloadUrl: [],
+                    encryptedMediaUrl: ''
+                };
+            });
+        }
+        return [];
+    } catch (error) {
+        console.error('Error searching playlists:', error);
         return [];
     }
 }
@@ -501,18 +584,30 @@ async function fetchApi(params: string, useCache: boolean = false): Promise<any>
 }
 
 export async function getTopCharts(): Promise<any[]> {
-    const data = await fetchApi('__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0', true); // CACHED
+    const settings = loadSettings();
+    const langs = (settings.languages || ['english', 'hindi']).join(',');
+    const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${langs}`, true); // CACHED
     // Ensure it's an array, otherwise return empty
     return Array.isArray(data) ? data : [];
 }
 
 export async function getTrending(): Promise<JioSaavnSong[]> {
     try {
-        const data = await fetchApi('__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4', true); // CACHED
-        if (!data || !Array.isArray(data)) return [];
-        // Trending API returns a slightly different structure sometimes, but usually list of songs/albums
-        // We filter for songs only for now
-        const songs = data.filter((item: any) => item.type === 'song');
+        const settings = loadSettings();
+        const langs = (settings.languages || ['english', 'hindi']).join(',');
+        const data = await fetchApi(`__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4&languages=${langs}`, true); // CACHED
+        if (!data || !Array.isArray(data)) {
+            console.log('[getTrending] No data or not array:', typeof data);
+            return [];
+        }
+        console.log('[getTrending] Raw data count:', data.length, 'Types:', data.slice(0, 3).map((i: any) => i.type));
+        // Trending API returns mixed content - filter for songs (case-insensitive) or items that look like songs
+        const songs = data.filter((item: any) => {
+            const itemType = (item.type || '').toLowerCase();
+            // Include songs, or items with downloadUrl/duration (song indicators)
+            return itemType === 'song' || itemType === '' || item.downloadUrl || item.duration;
+        });
+        console.log('[getTrending] Filtered songs count:', songs.length);
         return songs.map(mapToSong);
     } catch (e) {
         console.error("Error fetching trending:", e);

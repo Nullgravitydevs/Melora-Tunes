@@ -7,6 +7,7 @@ export interface AppSettings {
     version: string;
     userName?: string;
     userDOB?: string;
+    languages?: string[];
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -15,7 +16,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     theme: 'classic', // White/Classic iPod
     bitrate: '320', // Default to High Quality
     lastPlayedSongId: null,
-    version: '2.0.0'
+    version: '2.0.0',
+    languages: ['english', 'hindi']
 };
 
 const STORAGE_KEY = 'melora-settings';

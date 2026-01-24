@@ -2,19 +2,37 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DiscoveryTheme } from "./DiscoveryLayout";
-import { getTrending, getTopCharts } from "@/lib/jiosaavn";
+import { getTrending, getTopCharts, searchPlaylists } from "@/lib/jiosaavn";
 import { searchUnified } from "@/lib/unified-search";
 import { OfflineStore } from "@/lib/offline-store";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
 import { useLyrics } from "@/hooks/useLyrics";
 import { DiscoveryEngine } from "@/lib/discovery-engine";
-import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2, Monitor } from "lucide-react";
+import { HistoryStore, HistoryItem } from "@/lib/history-store";
+import { LanguageModal } from "@/components/windows/scenes/language-modal";
+import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2, Monitor, Globe } from "lucide-react";
 import { HomeView } from "./HomeView";
 import { ArtistView } from "./ArtistView";
 import { AlbumView } from "./AlbumView";
-import { HistoryStore } from "@/lib/history-store"; // Restore this import
+import { ChartDetailScreen } from "./ChartDetailScreen";
+import { PlaylistScreen } from "./PlaylistScreen";
 import { TrackRow, FeatureCard, MoodPill, DiscoveryThemeColors, getArt, NavItem, PlaylistItem } from "./DiscoveryShared";
+import { MoodDetailScreen } from "./MoodDetailScreen";
+
+
+// Mood Categories for Explore Screen (Per Spec)
+const moodCategories = [
+    { id: 'romance', name: 'Romance', gradient: 'from-rose-500 to-pink-600', icon: '❤️' },
+    { id: 'chill', name: 'Chill', gradient: 'from-cyan-400 to-blue-500', icon: '🌊' },
+    { id: 'party', name: 'Party', gradient: 'from-purple-500 to-pink-500', icon: '🎉' },
+    { id: 'sad', name: 'Sad', gradient: 'from-slate-600 to-gray-800', icon: '💔' },
+    { id: 'workout', name: 'Workout', gradient: 'from-orange-500 to-red-600', icon: '💪' },
+    { id: 'focus', name: 'Focus', gradient: 'from-indigo-500 to-purple-600', icon: '🎯' },
+    { id: 'sleep', name: 'Sleep', gradient: 'from-indigo-900 to-slate-900', icon: '🌙' },
+    { id: 'travel', name: 'Travel', gradient: 'from-emerald-500 to-teal-600', icon: '✈️' },
+    { id: 'feelgood', name: 'Feel Good', gradient: 'from-yellow-400 to-orange-500', icon: '☀️' }
+];
 
 interface DesktopDiscoveryProps {
     theme: DiscoveryTheme;
@@ -362,6 +380,32 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('playlist');
     const [activeRegion, setActiveRegion] = useState<string | null>(null);
+    const [isLangModalOpen, setIsLangModalOpen] = useState(false);
+
+    // Category View State
+    const [activeCategory, setActiveCategory] = useState<any | null>(null);
+    const [categoryContent, setCategoryContent] = useState<{ playlists: any[], songs: any[] } | null>(null);
+
+    // Chart & Playlist Detail States
+    const [activeChart, setActiveChart] = useState<any | null>(null);
+    const [activePlaylistDetail, setActivePlaylistDetail] = useState<any | null>(null);
+    const [activeMood, setActiveMood] = useState<typeof moodCategories[0] | null>(null);
+
+    const openCategory = async (cat: any) => {
+        setActiveCategory(cat);
+        setActiveView('category');
+        setCategoryContent(null);
+
+        try {
+            const [pl, s] = await Promise.all([
+                searchPlaylists(cat.name),
+                searchUnified(cat.name)
+            ]);
+            setCategoryContent({ playlists: pl, songs: s });
+        } catch (e) {
+            console.error("Category Fetch Failed", e);
+        }
+    };
 
     // MINIMALIST PALETTE (Project Linear)
     const c = {
@@ -381,7 +425,9 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     // Data State
     const [trending, setTrending] = useState<any[]>([]);
     const [charts, setCharts] = useState<any[]>([]);
-    const [recent, setRecent] = useState<any[]>([]);
+    const [recent, setRecent] = useState<HistoryItem[]>([]);  // Raw HistoryItem[]
+    const [newAndTrending, setNewAndTrending] = useState<any[]>([]);
+    const [editorialPicks, setEditorialPicks] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Search State
@@ -414,15 +460,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 // 2. Fetch Charts
                 const topCharts = await getTopCharts();
 
-                // 3. Load Recent from HistoryStore
-                const history = HistoryStore.getHistory();
-                setRecent(history.map(h => ({
-                    id: h.track.id,
-                    title: h.track.song.name,
-                    artist: h.track.song.primaryArtists,
-                    art: getArt(h.track.song),
-                    original: h.track
-                })));
+                // 3. Load Recent from HistoryStore (Raw HistoryItem[])
+                setRecent(HistoryStore.getHistory().slice(0, 6));
 
                 // 4. Load Downloads
                 const downloadedSongs = await OfflineStore.getAllDownloadedSongs();
@@ -439,7 +478,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 // Map charts to feature cards - filtered for playlists/charts
                 const usefulCharts = topCharts
                     .filter((c: any) => c.image) // Must have image
-                    .slice(0, 3) // Take top 3
+                    .slice(0, 4) // Take top 4 for Chart Toppers
                     .map((c: any) => ({
                         id: c.id,
                         title: c.title || c.name,
@@ -449,6 +488,38 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     }));
 
                 setCharts(usefulCharts);
+
+                // 5. New & Trending - use trending songs, fallback to search
+                let newTrendingItems = trendingSongs.slice(0, 10).map((s: any) => ({
+                    ...s,
+                    type: 'single'
+                }));
+
+                // Fallback: if trending is empty, search for popular songs
+                if (newTrendingItems.length === 0) {
+                    console.log('[HomeDebug] Trending empty, falling back to search');
+                    const { searchSongs } = await import('@/lib/jiosaavn');
+                    const popularSongs = await searchSongs('popular hits', 1, 10);
+                    newTrendingItems = popularSongs.map((s: any) => ({
+                        ...s,
+                        type: 'single'
+                    }));
+                }
+                console.log('[HomeDebug] Setting newAndTrending:', newTrendingItems.length, 'items');
+                setNewAndTrending(newTrendingItems);
+
+                // 6. Editorial Picks - use charts that have playlists or fetch featured playlists
+                const editorialItems = topCharts
+                    .filter((c: any) => c.image && c.type !== 'song')
+                    .slice(0, 6)
+                    .map((c: any) => ({
+                        id: c.id,
+                        name: c.title || c.name,
+                        image: c.image,
+                        type: 'playlist'
+                    }));
+                console.log('[HomeDebug] Setting editorialPicks:', editorialItems.length, 'items');
+                setEditorialPicks(editorialItems);
             } catch (e) {
                 console.error("Discovery Load Failed:", e);
             } finally {
@@ -460,14 +531,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
         // Listen for history updates
         const onHistoryUpdate = () => {
-            const history = HistoryStore.getHistory();
-            setRecent(history.map(h => ({
-                id: h.track.id,
-                title: h.track.song.name,
-                artist: h.track.song.primaryArtists,
-                art: getArt(h.track.song),
-                original: h.track
-            })));
+            setRecent(HistoryStore.getHistory().slice(0, 6));
         };
 
         window.addEventListener('melora-history-update', onHistoryUpdate);
@@ -653,84 +717,167 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     </div>
                 );
             case 'explore':
-                // EXPLORE VIEW (Controlled Discovery)
-                const genres = [
-                    { id: 'pop', name: 'Pop', color: '#EC4899', icon: '🎤' },
-                    { id: 'hiphop', name: 'Hip Hop', color: '#F59E0B', icon: '🔥' },
-                    { id: 'rock', name: 'Rock', color: '#EF4444', icon: '🎸' },
-                    { id: 'electronic', name: 'Electronic', color: '#8B5CF6', icon: '🎧' },
-                    { id: 'rnb', name: 'R&B', color: '#6366F1', icon: '💜' },
-                    { id: 'classical', name: 'Classical', color: '#10B981', icon: '🎻' },
-                    { id: 'jazz', name: 'Jazz', color: '#14B8A6', icon: '🎷' },
-                    { id: 'indie', name: 'Indie', color: '#F97316', icon: '🌻' },
-                ];
-
-                const handleGenrePlay = async (genre: any) => {
-                    if (isGeneratingMix) return;
-                    setIsGeneratingMix(true);
-                    try {
-                        const mix = await DiscoveryEngine.generateGenreMix(genre.name, activeRegion || undefined);
-                        playInstantMix(mix);
-                    } catch (e) {
-                        console.error("Genre Mix Failed", e);
-                        alert("Could not start mix for " + genre.name);
-                    } finally {
-                        setIsGeneratingMix(false);
-                    }
-                };
-
                 return (
                     <div className="flex-1 px-8 py-6 overflow-y-auto [&::-webkit-scrollbar]:hidden">
                         {/* Header */}
-                        <div className="mb-8">
+                        <div className="mb-10">
                             <h1 className="text-4xl font-bold mb-2">Explore</h1>
-                            <p className="text-white/50">Intentional discovery. Pick a vibe.</p>
+                            <p className="text-white/50">Music for every mood</p>
                         </div>
 
-                        {/* 1. Genre Discovery Grid */}
-                        <div className="mb-10">
-                            <h2 className="text-lg font-bold mb-4">Genre Channels</h2>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                {genres.map(genre => (
-                                    <motion.div
-                                        key={genre.id}
-                                        className="h-24 rounded-xl flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden group"
-                                        style={{ backgroundColor: genre.color }}
-                                        whileHover={{ scale: 1.02 }}
-                                        onClick={() => handleGenrePlay(genre)}
-                                    >
-                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-                                        <span className="text-2xl relative z-10">{genre.icon}</span>
-                                        <span className="text-sm font-bold uppercase tracking-widest text-white relative z-10">{genre.name}</span>
-                                    </motion.div>
-                                ))}
+                        {/* Mood Destination Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                            {moodCategories.map(mood => (
+                                <motion.div
+                                    key={mood.id}
+                                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer relative overflow-hidden group shadow-xl transition-all bg-gradient-to-br ${mood.gradient}`}
+                                    whileHover={{ scale: 1.05, y: -5 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => {
+                                        setActiveMood(mood);
+                                        setActiveView('mood-detail');
+                                    }}
+                                >
+                                    {/* Icon */}
+                                    <div className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">{mood.icon}</div>
+
+                                    {/* Name */}
+                                    <span className="text-xl font-bold text-white text-center drop-shadow-lg">{mood.name}</span>
+
+                                    {/* Subtle Glow Effect */}
+                                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-300" />
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'mood-detail':
+                return activeMood ? (
+                    <MoodDetailScreen
+                        mood={activeMood}
+                        colors={c}
+                        onBack={() => setActiveView('explore')}
+                        onOpenPlaylist={(playlist) => {
+                            setActivePlaylistDetail(playlist);
+                            setActiveView('playlist-detail');
+                        }}
+                    />
+                ) : null;
+            case 'category':
+                return (
+                    <div className="flex-1 flex flex-col overflow-y-auto w-full h-full bg-[#121212]">
+
+                        {/* 1. Channel Banner Header */}
+                        <div
+                            className="relative w-full h-[35vh] min-h-[300px] flex items-end p-8 md:p-12 overflow-hidden"
+                            style={{ background: activeCategory?.color || c.surface }}
+                        >
+                            <button onClick={() => setActiveView('explore')} className="absolute top-8 left-8 flex items-center gap-2 text-white/90 hover:text-white font-bold text-xs uppercase tracking-widest bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-md transition-colors z-20">
+                                <ChevronRight className="rotate-180" size={14} /> Back
+                            </button>
+
+                            {/* Abstract Shapes/Texture */}
+                            <div className="absolute inset-0 opacity-30">
+                                <div className="absolute top-[-50%] right-[-20%] w-[80%] h-[150%] bg-white/20 rotate-12 blur-3xl rounded-full" />
+                                <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[80%] bg-black/10 rotate-45 blur-2xl rounded-full" />
+                            </div>
+
+                            <div className="relative z-10 w-full max-w-4xl">
+                                <h1 className="text-6xl md:text-8xl font-black text-white mb-4 tracking-tighter drop-shadow-lg leading-none">
+                                    {activeCategory?.name}
+                                </h1>
+                                <p className="text-xl text-white/90 font-medium mb-8 max-w-lg drop-shadow-md">
+                                    Handpicked {activeCategory?.name} hits, just for you.
+                                </p>
+                                <button className="px-8 py-3 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-transform shadow-xl flex items-center gap-2">
+                                    <Play size={18} fill="black" /> Start Radio
+                                </button>
                             </div>
                         </div>
 
-                        {/* 2. Editorial Collections (Curated Playlists as Seeds) */}
-                        <div className="mb-10">
-                            <h2 className="text-lg font-bold mb-4">Editorial Collections</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {[
-                                    { title: 'New & Hot', subtitle: 'The latest chart toppers', image: 'https://c.saavncdn.com/editorial/logo/Charts_TopTrending_1650361250_random.jpg' },
-                                    { title: 'Global Top 50', subtitle: 'Most played worldwide', image: 'https://c.saavncdn.com/editorial/logo/Charts_Top50Global_1669032733_random.jpg' },
-                                    { title: 'Feel Good', subtitle: 'Boost your mood', image: 'https://c.saavncdn.com/editorial/logo/Charts_FeelGood_1672658826_random.jpg' }
-                                ].map((item, i) => (
-                                    <FeatureCard
-                                        key={i}
-                                        {...item}
-                                        onClick={async () => {
-                                            if (isGeneratingMix) return;
-                                            setIsGeneratingMix(true);
-                                            try {
-                                                const mix = await DiscoveryEngine.generateChartMix(item.title, activeRegion || undefined);
-                                                playInstantMix(mix);
-                                            } catch (e) { console.error(e); } finally { setIsGeneratingMix(false); }
-                                        }}
-                                        colors={c}
-                                    />
-                                ))}
-                            </div>
+                        {/* 2. Content Body */}
+                        <div className="flex-1 p-8 md:p-12 space-y-12">
+                            {/* Loading State */}
+                            {!categoryContent && (
+                                <div className="flex items-center justify-center h-40">
+                                    <WaveLoader />
+                                </div>
+                            )}
+
+                            {categoryContent && (
+                                <>
+                                    {/* Horizontal Playlists (Carousel) */}
+                                    <div className="w-full">
+                                        <div className="flex items-end justify-between mb-6">
+                                            <h2 className="text-xl md:text-2xl font-bold text-white">Top Playlists</h2>
+                                            <button className="text-xs font-bold text-white/50 uppercase tracking-widest hover:text-white">View All</button>
+                                        </div>
+
+                                        <div className="relative w-full overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden mask-gradient-r">
+                                            <div className="flex gap-6 w-max">
+                                                {categoryContent.playlists.map((pl: any, i: number) => (
+                                                    <div key={i} className="w-[180px] md:w-[220px] cursor-pointer group flex-shrink-0" onClick={() => {
+                                                        playInstantMix({
+                                                            id: pl.id,
+                                                            title: pl.name,
+                                                            color: activeCategory?.color || 'blue',
+                                                            songs: [],
+                                                            currentSongIndex: 0
+                                                        });
+                                                        // Auto fetch logic...
+                                                        setIsGeneratingMix(true);
+                                                        DiscoveryEngine.generateGenreMix(pl.name, activeRegion || undefined).then(mix => {
+                                                            playInstantMix(mix);
+                                                        }).finally(() => setIsGeneratingMix(false));
+                                                    }}>
+                                                        <div className="w-full aspect-square rounded-2xl bg-neutral-800 mb-4 overflow-hidden relative shadow-lg group-hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)] transition-all duration-500">
+                                                            {pl.image?.[2]?.link || pl.image ? (
+                                                                <img src={pl.image?.[2]?.link || (typeof pl.image === 'string' ? pl.image : pl.image?.[0]?.link)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                                            ) : (
+                                                                <div className="w-full h-full bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center"><Disc size={40} className="text-white/20" /></div>
+                                                            )}
+                                                            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 backdrop-blur-[1px]">
+                                                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl transform scale-50 group-hover:scale-100 transition-transform duration-300">
+                                                                    <Play size={20} fill="black" className="ml-1 text-black" />
+                                                                </div>
+                                                            </div>
+                                                            {/* Playlist Decor Line */}
+                                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </div>
+                                                        <h3 className="font-bold text-white truncate text-base mb-1 group-hover:text-white/90 transition-colors">{pl.name}</h3>
+                                                        <p className="text-xs text-white/50 truncate font-medium">JioSaavn • {pl.playCount || 'Popular'}</p>
+                                                    </div>
+                                                ))}
+                                                {categoryContent.playlists.length === 0 && <p className="opacity-50 text-sm">No playlists found.</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Top Songs List */}
+                                    <div className="max-w-5xl">
+                                        <h2 className="text-xl md:text-2xl font-bold text-white mb-6">Top Songs</h2>
+                                        <div className="flex flex-col gap-1">
+                                            {categoryContent.songs.map((item: any, i: number) => (
+                                                <TrackRow
+                                                    key={item.id}
+                                                    index={i + 1}
+                                                    track={{
+                                                        id: item.id,
+                                                        title: item.name,
+                                                        artist: item.primaryArtists,
+                                                        duration: item.duration ? Math.floor(item.duration / 60) + ':' + (item.duration % 60).toString().padStart(2, '0') : '3:00',
+                                                        art: getArt(item),
+                                                        original: item
+                                                    }}
+                                                    colors={c}
+                                                    isPlaying={currentSong?.id === item.id && isPlaying}
+                                                    onPlay={() => handlePlay(item)}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 );
@@ -802,21 +949,27 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         trending={trending}
                         charts={charts}
                         recent={recent}
+                        newAndTrending={newAndTrending}
+                        editorialPicks={editorialPicks}
                         loading={loading}
                         onPlay={handlePlay}
                         onNavigate={(view, data) => {
                             if (view === 'artist') navigateToArtist(data);
                             if (view === 'album') navigateToAlbum(data);
                         }}
-                        activeRegion={activeRegion}
-                        onRegionChange={setActiveRegion}
-                        onPlayChart={async (chart) => {
-                            if (isGeneratingMix) return;
-                            setIsGeneratingMix(true);
-                            try {
-                                const mix = await DiscoveryEngine.generateChartMix(chart.title, activeRegion || undefined);
-                                playInstantMix(mix);
-                            } catch (e) { console.error(e); } finally { setIsGeneratingMix(false); }
+                        onPlayChart={(chart) => {
+                            setActiveChart(chart);
+                            setActiveView('chart-detail');
+                        }}
+                        onOpenPlaylist={(playlist) => {
+                            setActivePlaylistDetail(playlist);
+                            setActiveView('playlist-detail');
+                        }}
+                        onOpenAlbum={(album) => navigateToAlbum(album?.id || album)}
+                        onResumeSong={(track, position) => {
+                            // Resume playback from position
+                            handlePlay(track.song);
+                            // Position seek handled by playback context
                         }}
                     />
                 );
@@ -857,6 +1010,27 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         onAddToOTG={addToOTG}
                     />
                 ) : <div className="flex-1 flex items-center justify-center text-white/50">No song playing</div>;
+            case 'chart-detail':
+                return activeChart ? (
+                    <ChartDetailScreen
+                        chartId={activeChart.id}
+                        chartTitle={activeChart.title || activeChart.name}
+                        chartImage={activeChart.image}
+                        colors={c}
+                        onBack={() => setActiveView('home')}
+                        onPlay={handlePlay}
+                    />
+                ) : null;
+            case 'playlist-detail':
+                return activePlaylistDetail ? (
+                    <PlaylistScreen
+                        playlistId={activePlaylistDetail.id}
+                        playlistTitle={activePlaylistDetail.title || activePlaylistDetail.name}
+                        playlistImage={activePlaylistDetail.image}
+                        colors={c}
+                        onBack={() => setActiveView('home')}
+                    />
+                ) : null;
         }
     };
 
@@ -957,6 +1131,13 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
                     <div className="pt-4 mt-2 border-t flex justify-center gap-3 opacity-50 hover:opacity-100 transition-opacity" style={{ borderColor: c.border }}>
                         <button
+                            onClick={() => setIsLangModalOpen(true)}
+                            className="w-4 h-4 rounded flex items-center justify-center border border-gray-500 hover:border-white text-gray-500 hover:text-white transition-colors"
+                            title="Music Languages"
+                        >
+                            <Globe size={10} />
+                        </button>
+                        <button
                             onClick={() => {
                                 localStorage.removeItem('melora-setup-complete');
                                 window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'WELCOME' }));
@@ -966,8 +1147,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         >
                             <Monitor size={10} />
                         </button>
-                        <button onClick={() => onThemeChange('midnight')} className={`w - 4 h - 4 rounded - full bg - black border ${theme === 'midnight' ? 'ring-2 ring-white ring-offset-2 ring-offset-black' : 'border-gray-600'} `} />
-                        <button onClick={() => onThemeChange('polar')} className={`w - 4 h - 4 rounded - full bg - white border ${theme === 'polar' ? 'ring-2 ring-black ring-offset-2 ring-offset-white' : 'border-gray-300'} `} />
+                        <button onClick={() => onThemeChange('midnight')} className={`w-4 h-4 rounded-full bg-black border ${theme === 'midnight' ? 'ring-2 ring-white ring-offset-2 ring-offset-black' : 'border-gray-600'}`} />
+                        <button onClick={() => onThemeChange('polar')} className={`w-4 h-4 rounded-full bg-white border ${theme === 'polar' ? 'ring-2 ring-black ring-offset-2 ring-offset-white' : 'border-gray-300'}`} />
                     </div>
                 </aside>
 
@@ -1012,15 +1193,15 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                     backgroundColor: c.accentSoft,
                                     x: 2
                                 }}
-                                onClick={() => handlePlay(item.original)}
+                                onClick={() => handlePlay(item.track)}
                                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                             >
                                 {/* Album Art with Play Overlay */}
                                 <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 relative shadow-md">
-                                    {item.art ? (
+                                    {getArt(item.track.song) ? (
                                         <img
-                                            src={item.art}
-                                            alt={item.title}
+                                            src={getArt(item.track.song)}
+                                            alt={item.track.song.name}
                                             className="w-full h-full object-cover"
                                         />
                                     ) : (
@@ -1037,8 +1218,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
                                 {/* Text */}
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-semibold truncate hover:underline" onClick={() => navigateToArtist(item.artist)}>{item.title}</p>
-                                    <p className="text-[10px] truncate hover:text-white transition-colors" style={{ color: c.textMuted }} onClick={() => navigateToArtist(item.artist)}>{item.artist}</p>
+                                    <p className="text-xs font-semibold truncate hover:underline" onClick={() => navigateToArtist(item.track.song.primaryArtists)}>{item.track.song.name}</p>
+                                    <p className="text-[10px] truncate hover:text-white transition-colors" style={{ color: c.textMuted }} onClick={() => navigateToArtist(item.track.song.primaryArtists)}>{item.track.song.primaryArtists}</p>
                                 </div>
                             </motion.div>
                         ))}

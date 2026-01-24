@@ -7,6 +7,8 @@ export interface HistoryItem {
     id: string; // STRICTLY track.id (Stable Identity)
     track: PlayableTrack;
     playedAt: number;
+    lastPosition?: number; // Seconds into the track
+    itemType?: 'song' | 'album' | 'playlist'; // For navigation
     context?: {
         source: 'discovery' | 'playlist' | 'album' | 'search' | 'offline';
         id?: string; // playlist/album id
@@ -38,6 +40,8 @@ export const HistoryStore = {
                     id: track.id, // Enforce Stable ID (Rule 1)
                     track: track,
                     playedAt: item.playedAt || Date.now(),
+                    lastPosition: item.lastPosition || 0,
+                    itemType: item.itemType || 'song',
                     context: item.context || { source: 'discovery' }
                 };
             }).filter(Boolean);
@@ -72,6 +76,8 @@ export const HistoryStore = {
                 id: track.id, // Stable Identity
                 track,
                 playedAt: Date.now(),
+                lastPosition: 0,
+                itemType: 'song',
                 context // Rule 5: Context persistence
             };
 
@@ -89,5 +95,29 @@ export const HistoryStore = {
         if (typeof window === 'undefined') return;
         localStorage.removeItem(HISTORY_KEY);
         window.dispatchEvent(new Event('melora-history-update'));
+    },
+
+    // Update playback position for a track (for resume)
+    updatePosition: (trackId: string, position: number) => {
+        if (typeof window === 'undefined') return;
+        try {
+            const history = HistoryStore.getHistory();
+            const updated = history.map(h => {
+                if (h.id === trackId) {
+                    return { ...h, lastPosition: Math.floor(position) };
+                }
+                return h;
+            });
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+        } catch (e) {
+            console.error("Failed to update position", e);
+        }
+    },
+
+    // Get last position for a track
+    getPosition: (trackId: string): number => {
+        const history = HistoryStore.getHistory();
+        const item = history.find(h => h.id === trackId);
+        return item?.lastPosition || 0;
     }
 };

@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Heart, Disc, Zap, Coffee, Moon, Activity, ArrowRight } from "lucide-react";
-import { FeatureCard, TrackRow, MoodPill, SectionHeader, DiscoveryThemeColors, SkeletonHero, SkeletonCard, SkeletonTrackRow } from "./DiscoveryShared";
+import { Play, Pause, Heart, Disc, Zap, Clock, Music, ListMusic, TrendingUp, Sparkles, ArrowRight, BarChart3 } from "lucide-react";
+import { FeatureCard, TrackRow, SectionHeader, DiscoveryThemeColors, SkeletonHero, SkeletonCard, SkeletonTrackRow } from "./DiscoveryShared";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
-import { DiscoveryEngine } from "@/lib/discovery-engine";
+import { HistoryItem } from "@/lib/history-store";
 
 // Helper for Art
 function getArt(song: any) {
@@ -14,20 +14,73 @@ function getArt(song: any) {
     return img || '';
 }
 
+// Relative time formatter
+function formatRelativeTime(timestamp: number): string {
+    const now = Date.now();
+    const diff = Math.floor((now - timestamp) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return new Date(timestamp).toLocaleDateString();
+}
+
+// Progress bar for resume
+function PlaybackProgress({ position, duration }: { position: number; duration: number }) {
+    const percent = duration > 0 ? Math.min((position / duration) * 100, 100) : 0;
+    if (percent === 0) return null;
+    return (
+        <div className="w-full h-[3px] bg-white/10 rounded-full overflow-hidden mt-2">
+            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${percent}%` }} />
+        </div>
+    );
+}
+
+// Type badge component
+function TypeBadge({ type }: { type: 'Album' | 'Playlist' | 'Single' }) {
+    const colors: Record<string, string> = {
+        Album: 'bg-blue-500/20 text-blue-400',
+        Playlist: 'bg-green-500/20 text-green-400',
+        Single: 'bg-orange-500/20 text-orange-400'
+    };
+    return (
+        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${colors[type]}`}>
+            {type}
+        </span>
+    );
+}
+
 interface HomeViewProps {
     colors: DiscoveryThemeColors;
     trending: any[];
     charts: any[];
-    recent: any[];
+    recent: HistoryItem[]; // Now HistoryItem with lastPosition
+    newAndTrending?: any[]; // Mixed content
+    editorialPicks?: any[]; // Curated playlists
     loading?: boolean;
     onPlay: (song: any, list?: any[]) => void;
     onNavigate: (view: string, data?: any) => void;
-    activeRegion: string | null;
-    onRegionChange: (region: string | null) => void;
     onPlayChart: (chart: any) => void;
+    onOpenPlaylist: (playlist: any) => void;
+    onOpenAlbum: (album: any) => void;
+    onResumeSong: (song: any, position: number) => void;
 }
 
-export function HomeView({ colors, trending, charts, recent, loading, onPlay, onNavigate, activeRegion, onRegionChange, onPlayChart }: HomeViewProps) {
+export function HomeView({
+    colors,
+    trending,
+    charts,
+    recent,
+    newAndTrending = [],
+    editorialPicks = [],
+    loading,
+    onPlay,
+    onNavigate,
+    onPlayChart,
+    onOpenPlaylist,
+    onOpenAlbum,
+    onResumeSong
+}: HomeViewProps) {
     const { playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
     const videoRef = useRef<HTMLVideoElement>(null);
     const [scrolled, setScrolled] = useState(false);
@@ -36,23 +89,22 @@ export function HomeView({ colors, trending, charts, recent, loading, onPlay, on
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
 
-    // Region Logic
-    const handleRegionSelect = async (region: string) => {
-        if (activeRegion === region) {
-            onRegionChange(null);
-            return;
-        }
-        onRegionChange(region);
-    };
-
-    const REGIONS = [
-        { id: 'global', label: 'Global', icon: Disc },
-        { id: 'india', label: 'India', icon: Zap },
-        { id: 'us', label: 'US', icon: Activity },
-        { id: 'uk', label: 'UK', icon: Coffee },
-        { id: 'k-pop', label: 'K-Pop', icon: Heart },
-        { id: 'latin', label: 'Latin', icon: Moon },
+    // Chart Toppers: Use actual chart data from API, fallback to defaults
+    const defaultCharts = [
+        { id: 'india-top-50', title: 'India Top 50', subtitle: 'Updated daily', color: 'from-orange-600 to-orange-900' },
+        { id: 'global-top-50', title: 'Global Top 50', subtitle: 'Updated daily', color: 'from-blue-600 to-blue-900' },
+        { id: 'viral-hits', title: 'Viral Hits', subtitle: 'Trending virally', color: 'from-pink-600 to-pink-900' },
+        { id: 'trending-now', title: 'Trending Now', subtitle: "What's hot", color: 'from-purple-600 to-purple-900' }
     ];
+
+    // Use passed charts if available, pad with defaults if less than 4
+    const chartToppers = charts.length > 0
+        ? charts.slice(0, 4).map((c, i) => ({
+            ...c,
+            subtitle: c.subtitle || defaultCharts[i]?.subtitle || 'Updated daily',
+            color: defaultCharts[i]?.color || 'from-gray-600 to-gray-900'
+        }))
+        : defaultCharts;
 
     const heroSong = trending[0];
 
@@ -60,19 +112,37 @@ export function HomeView({ colors, trending, charts, recent, loading, onPlay, on
         setScrolled(e.currentTarget.scrollTop > 50);
     };
 
+    // Jump Back In card click
+    const handleRecentClick = (item: HistoryItem) => {
+        if (item.itemType === 'album') {
+            onOpenAlbum(item.track.song);
+        } else if (item.itemType === 'playlist') {
+            onOpenPlaylist(item.track.song);
+        } else {
+            // Song: resume from position
+            onResumeSong(item.track, item.lastPosition || 0);
+        }
+    };
+
+    // New & Trending card click
+    const handleNewTrendingClick = (item: any) => {
+        if (item.type === 'album') {
+            onOpenAlbum(item);
+        } else if (item.type === 'playlist') {
+            onOpenPlaylist(item);
+        } else {
+            onPlay(item); // Single: play immediately
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden pb-32">
                 <SkeletonHero />
                 <div className="px-6 md:px-12 -mt-10 relative z-20 space-y-16">
-                    {/* Dummy Region Pills */}
-                    <div className="flex gap-4 py-6 overflow-hidden">
-                        {[1, 2, 3, 4].map(i => <div key={i} className="w-24 h-8 rounded-full bg-white/5 animate-pulse" />)}
-                    </div>
-
                     {/* Charts Skeletons */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
                     </div>
 
                     {/* Track Skeletons */}
@@ -149,7 +219,8 @@ export function HomeView({ colors, trending, charts, recent, loading, onPlay, on
                                 <div className="flex items-center gap-4">
                                     <button
                                         onClick={() => heroSong && onPlay(heroSong)}
-                                        className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-transform flex items-center gap-3 shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+                                        disabled={!heroSong}
+                                        className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-transform flex items-center gap-3 shadow-[0_0_30px_rgba(255,255,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Play size={20} fill="black" /> Play Now
                                     </button>
@@ -165,95 +236,112 @@ export function HomeView({ colors, trending, charts, recent, loading, onPlay, on
                 {/* === MAIN CONTENT === */}
                 <div className="px-6 md:px-12 -mt-10 relative z-20 space-y-16">
 
-                    {/* 1. Region Station (Was Moods) */}
-                    <section>
-                        <div className="flex items-center gap-4 py-6 overflow-x-auto [&::-webkit-scrollbar]:hidden mask-gradient-r">
-                            {REGIONS.map(region => (
-                                <MoodPill
-                                    key={region.id}
-                                    label={region.label}
-                                    active={activeRegion === region.id}
-                                    onClick={() => handleRegionSelect(region.id)}
-                                />
-                            ))}
-                        </div>
-                    </section>
-
-                    {/* 2. Jump Back In (History) */}
+                    {/* Section 1: Jump Back In */}
                     {recent.length > 0 && (
                         <section>
                             <SectionHeader title="Jump Back In" subtitle="Pick up where you left off" />
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                                 {recent.slice(0, 6).map((item, i) => (
                                     <motion.div
-                                        key={i}
+                                        key={item.id}
                                         whileHover={{ y: -5 }}
                                         className="bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer group transition-colors border border-white/5"
-                                        onClick={() => onPlay(item.original)}
+                                        onClick={() => handleRecentClick(item)}
                                     >
                                         <div className="aspect-square rounded-lg bg-neutral-900 mb-3 overflow-hidden relative shadow-lg">
-                                            <img src={item.art} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            <img src={getArt(item.track.song)} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
                                                 <Play size={24} fill="white" className="text-white" />
                                             </div>
                                         </div>
-                                        <p className="font-bold text-sm text-white truncate">{item.title}</p>
-                                        <p className="text-xs text-white/50 truncate">{item.artist}</p>
+                                        <p className="font-bold text-sm text-white truncate">{item.track.song.name}</p>
+                                        <p className="text-xs text-white/50 truncate">{item.track.song.primaryArtists}</p>
+                                        {/* Progress & Timestamp */}
+                                        <PlaybackProgress position={item.lastPosition || 0} duration={item.track.song.duration || 0} />
+                                        <p className="text-[10px] text-white/30 mt-1">{formatRelativeTime(item.playedAt)}</p>
                                     </motion.div>
                                 ))}
                             </div>
                         </section>
                     )}
 
-                    {/* 3. Global Charts */}
+                    {/* Section 2: New & Trending (Mixed content) */}
+                    {newAndTrending.length > 0 && (
+                        <section>
+                            <SectionHeader title="New & Trending" subtitle="Fresh releases and viral hits" />
+                            <div className="flex gap-4 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden">
+                                {newAndTrending.slice(0, 10).map((item, i) => (
+                                    <motion.div
+                                        key={item.id || i}
+                                        whileHover={{ y: -5 }}
+                                        className="flex-shrink-0 w-48 bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer group transition-colors border border-white/5"
+                                        onClick={() => handleNewTrendingClick(item)}
+                                    >
+                                        <div className="aspect-square rounded-lg bg-neutral-900 mb-3 overflow-hidden relative shadow-lg">
+                                            <img src={getArt(item)} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
+                                                <Play size={24} fill="white" className="text-white" />
+                                            </div>
+                                            {/* Type Badge */}
+                                            <div className="absolute top-2 left-2">
+                                                <TypeBadge type={item.type === 'album' ? 'Album' : item.type === 'playlist' ? 'Playlist' : 'Single'} />
+                                            </div>
+                                        </div>
+                                        <p className="font-bold text-sm text-white truncate">{item.name}</p>
+                                        <p className="text-xs text-white/50 truncate">{item.primaryArtists || item.subtitle || ''}</p>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Section 3: Chart Toppers */}
                     <section>
-                        <SectionHeader title="Global Charts" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {charts.map((chart, i) => (
+                        <SectionHeader title="Chart Toppers" subtitle="Today's biggest hits" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {chartToppers.slice(0, 4).map((chart, i) => (
                                 <FeatureCard
                                     key={chart.id}
                                     title={chart.title}
-                                    subtitle={chart.subtitle}
+                                    subtitle={chart.subtitle || 'Updated daily'}
                                     image={chart.image}
                                     colors={colors}
                                     onClick={() => onPlayChart(chart)}
                                     type="CHART"
-                                    isNew={chart.isNew}
+                                    isNew={false}
                                 />
                             ))}
                         </div>
                     </section>
 
-                    {/* 4. Trending List */}
-                    <section className="max-w-4xl">
-                        <SectionHeader title={`Trending ${activeRegion ? activeRegion.charAt(0).toUpperCase() + activeRegion.slice(1) : 'Global'}`} subtitle="Top 20 hits right now" />
-                        <div className="flex flex-col gap-1">
-                            {trending.slice(0, 10).map((song, i) => (
-                                <TrackRow
-                                    key={song.id}
-                                    index={i + 1}
-                                    track={{
-                                        id: song.id,
-                                        title: song.name,
-                                        artist: song.primaryArtists,
-                                        duration: song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : '--:--',
-                                        art: getArt(song),
-                                        original: song
-                                    }}
-                                    colors={colors}
-                                    isPlaying={currentSong?.id === song.id && isPlaying}
-                                    onPlay={() => onPlay(song)}
-                                />
-                            ))}
-                        </div>
-                    </section>
+                    {/* Section 4: Editorial Picks */}
+                    {editorialPicks.length > 0 && (
+                        <section>
+                            <SectionHeader title="Editorial Picks" subtitle="Curated by our team" />
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                                {editorialPicks.slice(0, 6).map((playlist, i) => (
+                                    <motion.div
+                                        key={playlist.id || i}
+                                        whileHover={{ y: -5 }}
+                                        className="bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer group transition-colors border border-white/5"
+                                        onClick={() => onOpenPlaylist(playlist)}
+                                    >
+                                        <div className="aspect-square rounded-lg bg-neutral-900 mb-3 overflow-hidden relative shadow-lg">
+                                            <img src={getArt(playlist)} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
+                                                <ListMusic size={24} className="text-white" />
+                                            </div>
+                                        </div>
+                                        <p className="font-bold text-sm text-white truncate">{playlist.name || playlist.title}</p>
+                                        <p className="text-xs text-white/50 truncate">{playlist.subtitle || 'Curated playlist'}</p>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
 
                     <div className="h-20" /> {/* Spacer */}
                 </div>
-
-                <style jsx>{`
-                    .mask-gradient-r { mask-image: linear-gradient(to right, black 85%, transparent); }
-                `}</style>
             </div>
         </div>
     );
