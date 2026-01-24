@@ -1202,47 +1202,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 // Signal: Verified Play (>10s)
                 SignalStore.addSignal(trackToSave, 'PLAY');
 
-                // LOOPHOLE FIX: Sync to "Discovery Mix" (Global History Tape)
-                // If the user has a Discovery Mix tape, we append this song to it so it tracks ALL playback.
-                setMixes(prev => {
-                    const discMix = prev.find(m => m.id === DISCOVERY_MIX_ID);
-                    if (!discMix) return prev; // Don't force-create if deleted
-
-                    // Prevent duplicate tail (Stop "Double Song" echo)
-                    const lastSong = discMix.songs[discMix.songs.length - 1];
-                    // Normalize for fuzzy comparison logic
-                    const normalize = (str: string) => str?.toLowerCase().split('(')[0].replace(/[^a-z0-9]/g, '') || '';
-
-                    if (lastSong) {
-                        const lastId = isPlayableTrack(lastSong) ? lastSong.id : lastSong.id;
-                        if (lastId === trackToSave.id) return prev;
-
-                        // Fuzzy Check
-                        const s1 = isPlayableTrack(lastSong) ? lastSong.song : lastSong;
-                        const s2 = trackToSave.song;
-                        const k1 = normalize(s1.name) + normalize(s1.primaryArtists);
-                        const k2 = normalize(s2.name) + normalize(s2.primaryArtists);
-                        if (k1 === k2) return prev;
-                    }
-
-                    // Append and slice to last 50
-                    const newSongs = [...discMix.songs, trackToSave].slice(-50); // Keep last 50
-
-                    return prev.map(m => m.id === DISCOVERY_MIX_ID ? {
-                        ...m,
-                        songs: newSongs,
-                        // Update index so we are at the end? 
-                        // If we are currently playing FROM this mix, currentIndex updates automatically via logic?
-                        // If we are playing "My Tape 1", activeMix is "My Tape 1".
-                        // modifying "discovery-mix" (inactive) doesn't affect playback.
-                        // If we ARE playing "discovery-mix", this update might cause re-render?
-                        // If activeMixId === 'discovery-mix', we are appending to current mix.
-                        // Playback engine handles index. We shouldn't mess up currentSongIndex if active.
-                        // If active, we probably shouldn't slice off the *currently playing* song.
-                        // Safe logic: Just append.
-                    } : m);
-                });
-
+                /* 
+                   STRICT DISCOVERY RULE: 
+                   Do NOT append to any background "History Mix". 
+                   History is read-only via HistoryStore.
+                   Mixes are immutable unless explicitly extended by engine.
+                */
             }, 10000);
             return () => clearTimeout(timer);
         }

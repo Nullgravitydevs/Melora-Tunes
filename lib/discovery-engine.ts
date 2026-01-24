@@ -185,9 +185,9 @@ export class DiscoveryEngine {
     // --- The Filter (Deduplication & Anti-Loop) ---
 
     private static smartShuffle(pool: PlayableTrack[], seed: PlayableTrack): PlayableTrack[] {
-        const history = HistoryStore.getHistory(); // Last 50
-        // Filter out recent history (Last 20 items to avoid repetition)
-        const recentIds = new Set(history.slice(0, 20).map(h => h.id));
+        const history = HistoryStore.getHistory(); // Full available history
+        // STRICT 24H RULE: Filter out ALL recent history available in store
+        const recentIds = new Set(history.map(h => h.id));
 
         const unique = new Map<string, PlayableTrack>();
         const artistCounts = new Map<string, number>();
