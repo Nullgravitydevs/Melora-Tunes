@@ -9,7 +9,7 @@ import { PlaylistStore, Playlist } from "@/lib/playlist-store";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
 import { useLyrics } from "@/hooks/useLyrics";
 import { DiscoveryEngine } from "@/lib/discovery-engine";
-import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2 } from "lucide-react";
+import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2, Monitor } from "lucide-react";
 
 interface DesktopDiscoveryProps {
     theme: DiscoveryTheme;
@@ -193,14 +193,7 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
                             </div>
                             <button onClick={() => playback.setRepeat(playback.repeat === 'one' ? 'none' : playback.repeat === 'all' ? 'one' : 'all')} className={`transition-all ${playback.repeat !== 'none' ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]' : 'text-white/40 hover:text-white'}`}><Repeat size={18} /></button>
 
-                            {/* OTG Add Button */}
-                            <button
-                                onClick={() => onAddToOTG(song)}
-                                className="text-white/40 hover:text-white hover:scale-110 transition-all active:scale-90"
-                                title="Add to On-The-Go Tape"
-                            >
-                                <Plus size={18} />
-                            </button>
+                            {/* OTG Removed */}
                         </div>
                     </div>
 
@@ -1353,7 +1346,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                 }
                             }}
                         />
-                        {playlists.map(pl => (
+                        {playlists.filter(pl => pl.id !== 'discovery-mix').map(pl => (
                             <PlaylistItem
                                 key={pl.id}
                                 title={pl.name}
@@ -1379,8 +1372,14 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         )}
                     </div>
 
-                    {/* Theme Toggle */}
                     <div className="pt-4 mt-2 border-t flex justify-center gap-3 opacity-50 hover:opacity-100 transition-opacity" style={{ borderColor: c.border }}>
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'WELCOME' }))}
+                            className="w-4 h-4 rounded flex items-center justify-center border border-gray-500 hover:border-white text-gray-500 hover:text-white transition-colors"
+                            title="Switch Mode"
+                        >
+                            <Monitor size={10} />
+                        </button>
                         <button onClick={() => onThemeChange('midnight')} className={`w-4 h-4 rounded-full bg-black border ${theme === 'midnight' ? 'ring-2 ring-white ring-offset-2 ring-offset-black' : 'border-gray-600'}`} />
                         <button onClick={() => onThemeChange('polar')} className={`w-4 h-4 rounded-full bg-white border ${theme === 'polar' ? 'ring-2 ring-black ring-offset-2 ring-offset-white' : 'border-gray-300'}`} />
                     </div>

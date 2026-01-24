@@ -94,6 +94,15 @@ const SYSTEM_MENU: MenuItem[] = [
                 // window.location.reload();
             }
         }
+    },
+    {
+        label: "Reset to Setup Wizard",
+        type: 'action',
+        action: () => {
+            if (confirm('Re-run the Setup Wizard?')) {
+                window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'WELCOME' }));
+            }
+        }
     }
 ];
 
@@ -1017,23 +1026,26 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     return [{ label: "(Queue Empty)", type: 'action', action: () => handleBack() }];
                 }
 
-                return queue.map((s, index) => ({
-                    label: `${index === currentIndex ? '▶ ' : ''}${decodeHtml(s.name)}`,
-                    type: 'action',
-                    action: () => {
-                        // If clicking current song, go to Now Playing
-                        if (index === currentIndex) {
-                            goToNowPlaying();
-                        } else {
-                            // Jump to that song in queue
-                            // We need a way to skip to index. 
-                            // Since updateMix handles index update:
-                            if (activeMixId) {
-                                updateMix(activeMixId, { currentSongIndex: index });
+                return queue.map((s, index) => {
+                    const name = 'song' in s ? s.song.name : s.name;
+                    return {
+                        label: `${index === currentIndex ? '▶ ' : ''}${decodeHtml(name)}`,
+                        type: 'action',
+                        action: () => {
+                            // If clicking current song, go to Now Playing
+                            if (index === currentIndex) {
+                                goToNowPlaying();
+                            } else {
+                                // Jump to that song in queue
+                                // We need a way to skip to index. 
+                                // Since updateMix handles index update:
+                                if (activeMixId) {
+                                    updateMix(activeMixId, { currentSongIndex: index });
+                                }
                             }
                         }
-                    }
-                })) as MenuItem[];
+                    };
+                }) as MenuItem[];
 
             default:
                 // Handle dynamic IDs

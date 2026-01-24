@@ -5,6 +5,8 @@ export interface AppSettings {
     bitrate: 'flac' | '320' | '160' | '96' | '48' | '12';
     lastPlayedSongId: string | null;
     version: string;
+    userName?: string;
+    userDOB?: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {

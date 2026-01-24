@@ -75,12 +75,13 @@ interface PlaybackContextType {
     currentTrack: PlayableTrack | undefined; // Internal track with sources
     volume: number;
     progress: number;
-    duration: number;
     shuffle: boolean;
     repeat: 'off' | 'one' | 'all';
+    duration: number; // Restored
 
     // Actions
     setMixes: (mixes: Mix[]) => void;
+    setQueue: (queue: (JioSaavnSong | PlayableTrack)[]) => void;
     loadMix: (mixId: string) => void;
     play: () => void;
     pause: () => void;
@@ -99,8 +100,8 @@ interface PlaybackContextType {
     isLoaded: boolean;
     activeMix: Mix | undefined;
 
-    // Queue
-    queue: JioSaavnSong[];
+    // Queue (Typed correctly)
+    queue: (JioSaavnSong | PlayableTrack)[];
     currentIndex: number;
 
     // Sleep Timer
@@ -130,7 +131,6 @@ interface PlaybackContextType {
     toggleLike: (song: JioSaavnSong | PlayableTrack) => void;
     isLiked: (songId: string) => boolean;
 
-    // Recently Played
     // Recently Played
     recentlyPlayed: JioSaavnSong[];
 
@@ -222,10 +222,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                         return !song.id.startsWith('mock-') && !song.name.startsWith('Track ');
                     })
                 })).filter((m: Mix) => {
-                    // Remove old spam, but KEEP our discovery mix
                     if (m.title === 'Discovery Mix' && m.id !== DISCOVERY_MIX_ID) return false;
-                    // Also wipe the OTG tape if we are migrating away from it
-                    if (m.id === 'otg-tape') return false;
                     return !['Pawan Kalyan Hits', 'DSP Hits', 'Megastar Hits', 'Yuvan Shankar Raja'].includes(m.title);
                 });
 
@@ -1315,53 +1312,46 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // We also need to ensure currentSong matches what's actually playing if we are in a mix
 
+    const setQueue = useCallback((newQueue: (JioSaavnSong | PlayableTrack)[]) => {
+        if (newQueue.length === 0) {
+            setIsPlaying(false);
+            setActiveMixId(null);
+            setCurrentSongUrl(null);
+            audioPlayerRef.current?.pause();
+        }
+    }, []);
+
+    const value = {
+        mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration, shuffle, repeat,
+        setMixes,
+        setQueue,
+        loadMix, play, pause, togglePlay, next, prev, seek,
+        setVolume, setShuffle, setRepeat,
+
+        addMix,
+        updateMix,
+        deleteMix,
+        isLoaded: true,
+        activeMix,
+
+        queue: activeMix?.songs || [],
+        currentIndex: activeMix?.currentSongIndex || 0,
+
+        sleepTimer, setSleepTimer,
+        crossfadeDuration, setCrossfadeDuration,
+        bitrate, setBitrate,
+        stopAtEndOfSong, setStopAtEndOfSong,
+        notificationsEnabled, setNotificationsEnabled,
+        likedSongs, toggleLike, isLiked,
+        recentlyPlayed,
+        playbackSpeed, setPlaybackSpeed,
+        eq,
+        downloadSong, removeDownload, isDownloaded,
+        playInstantMix
+    };
+
     return (
-        <PlaybackContext.Provider value={{
-            mixes,
-            activeMixId,
-            isPlaying,
-            currentSong,
-            currentTrack, // New
-            volume,
-            progress,
-            duration,
-            shuffle,
-            repeat,
-
-            setMixes,
-            loadMix,
-            play,
-            pause,
-            togglePlay,
-            next,
-            prev,
-            seek,
-            setVolume,
-            setShuffle,
-            setRepeat,
-
-            addMix,
-            updateMix,
-            deleteMix,
-            isLoaded: true,
-            activeMix,
-
-            queue, // Normalized
-            currentIndex,
-
-            sleepTimer, setSleepTimer,
-            crossfadeDuration, setCrossfadeDuration,
-            bitrate, setBitrate,
-            // forceLossless removed - use bitrate: 'flac' instead
-            stopAtEndOfSong, setStopAtEndOfSong,
-            notificationsEnabled, setNotificationsEnabled,
-            likedSongs, toggleLike, isLiked,
-            recentlyPlayed,
-            playbackSpeed, setPlaybackSpeed,
-            eq,
-            downloadSong, removeDownload, isDownloaded,
-            playInstantMix // Atomic playback
-        }}>
+        <PlaybackContext.Provider value={value}>
             {children}
 
             {/* Global Audio Element */}
@@ -1407,14 +1397,16 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             />
 
             {/* Minimal Toast UI */}
-            {toast && (
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 bg-zinc-800/90 text-white text-xs font-bold rounded-full border border-white/10 backdrop-blur-md shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 transition-all">
-                    {toast.type === 'error' && <span className="text-red-400">⚠️</span>}
-                    {toast.type === 'info' && <span className="text-amber-400">ℹ️</span>}
-                    {toast.message}
-                </div>
-            )}
-        </PlaybackContext.Provider>
+            {
+                toast && (
+                    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 bg-zinc-800/90 text-white text-xs font-bold rounded-full border border-white/10 backdrop-blur-md shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 transition-all">
+                        {toast.type === 'error' && <span className="text-red-400">⚠️</span>}
+                        {toast.type === 'info' && <span className="text-amber-400">ℹ️</span>}
+                        {toast.message}
+                    </div>
+                )
+            }
+        </PlaybackContext.Provider >
     );
 }
 

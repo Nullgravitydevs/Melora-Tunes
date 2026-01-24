@@ -4,49 +4,126 @@ import { Suspense, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { usePlayback } from "@/components/providers/playback-context";
 
-const WindowsStage = dynamic(() => import("@/components/windows/scenes/stage").then(mod => mod.WindowsStage), { ssr: false });
-const AndroidEntry = dynamic(() => import("@/components/android/AndroidEntry").then(mod => mod.AndroidEntry), { ssr: false });
+// --- THE TRINITY: 3 MODES ---
+const ClassicMode = dynamic(() => import("@/components/android/AndroidEntry").then(mod => mod.AndroidEntry), {
+  ssr: false,
+  loading: () => <SplashScreen text="LOADING CLASSIC..." />
+});
+
+const DiscoveryMode = dynamic(() => import("@/components/discovery/DiscoveryLayout").then(mod => mod.DiscoveryLayout), {
+  ssr: false,
+  loading: () => <SplashScreen text="LOADING DISCOVERY..." />
+});
+
+const DeckMode = dynamic(() => import("@/components/windows/scenes/stage").then(mod => mod.WindowsStage), {
+  ssr: false,
+  loading: () => <SplashScreen text="LOADING DECK..." />
+});
+
+import { SetupWizard } from "@/components/windows/scenes/setup-wizard";
+
+type UIMode = 'CLASSIC' | 'DISCOVERY' | 'DECK' | 'WELCOME';
 
 export default function Home() {
   const isMobileSystem = useIsMobile();
-  const [viewModeOverride, setViewModeOverride] = useState<'desktop' | 'mobile' | null>(null);
-  const [requestedTheme, setRequestedTheme] = useState<string | null>(null);
+  const [mode, setMode] = useState<UIMode | null>(null);
   const [mounted, setMounted] = useState(false);
+  const { pause, setQueue, updateMix } = usePlayback();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  // Reset override and requested theme on system change
-  useEffect(() => {
-    setViewModeOverride(null);
-    setRequestedTheme(null);
+    // 1. Check Persistence
+    const saved = localStorage.getItem('melora-ui-mode') as UIMode;
+    if (saved && ['CLASSIC', 'DISCOVERY', 'DECK'].includes(saved)) {
+      setMode(saved);
+    } else {
+      // 2. Default to Welcome Screen (First Run Experience)
+      // Exception: If strict mobile app, maybe default to Classic? 
+      // But standard "App" behavior is often a choice.
+      // Let's restore the choice. "Bruh where is welcome screen" -> They want the choice.
+      setMode('WELCOME');
+    }
   }, [isMobileSystem]);
 
-  if (!mounted) return null;
+  // Function to Switch Modes (Passed down via Context or Props if needed, 
+  // but usually components will just set localStorage and reload or we pass a callback)
+  // For now, components can use:
+  // window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'DECK' }));
+  // We listen for it here.
 
-  const effectiveMode = viewModeOverride || (isMobileSystem ? 'mobile' : 'desktop');
+  useEffect(() => {
+    const handleModeChange = (e: CustomEvent) => {
+      const newMode = e.detail as UIMode;
+      if (['CLASSIC', 'DISCOVERY', 'DECK', 'WELCOME'].includes(newMode)) {
+        // STOP LOOPHOLE: Switching modes resets the experience.
+        pause();
+        // Optional: Clear queue to force "Insert Tape" or "Select Song"
+        // setQueue([]); 
 
+        setMode(newMode);
+        localStorage.setItem('melora-ui-mode', newMode);
+      }
+    };
+    window.addEventListener('melora-mode-change', handleModeChange as any);
+    return () => window.removeEventListener('melora-mode-change', handleModeChange as any);
+  }, []);
+
+  if (!mounted || !mode) return <SplashScreen text="INITIALIZING..." />;
+
+  // Render ONE mode exclusively (Unmount others)
   return (
-    <main className="w-full h-full">
+    <main className="w-full h-full bg-black overflow-hidden relative">
       <ErrorBoundary>
-        <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center font-mono">LOADING SYSTEM...</div>}>
-          {effectiveMode === 'mobile' ? (
-            <AndroidEntry
-              onSwitchToDesktop={(theme?: string) => {
-                setViewModeOverride('desktop');
-                if (theme) setRequestedTheme(theme);
+        <Suspense fallback={<SplashScreen text="LOADING..." />}>
+
+          {mode === 'WELCOME' && (
+            <SetupWizard
+              onComplete={(selectedMode) => {
+                setMode(selectedMode);
+                localStorage.setItem('melora-ui-mode', selectedMode);
               }}
             />
-          ) : (
-            <WindowsStage
-              onSwitchToMobile={() => setViewModeOverride('mobile')}
-              initialTheme={requestedTheme}
+          )}
+
+          {mode === 'CLASSIC' && (
+            <ClassicMode
+              onSwitchToDesktop={(theme) => {
+                // Classic -> Discovery/Deck Switcher
+                const target = theme === 'GLASS' ? 'DISCOVERY' : 'DECK';
+                setMode(target);
+                localStorage.setItem('melora-ui-mode', target);
+              }}
+            />
+          )}
+
+          {mode === 'DISCOVERY' && (
+            <DiscoveryMode />
+            // Note: DiscoveryLayout handles internal Theme state.
+            // We need a way to Switch to Deck/Classic from inside Discovery.
+            // We will add a "Mode Switcher" UI later.
+          )}
+
+          {mode === 'DECK' && (
+            <DeckMode
+              onSwitchToMobile={() => {
+                setMode('CLASSIC');
+                localStorage.setItem('melora-ui-mode', 'CLASSIC');
+              }}
+            // Deck -> Discovery handled via Settings often
             />
           )}
         </Suspense>
       </ErrorBoundary>
     </main>
+  );
+}
+
+function SplashScreen({ text }: { text: string }) {
+  return (
+    <div className="fixed inset-0 bg-black text-zinc-500 flex items-center justify-center font-mono text-xs tracking-[0.2em] animate-pulse">
+      {text}
+    </div>
   );
 }
