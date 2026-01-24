@@ -140,10 +140,10 @@ export function HomeView({ colors, trending, charts, recent, loading, onPlay, on
                                     Trending Now
                                 </span>
                                 <h1 className="text-5xl md:text-7xl font-black text-white leading-none tracking-tight mb-4 drop-shadow-2xl">
-                                    {heroSong?.name || "Melora Tunes"}
+                                    {heroSong?.name || (loading ? "Loading..." : "Premium Discovery")}
                                 </h1>
                                 <p className="text-lg text-white/70 font-medium mb-8 line-clamp-2 max-w-lg">
-                                    {heroSong?.primaryArtists} • Experience the highest fidelity audio streaming engine.
+                                    {heroSong ? `${heroSong.primaryArtists} • Highest Fidelity` : "Connect to the Pulse of Music."}
                                 </p>
 
                                 <div className="flex items-center gap-4">
