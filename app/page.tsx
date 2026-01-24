@@ -23,8 +23,9 @@ const DeckMode = dynamic(() => import("@/components/windows/scenes/stage").then(
 });
 
 import { SetupWizard } from "@/components/windows/scenes/setup-wizard";
+import { Launcher } from "@/components/windows/scenes/launcher";
 
-type UIMode = 'CLASSIC' | 'DISCOVERY' | 'DECK' | 'WELCOME';
+export type UIMode = 'CLASSIC' | 'DISCOVERY' | 'DECK' | 'WELCOME' | 'LAUNCHER';
 
 export default function Home() {
   const isMobileSystem = useIsMobile();
@@ -34,15 +35,13 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    // 1. Check Persistence
-    const saved = localStorage.getItem('melora-ui-mode') as UIMode;
-    if (saved && ['CLASSIC', 'DISCOVERY', 'DECK'].includes(saved)) {
-      setMode(saved);
+
+    // User Request: "When setup is done and user open normally app show this (Interface Chooser)"
+    const isSetupDone = localStorage.getItem('melora-setup-complete') === 'true';
+
+    if (isSetupDone) {
+      setMode('LAUNCHER');
     } else {
-      // 2. Default to Welcome Screen (First Run Experience)
-      // Exception: If strict mobile app, maybe default to Classic? 
-      // But standard "App" behavior is often a choice.
-      // Let's restore the choice. "Bruh where is welcome screen" -> They want the choice.
       setMode('WELCOME');
     }
   }, [isMobileSystem]);
@@ -56,7 +55,7 @@ export default function Home() {
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
       const newMode = e.detail as UIMode;
-      if (['CLASSIC', 'DISCOVERY', 'DECK', 'WELCOME'].includes(newMode)) {
+      if (['CLASSIC', 'DISCOVERY', 'DECK', 'WELCOME', 'LAUNCHER'].includes(newMode)) { // Updated valid modes
         // STOP LOOPHOLE: Switching modes resets the experience.
         pause();
         // Optional: Clear queue to force "Insert Tape" or "Select Song"
@@ -78,9 +77,19 @@ export default function Home() {
       <ErrorBoundary>
         <Suspense fallback={<SplashScreen text="LOADING..." />}>
 
+          {mode === 'LAUNCHER' && (
+            <Launcher
+              onSelect={(selectedMode) => {
+                setMode(selectedMode);
+                localStorage.setItem('melora-ui-mode', selectedMode);
+              }}
+            />
+          )}
+
           {mode === 'WELCOME' && (
             <SetupWizard
               onComplete={(selectedMode) => {
+                localStorage.setItem('melora-setup-complete', 'true'); // Added setup complete flag
                 setMode(selectedMode);
                 localStorage.setItem('melora-ui-mode', selectedMode);
               }}

@@ -25,6 +25,7 @@ import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useIpodAudio } from "@/hooks/use-ipod-audio";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 interface MenuItem {
     label: string;
@@ -172,7 +173,13 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     // Audio Hook
     const { playLock, playClick, playScroll } = useIpodAudio();
 
+    const isMobile = useIsMobile();
+
     const handleSwitchToDesktop = (mode?: string) => { // Updated to accept string for 'GLASS'
+        if (isMobile && mode !== 'GLASS') {
+            showToast("Desktop Only Feature");
+            return;
+        }
         // Small delay to hear sound before unmount
         setTimeout(() => {
             if (onSwitchToDesktop) onSwitchToDesktop(mode);
