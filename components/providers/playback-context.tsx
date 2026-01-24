@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { JioSaavnSong, getAudioUrl, getSongDetails, searchSongs } from "@/lib/jiosaavn";
 import { getHiFiStream } from '@/lib/hifi-client';
@@ -838,6 +840,39 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
                 return result;
             }
+        }
+
+        // --- PHASE 3: LAST RESORT (Hail Mary) ---
+        // If specific ID/Quality lookup failed, the ID might be dead. 
+        // Try to find ANY version of this song that works.
+        try {
+            console.log(`[Resolver] Phase 3: Hail Mary for "${songName}"...`);
+            const query = `${songName} ${track.song.primaryArtists}`;
+            const results = await searchSongs(query);
+
+            if (results && results.length > 0) {
+                // Find first with media
+                const match = results.find(s => s.encryptedMediaUrl);
+                if (match) {
+                    // Normalize names to verify it's not a totally different song
+                    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const n1 = normalize(match.name);
+                    const n2 = normalize(songName);
+
+                    // Allow substring match or fuzzy match
+                    if (n1.includes(n2) || n2.includes(n1)) {
+                        console.log(`[Resolver] ✓ Hail Mary Success: Swapped ID ${track.id} -> ${match.id}`);
+                        // Use standard 160kbps for safety
+                        const url = getAudioUrl(match, '160');
+                        if (url) {
+                            showToast("Source repaired automatically", 'info');
+                            return { url, quality: '160' };
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[Resolver] Hail Mary failed:", e);
         }
 
         console.error(`[Resolver] ✗ All Resolvers Failed`);
