@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, Disc, Smartphone, CassetteTape, Github, MessageCircle, Coffee } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Volume2, VolumeX, Disc, Smartphone, CassetteTape, Github, MessageCircle, Coffee, AudioWaveform } from 'lucide-react';
 import type { UIMode } from '@/app/page';
 
 interface LauncherProps {
@@ -45,15 +45,15 @@ export function Launcher({ onSelect }: LauncherProps) {
                 {/* Header */}
                 <header className="p-8 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-                            <span className="font-bold text-xs tracking-tighter">MT</span>
+                        <div className="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
+                            <AudioWaveform size={20} className="text-white" />
                         </div>
-                        <span className="font-bold tracking-widest text-sm text-white/70">MELORA TUNES</span>
+                        <span className="font-display font-bold text-xl tracking-tighter uppercase">Melora Tunes</span>
                     </div>
 
                     <button
                         onClick={() => setIsMuted(!isMuted)}
-                        className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full transition-all text-white/50 hover:text-white"
+                        className="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors"
                         aria-label={isMuted ? "Unmute" : "Mute"}
                     >
                         {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
@@ -84,7 +84,7 @@ function ModeSelector({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m:
             animate={{ opacity: 1, scale: 1 }}
             className="w-full max-w-5xl"
         >
-            <h2 className="text-3xl md:text-5xl font-bold text-center mb-12 drop-shadow-2xl">Choose your Interface</h2>
+            <h2 className="text-3xl font-bold text-center mb-10">Choose your Interface</h2>
 
             <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
                 {/* 1. DISCOVERY */}
@@ -122,24 +122,23 @@ function ModeSelector({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m:
 
 function ModeCard({ title, desc, icon, onClick, color }: any) {
     return (
-        <motion.button
-            whileHover={{ y: -10, scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+        <button
             onClick={onClick}
-            className={`relative group h-64 md:h-80 rounded-3xl overflow-hidden text-left p-8 flex flex-col justify-end bg-gradient-to-br ${color} shadow-2xl border border-white/10`}
+            className="relative group h-64 rounded-3xl overflow-hidden border border-white/10 hover:border-white transition-all text-left p-6 flex flex-col justify-end"
         >
-            <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-500" />
+            <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-20 group-hover:opacity-40 transition-opacity`} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+            {/* 3. Bottom Gradient (Text Legibility) */}
+            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 
-            {/* Icon */}
-            <div className="absolute top-8 left-8 p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white group-hover:bg-white group-hover:text-black transition-all duration-300 shadow-lg">
-                {icon}
+            <div className="relative z-10 transform group-hover:-translate-y-2 transition-transform duration-300">
+                <div className="mb-4 w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md group-hover:bg-white group-hover:text-black transition-colors">
+                    {icon}
+                </div>
+                <h3 className="text-2xl font-bold mb-1">{title}</h3>
+                <p className="text-white/60 text-sm opacity-0 group-hover:opacity-100 transition-opacity transition-delay-100">{desc}</p>
             </div>
-
-            <div className="relative z-10">
-                <h3 className="text-2xl font-bold mb-2">{title}</h3>
-                <p className="text-white/70 font-medium group-hover:text-white transition-colors">{desc}</p>
-            </div>
-        </motion.button>
+        </button>
     );
 }
 
