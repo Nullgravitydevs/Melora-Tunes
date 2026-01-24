@@ -74,6 +74,54 @@ export class DiscoveryEngine {
         };
     }
 
+    /**
+     * Generate a Genre-Based Mix
+     */
+    static async generateGenreMix(genre: string, region?: string): Promise<Mix> {
+        console.log(`💿 The DJ: Mixing Genre: ${genre}`);
+        try {
+            // 1. Find a seed
+            const query = `${genre} Hits ${region || ''}`;
+            const results = await searchUnified(query);
+
+            if (results.length === 0) throw new Error("No seed found for genre");
+
+            // Pick random top seed to avoid same start every time
+            const seed = results[Math.floor(Math.random() * Math.min(5, results.length))];
+
+            // 2. Generate Mix
+            const mix = await this.generateSessionMix(seed, region);
+            mix.title = `${genre} Mix`; // Override title
+            mix.color = 'purple';
+            return mix;
+        } catch (e) {
+            console.error("Genre Mix Failed", e);
+            throw e;
+        }
+    }
+
+    /**
+     * Generate a Chart-Based Mix
+     */
+    static async generateChartMix(chartName: string, region?: string): Promise<Mix> {
+        console.log(`💿 The DJ: Mixing Chart: ${chartName}`);
+        try {
+            const query = `${chartName} ${region || ''}`;
+            const results = await searchUnified(query);
+
+            if (results.length === 0) throw new Error("No seed found for chart");
+
+            const seed = results[0]; // Chart usually implies order, pick top
+
+            const mix = await this.generateSessionMix(seed, region);
+            mix.title = `${chartName}`;
+            mix.color = 'red';
+            return mix;
+        } catch (e) {
+            throw e;
+        }
+    }
+
     // --- Ingredient Sourcing ---
 
     private static async getTasteCandidates(): Promise<PlayableTrack[]> {

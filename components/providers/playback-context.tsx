@@ -459,14 +459,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                         if (currentMix && currentMix.id === activeMixIdRef.current) {
 
                             // Merge Strategy: Append new songs (excluding duplication)
+                            // Merge Strategy: Append new songs (excluding duplication)
                             const newSongs = newMix.songs.filter(s => {
+                                const sTrack = isPlayableTrack(s) ? s : ensurePlayableTrack(s);
+
                                 // Exclude the seed itself if it's identical to current playback
-                                if (s.id === seed.id || (s.song && s.song.id === seed.id)) return false;
+                                if (sTrack.id === seed.id || sTrack.song.id === seed.song.id) return false;
 
                                 // Exclude duplicates existing in the mix
                                 return !currentMix.songs.some(existing => {
                                     const e = isPlayableTrack(existing) ? existing.song : existing;
-                                    const c = isPlayableTrack(s) ? s.song : s;
+                                    const c = sTrack.song;
                                     return e.id === c.id;
                                 });
                             });

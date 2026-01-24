@@ -399,8 +399,17 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         const loadData = async () => {
             setLoading(true);
             try {
-                // 1. Fetch Trending
-                const trendingSongs = await getTrending();
+                // 1. Fetch Trending (Contextual)
+                let trendingSongs: any[] = [];
+                if (activeRegion && activeRegion !== 'global') {
+                    // Use Search for Regional Trending
+                    const query = `Trending ${activeRegion}`;
+                    const items = await searchUnified(query);
+                    trendingSongs = items.map(t => t.song);
+                } else {
+                    // Global Default
+                    trendingSongs = await getTrending();
+                }
 
                 // 2. Fetch Charts
                 const topCharts = await getTopCharts();
@@ -656,12 +665,17 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     { id: 'indie', name: 'Indie', color: '#F97316', icon: '🌻' },
                 ];
 
-                const exploreGenre = async (genre: any) => {
-                    const results = await searchUnified(genre.name + " Hits", 'song');
-                    if (results.length > 0) {
-                        handlePlay(results[0].song);
-                    } else {
-                        alert(`No songs found for ${genre.name}`);
+                const handleGenrePlay = async (genre: any) => {
+                    if (isGeneratingMix) return;
+                    setIsGeneratingMix(true);
+                    try {
+                        const mix = await DiscoveryEngine.generateGenreMix(genre.name, activeRegion || undefined);
+                        playInstantMix(mix);
+                    } catch (e) {
+                        console.error("Genre Mix Failed", e);
+                        alert("Could not start mix for " + genre.name);
+                    } finally {
+                        setIsGeneratingMix(false);
                     }
                 };
 
@@ -683,7 +697,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                         className="h-24 rounded-xl flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden group"
                                         style={{ backgroundColor: genre.color }}
                                         whileHover={{ scale: 1.02 }}
-                                        onClick={() => exploreGenre(genre)}
+                                        onClick={() => handleGenrePlay(genre)}
                                     >
                                         <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
                                         <span className="text-2xl relative z-10">{genre.icon}</span>
@@ -698,21 +712,23 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             <h2 className="text-lg font-bold mb-4">Editorial Collections</h2>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {[
-                                    { title: "Fresh Regional Hits", subtitle: "Trending Globally", term: "Trending India" },
-                                    { title: "Late Night Listening", subtitle: "LoFi & Chill", term: "LoFi Chill" },
-                                    { title: "Global Indie Picks", subtitle: "Undiscovered Gems", term: "Indie Pop" },
+                                    { title: 'New & Hot', subtitle: 'The latest chart toppers', image: 'https://c.saavncdn.com/editorial/logo/Charts_TopTrending_1650361250_random.jpg' },
+                                    { title: 'Global Top 50', subtitle: 'Most played worldwide', image: 'https://c.saavncdn.com/editorial/logo/Charts_Top50Global_1669032733_random.jpg' },
+                                    { title: 'Feel Good', subtitle: 'Boost your mood', image: 'https://c.saavncdn.com/editorial/logo/Charts_FeelGood_1672658826_random.jpg' }
                                 ].map((item, i) => (
-                                    <div key={i} className="bg-white/5 p-6 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer border border-white/5 group"
+                                    <FeatureCard
+                                        key={i}
+                                        {...item}
                                         onClick={async () => {
-                                            const res = await searchUnified(item.term);
-                                            if (res.length > 0) handlePlay(res[0].song);
-                                        }}>
-                                        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                            <Play size={20} fill="white" />
-                                        </div>
-                                        <h3 className="text-xl font-bold mb-1">{item.title}</h3>
-                                        <p className="text-white/50">{item.subtitle}</p>
-                                    </div>
+                                            if (isGeneratingMix) return;
+                                            setIsGeneratingMix(true);
+                                            try {
+                                                const mix = await DiscoveryEngine.generateChartMix(item.title, activeRegion || undefined);
+                                                playInstantMix(mix);
+                                            } catch (e) { console.error(e); } finally { setIsGeneratingMix(false); }
+                                        }}
+                                        colors={c}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -794,6 +810,14 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         }}
                         activeRegion={activeRegion}
                         onRegionChange={setActiveRegion}
+                        onPlayChart={async (chart) => {
+                            if (isGeneratingMix) return;
+                            setIsGeneratingMix(true);
+                            try {
+                                const mix = await DiscoveryEngine.generateChartMix(chart.title, activeRegion || undefined);
+                                playInstantMix(mix);
+                            } catch (e) { console.error(e); } finally { setIsGeneratingMix(false); }
+                        }}
                     />
                 );
             case 'artist':

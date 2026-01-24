@@ -24,9 +24,10 @@ interface HomeViewProps {
     onNavigate: (view: string, data?: any) => void;
     activeRegion: string | null;
     onRegionChange: (region: string | null) => void;
+    onPlayChart: (chart: any) => void;
 }
 
-export function HomeView({ colors, trending, charts, recent, loading, onPlay, onNavigate, activeRegion, onRegionChange }: HomeViewProps) {
+export function HomeView({ colors, trending, charts, recent, loading, onPlay, onNavigate, activeRegion, onRegionChange, onPlayChart }: HomeViewProps) {
     const { playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
     const videoRef = useRef<HTMLVideoElement>(null);
     const [scrolled, setScrolled] = useState(false);
@@ -215,9 +216,9 @@ export function HomeView({ colors, trending, charts, recent, loading, onPlay, on
                                     subtitle={chart.subtitle}
                                     image={chart.image}
                                     colors={colors}
-                                    onClick={() => onPlay(trending[0])}
+                                    onClick={() => onPlayChart(chart)}
                                     type="CHART"
-                                    isNew={i === 0}
+                                    isNew={chart.isNew}
                                 />
                             ))}
                         </div>
@@ -225,7 +226,7 @@ export function HomeView({ colors, trending, charts, recent, loading, onPlay, on
 
                     {/* 4. Trending List */}
                     <section className="max-w-4xl">
-                        <SectionHeader title="Trending Global" subtitle="Top 20 hits right now" />
+                        <SectionHeader title={`Trending ${activeRegion ? activeRegion.charAt(0).toUpperCase() + activeRegion.slice(1) : 'Global'}`} subtitle="Top 20 hits right now" />
                         <div className="flex flex-col gap-1">
                             {trending.slice(0, 10).map((song, i) => (
                                 <TrackRow
