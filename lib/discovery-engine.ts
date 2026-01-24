@@ -5,6 +5,18 @@ import { getTrending, searchSongs, getSongDetails } from './jiosaavn';
 import { searchUnified } from './unified-search';
 import { Mix } from '@/components/providers/playback-context';
 
+// --- STRICT NORMALIZATION ---
+export function normalizeIdentity(title: string, artist: string): string {
+    const t = title.toLowerCase()
+        .split('(')[0] // Remove brackets
+        .split('[')[0]
+        .split('-')[0] // Remove hyphens (Risk: "Song - Remix" -> "Song") - Acceptable for dedup
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+    const a = artist.toLowerCase().split(',')[0].replace(/[^a-z0-9]/g, '').trim();
+    return `${t}|${a}`;
+}
+
 export class DiscoveryEngine {
 
     // THE GOLDEN RATIO (Fixed)
@@ -81,10 +93,6 @@ export class DiscoveryEngine {
 
     private static async getRegionalCandidates(region?: string): Promise<PlayableTrack[]> {
         try {
-            // If region is provided, search for "Trending [Region]" or use a specific chart?
-            // Since we don't have direct regional chart API exposed easily, we can use search 
-            // or if we had a regional trending endpoint.
-            // For now, let's use searchUnified with a regional query or fallback to global trending.
             if (region && region.toLowerCase() !== 'global') {
                 const query = `${region} Hit Songs`;
                 const results = await searchUnified(query);
@@ -108,13 +116,21 @@ export class DiscoveryEngine {
 
     private static async getWildcardCandidates(region?: string): Promise<PlayableTrack[]> {
         // High Quality Wildcards - biased by region if present
-        const baseTerms = ['Top', 'Viral', 'New', 'Hifi', 'Master'];
+        const baseTerms = ['Top', 'Viral', 'New', 'Hifi', 'Master', 'Essential', 'Best of'];
         const term = baseTerms[Math.floor(Math.random() * baseTerms.length)];
         const query = region ? `${region} ${term}` : term;
 
         try {
             const results = await searchUnified(query);
-            return results.sort(() => 0.5 - Math.random()); // Randomize
+            // Strict Filter: Remove Junk
+            const clean = results.filter(track => {
+                const name = track.song.name.toLowerCase();
+                const junk = ['remix', 'lofi', 'slowed', 'reverb', 'cover', 'live at', 'demo'];
+                if (junk.some(j => name.includes(j))) return false;
+                return true;
+            });
+
+            return clean.sort(() => 0.5 - Math.random()); // Randomize
         } catch (e) { return []; }
     }
 
@@ -122,56 +138,55 @@ export class DiscoveryEngine {
 
     private static smartShuffle(pool: PlayableTrack[], seed: PlayableTrack): PlayableTrack[] {
         const history = HistoryStore.getHistory(); // Last 50
-        // Filter out recent history (Last 24h)
+        // Filter out recent history (Last 20 items to avoid repetition)
         const recentIds = new Set(history.slice(0, 20).map(h => h.id));
 
         const unique = new Map<string, PlayableTrack>();
         const artistCounts = new Map<string, number>();
 
-        // Normalize helper
-        const normalize = (str: string) => str?.toLowerCase().split('(')[0].replace(/[^a-z0-9]/g, '') || '';
-
         // Add SEED first manually to ensure it exists
-        unique.set(seed.id, seed);
-        const seedArtist = seed.song.primaryArtists.split(',')[0];
+        unique.set(normalizeIdentity(seed.song.name, seed.song.primaryArtists), seed);
+
+        const seedArtist = seed.song.primaryArtists.split(',')[0].trim();
         artistCounts.set(seedArtist, 1);
 
         for (const track of pool) {
             // SKIP Seed (already added)
-            if (track.id === seed.id) continue;
+            // if (track.id === seed.id) continue; // ID check might fail if different providers
 
             // 1. Anti-Loop (Recent History)
             if (recentIds.has(track.id)) continue;
 
-            // 2. Exact Deduplication
-            if (unique.has(track.id)) continue;
+            // 2. Normalization Identity Check
+            const identity = normalizeIdentity(track.song.name, track.song.primaryArtists);
+            if (unique.has(identity)) continue;
 
-            // 3. Fuzzy Deduplication (Same Title)
-            const normTitle = normalize(track.song.name);
-            const duplicateTitle = Array.from(unique.values()).some(t => normalize(t.song.name) === normTitle);
-            if (duplicateTitle) continue;
-
-            // 4. Artist Cap (Max 2 per mix)
-            const artist = track.song.primaryArtists.split(',')[0];
+            // 3. Artist Cap (Max 2 per mix)
+            const artist = track.song.primaryArtists.split(',')[0].trim();
             const count = artistCounts.get(artist) || 0;
-            if (count >= 2) continue;
+            if (count >= 2) continue; // Strict Cap
 
             // Add
-            unique.set(track.id, track);
+            unique.set(identity, track);
             artistCounts.set(artist, count + 1);
         }
 
-        // Convert to array and Shuffle
+        // Convert to array
         const result = Array.from(unique.values());
 
         // Ensure Seed is #1
-        const seedIndex = result.findIndex(s => s.id === seed.id);
-        if (seedIndex > -1) result.splice(seedIndex, 1);
+        // (It was added first to the map, but Map order is insertion order usually.
+        // But let's be explicit)
+        const seedIdentity = normalizeIdentity(seed.song.name, seed.song.primaryArtists);
+        const seedTrack = unique.get(seedIdentity);
 
-        // Shuffle rest
-        result.sort(() => 0.5 - Math.random());
+        // Remove seed from result to shuffle the rest
+        const others = result.filter(t => t !== seedTrack);
 
-        // Prepend Seed
-        return [seed, ...result];
+        // Shuffle others
+        others.sort(() => 0.5 - Math.random());
+
+        // Return Seed + Others
+        return [seedTrack!, ...others];
     }
 }

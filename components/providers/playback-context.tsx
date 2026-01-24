@@ -1,10 +1,8 @@
-"use client";
-
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { JioSaavnSong, getAudioUrl, getStation, getSongDetails, searchSongs } from "@/lib/jiosaavn";
+import { JioSaavnSong, getAudioUrl, getSongDetails, searchSongs } from "@/lib/jiosaavn";
 import { getHiFiStream } from '@/lib/hifi-client';
-import { searchHiFi } from '@/lib/hifi'; // God Mode Search
-import { KeyVault } from '@/lib/key-vault'; // Lazarus Loop Feedback
+import { searchHiFi } from '@/lib/hifi';
+import { KeyVault } from '@/lib/key-vault';
 import { AudioPlayer, AudioPlayerRef } from "@/components/ui/audio-player";
 import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { recordPlay } from "@/lib/stats";
@@ -14,6 +12,7 @@ import { useEqualizer } from "@/hooks/useEqualizer";
 import { OfflineStore } from "@/lib/offline-store";
 import { HistoryStore } from "@/lib/history-store";
 import { SignalStore } from "@/lib/signal-store";
+import { DiscoveryEngine } from '@/lib/discovery-engine';
 
 // --- Audio Quality Abstraction ---
 import { AudioQuality, PlayableSource, PlayableTrack, isPlayableTrack } from "@/lib/types";
@@ -148,6 +147,9 @@ interface PlaybackContextType {
 
     // Atomic Playback
     playInstantMix: (mix: Mix) => void;
+
+    // Active Streaming Quality
+    activeQuality: AudioQuality | null;
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -177,6 +179,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [playbackSpeed, setPlaybackSpeed] = useState(1); // 0.5, 0.75, 1, 1.25, 1.5, 2
     const [skipSegments, setSkipSegments] = useState<SkipSegment[]>([]);
     const [downloadedState, setDownloadedState] = useState<Record<string, AudioQuality[]>>({});
+    const [activeQuality, setActiveQuality] = useState<AudioQuality | null>(null);
 
     // Toast State
     const [toast, setToast] = useState<ToastState | null>(null);
@@ -418,63 +421,69 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // Sync active mix song to currentSong - REMOVED (Computed state)
 
     // --- Autoplay & Pre-fetch Logic ---(Moved after Actions) ---
+    // --- Autoplay & Pre-fetch Logic ---
     const autoplayFetchedRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (!activeMixId || !isPlaying || duration <= 0 || !currentSong) return;
 
-        // Reset fetcher if song changed or mix changed
+        // Reset fetcher if song changed
         if (autoplayFetchedRef.current !== currentSong.id) {
             autoplayFetchedRef.current = null;
         }
 
-        // Trigger 20 seconds before end (or 50% for short songs)
+        // Trigger 20 seconds before end
         const threshold = Math.max(duration - 20, duration * 0.5);
 
         if (progress >= threshold && !autoplayFetchedRef.current && !isStationGenerating.current) {
             const activeMix = mixes.find(m => m.id === activeMixId);
             // Only fetch if we are actually at the end of the queue
             if (activeMix && activeMix.currentSongIndex >= activeMix.songs.length - 1) {
-                console.log("[Autoplay] Pre-fetching recommendations for:", currentSong.name);
+                console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
                 autoplayFetchedRef.current = currentSong.id; // Mark as fetching
                 isStationGenerating.current = true;
 
-                getStation(currentSong.id).then((stationSongs) => {
-                    isStationGenerating.current = false;
-                    if (stationSongs && stationSongs.length > 0) {
+                // Use Discovery Engine to Extend
+                // Use the current song as the seed for continuity
+                const seed = ensurePlayableTrack(currentSong);
+
+                // Infer region from Mix title? Weak heuristic but works for now.
+                // e.g. "Telugu Mix" -> "telugu" (To be refined later)
+                const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
+
+                DiscoveryEngine.generateSessionMix(seed, inferredRegion)
+                    .then((newMix) => {
+                        isStationGenerating.current = false;
                         // Use Ref to get latest state
                         const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
                         if (currentMix && currentMix.id === activeMixIdRef.current) {
-                            // Double check we haven't navigated away
-                            const newUnique = stationSongs.filter(s => !currentMix.songs.some(existing => {
-                                const e = isPlayableTrack(existing) ? existing.song : existing;
-                                // 1. Strict ID Match
-                                if (e.id === s.id) return true;
-                                // 2. Fuzzy Match (Name + Artist) to catch duplicates with different IDs
-                                // Normalized comparision
-                                const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
-                                if (normalize(e.name) === normalize(s.name) &&
-                                    normalize(e.primaryArtists) === normalize(s.primaryArtists)) {
-                                    return true;
-                                }
-                                return false;
-                            }));
-                            if (newUnique.length > 0) {
-                                console.log(`[Autoplay] Added ${newUnique.length} tracks to queue`);
-                                // Wrap new songs as PlayableTracks with current global settings
-                                console.log(`[Autoplay] Added ${newUnique.length} tracks to queue`);
-                                // Wrap new songs as PlayableTracks with current global settings
-                                // Fix 6: Station tracks default to 320. No Hi-Res implication.
-                                const wrappedSongs = newUnique.map(s => ensurePlayableTrack(s, '320'));
-                                updateMix(currentMix.id, { songs: [...currentMix.songs, ...wrappedSongs] });
+
+                            // Merge Strategy: Append new songs (excluding duplication)
+                            const newSongs = newMix.songs.filter(s => {
+                                // Exclude the seed itself if it's identical to current playback
+                                if (s.id === seed.id || (s.song && s.song.id === seed.id)) return false;
+
+                                // Exclude duplicates existing in the mix
+                                return !currentMix.songs.some(existing => {
+                                    const e = isPlayableTrack(existing) ? existing.song : existing;
+                                    const c = isPlayableTrack(s) ? s.song : s;
+                                    return e.id === c.id;
+                                });
+                            });
+
+                            if (newSongs.length > 0) {
+                                console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
+                                updateMix(currentMix.id, { songs: [...currentMix.songs, ...newSongs] });
+                            } else {
+                                console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
                             }
                         }
-                    }
-                }).catch(err => {
-                    console.error("[Autoplay] Failed to fetch station:", err);
-                    isStationGenerating.current = false;
-                    autoplayFetchedRef.current = null; // Retry capable?
-                });
+                    })
+                    .catch(err => {
+                        console.error("[Autoplay] Failed to extend session:", err);
+                        isStationGenerating.current = false;
+                        // Allow retry?
+                    });
             }
         }
     }, [progress, duration, activeMixId, isPlaying, currentSong, updateMix, bitrate]);
@@ -908,6 +917,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     currentStreamKeyRef.current = result.keyName;
                     console.log(`[Playback] Active Key: ${result.keyName}`);
                 }
+                setActiveQuality(result.quality);
             } else {
                 throw new Error("All qualities failed");
             }
@@ -1347,7 +1357,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         playbackSpeed, setPlaybackSpeed,
         eq,
         downloadSong, removeDownload, isDownloaded,
-        playInstantMix
+        playInstantMix,
+        activeQuality
     };
 
     return (

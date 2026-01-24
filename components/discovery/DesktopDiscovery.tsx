@@ -337,7 +337,8 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
 
 export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps) {
     const isMidnight = theme === 'midnight';
-    const { playInstantMix, currentSong, currentTrack, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, toggleLike, isLiked, likedSongs, activeMixId, activeMix, mixes, updateMix } = usePlayback();
+    const { playInstantMix, currentSong, currentTrack, activeQuality, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, toggleLike, isLiked, likedSongs, activeMixId, activeMix, mixes, updateMix } = usePlayback();
+
 
     const addToOTG = (song: any) => {
         const otgMix = mixes.find(m => m.id === 'otg-tape');
@@ -475,41 +476,56 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
 
 
+    // Mix Loading State
+    const [isGeneratingMix, setIsGeneratingMix] = useState(false);
+
     const handlePlay = async (song: any, allSongs: any[] = []) => {
-        if (!song) return;
+        if (!song || isGeneratingMix) return;
 
-        // STRICT DISCOVERY MODE: Always generate a mix unless explicit User Playlist/Album context.
-        if (allSongs.length > 0) {
-            // Contextual Play (Playlist/Album only)
-            let songList = allSongs;
-            let startIndex = songList.findIndex(s => s.id === song.id);
+        // VISUAL FEEDBACK: Start Loading
+        setIsGeneratingMix(true);
 
-            const newMix: Mix = {
-                id: 'context-mix',
-                title: "Context Mix",
-                color: 'blue',
-                songs: songList,
-                currentSongIndex: startIndex >= 0 ? startIndex : 0
-            };
-            playInstantMix(newMix);
-        } else {
-            // THE DJ MODE (Discovery Engine)
-            try {
-                const seed = ensurePlayableTrack(song);
-                // PASS ACTIVE REGION
-                const sessionMix = await DiscoveryEngine.generateSessionMix(seed, activeRegion || undefined);
-                playInstantMix(sessionMix);
-            } catch (e) {
-                console.error("DJ Failed:", e);
-                // Fallback safe play
-                playInstantMix({
-                    id: 'fallback-mix',
-                    title: 'Mix',
+        try {
+            await new Promise(r => setTimeout(r, 50)); // Micro-yield for UI update
+
+            // STRICT DISCOVERY MODE: Always generate a mix unless explicit User Playlist/Album context.
+            if (allSongs.length > 0) {
+                // Contextual Play (Playlist/Album only) - ALLOW RAW QUEUE HERE FOR ALBUMS ONLY
+                let songList = allSongs;
+                let startIndex = songList.findIndex(s => s.id === song.id);
+
+                const newMix: Mix = {
+                    id: `context-mix-${Date.now()}`,
+                    title: "Context Mix",
                     color: 'blue',
-                    songs: [ensurePlayableTrack(song)],
-                    currentSongIndex: 0
-                });
+                    songs: songList,
+                    currentSongIndex: startIndex >= 0 ? startIndex : 0
+                };
+                playInstantMix(newMix);
+            } else {
+                // THE DJ MODE (Discovery Engine)
+                // 1. Ensure Seed
+                const seed = ensurePlayableTrack(song);
+
+                // 2. Generate Mix
+                // PASS ACTIVE REGION (Session Context)
+                const sessionMix = await DiscoveryEngine.generateSessionMix(seed, activeRegion || undefined);
+
+                // 3. Play
+                playInstantMix(sessionMix);
             }
+        } catch (e) {
+            console.error("DJ Failed:", e);
+            // Fallback safe play (Should rarely happen)
+            playInstantMix({
+                id: 'fallback-mix',
+                title: 'Mix',
+                color: 'blue',
+                songs: [ensurePlayableTrack(song)],
+                currentSongIndex: 0
+            });
+        } finally {
+            setIsGeneratingMix(false);
         }
     };
 
@@ -806,7 +822,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <NowPlayingOverlay
                         song={currentSong}
                         nextSong={(activeMix?.songs || [])[(activeMix?.currentSongIndex || 0) + 1]}
-                        quality={currentTrack?.preferredQuality || '320'}
+                        quality={activeQuality || currentTrack?.preferredQuality || '320'}
                         onClose={() => setActiveView('home')}
                         playback={{
                             isPlaying, togglePlay, next, prev,
@@ -1050,8 +1066,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             <div className="flex-1 min-w-0 flex flex-col justify-center">
                                 <div className="flex items-center gap-2">
                                     <p className="text-sm font-bold text-white truncate cursor-pointer hover:underline" onClick={() => setActiveView('now-playing')}>{currentSong?.name || 'Not Playing'}</p>
-                                    {/* Quality Badge - Use currentTrack for accurate streaming quality */}
-                                    {currentSong && <QualityBadge quality={currentTrack?.preferredQuality || '320'} />}
+                                    {/* Quality Badge - Use activeQuality for accurate streaming quality */}
+                                    {currentSong && <QualityBadge quality={activeQuality || currentTrack?.preferredQuality || '320'} />}
                                 </div>
                                 <p className="text-xs text-white/50 truncate hover:text-white transition-colors cursor-pointer">{currentSong?.primaryArtists || 'Select a song'}</p>
                             </div>
@@ -1118,7 +1134,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             {currentSong && (
                                 <Heart
                                     size={18}
-                                    className={`cursor - pointer transition - all ${isLiked(currentSong.id) ? 'text-[#e91e63] fill-[#e91e63]' : 'text-white/40 hover:text-white'} `}
+                                    className={`cursor-pointer transition-all ${isLiked(currentSong.id) ? 'text-[#e91e63] fill-[#e91e63]' : 'text-white/40 hover:text-white'}`}
                                     onClick={() => toggleLike(currentSong)}
                                 />
                             )}
@@ -1128,9 +1144,39 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 </div>
             )}
             {/* End of Floating Player */}
+
+            {/* === GLOBAL DJ LOADER === */}
+            <AnimatePresence>
+                {isGeneratingMix && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center"
+                    >
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="relative w-16 h-16">
+                                <div className="absolute inset-0 border-t-2 border-white rounded-full animate-spin" />
+                                <div className="absolute inset-2 border-r-2 border-white/50 rounded-full animate-spin-slow" />
+                            </div>
+                            <p className="text-lg font-bold text-white tracking-widest animate-pulse">
+                                DJ is Mixing...
+                            </p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
+
+// Add to style in head or global loop
+const style = `
+@keyframes spin-slow {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+`;
 
 
 
