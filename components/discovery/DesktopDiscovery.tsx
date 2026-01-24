@@ -8,6 +8,7 @@ import { OfflineStore } from "@/lib/offline-store";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
 import { useLyrics } from "@/hooks/useLyrics";
+import { DiscoveryEngine } from "@/lib/discovery-engine";
 import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2 } from "lucide-react";
 
 interface DesktopDiscoveryProps {
@@ -81,7 +82,7 @@ const spring = { type: "spring" as const, stiffness: 400, damping: 30 };
 // --- Now Playing Overlay ---
 // --- Now Playing Overlay ---
 // --- Now Playing Overlay ---
-function NowPlayingOverlay({ song, nextSong, quality, onClose, playback }: { song: any, nextSong: any, quality: string, onClose: () => void, playback: any }) {
+function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddToOTG }: { song: any, nextSong: any, quality: string, onClose: () => void, playback: any, onAddToOTG: (s: any) => void }) {
     const Art = getArt(song);
     const { lyrics, plainLyrics, isSynced, isLoading } = useLyrics(song);
     const [activeIndex, setActiveIndex] = useState(-1);
@@ -191,6 +192,15 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback }: { son
                                 <button onClick={playback.next} className="text-white hover:scale-110 transition-transform drop-shadow-md"><SkipForward size={32} strokeWidth={1.5} /></button>
                             </div>
                             <button onClick={() => playback.setRepeat(playback.repeat === 'one' ? 'none' : playback.repeat === 'all' ? 'one' : 'all')} className={`transition-all ${playback.repeat !== 'none' ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]' : 'text-white/40 hover:text-white'}`}><Repeat size={18} /></button>
+
+                            {/* OTG Add Button */}
+                            <button
+                                onClick={() => onAddToOTG(song)}
+                                className="text-white/40 hover:text-white hover:scale-110 transition-all active:scale-90"
+                                title="Add to On-The-Go Tape"
+                            >
+                                <Plus size={18} />
+                            </button>
                         </div>
                     </div>
 
@@ -625,7 +635,24 @@ function TrackRow({ index, track, colors, isPlaying, onPlay }: any) {
 
 export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps) {
     const isMidnight = theme === 'midnight';
-    const { playInstantMix, currentSong, currentTrack, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, toggleLike, isLiked, likedSongs, activeMixId, activeMix } = usePlayback();
+    const { playInstantMix, currentSong, currentTrack, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, toggleLike, isLiked, likedSongs, activeMixId, activeMix, mixes, updateMix } = usePlayback();
+
+    const addToOTG = (song: any) => {
+        const otgMix = mixes.find(m => m.id === 'otg-tape');
+        if (otgMix && song) {
+            const track = ensurePlayableTrack(song);
+            // Prevent duplicates (optional, but good for tape)
+            const exists = otgMix.songs.some(s => {
+                const sId = 'song' in s ? s.song.id : s.id;
+                return sId === track.song.id;
+            });
+
+            if (!exists) {
+                updateMix('otg-tape', { songs: [...otgMix.songs, track] });
+                // Visual feedback handled by button animation hopefully
+            }
+        }
+    };
 
     const [activeView, setActiveView] = useState('home');
     const [activeTab, setActiveTab] = useState('playlist');
@@ -744,7 +771,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
 
 
-    const handlePlay = (song: any, allSongs: any[] = []) => {
+    const handlePlay = async (song: any, allSongs: any[] = []) => {
         if (!song) return;
 
         let songList: any[] = [];
@@ -754,27 +781,34 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
             // Contextual Play (Playlist/Album/Charts) - Use the provided list
             songList = allSongs;
             startIndex = songList.findIndex(s => s.id === song.id);
+
+            const newMix: Mix = {
+                id: 'discovery-mix', // Persistent Session ID
+                title: "Discovery Mix",
+                color: 'blue',
+                songs: songList,
+                currentSongIndex: startIndex >= 0 ? startIndex : 0
+            };
+            playInstantMix(newMix);
         } else {
-            // Single Song Play (Search) - Build from History (Session Tape)
-            // Get last 40 songs from history to create a seamless "Recent Timeline"
-            const history = HistoryStore.getHistory().slice(0, 40).reverse().map(h => h.track);
-
-            // Remove the target song from history if it exists (to avoid duplicate at end)
-            const cleanHistory = history.filter(h => h.id !== song.id);
-
-            songList = [...cleanHistory, song];
-            startIndex = songList.length - 1;
+            // SINGLE SONG PLAY (The DJ Mode)
+            try {
+                // UI: You could show a toast here if you wanted.
+                const seed = ensurePlayableTrack(song);
+                const sessionMix = await DiscoveryEngine.generateSessionMix(seed);
+                playInstantMix(sessionMix);
+            } catch (e) {
+                console.error("DJ Failed:", e);
+                // Fallback safe play
+                playInstantMix({
+                    id: 'discovery-mix',
+                    title: 'Discovery Mix',
+                    color: 'blue',
+                    songs: [ensurePlayableTrack(song)],
+                    currentSongIndex: 0
+                });
+            }
         }
-
-        const newMix: Mix = {
-            id: 'discovery-mix', // Persistent Session ID
-            title: "Discovery Mix",
-            color: 'blue',
-            songs: songList,
-            currentSongIndex: startIndex >= 0 ? startIndex : 0
-        };
-
-        playInstantMix(newMix);
     };
 
     const performSearch = async (query: string) => {
@@ -1212,6 +1246,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             shuffle, setShuffle, repeat, setRepeat,
                             toggleLike, isLiked: (id: string) => likedSongs.some(s => s.id === id)
                         }}
+                        onAddToOTG={addToOTG}
                     />
                 ) : <div className="flex-1 flex items-center justify-center text-white/50">No song playing</div>;
             case 'library':

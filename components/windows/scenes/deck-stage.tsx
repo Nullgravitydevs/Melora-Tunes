@@ -366,8 +366,15 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             {mixes.map((mix, i) => {
                                 if (mix.id === activeMixId) return null;
 
-                                const bgColor = cassetteColors[mix.color] || "bg-orange-500";
-                                const accentColor = accentColors[mix.color] || "bg-orange-300";
+                                const isOTG = mix.id === 'otg-tape';
+                                // Special Glass Style for OTG
+                                const bgColor = isOTG
+                                    ? "bg-white/20 backdrop-blur-md border border-white/30 shadow-[inset_0_0_20px_rgba(255,255,255,0.2)]"
+                                    : (cassetteColors[mix.color] || "bg-orange-500");
+
+                                const accentColor = isOTG
+                                    ? "bg-white/40"
+                                    : (accentColors[mix.color] || "bg-orange-300");
 
                                 return (
                                     <motion.div
@@ -392,7 +399,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                             bgColor
                                         )}
                                         id={`studio-mix-${mix.id}`}
-                                        style={{ backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px, transparent 2px, transparent 4px)' }}
+                                        style={{ backgroundImage: isOTG ? 'url("/glass-noise.png"), linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)' : 'repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px, transparent 2px, transparent 4px)' }}
                                     >
                                         {/* Screws */}
                                         <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-gray-300 shadow-inner flex items-center justify-center">
@@ -409,13 +416,18 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                         </div>
 
                                         {/* Label */}
-                                        <div className="relative bg-amber-50 mx-2 mt-1 h-20 rounded-sm shadow-sm p-1 transform rotate-0 group-hover:rotate-[0.5deg] transition-transform duration-500 flex flex-col justify-center items-center">
+                                        <div className={clsx(
+                                            "relative mx-2 mt-1 h-20 rounded-sm shadow-sm p-1 transform rotate-0 group-hover:rotate-[0.5deg] transition-transform duration-500 flex flex-col justify-center items-center",
+                                            isOTG ? "bg-white/80 backdrop-blur-sm" : "bg-amber-50"
+                                        )}>
                                             <div className={clsx("absolute top-0 left-0 w-full h-3 opacity-20", accentColor)}></div>
                                             <div className="absolute top-1 left-1 font-mono font-bold text-gray-800 text-sm opacity-60">A</div>
                                             <h3 className="font-hand font-bold text-sm text-gray-900 tracking-tight text-center line-clamp-2">
                                                 {mix.title}
                                             </h3>
-                                            <p className="font-mono text-[10px] text-gray-400 absolute bottom-1 uppercase tracking-widest">Melora High Bias</p>
+                                            <p className="font-mono text-[10px] text-gray-400 absolute bottom-1 uppercase tracking-widest">
+                                                {isOTG ? "MASTER TAPE" : "Melora High Bias"}
+                                            </p>
                                             <div className="w-full h-px bg-gray-200 mt-2 mb-1"></div>
                                             <div className="w-full h-px bg-gray-200"></div>
                                         </div>
@@ -459,48 +471,52 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                             >
                                                 <Pencil size={12} className="text-blue-900" />
                                             </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const node = document.getElementById(`studio-mix-${mix.id}`);
-                                                    if (node) {
-                                                        toPng(node, {
-                                                            filter: (n) => !n.classList?.contains('no-snapshot'),
-                                                            pixelRatio: 2,
-                                                            cacheBust: true,
-                                                            fontEmbedCSS: ''
-                                                        })
-                                                            .then((dataUrl) => {
-                                                                const link = document.createElement('a');
-                                                                link.download = `melora-studio-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
-                                                                link.href = dataUrl;
-                                                                link.click();
-                                                                const shareUrl = `${window.location.origin}?mix=${mix.id}`;
-                                                                navigator.clipboard.writeText(shareUrl);
-                                                                setToast("Snapshot saved! Link copied 📸");
-                                                                setTimeout(() => setToast(null), 3000);
-                                                            })
-                                                            .catch((err) => {
-                                                                console.error("Snapshot failed", err);
-                                                                const shareUrl = `${window.location.origin}?mix=${mix.id}`;
-                                                                navigator.clipboard.writeText(shareUrl);
-                                                                setToast("Snapshot failed. Link copied!");
-                                                                setTimeout(() => setToast(null), 3000);
-                                                            });
-                                                    }
-                                                }}
-                                                className="flex items-center justify-center w-6 h-7 bg-[#f4f4f5] shadow-md hover:-translate-y-0.5 transition-transform rounded-t-sm"
-                                                title="Share Snapshot"
-                                            >
-                                                <Camera size={12} className="text-zinc-800" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }}
-                                                className="flex items-center justify-center w-6 h-7 bg-[#e0f2fe] shadow-md hover:-translate-y-0.5 transition-transform"
-                                                title="Share Mix"
-                                            >
-                                                <Share2 size={12} className="text-blue-900" />
-                                            </button>
+                                            {!isOTG && (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const node = document.getElementById(`studio-mix-${mix.id}`);
+                                                            if (node) {
+                                                                toPng(node, {
+                                                                    filter: (n) => !n.classList?.contains('no-snapshot'),
+                                                                    pixelRatio: 2,
+                                                                    cacheBust: true,
+                                                                    fontEmbedCSS: ''
+                                                                })
+                                                                    .then((dataUrl) => {
+                                                                        const link = document.createElement('a');
+                                                                        link.download = `melora-studio-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
+                                                                        link.href = dataUrl;
+                                                                        link.click();
+                                                                        const shareUrl = `${window.location.origin}?mix=${mix.id}`;
+                                                                        navigator.clipboard.writeText(shareUrl);
+                                                                        setToast("Snapshot saved! Link copied 📸");
+                                                                        setTimeout(() => setToast(null), 3000);
+                                                                    })
+                                                                    .catch((err) => {
+                                                                        console.error("Snapshot failed", err);
+                                                                        const shareUrl = `${window.location.origin}?mix=${mix.id}`;
+                                                                        navigator.clipboard.writeText(shareUrl);
+                                                                        setToast("Snapshot failed. Link copied!");
+                                                                        setTimeout(() => setToast(null), 3000);
+                                                                    });
+                                                            }
+                                                        }}
+                                                        className="flex items-center justify-center w-6 h-7 bg-[#f4f4f5] shadow-md hover:-translate-y-0.5 transition-transform rounded-t-sm"
+                                                        title="Share Snapshot"
+                                                    >
+                                                        <Camera size={12} className="text-zinc-800" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }}
+                                                        className="flex items-center justify-center w-6 h-7 bg-[#e0f2fe] shadow-md hover:-translate-y-0.5 transition-transform"
+                                                        title="Share Mix"
+                                                    >
+                                                        <Share2 size={12} className="text-blue-900" />
+                                                    </button>
+                                                </>
+                                            )}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }}
                                                 className="flex items-center justify-center w-6 h-7 bg-[#dcfce7] shadow-md hover:-translate-y-0.5 transition-transform rounded-t-sm"

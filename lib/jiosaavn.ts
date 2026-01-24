@@ -251,13 +251,23 @@ export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' 
 }
 
 export function getThumbnailUrl(song: JioSaavnSong): string {
+    if (!song || !song.image) return '';
+
+    // Handle legacy/raw string format
+    if (typeof song.image === 'string') return song.image;
+
+    // Safety check for array
+    if (!Array.isArray(song.image)) return '';
+
     const qualities = ['500x500', '150x150', '50x50'];
 
     for (const quality of qualities) {
-        const link = song.image.find(i => i.quality === quality)?.link;
-        if (link) return link;
+        // Safe access
+        const match = song.image.find(i => i && i.quality === quality);
+        if (match && match.link) return match.link;
     }
 
+    // Fallback to first available
     return song.image[0]?.link || '';
 }
 

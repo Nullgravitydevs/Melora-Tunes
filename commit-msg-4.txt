@@ -1,3 +1,0 @@
-fix: Reduce player cassette size to 70% width
-
-- Further reduced width from 82% to 70% to ensure cassette sits comfortably inside the player window with visible margins.

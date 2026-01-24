@@ -1,7 +1,0 @@
-feat: Add Realistic Metal Edition theme as default
-
-- Complete Metal theme with grid layout, draggable cassettes and player
-- Deep black background with all modals working
-- Fixed z-index so player stays above cassette elements
-- All header buttons functional: Settings, Cinema Mode, Create Mix
-- Cassette action buttons: Edit, Share, Add Songs

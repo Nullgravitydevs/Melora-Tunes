@@ -379,10 +379,19 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 const albumId = s.album?.id || `unknown-${s.id}`;
                 const albumName = s.album?.name || "Unknown Album";
 
+                // Safe Image Extractor
+                const getImageUrl = (img: any) => {
+                    if (!img) return '';
+                    if (typeof img === 'string') return img;
+                    if (Array.isArray(img)) {
+                        return img.find((i: any) => i.quality === '500x500')?.link || img[0]?.link || '';
+                    }
+                    return '';
+                };
+
                 if (!albumMap.has(albumId)) {
                     // Create Album Entry
-                    const albumImage = s.image?.find((img: any) => img.quality === '500x500')?.link ||
-                        s.image?.[0]?.link || '';
+                    const albumImage = getImageUrl(s.image);
                     albumMap.set(albumId, {
                         id: albumId,
                         title: decodeHtml(albumName),
@@ -398,7 +407,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         id: s.id,
                         name: decodeHtml(s.name),
                         duration: s.duration,
-                        image: s.image?.find((img: any) => img.quality === '500x500')?.link || s.image?.[0]?.link || '',
+                        image: getImageUrl(s.image),
                         primaryArtists: s.primaryArtists
                     });
                 }
@@ -1814,7 +1823,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             selectedIndex={currentView.selectedIndex}
                             currentSong={currentSong || undefined}
                             isPlaying={isPlaying}
-                            progress={progress}
+                            progress={duration > 0 ? progress / duration : 0}
                             duration={duration}
                             isLoading={isLoading}
                             searchQuery={currentView.searchQuery}

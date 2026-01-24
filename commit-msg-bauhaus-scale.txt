@@ -1,6 +1,0 @@
-refactor(bauhaus): scale down UI and add action buttons
-
-- Reduced sizes of Header text, buttons, and padding for a more compact header.
-- Scaled down Grid Cards (h-60) and typography.
-- Added 'Edit Mix' (Pencil) button to Grid Cards on hover.
-- Further compacted the Draggable Player (w-320px) and its internal cassette card scale.

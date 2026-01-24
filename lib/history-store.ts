@@ -1,12 +1,16 @@
-import { PlayableTrack } from './types';
+import { PlayableTrack, isPlayableTrack } from './types';
 
 const HISTORY_KEY = 'melora_history';
 const MAX_HISTORY = 50;
 
 export interface HistoryItem {
-    id: string;
+    id: string; // STRICTLY track.id (Stable Identity)
     track: PlayableTrack;
     playedAt: number;
+    context?: {
+        source: 'discovery' | 'playlist' | 'album' | 'search' | 'offline';
+        id?: string; // playlist/album id
+    };
 }
 
 export const HistoryStore = {
@@ -14,26 +18,61 @@ export const HistoryStore = {
         if (typeof window === 'undefined') return [];
         try {
             const raw = localStorage.getItem(HISTORY_KEY);
-            return raw ? JSON.parse(raw) : [];
+            if (!raw) return [];
+
+            const parsed = JSON.parse(raw);
+
+            // Rule 3: Legacy Data Normalization (On Read)
+            // If data looks wrong, normalize it instantly
+            const normalized = parsed.map((item: any) => {
+                // Ensure track shape is PlayableTrack
+                let track = item.track;
+                if (!track) return null;
+
+                // Handle raw song vs PlayableTrack
+                if (!('song' in track) && ('name' in track || 'id' in track)) {
+                    track = { song: track, id: track.id, preferredQuality: '320' };
+                }
+
+                return {
+                    id: track.id, // Enforce Stable ID (Rule 1)
+                    track: track,
+                    playedAt: item.playedAt || Date.now(),
+                    context: item.context || { source: 'discovery' }
+                };
+            }).filter(Boolean);
+
+            return normalized;
         } catch (e) {
             console.error("Failed to load history", e);
             return [];
         }
     },
 
-    addToHistory: (track: PlayableTrack) => {
+    addToHistory: (track: PlayableTrack, context: HistoryItem['context'] = { source: 'discovery' }) => {
         if (typeof window === 'undefined') return;
         try {
             const history = HistoryStore.getHistory();
 
-            // Remove if existing (to bump to top)
-            const filtered = history.filter(h => h.track.id !== track.id);
+            // Rule 4: Deduplication Logic (Strict + Fuzzy)
+            const normalize = (str: string) => str?.toLowerCase().split('(')[0].replace(/[^a-z0-9]/g, '') || '';
+            const targetKey = normalize(track.song.name) + normalize(track.song.primaryArtists);
 
-            // Add new
+            // Remove existing instances to bump (Rule 4)
+            const filtered = history.filter(h => {
+                const hName = h.track.song.name || "";
+                const hArtist = h.track.song.primaryArtists || "";
+                const hKey = normalize(hName) + normalize(hArtist);
+
+                return h.id !== track.id && hKey !== targetKey;
+            });
+
+            // Add new with Stable ID
             const newItem: HistoryItem = {
-                id: `${track.id}-${Date.now()}`,
+                id: track.id, // Stable Identity
                 track,
-                playedAt: Date.now()
+                playedAt: Date.now(),
+                context // Rule 5: Context persistence
             };
 
             const updated = [newItem, ...filtered].slice(0, MAX_HISTORY);

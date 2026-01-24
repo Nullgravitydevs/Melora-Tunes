@@ -1,6 +1,0 @@
-feat: Add Bauhaus Aesthetic Edition theme
-
-- Added 'BAUHAUS' theme config with primary color palette (Blue/Red/Yellow).
-- Created 'BauhausStage' component implementing the geometric design with hard shadows and grid patterns.
-- Updated 'stage.tsx' to include Bauhaus layout and set it as the default theme.
-- Integrated all playback and mix management functionalities into the new UI.

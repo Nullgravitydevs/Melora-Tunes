@@ -13,6 +13,7 @@ import { getSkipSegments, SkipSegment } from "@/lib/sponsorblock";
 import { useEqualizer } from "@/hooks/useEqualizer";
 import { OfflineStore } from "@/lib/offline-store";
 import { HistoryStore } from "@/lib/history-store";
+import { SignalStore } from "@/lib/signal-store";
 
 // --- Audio Quality Abstraction ---
 import { AudioQuality, PlayableSource, PlayableTrack, isPlayableTrack } from "@/lib/types";
@@ -206,13 +207,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const currentSong: JioSaavnSong | undefined = isPlayableTrack(rawCurrentItem) ? rawCurrentItem.song : rawCurrentItem;
 
     // --- Persistence ---
+    const DISCOVERY_MIX_ID = 'discovery-mix';
+
     useEffect(() => {
         const saved = localStorage.getItem('melora-mixes');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                // Sanitize: Remove mock songs and unwanted default playlists
-                // Also clean up old spammy "Discovery Mix" tapes (legacy ID format)
+                // Sanitize
                 const sanitized = parsed.map((m: Mix) => ({
                     ...m,
                     songs: m.songs.filter(s => {
@@ -220,10 +222,29 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                         return !song.id.startsWith('mock-') && !song.name.startsWith('Track ');
                     })
                 })).filter((m: Mix) => {
-                    // Remove legacy spam mixes (id starts with discovery- but not the fixed one, or title is generic)
-                    if (m.title === 'Discovery Mix' && m.id !== 'discovery-mix') return false;
+                    // Remove old spam, but KEEP our discovery mix
+                    if (m.title === 'Discovery Mix' && m.id !== DISCOVERY_MIX_ID) return false;
+                    // Also wipe the OTG tape if we are migrating away from it
+                    if (m.id === 'otg-tape') return false;
                     return !['Pawan Kalyan Hits', 'DSP Hits', 'Megastar Hits', 'Yuvan Shankar Raja'].includes(m.title);
                 });
+
+                // Enforce Discovery Mix at Top
+                const discIndex = sanitized.findIndex((m: Mix) => m.id === DISCOVERY_MIX_ID);
+                if (discIndex === -1) {
+                    // Create if missing
+                    sanitized.unshift({
+                        id: DISCOVERY_MIX_ID,
+                        title: "Discovery Mix",
+                        color: "blue",
+                        songs: [],
+                        currentSongIndex: 0
+                    });
+                } else if (discIndex > 0) {
+                    // Move to front
+                    const [disc] = sanitized.splice(discIndex, 1);
+                    sanitized.unshift(disc);
+                }
 
                 if (sanitized.length === 0) {
                     setDefaults();
@@ -248,6 +269,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     const setDefaults = () => {
         setMixes([
+            {
+                id: DISCOVERY_MIX_ID,
+                title: "Discovery Mix",
+                color: "blue",
+                songs: [],
+                currentSongIndex: 0
+            },
             { id: "1", title: "My Tape", color: "orange", songs: [], currentSongIndex: 0 }
         ]);
     };
@@ -286,6 +314,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             if (exists) {
                 return prev.filter(s => s.id !== song.id);
             } else {
+                // Signal: Explicit Taste (LIKE)
+                const s = 'song' in item ? item.song : item;
+                const track = ensurePlayableTrack(s);
+                SignalStore.addSignal(track, 'LIKE');
                 return [song, ...prev];
             }
         });
@@ -316,19 +348,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const addMix = useCallback((mix: Mix) => {
         console.log("Adding mix. Current count:", mixesRef.current.length);
 
-        // Count only USER tapes (exclude System tapes like On-the-Go and Discovery Mix)
-        const userTapeCount = mixesRef.current.filter(m => m.title !== "On-the-Go" && m.id !== 'discovery-mix').length;
+        // Count only USER tapes (exclude Discovery Mix)
+        const userTapeCount = mixesRef.current.filter(m => m.id !== DISCOVERY_MIX_ID).length;
 
-        // Allow "On-the-Go" and "Discovery Mix" to bypass limit, check user limit for others
-        const isSystem = mix.title === "On-the-Go" || mix.id === 'discovery-mix';
+        // Allow "Discovery Mix" to bypass limit
+        const isSystem = mix.id === DISCOVERY_MIX_ID;
 
         if (!isSystem && userTapeCount >= 8) {
             console.log("Limit blocked.");
+            showToast("Mix limit reached (8)", 'error');
             return false;
         }
         setMixes(prev => [...prev, mix]);
         return true;
-    }, []);
+    }, [showToast]);
 
     const updateMix = useCallback((mixId: string, updates: Partial<Mix>) => {
         setMixes(prev => {
@@ -341,19 +374,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     const newSongs = updates.songs;
 
                     // If current song is no longer in the new list (deleted)
-                    const stillExists = currentSong && newSongs.some(s => s.id === currentSong.id);
+                    const stillExists = currentSong && newSongs.some(s => {
+                        const existingId = isPlayableTrack(s) ? s.id : s.id;
+                        return existingId === (isPlayableTrack(currentSong) ? currentSong.id : currentSong.id);
+                    });
 
                     if (!stillExists) {
                         console.log("[updateMix] Current song deleted, stopping playback");
-                        // We can't call setIsPlaying/setCurrentSongUrl here directly cleanly inside the updater
-                        // but we can schedule it.
                         setTimeout(() => {
                             setIsPlaying(false);
                             setCurrentSongUrl(null);
                             if (audioPlayerRef.current) audioPlayerRef.current.seekTo(0);
                         }, 0);
 
-                        // Also reset index to 0 or valid range
+                        // Reset index
                         return { ...m, ...updates, currentSongIndex: 0 };
                     }
                 }
@@ -365,6 +399,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [activeMixId]);
 
     const deleteMix = (mixId: string) => {
+        if (mixId === DISCOVERY_MIX_ID) {
+            showToast("Cannot delete the Discovery Mix!", 'error');
+            return;
+        }
         setMixes(prev => prev.filter(m => m.id !== mixId));
         if (activeMixId === mixId) {
             setActiveMixId(null);
@@ -413,7 +451,16 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             // Double check we haven't navigated away
                             const newUnique = stationSongs.filter(s => !currentMix.songs.some(existing => {
                                 const e = isPlayableTrack(existing) ? existing.song : existing;
-                                return e.id === s.id;
+                                // 1. Strict ID Match
+                                if (e.id === s.id) return true;
+                                // 2. Fuzzy Match (Name + Artist) to catch duplicates with different IDs
+                                // Normalized comparision
+                                const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                if (normalize(e.name) === normalize(s.name) &&
+                                    normalize(e.primaryArtists) === normalize(s.primaryArtists)) {
+                                    return true;
+                                }
+                                return false;
                             }));
                             if (newUnique.length > 0) {
                                 console.log(`[Autoplay] Added ${newUnique.length} tracks to queue`);
@@ -1142,25 +1189,36 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 const trackToSave = rawCurrentItem ? ensurePlayableTrack(rawCurrentItem) : ensurePlayableTrack(currentSong);
                 HistoryStore.addToHistory(trackToSave);
 
+                // Signal: Verified Play (>10s)
+                SignalStore.addSignal(trackToSave, 'PLAY');
+
                 // LOOPHOLE FIX: Sync to "Discovery Mix" (Global History Tape)
                 // If the user has a Discovery Mix tape, we append this song to it so it tracks ALL playback.
                 setMixes(prev => {
-                    const discMix = prev.find(m => m.id === 'discovery-mix');
+                    const discMix = prev.find(m => m.id === DISCOVERY_MIX_ID);
                     if (!discMix) return prev; // Don't force-create if deleted
 
-                    // Prevent duplicate tail
-                    /* const lastSong = discMix.songs[discMix.songs.length - 1];
-                    const lastId = lastSong ? ('id' in lastSong ? lastSong.id : (lastSong as any).id) : null;
-                    if (lastId === trackToSave.id) return prev; */
+                    // Prevent duplicate tail (Stop "Double Song" echo)
+                    const lastSong = discMix.songs[discMix.songs.length - 1];
+                    // Normalize for fuzzy comparison logic
+                    const normalize = (str: string) => str?.toLowerCase().split('(')[0].replace(/[^a-z0-9]/g, '') || '';
 
-                    // Actually, let's just append. History allows repeats.
-                    // But we should limit the tape size? Maybe last 50?
-                    // Let's keep it simple: Append. 
-                    // To avoid infinite growth, maybe slice? 
-                    // Let's slice to last 50 to keep it performant and matching "Recents" concept.
+                    if (lastSong) {
+                        const lastId = isPlayableTrack(lastSong) ? lastSong.id : lastSong.id;
+                        if (lastId === trackToSave.id) return prev;
+
+                        // Fuzzy Check
+                        const s1 = isPlayableTrack(lastSong) ? lastSong.song : lastSong;
+                        const s2 = trackToSave.song;
+                        const k1 = normalize(s1.name) + normalize(s1.primaryArtists);
+                        const k2 = normalize(s2.name) + normalize(s2.primaryArtists);
+                        if (k1 === k2) return prev;
+                    }
+
+                    // Append and slice to last 50
                     const newSongs = [...discMix.songs, trackToSave].slice(-50); // Keep last 50
 
-                    return prev.map(m => m.id === 'discovery-mix' ? {
+                    return prev.map(m => m.id === DISCOVERY_MIX_ID ? {
                         ...m,
                         songs: newSongs,
                         // Update index so we are at the end? 
@@ -1175,7 +1233,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     } : m);
                 });
 
-            }, 5000);
+            }, 10000);
             return () => clearTimeout(timer);
         }
     }, [currentSong?.id, isPlaying, rawCurrentItem]);
