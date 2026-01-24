@@ -1,15 +1,20 @@
+
 import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { DiscoveryTheme } from "./DiscoveryLayout";
 import { getTrending, getTopCharts } from "@/lib/jiosaavn";
 import { searchUnified } from "@/lib/unified-search";
-import { HistoryStore } from "@/lib/history-store";
 import { OfflineStore } from "@/lib/offline-store";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
 import { useLyrics } from "@/hooks/useLyrics";
 import { DiscoveryEngine } from "@/lib/discovery-engine";
 import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2, Monitor } from "lucide-react";
+import { HomeView } from "./HomeView";
+import { ArtistView } from "./ArtistView";
+import { AlbumView } from "./AlbumView";
+import { HistoryStore } from "@/lib/history-store"; // Restore this import
+import { TrackRow, FeatureCard, MoodPill, DiscoveryThemeColors, getArt, NavItem, PlaylistItem } from "./DiscoveryShared";
 
 interface DesktopDiscoveryProps {
     theme: DiscoveryTheme;
@@ -38,7 +43,7 @@ function QualityBadge({ quality }: { quality: string }) {
 
     return (
         <div className="relative flex items-center" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded cursor-help ${q === 'hires' || q === 'flac' ? 'bg-white text-black' : 'bg-white/10 text-white/70'}`}>
+            <span className={`text - [9px] font - bold px - 1.5 py - 0.5 rounded cursor - help ${q === 'hires' || q === 'flac' ? 'bg-white text-black' : 'bg-white/10 text-white/70'} `}>
                 {q === 'hires' ? 'HI-RES' : q === 'flac' ? 'FLAC' : q === '320' ? 'HQ' : 'MQ'}
             </span>
             {/* Tooltip */}
@@ -170,10 +175,10 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
                                     playback.seek((e.clientX - rect.left) / rect.width);
                                 }}
                             >
-                                <div className="bg-white h-full rounded-full relative overflow-hidden" style={{ width: `${playback.duration > 0 ? (playback.progress / playback.duration) * 100 : 0}%` }}>
+                                <div className="bg-white h-full rounded-full relative overflow-hidden" style={{ width: `${playback.duration > 0 ? (playback.progress / playback.duration) * 100 : 0}% ` }}>
                                     <div className="absolute right-0 top-0 bottom-0 w-full bg-gradient-to-l from-white to-transparent opacity-50" />
                                 </div>
-                                <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" style={{ left: `${playback.duration > 0 ? (playback.progress / playback.duration) * 100 : 0}%` }} />
+                                <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" style={{ left: `${playback.duration > 0 ? (playback.progress / playback.duration) * 100 : 0}% ` }} />
                             </div>
                             <div className="flex justify-between text-[10px] font-mono text-white/40 font-bold uppercase tracking-widest">
                                 <span>{Math.floor(playback.progress / 60)}:{(Math.floor(playback.progress) % 60).toString().padStart(2, '0')}</span>
@@ -183,7 +188,7 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
 
                         {/* Controls */}
                         <div className="flex items-center justify-center gap-10 w-full">
-                            <button onClick={() => playback.setShuffle(!playback.shuffle)} className={`transition-all ${playback.shuffle ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]' : 'text-white/40 hover:text-white'}`}><Shuffle size={18} /></button>
+                            <button onClick={() => playback.setShuffle(!playback.shuffle)} className={`transition - all ${playback.shuffle ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]' : 'text-white/40 hover:text-white'} `}><Shuffle size={18} /></button>
                             <div className="flex items-center gap-6">
                                 <button onClick={playback.prev} className="text-white hover:scale-110 transition-transform drop-shadow-md"><SkipBack size={32} strokeWidth={1.5} /></button>
                                 <button onClick={playback.togglePlay} className="w-16 h-16 bg-white/90 text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)] backdrop-blur-md">
@@ -191,7 +196,7 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
                                 </button>
                                 <button onClick={playback.next} className="text-white hover:scale-110 transition-transform drop-shadow-md"><SkipForward size={32} strokeWidth={1.5} /></button>
                             </div>
-                            <button onClick={() => playback.setRepeat(playback.repeat === 'one' ? 'none' : playback.repeat === 'all' ? 'one' : 'all')} className={`transition-all ${playback.repeat !== 'none' ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]' : 'text-white/40 hover:text-white'}`}><Repeat size={18} /></button>
+                            <button onClick={() => playback.setRepeat(playback.repeat === 'one' ? 'none' : playback.repeat === 'all' ? 'one' : 'all')} className={`transition - all ${playback.repeat !== 'none' ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]' : 'text-white/40 hover:text-white'} `}><Repeat size={18} /></button>
 
                             {/* OTG Removed */}
                         </div>
@@ -208,7 +213,7 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
 
                             return (
                                 <div className="flex flex-col items-start gap-1 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-help group">
-                                    <div className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${q === 'hires' || q === 'flac' ? 'text-white' : 'text-white/70'}`}>
+                                    <div className={`text - [10px] font - bold uppercase tracking - widest flex items - center gap - 2 ${q === 'hires' || q === 'flac' ? 'text-white' : 'text-white/70'} `}>
                                         {(q === 'hires' || q === 'flac') && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shadow-[0_0_10px_white]" />}
                                         {info.title}
                                     </div>
@@ -283,10 +288,10 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
                                                 color: i === activeIndex ? '#ffffff' : '#a0a0a0',
                                             }}
                                             transition={{ duration: 0.3 }}
-                                            className={`cursor-pointer transition-colors origin-center`}
+                                            className={`cursor - pointer transition - colors origin - center`}
                                             onClick={() => playback.seek(line.time / playback.duration)}
                                         >
-                                            <p className={`text-xl md:text-3xl font-bold leading-tight tracking-tight ${i === activeIndex ? 'drop-shadow-lg' : ''}`}>
+                                            <p className={`text - xl md: text - 3xl font - bold leading - tight tracking - tight ${i === activeIndex ? 'drop-shadow-lg' : ''} `}>
                                                 {line.text}
                                             </p>
                                         </motion.div>
@@ -301,9 +306,9 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
                                 </div>
                             )}
                             <style jsx>{`
-                                .mask-gradient-y { mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent); }
-                                .mask-gradient-b { mask-image: linear-gradient(to bottom, black 85%, transparent); }
-                            `}</style>
+    .mask - gradient - y { mask - image: linear - gradient(to bottom, transparent, black 15 %, black 85 %, transparent); }
+                                .mask - gradient - b { mask - image: linear - gradient(to bottom, black 85 %, transparent); }
+`}</style>
                         </div>
                     )}
 
@@ -328,303 +333,7 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
     );
 }
 
-// --- Subcomponents & Helpers ---
-
-function getArt(song: any) {
-    if (!song) return '';
-    // Handle both new unified format and raw jiosaavn
-    let img = song.image || song.art;
-    if (Array.isArray(img)) {
-        img = img[img.length - 1]?.link || img[0]?.link || '';
-    }
-    // Force High Quality - Robust Regex
-    if (typeof img === 'string') {
-        // Replace common low-res patterns with 500x500
-        return img
-            .replace(/150x150/g, '500x500')
-            .replace(/50x50/g, '500x500')
-            .replace(/_150\./g, '_500.') // Some providers use _150.jpg
-            .replace(/_50\./g, '_500.');
-    }
-    return img || '';
-}
-
-function NavItem({ icon, label, active, colors, onClick }: any) {
-    return (
-        <motion.button
-            onClick={onClick}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium w-full text-left transition-colors"
-            style={{
-                backgroundColor: 'transparent',
-                color: active ? '#FFFFFF' : '#666666'
-            }}
-            whileHover={{
-                color: '#FFFFFF',
-                backgroundColor: 'rgba(255,255,255,0.05)'
-            }}
-            transition={{ duration: 0.1 }}
-        >
-            {icon}
-            {label}
-        </motion.button>
-    );
-}
-
-function Pill({ label, active, colors }: any) {
-    return (
-        <button
-            className="px-2 py-0.5 rounded-full text-[10px] font-medium border"
-            style={{
-                backgroundColor: active ? colors.accent : 'transparent',
-                color: active ? colors.bg : colors.textMuted,
-                borderColor: active ? colors.accent : colors.border
-            }}
-        >{label}</button>
-    );
-}
-
-function PlaylistItem({ icon, title, subtitle, active, colors, onClick }: any) {
-    return (
-        <motion.div
-            className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
-            style={{
-                backgroundColor: 'transparent',
-                opacity: active ? 1 : 0.7
-            }}
-            whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)', opacity: 1 }}
-            onClick={onClick}
-            transition={spring}
-        >
-            {icon ? (
-                <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ backgroundColor: colors.accent, color: colors.bg }}>{icon}</div>
-            ) : (
-                <div className="w-9 h-9 rounded-md" style={{ backgroundColor: colors.border }}></div>
-            )}
-            <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate">{title}</p>
-                <p className="text-[10px] truncate" style={{ color: colors.textMuted }}>{subtitle}</p>
-            </div>
-            {active && <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />}
-        </motion.div>
-    );
-}
-
-function MoodPill({ label, active, onClick, colors }: any) {
-    return (
-        <motion.button
-            onClick={onClick}
-            className="px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border transition-all"
-            style={{
-                backgroundColor: active ? '#fff' : 'transparent',
-                borderColor: active ? '#fff' : 'rgba(255,255,255,0.2)',
-                color: active ? '#000' : 'rgba(255,255,255,0.6)',
-            }}
-            whileHover={{
-                borderColor: '#fff',
-                color: active ? '#000' : '#fff'
-            }}
-            whileTap={{ scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-        >
-            {label}
-        </motion.button>
-    );
-}
-
-function FeatureCard({ title, subtitle, isNew, colors, image, onClick }: any) {
-    // Premium Feature Card with background art and hover effects
-    const hasImage = !!image;
-
-    return (
-        <motion.div
-            className="flex-1 h-48 rounded-xl cursor-pointer relative overflow-hidden group"
-            style={{
-                backgroundColor: hasImage ? 'transparent' : '#0f0f0f',
-                border: hasImage ? 'none' : '1px solid rgba(255,255,255,0.06)'
-            }}
-            onClick={onClick}
-            whileHover={{
-                y: -6,
-                boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
-            }}
-            transition={{ duration: 0.2 }}
-        >
-            {/* Background Image */}
-            {hasImage && (
-                <>
-                    <img
-                        src={image}
-                        alt={title}
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    {/* Clean Dark Overlay */}
-                    <div className="absolute inset-0 bg-black/50" />
-                </>
-            )}
-
-            {/* Content */}
-            <div className="relative z-10 h-full p-5 flex flex-col justify-end">
-                {isNew && (
-                    <span
-                        className="absolute top-4 left-4 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md backdrop-blur-md"
-                        style={{
-                            backgroundColor: 'rgba(34, 197, 94, 0.9)',
-                            color: '#fff',
-                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.4)'
-                        }}
-                    >
-                        New Release
-                    </span>
-                )}
-                <p
-                    className="text-[10px] uppercase tracking-widest mb-1.5 font-medium"
-                    style={{ color: hasImage ? 'rgba(255,255,255,0.7)' : colors.textMuted }}
-                >
-                    {isNew ? 'Album' : 'Daily Mix'}
-                </p>
-                <p
-                    className="text-base font-bold leading-tight"
-                    style={{ color: hasImage ? '#fff' : colors.text }}
-                >
-                    {title}
-                </p>
-                <p
-                    className="text-[11px] mt-1"
-                    style={{ color: hasImage ? 'rgba(255,255,255,0.6)' : colors.textMuted }}
-                >
-                    {subtitle}
-                </p>
-            </div>
-
-            {/* Play Button on Hover */}
-            <motion.div
-                className="absolute right-4 bottom-4 w-11 h-11 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100"
-                style={{
-                    backgroundColor: '#ffffff',
-                    boxShadow: '0 8px 24px rgba(255, 255, 255, 0.2)',
-                    color: '#000'
-                }}
-                initial={{ y: 10, opacity: 0 }}
-                whileHover={{ scale: 1.1 }}
-                animate={{ y: 0 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            >
-                <Play size={18} fill="#fff" color="#fff" />
-            </motion.div>
-        </motion.div>
-    );
-}
-
-function TrackRow({ index, track, colors, isPlaying, onPlay }: any) {
-    return (
-        <motion.div
-            className="flex items-center px-4 py-3 rounded-lg cursor-pointer group relative transition-colors"
-            style={{ backgroundColor: isPlaying ? 'rgba(29, 185, 84, 0.1)' : 'transparent' }}
-            whileHover={{
-                backgroundColor: 'rgba(255,255,255,0.04)',
-            }}
-            onClick={onPlay}
-            transition={{ duration: 0.15 }}
-        >
-            {/* Index / Playing Indicator */}
-            <span
-                className="w-8 text-xs font-medium text-center"
-                style={{ color: isPlaying ? '#ffffff' : colors.textMuted }}
-            >
-                {isPlaying ? (
-                    <div className="flex items-end justify-center gap-[2px] h-4">
-                        <motion.div
-                            className="w-[3px] bg-white rounded-sm"
-                            animate={{ height: ['40%', '100%', '60%', '100%', '40%'] }}
-                            transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut' }}
-                        />
-                        <motion.div
-                            className="w-[3px] bg-[#1DB954] rounded-sm"
-                            animate={{ height: ['100%', '40%', '100%', '60%', '100%'] }}
-                            transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut', delay: 0.2 }}
-                        />
-                        <motion.div
-                            className="w-[3px] bg-white rounded-sm"
-                            animate={{ height: ['60%', '100%', '40%', '100%', '60%'] }}
-                            transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut', delay: 0.4 }}
-                        />
-                    </div>
-                ) : (
-                    <span className="group-hover:hidden">{index}</span>
-                )}
-                {!isPlaying && (
-                    <Play
-                        size={14}
-                        className="hidden group-hover:block mx-auto"
-                        style={{ color: colors.text }}
-                    />
-                )}
-            </span>
-
-            {/* Album Art Thumbnail */}
-            <div
-                className="w-12 h-12 rounded-md mr-4 overflow-hidden flex-shrink-0 shadow-lg"
-                style={{ backgroundColor: '#1a1a1a' }}
-            >
-                {track.art ? (
-                    <img
-                        src={track.art}
-                        alt={track.title}
-                        className="w-full h-full object-cover"
-                    />
-                ) : null}
-            </div>
-
-            {/* Title */}
-            <div className="flex-1 min-w-0">
-                <p
-                    className="text-sm font-medium truncate"
-                    style={{ color: isPlaying ? '#ffffff' : colors.text }}
-                >
-                    {track.title}
-                </p>
-            </div>
-
-            {/* Artist */}
-            <span
-                className="w-36 text-xs truncate px-2"
-                style={{ color: colors.textMuted }}
-            >
-                {track.artist}
-            </span>
-
-            {/* Quality Badge */}
-            {track.quality && (
-                <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                    style={{
-                        backgroundColor: track.quality === 'flac' || track.quality === 'hires' ? '#10B981' :
-                            track.quality === '320' ? '#3B82F6' : '#6B7280',
-                        color: '#fff'
-                    }}
-                >
-                    {track.quality === 'hires' ? 'Hi-Res' : track.quality === 'flac' ? 'FLAC' : track.quality}
-                </span>
-            )}
-
-            {/* Duration */}
-            <span
-                className="w-14 text-xs text-right"
-                style={{ color: colors.textMuted }}
-            >
-                {track.duration}
-            </span>
-
-            {/* Like Button */}
-            <Heart
-                size={14}
-                className="ml-3 cursor-pointer transition-colors hover:scale-110"
-                style={{ color: isPlaying ? '#F43F5E' : colors.textMuted }}
-                fill={isPlaying ? '#F43F5E' : 'transparent'}
-            />
-        </motion.div>
-    );
-}
+// --- Subcomponents moved to DiscoveryShared.tsx ---
 
 export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps) {
     const isMidnight = theme === 'midnight';
@@ -648,8 +357,10 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     };
 
     const [activeView, setActiveView] = useState('home');
+    const [activeArtist, setActiveArtist] = useState<string | null>(null);
+    const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('playlist');
-    const [activeMood, setActiveMood] = useState<string | null>(null);
+    const [activeRegion, setActiveRegion] = useState<string | null>(null);
 
     // MINIMALIST PALETTE (Project Linear)
     const c = {
@@ -722,7 +433,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     .map((c: any) => ({
                         id: c.id,
                         title: c.title || c.name,
-                        subtitle: c.subtitle || `${c.language || 'Global'} • ${c.type}`,
+                        subtitle: c.subtitle || `${c.language || 'Global'} • ${c.type} `,
                         image: c.image || c.image?.[2]?.link,
                         isNew: c.isNew || false
                     }));
@@ -767,35 +478,33 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     const handlePlay = async (song: any, allSongs: any[] = []) => {
         if (!song) return;
 
-        let songList: any[] = [];
-        let startIndex = 0;
-
+        // STRICT DISCOVERY MODE: Always generate a mix unless explicit User Playlist/Album context.
         if (allSongs.length > 0) {
-            // Contextual Play (Playlist/Album/Charts) - Use the provided list
-            songList = allSongs;
-            startIndex = songList.findIndex(s => s.id === song.id);
+            // Contextual Play (Playlist/Album only)
+            let songList = allSongs;
+            let startIndex = songList.findIndex(s => s.id === song.id);
 
             const newMix: Mix = {
-                id: 'discovery-mix', // Persistent Session ID
-                title: "Discovery Mix",
+                id: 'context-mix',
+                title: "Context Mix",
                 color: 'blue',
                 songs: songList,
                 currentSongIndex: startIndex >= 0 ? startIndex : 0
             };
             playInstantMix(newMix);
         } else {
-            // SINGLE SONG PLAY (The DJ Mode)
+            // THE DJ MODE (Discovery Engine)
             try {
-                // UI: You could show a toast here if you wanted.
                 const seed = ensurePlayableTrack(song);
-                const sessionMix = await DiscoveryEngine.generateSessionMix(seed);
+                // PASS ACTIVE REGION
+                const sessionMix = await DiscoveryEngine.generateSessionMix(seed, activeRegion || undefined);
                 playInstantMix(sessionMix);
             } catch (e) {
                 console.error("DJ Failed:", e);
                 // Fallback safe play
                 playInstantMix({
-                    id: 'discovery-mix',
-                    title: 'Discovery Mix',
+                    id: 'fallback-mix',
+                    title: 'Mix',
                     color: 'blue',
                     songs: [ensurePlayableTrack(song)],
                     currentSongIndex: 0
@@ -834,6 +543,17 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         if (e.key === 'Enter') {
             performSearch(e.currentTarget.value);
         }
+    };
+
+    // NAVIGATION HELPER
+    const navigateToArtist = (artistName: string) => {
+        setActiveArtist(artistName);
+        setActiveView('artist');
+    };
+
+    const navigateToAlbum = (albumId: string) => {
+        setActiveAlbum(albumId);
+        setActiveView('album');
     };
 
     const renderContent = () => {
@@ -883,7 +603,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                             }}
                                             colors={c}
                                             isPlaying={currentSong?.id === item.id && isPlaying}
-                                            onPlay={() => handlePlay(item.original, searchResults.map(r => r.original))}
+                                            onPlay={() => handlePlay(item.original)}
                                         />
                                     );
                                 })}
@@ -908,6 +628,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     </div>
                 );
             case 'explore':
+                // EXPLORE VIEW (Controlled Discovery)
                 const genres = [
                     { id: 'pop', name: 'Pop', color: '#EC4899', icon: '🎤' },
                     { id: 'hiphop', name: 'Hip Hop', color: '#F59E0B', icon: '🔥' },
@@ -920,16 +641,9 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 ];
 
                 const exploreGenre = async (genre: any) => {
-                    const results = await searchUnified(genre.name, 'song');
+                    const results = await searchUnified(genre.name + " Hits", 'song');
                     if (results.length > 0) {
-                        const mix: Mix = {
-                            id: `genre-${genre.id}`,
-                            title: `${genre.name} Mix`,
-                            color: 'purple',
-                            songs: results,
-                            currentSongIndex: 0
-                        };
-                        playInstantMix(mix);
+                        handlePlay(results[0].song);
                     } else {
                         alert(`No songs found for ${genre.name}`);
                     }
@@ -940,292 +654,153 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         {/* Header */}
                         <div className="mb-8">
                             <h1 className="text-4xl font-bold mb-2">Explore</h1>
-                            <p className="text-white/50">Discover new sounds, moods, and trending hits.</p>
+                            <p className="text-white/50">Intentional discovery. Pick a vibe.</p>
                         </div>
 
-                        {/* Moods Section - Circular */}
+                        {/* 1. Genre Discovery Grid */}
                         <div className="mb-10">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-bold">Vibe Check</h2>
-                            </div>
-                            <div className="flex gap-4 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden">
+                            <h2 className="text-lg font-bold mb-4">Genre Channels</h2>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                                 {genres.map(genre => (
                                     <motion.div
                                         key={genre.id}
-                                        className="min-w-[100px] h-[140px] rounded-full flex flex-col items-center gap-3 cursor-pointer group"
-                                        whileHover={{ y: -5 }}
+                                        className="h-24 rounded-xl flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden group"
+                                        style={{ backgroundColor: genre.color }}
+                                        whileHover={{ scale: 1.02 }}
                                         onClick={() => exploreGenre(genre)}
                                     >
-                                        <div
-                                            className="w-[100px] h-[100px] rounded-full flex items-center justify-center text-4xl shadow-xl transition-transform group-hover:scale-110 border-2 border-transparent group-hover:border-white/20"
-                                            style={{ backgroundColor: genre.color }}
-                                        >
-                                            <span className="group-hover:scale-125 transition-transform duration-300">{genre.icon}</span>
-                                        </div>
-                                        <span className="text-xs font-bold font-mono tracking-widest uppercase text-white/60 group-hover:text-white transition-colors">{genre.name}</span>
+                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                                        <span className="text-2xl relative z-10">{genre.icon}</span>
+                                        <span className="text-sm font-bold uppercase tracking-widest text-white relative z-10">{genre.name}</span>
                                     </motion.div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Featured Global Grid */}
+                        {/* 2. Editorial Collections (Curated Playlists as Seeds) */}
                         <div className="mb-10">
-                            <h2 className="text-lg font-bold mb-5">Trending Globally</h2>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {trending.slice(0, 8).map((song, i) => (
-                                    <motion.div
-                                        key={song.id || i}
-                                        className="bg-white/5 hover:bg-white/10 rounded-2xl p-3 flex gap-4 cursor-pointer group transition-colors shadow-lg border border-white/5"
-                                        onClick={() => handlePlay(song, trending)}
-                                        whileHover={{ scale: 1.02 }}
-                                    >
-                                        <div className="w-20 h-20 rounded-xl overflow-hidden relative flex-shrink-0">
-                                            <img src={getArt(song)} className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Play size={20} fill="white" className="text-white" />
-                                            </div>
+                            <h2 className="text-lg font-bold mb-4">Editorial Collections</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {[
+                                    { title: "Fresh Regional Hits", subtitle: "Trending Globally", term: "Trending India" },
+                                    { title: "Late Night Listening", subtitle: "LoFi & Chill", term: "LoFi Chill" },
+                                    { title: "Global Indie Picks", subtitle: "Undiscovered Gems", term: "Indie Pop" },
+                                ].map((item, i) => (
+                                    <div key={i} className="bg-white/5 p-6 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer border border-white/5 group"
+                                        onClick={async () => {
+                                            const res = await searchUnified(item.term);
+                                            if (res.length > 0) handlePlay(res[0].song);
+                                        }}>
+                                        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                            <Play size={20} fill="white" />
                                         </div>
-                                        <div className="flex flex-col justify-center min-w-0">
-                                            <h3 className="font-bold truncate text-white mb-1 group-hover:text-white transition-colors">{song.name}</h3>
-                                            <p className="text-xs text-white/50 truncate mb-2">{song.primaryArtists}</p>
-                                            <span className="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded text-white/40 self-start group-hover:bg-white/20 transition-colors">#{i + 1} Trending</span>
-                                        </div>
-                                    </motion.div>
+                                        <h3 className="text-xl font-bold mb-1">{item.title}</h3>
+                                        <p className="text-white/50">{item.subtitle}</p>
+                                    </div>
                                 ))}
                             </div>
-                        </div>
-
-                        {/* Top Charts Banner */}
-                        <h2 className="text-lg font-bold mb-5">Charts</h2>
-                        <div className="grid grid-cols-2 gap-6 relative">
-                            {charts.slice(0, 2).map((chart, i) => (
-                                <div key={chart.id} className="h-48 rounded-[32px] overflow-hidden relative group cursor-pointer" onClick={() => handlePlay(trending[0], trending)}>
-                                    <div className="absolute inset-0 bg-gradient-to-r from-black to-transparent z-10" />
-                                    <img src={chart.image} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                                    <div className="absolute inset-0 z-20 p-8 flex flex-col justify-center items-start">
-                                        <span className="text-xs font-bold uppercase tracking-[0.2em] text-white mb-2">Top 50</span>
-                                        <h3 className="text-3xl font-black text-white max-w-[200px] leading-none mb-4">{chart.title}</h3>
-                                        <button className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform">
-                                            <Play size={18} fill="black" className="ml-0.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 );
             case 'library':
                 return (
-                    <div className="flex-1 px-4 py-3 overflow-y-auto [&::-webkit-scrollbar]:hidden">
-                        <h2 className="text-xl font-bold mb-4 px-2 flex items-center gap-2">
-                            <Download size={20} />
-                            Downloads
-                        </h2>
-                        {downloads.length === 0 ? (
-                            <div className="text-center opacity-50 py-10">
-                                <Heart size={48} className="mx-auto mb-4 opacity-50" />
-                                <p>No downloaded songs yet.</p>
+                    <div className="flex-1 flex flex-col p-8 overflow-y-auto">
+                        <h1 className="text-3xl font-bold mb-6">Your Library</h1>
+
+                        {/* Playlists */}
+                        <div className="mb-8">
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Playlists</h2>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                {playlists.map(pl => (
+                                    <div key={pl.id} className="bg-white/5 p-4 rounded-xl hover:bg-white/10 cursor-pointer" onClick={() => {
+                                        playInstantMix({
+                                            id: pl.id,
+                                            title: pl.name,
+                                            color: 'blue',
+                                            songs: pl.tracks,
+                                            currentSongIndex: 0
+                                        });
+                                    }}>
+                                        <div className="w-full aspect-square bg-neutral-800 rounded-lg mb-3 flex items-center justify-center">
+                                            {pl.tracks[0] ? <img src={getArt(pl.tracks[0])} className="w-full h-full object-cover rounded-lg" /> : <Library size={32} className="text-white/20" />}
+                                        </div>
+                                        <p className="font-bold truncate">{pl.name}</p>
+                                        <p className="text-xs text-white/50">{pl.tracks.length} songs</p>
+                                    </div>
+                                ))}
+                                <div className="bg-white/5 p-4 rounded-xl hover:bg-white/10 cursor-pointer flex flex-col items-center justify-center border border-dashed border-white/20" onClick={() => {
+                                    const name = prompt("New Playlist Name");
+                                    if (name) PlaylistStore.createPlaylist(name);
+                                }}>
+                                    <Plus size={32} className="text-white/50 mb-2" />
+                                    <p className="font-bold text-sm">New Playlist</p>
+                                </div>
                             </div>
-                        ) : (
-                            downloads.map((item, i) => (
-                                <TrackRow
-                                    key={item.id}
-                                    index={i + 1}
-                                    track={item}
-                                    colors={c}
-                                    isPlaying={false}
-                                    onPlay={() => handlePlay(item.original, downloads.map(d => d.original))}
-                                />
-                            ))
-                        )}
+                        </div>
+
+                        {/* Downloads */}
+                        <div>
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                <Download size={20} />
+                                Downloads
+                            </h2>
+                            {downloads.length === 0 ? (
+                                <div className="text-center opacity-50 py-10">
+                                    <p>No downloaded songs yet.</p>
+                                </div>
+                            ) : (
+                                downloads.map((item, i) => (
+                                    <TrackRow
+                                        key={item.id}
+                                        index={i + 1}
+                                        track={item}
+                                        colors={c}
+                                        isPlaying={false}
+                                        onPlay={() => handlePlay(item.original, downloads.map(d => d.original))}
+                                    />
+                                ))
+                            )}
+                        </div>
                     </div>
                 );
             case 'home':
-            default:
                 return (
-                    <>
-                        {/* Header: Search + Mood Pills */}
-                        <header className="p-4 flex items-center gap-6" style={{ backgroundColor: 'transparent' }}>
-                            <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border flex-1 max-w-md transition-colors" style={{ backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' }}>
-                                <Search size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
-                                <input
-                                    type="text"
-                                    placeholder="Search songs, artists, albums..."
-                                    className="bg-transparent border-none outline-none text-sm w-full placeholder:text-white/30"
-                                    style={{ color: '#fff' }}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={handleSearchKeyDown}
-                                />
-                            </div>
-                            <div className="flex gap-2">
-                                {moods.map(mood => (
-                                    <MoodPill key={mood} label={mood} active={activeMood === mood.toLowerCase().replace(' ', '')} onClick={() => setActiveMood(mood.toLowerCase().replace(' ', ''))} colors={c} />
-                                ))}
-                            </div>
-                        </header>
-
-                        {/* === HERO SECTION === */}
-                        {loading ? (
-                            <div className="mx-4 mb-5 h-48 rounded-2xl bg-gray-800 animate-pulse" />
-                        ) : trending[0] ? (
-                            <div className="relative mx-4 mb-5 h-64 rounded-2xl overflow-hidden group cursor-pointer shadow-2xl">
-                                {/* Blurred Background */}
-                                <img
-                                    src={getArt(trending[0])}
-                                    alt="Featured"
-                                    className="absolute inset-0 w-full h-full object-cover opacity-60 transition-transform duration-1000 group-hover:scale-105"
-                                />
-                                {/* Gradient Overlay - REMOVED, SHARP IMAGE */}
-                                <div className="absolute inset-0 bg-black/20" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-
-                                {/* Content */}
-                                <div className="relative z-10 h-full flex items-center p-8 gap-8">
-                                    {/* Album Art */}
-                                    <motion.div
-                                        className="w-40 h-40 rounded-lg overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex-shrink-0"
-                                        whileHover={{ scale: 1.05, rotate: 2 }}
-                                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                                    >
-                                        <img
-                                            src={getArt(trending[0])}
-                                            alt={trending[0].name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </motion.div>
-
-                                    {/* Info */}
-                                    <div className="flex-1 flex flex-col items-start gap-2">
-                                        <motion.span
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full border border-white/20 backdrop-blur-md text-white/90"
-                                        >
-                                            Trending Now
-                                        </motion.span>
-                                        <motion.h2
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.1 }}
-                                            className="text-5xl font-black text-white leading-tight drop-shadow-2xl line-clamp-1"
-                                        >
-                                            {trending[0].name}
-                                        </motion.h2>
-                                        <motion.p
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.2 }}
-                                            className="text-lg text-white/80 font-medium mb-4 line-clamp-1"
-                                        >
-                                            {trending[0].primaryArtists} <span className="opacity-50 mx-2">•</span> {trending[0].year || '2024'}
-                                        </motion.p>
-
-                                        <div className="flex gap-3">
-                                            <motion.button
-                                                className="h-12 px-8 rounded-full text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-white/20"
-                                                style={{ backgroundColor: '#ffffff', color: '#000' }}
-                                                whileHover={{ scale: 1.05 }}
-                                                whileTap={{ scale: 0.95 }}
-                                                onClick={() => {
-                                                    if (currentSong?.id === trending[0].id && isPlaying) {
-                                                        togglePlay();
-                                                    } else {
-                                                        handlePlay(trending[0], trending);
-                                                    }
-                                                }}
-                                            >
-                                                {currentSong?.id === trending[0].id && isPlaying ? (
-                                                    <><Pause size={18} fill="#fff" /> PAUSE</>
-                                                ) : (
-                                                    <><Play size={18} fill="#fff" /> PLAY NOW</>
-                                                )}
-                                            </motion.button>
-                                            <motion.button
-                                                className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center backdrop-blur-md text-white hover:bg-white/10"
-                                                whileHover={{ scale: 1.05 }}
-                                                whileTap={{ scale: 0.95 }}
-                                            >
-                                                <Heart size={20} />
-                                            </motion.button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            /* Hero - Sexy Aesthetic */
-                            <div className="relative mx-4 mb-5 h-72 rounded-[32px] overflow-hidden group cursor-pointer shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black" />
-                                <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=2070&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-50 group-hover:scale-105 transition-transform duration-700" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                                <div className="relative z-10 h-full flex flex-col justify-end p-10 items-start">
-                                    <div className="absolute top-8 right-8 w-16 h-16 rounded-full border border-white/20 flex items-center justify-center animate-spin-slow opacity-50">
-                                        <Disc size={32} className="text-white" />
-                                    </div>
-                                    <h1 className="text-6xl font-black text-white mb-2 tracking-tighter drop-shadow-2xl">FEEL THE<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">RHYTHM</span></h1>
-                                    <p className="text-lg text-white/80 mb-8 font-medium tracking-wide max-w-md">Your daily mix of energy and soul. Curated just for you.</p>
-                                    <button className="px-10 py-4 bg-white text-black text-sm font-bold tracking-[0.2em] uppercase rounded-full hover:scale-105 hover:bg-white transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center gap-2">
-                                        <Play size={16} fill="black" /> Start Listening
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Featured Cards Row */}
-                        <div className="px-4 flex gap-4 mb-5">
-                            {charts.map((chart) => (
-                                <FeatureCard
-                                    key={chart.id}
-                                    title={chart.title}
-                                    subtitle={chart.subtitle}
-                                    colors={c}
-                                    image={chart.image}
-                                    isNew={chart.id === 'chart2'}
-                                />
-                            ))}
-                        </div>
-
-
-
-                        {/* Track List - Using Real Trending Data */}
-                        <div className="flex-1 px-4 py-3 overflow-y-auto [&::-webkit-scrollbar]:hidden">
-
-                            {loading ? (
-                                // Loading skeletons
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <div key={i} className="flex items-center px-3 py-2.5 gap-3 animate-pulse">
-                                        <div className="w-8 h-4 rounded bg-gray-700" />
-                                        <div className="w-10 h-10 rounded-lg bg-gray-700" />
-                                        <div className="flex-1 h-4 rounded bg-gray-700" />
-                                        <div className="w-20 h-4 rounded bg-gray-700" />
-                                    </div>
-                                ))
-                            ) : trending.length > 0 ? (
-                                trending.slice(0, 10).map((song, i) => {
-                                    const trackData = {
-                                        id: song.id,
-                                        title: song.name,
-                                        artist: song.primaryArtists,
-                                        duration: song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : '--:--',
-                                        art: getArt(song)
-                                    };
-                                    return (
-                                        <TrackRow
-                                            key={song.id}
-                                            index={i + 1}
-                                            track={trackData}
-                                            colors={c}
-                                            isPlaying={currentSong?.id === song.id && isPlaying}
-                                            onPlay={() => handlePlay(song, trending)}
-                                        />
-                                    );
-                                })
-                            ) : (
-                                <p className="text-center text-sm opacity-50 mt-8">No trending songs available</p>
-                            )}
-                        </div>
-                    </>
+                    <HomeView
+                        colors={c}
+                        trending={trending}
+                        charts={charts}
+                        recent={recent}
+                        loading={loading}
+                        onPlay={handlePlay}
+                        onNavigate={(view, data) => {
+                            if (view === 'artist') navigateToArtist(data);
+                            if (view === 'album') navigateToAlbum(data);
+                        }}
+                        activeRegion={activeRegion}
+                        onRegionChange={setActiveRegion}
+                    />
                 );
+            case 'artist':
+                return activeArtist ? (
+                    <ArtistView
+                        artistName={activeArtist}
+                        colors={c}
+                        onBack={() => setActiveView('home')}
+                        onPlay={handlePlay}
+                        onNavigate={(view: string, data: any) => {
+                            if (view === 'album') navigateToAlbum(data);
+                        }}
+                    />
+                ) : null;
+            case 'album':
+                return activeAlbum ? (
+                    <AlbumView
+                        albumId={activeAlbum}
+                        colors={c}
+                        onBack={() => setActiveView('home')}
+                        onPlay={handlePlay}
+                    />
+                ) : null;
             case 'now-playing': // New Layout
                 return currentSong ? (
                     <NowPlayingOverlay
@@ -1242,38 +817,6 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         onAddToOTG={addToOTG}
                     />
                 ) : <div className="flex-1 flex items-center justify-center text-white/50">No song playing</div>;
-            case 'library':
-                return (
-                    <div className="flex-1 flex flex-col p-8 overflow-y-auto">
-                        <h1 className="text-3xl font-bold mb-6">Your Library</h1>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            {playlists.map(pl => (
-                                <div key={pl.id} className="bg-white/5 p-4 rounded-xl hover:bg-white/10 cursor-pointer" onClick={() => {
-                                    playInstantMix({
-                                        id: pl.id,
-                                        title: pl.name,
-                                        color: 'blue',
-                                        songs: pl.tracks,
-                                        currentSongIndex: 0
-                                    });
-                                }}>
-                                    <div className="w-full aspect-square bg-neutral-800 rounded-lg mb-3 flex items-center justify-center">
-                                        {pl.tracks[0] ? <img src={getArt(pl.tracks[0])} className="w-full h-full object-cover rounded-lg" /> : <Library size={32} className="text-white/20" />}
-                                    </div>
-                                    <p className="font-bold truncate">{pl.name}</p>
-                                    <p className="text-xs text-white/50">{pl.tracks.length} songs</p>
-                                </div>
-                            ))}
-                            <div className="bg-white/5 p-4 rounded-xl hover:bg-white/10 cursor-pointer flex flex-col items-center justify-center border border-dashed border-white/20" onClick={() => {
-                                const name = prompt("New Playlist Name");
-                                if (name) PlaylistStore.createPlaylist(name);
-                            }}>
-                                <Plus size={32} className="text-white/50 mb-2" />
-                                <p className="font-bold text-sm">New Playlist</p>
-                            </div>
-                        </div>
-                    </div>
-                );
         }
     };
 
@@ -1383,14 +926,25 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         >
                             <Monitor size={10} />
                         </button>
-                        <button onClick={() => onThemeChange('midnight')} className={`w-4 h-4 rounded-full bg-black border ${theme === 'midnight' ? 'ring-2 ring-white ring-offset-2 ring-offset-black' : 'border-gray-600'}`} />
-                        <button onClick={() => onThemeChange('polar')} className={`w-4 h-4 rounded-full bg-white border ${theme === 'polar' ? 'ring-2 ring-black ring-offset-2 ring-offset-white' : 'border-gray-300'}`} />
+                        <button onClick={() => onThemeChange('midnight')} className={`w - 4 h - 4 rounded - full bg - black border ${theme === 'midnight' ? 'ring-2 ring-white ring-offset-2 ring-offset-black' : 'border-gray-600'} `} />
+                        <button onClick={() => onThemeChange('polar')} className={`w - 4 h - 4 rounded - full bg - white border ${theme === 'polar' ? 'ring-2 ring-black ring-offset-2 ring-offset-white' : 'border-gray-300'} `} />
                     </div>
                 </aside>
 
                 {/* --- MAIN CONTENT --- */}
-                <main className="flex-1 flex flex-col overflow-hidden">
-                    {renderContent()}
+                <main className="flex-1 flex flex-col overflow-hidden relative">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={activeView + (activeArtist || '') + (activeAlbum || '')}
+                            initial={{ opacity: 0, scale: 0.98, filter: 'blur(10px)' }}
+                            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                            exit={{ opacity: 0, scale: 1.02, filter: 'blur(10px)' }}
+                            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                            className="absolute inset-0 flex flex-col"
+                        >
+                            {renderContent()}
+                        </motion.div>
+                    </AnimatePresence>
                 </main>
 
                 {/* --- RIGHT PANEL (Recent Played - GLASS) --- */}
@@ -1443,8 +997,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
                                 {/* Text */}
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-semibold truncate">{item.title}</p>
-                                    <p className="text-[10px] truncate" style={{ color: c.textMuted }}>{item.artist}</p>
+                                    <p className="text-xs font-semibold truncate hover:underline" onClick={() => navigateToArtist(item.artist)}>{item.title}</p>
+                                    <p className="text-[10px] truncate hover:text-white transition-colors" style={{ color: c.textMuted }} onClick={() => navigateToArtist(item.artist)}>{item.artist}</p>
                                 </div>
                             </motion.div>
                         ))}
@@ -1533,7 +1087,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                     }}
                                 >
                                     <div className="absolute inset-0 rounded-full bg-white origin-left transform transition-transform" style={{ transform: `scaleX(${duration > 0 ? progress / duration : 0})` }} />
-                                    <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `${duration > 0 ? (progress / duration) * 100 : 0}%`, transform: 'translateX(-50%) translateY(-50%)' }} />
+                                    <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `${duration > 0 ? (progress / duration) * 100 : 0}% `, transform: 'translateX(-50%) translateY(-50%)' }} />
                                 </div>
                                 <span className="text-[9px] text-white/50 font-mono w-7">{Math.floor(duration / 60)}:{(Math.floor(duration) % 60).toString().padStart(2, '0')}</span>
                             </div>
@@ -1553,7 +1107,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                         setVolume(Math.max(0, Math.min(1, vol)));
                                     }}
                                 >
-                                    <div className="h-full bg-white rounded-full relative" style={{ width: `${volume * 100}%` }}>
+                                    <div className="h-full bg-white rounded-full relative" style={{ width: `${volume * 100}% ` }}>
                                         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
                                 </div>
@@ -1564,7 +1118,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             {currentSong && (
                                 <Heart
                                     size={18}
-                                    className={`cursor-pointer transition-all ${isLiked(currentSong.id) ? 'text-[#e91e63] fill-[#e91e63]' : 'text-white/40 hover:text-white'}`}
+                                    className={`cursor - pointer transition - all ${isLiked(currentSong.id) ? 'text-[#e91e63] fill-[#e91e63]' : 'text-white/40 hover:text-white'} `}
                                     onClick={() => toggleLike(currentSong)}
                                 />
                             )}

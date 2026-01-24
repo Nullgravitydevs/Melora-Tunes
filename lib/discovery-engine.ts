@@ -7,27 +7,28 @@ import { Mix } from '@/components/providers/playback-context';
 
 export class DiscoveryEngine {
 
-    // THE GOLDEN RATIO
+    // THE GOLDEN RATIO (Fixed)
     private static RATIOS = {
-        TASTE: 0.3,    // 30% Brain
-        TREND: 0.3,    // 30% Global
-        ADJACENT: 0.2, // 20% Similar
-        WILDCARD: 0.2  // 20% Surprise
+        TASTE: 0.3,    // 30% User Taste
+        REGIONAL: 0.3, // 30% Regional/Trending
+        ADJACENT: 0.2, // 20% Adjacent Artists
+        WILDCARD: 0.2  // 20% High Quality Wildcards
     };
 
     /**
      * Generate a Session Mix (The DJ)
      * @param seed - The song that started the session
+     * @param region - Optional region/language filter (e.g. 'telugu', 'hindi', 'english')
      */
-    static async generateSessionMix(seed: PlayableTrack): Promise<Mix> {
-        console.log("💿 The DJ: Spinning new mix for " + seed.song.name);
+    static async generateSessionMix(seed: PlayableTrack, region?: string): Promise<Mix> {
+        console.log(`💿 The DJ: Spinning new mix for ${seed.song.name} [Region: ${region || 'Global'}]`);
 
         // 1. Fetch Ingredients (Parallel)
-        const [taste, trends, adjacent, wildcards] = await Promise.all([
+        const [taste, regional, adjacent, wildcards] = await Promise.all([
             this.getTasteCandidates(),
-            this.getTrendingCandidates(),
+            this.getRegionalCandidates(region),
             this.getAdjacentCandidates(seed),
-            this.getWildcardCandidates()
+            this.getWildcardCandidates(region)
         ]);
 
         // 2. Mix Formulation (Target size ~20 songs)
@@ -44,16 +45,17 @@ export class DiscoveryEngine {
 
         const remaining = 19; // Target size 20 (minus seed)
         fill(taste, Math.ceil(remaining * this.RATIOS.TASTE));
-        fill(trends, Math.ceil(remaining * this.RATIOS.TREND));
+        fill(regional, Math.ceil(remaining * this.RATIOS.REGIONAL));
         fill(adjacent, Math.ceil(remaining * this.RATIOS.ADJACENT));
         fill(wildcards, Math.ceil(remaining * this.RATIOS.WILDCARD));
 
         // 3. Post-Process (Smart Shuffle & Dedup)
         const finalMix = this.smartShuffle(pool, seed);
 
+        // 4. Session Scoped Mix
         return {
-            id: 'discovery-mix', // Reuses the "Tape" slot
-            title: "Discovery Mix",
+            id: `discovery-mix-${Date.now()}`, // UNIQUE SESSION ID
+            title: region ? `${region.charAt(0).toUpperCase() + region.slice(1)} Mix` : "Discovery Mix",
             color: 'blue',
             songs: finalMix,
             currentSongIndex: 0
@@ -66,12 +68,9 @@ export class DiscoveryEngine {
         const topIds = SignalStore.getTopTaste(10);
         if (topIds.length === 0) return [];
 
-        // Fetch details (simulated batch fetch via getSongDetails or minimal metadata if stored)
-        // For now, we assume we might need to fetch fresh metadata
-        // Optimization: SignalStore *could* store metadata, but currently only stores IDs and weight.
-        // We will fetch details for top 3 to minimalize API spam.
         const candidates: PlayableTrack[] = [];
-        for (const id of topIds.slice(0, 3)) {
+        // Only fetch top 5 for efficiency
+        for (const id of topIds.slice(0, 5)) {
             try {
                 const song = await getSongDetails(id);
                 if (song) candidates.push({ song, id: song.id, preferredQuality: '320', sources: [] });
@@ -80,16 +79,26 @@ export class DiscoveryEngine {
         return candidates;
     }
 
-    private static async getTrendingCandidates(): Promise<PlayableTrack[]> {
+    private static async getRegionalCandidates(region?: string): Promise<PlayableTrack[]> {
         try {
-            const trending = await getTrending();
-            return trending.map(s => ({ song: s, id: s.id, preferredQuality: '320', sources: [] }));
+            // If region is provided, search for "Trending [Region]" or use a specific chart?
+            // Since we don't have direct regional chart API exposed easily, we can use search 
+            // or if we had a regional trending endpoint.
+            // For now, let's use searchUnified with a regional query or fallback to global trending.
+            if (region && region.toLowerCase() !== 'global') {
+                const query = `${region} Hit Songs`;
+                const results = await searchUnified(query);
+                return results;
+            } else {
+                const trending = await getTrending();
+                return trending.map(s => ({ song: s, id: s.id, preferredQuality: '320', sources: [] }));
+            }
         } catch (e) { return []; }
     }
 
     private static async getAdjacentCandidates(seed: PlayableTrack): Promise<PlayableTrack[]> {
         try {
-            // Search for Artist or Similar Vibe
+            // Search for Artist
             const artist = seed.song.primaryArtists.split(',')[0].trim();
             const results = await searchUnified(artist);
             // Filter out the seed itself
@@ -97,15 +106,14 @@ export class DiscoveryEngine {
         } catch (e) { return []; }
     }
 
-    private static async getWildcardCandidates(): Promise<PlayableTrack[]> {
-        // For wildcards, we can use a randomized search or a different chart
-        // Let's use a generic search term like "Hit" or "Vibe" or get a playlist
-        // Hack: Search a random letter? Too risky. 
-        // Better: Search "LoFi" or "Pop" randomly?
-        const terms = ['Relax', 'Party', 'Top', 'Hit', 'New'];
-        const term = terms[Math.floor(Math.random() * terms.length)];
+    private static async getWildcardCandidates(region?: string): Promise<PlayableTrack[]> {
+        // High Quality Wildcards - biased by region if present
+        const baseTerms = ['Top', 'Viral', 'New', 'Hifi', 'Master'];
+        const term = baseTerms[Math.floor(Math.random() * baseTerms.length)];
+        const query = region ? `${region} ${term}` : term;
+
         try {
-            const results = await searchUnified(term);
+            const results = await searchUnified(query);
             return results.sort(() => 0.5 - Math.random()); // Randomize
         } catch (e) { return []; }
     }
@@ -114,8 +122,7 @@ export class DiscoveryEngine {
 
     private static smartShuffle(pool: PlayableTrack[], seed: PlayableTrack): PlayableTrack[] {
         const history = HistoryStore.getHistory(); // Last 50
-        // Filter out recent history (Last 24h approximation -> Last 20 songs usually)
-        // Hard constraint: Don't play what I just heard.
+        // Filter out recent history (Last 24h)
         const recentIds = new Set(history.slice(0, 20).map(h => h.id));
 
         const unique = new Map<string, PlayableTrack>();
