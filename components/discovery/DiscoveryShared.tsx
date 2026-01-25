@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart, Disc, Check } from 'lucide-react';
-import { usePlayback, ensurePlayableTrack } from '@/components/providers/playback-context';
+import { Play, Disc } from 'lucide-react';
 
 // Typings (Simplified)
 export interface TrackData {
@@ -28,33 +27,37 @@ export interface DiscoveryThemeColors {
 
 // --- HELPER FUNCTIONS ---
 
-export function getArt(song: any) {
+export function getArt(song: any): string {
     if (!song) return '';
-    // Handle both new unified format and raw jiosaavn
-    let img = song.image || song.art;
+
+    let img = song.image || song.art || song.images;
     if (Array.isArray(img)) {
         img = img[img.length - 1]?.link || img[0]?.link || '';
     }
-    // Force High Quality - Robust Regex
+
     if (typeof img === 'string') {
         return img
-            .replace(/150x150/g, '500x500')
-            .replace(/50x50/g, '500x500')
-            .replace(/_150\./g, '_500.')
-            .replace(/_50\./g, '_500.');
+            .replace(/(\d{2,3})x\1/g, '500x500')
+            .replace(/_(\d{2,3})\./g, '_500.')
+            .replace(/\/(\d{2,3})\//g, '/500/');
     }
-    return img || '';
+
+    return '';
 }
 
 // --- SHARED COMPONENTS ---
 
-export function NavItem({ icon, label, active, colors, onClick }: any) {
+export function NavItem({ icon, label, active, onClick }: {
+    icon: React.ReactNode;
+    label: string;
+    active?: boolean;
+    onClick: () => void;
+}) {
     return (
         <motion.button
             onClick={onClick}
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium w-full text-left transition-colors"
             style={{
-                backgroundColor: 'transparent',
                 color: active ? '#FFFFFF' : '#666666'
             }}
             whileHover={{
@@ -69,183 +72,122 @@ export function NavItem({ icon, label, active, colors, onClick }: any) {
     );
 }
 
-export function PlaylistItem({ icon, title, subtitle, active, colors, onClick }: any) {
+export function PlaylistItem({ icon, title, subtitle, active, colors, onClick }: {
+    icon?: React.ReactNode;
+    title: string;
+    subtitle?: string;
+    active?: boolean;
+    colors: DiscoveryThemeColors;
+    onClick: () => void;
+}) {
     return (
         <motion.div
             className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
-            style={{
-                backgroundColor: 'transparent',
-                opacity: active ? 1 : 0.7
-            }}
+            style={{ opacity: active ? 1 : 0.7 }}
             whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)', opacity: 1 }}
             onClick={onClick}
             transition={{ duration: 0.2 }}
         >
-            {icon ? (
-                <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ backgroundColor: colors.accent, color: colors.bg }}>{icon}</div>
-            ) : (
-                <div className="w-9 h-9 rounded-md" style={{ backgroundColor: colors.border }}></div>
-            )}
+            <div
+                className="w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: icon ? colors.accent : colors.border, color: colors.bg }}
+            >
+                {icon}
+            </div>
+
             <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate">{title}</p>
-                <p className="text-[10px] truncate" style={{ color: colors.textMuted }}>{subtitle}</p>
+                {subtitle && (
+                    <p className="text-[10px] truncate" style={{ color: colors.textMuted }}>
+                        {subtitle}
+                    </p>
+                )}
             </div>
+
             {active && <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />}
         </motion.div>
     );
 }
 
-export function TrackRow({ index, track, colors, isPlaying, onPlay }: { index: number, track: TrackData, colors: DiscoveryThemeColors, isPlaying: boolean, onPlay: () => void }) {
+export function TrackRow({
+    index,
+    track,
+    colors,
+    isPlaying,
+    onPlay
+}: {
+    index: number;
+    track: TrackData;
+    colors: DiscoveryThemeColors;
+    isPlaying: boolean;
+    onPlay: () => void;
+}) {
     return (
         <motion.div
             className="flex items-center px-4 py-3 rounded-lg cursor-pointer group relative transition-colors"
-            style={{ backgroundColor: isPlaying ? 'rgba(255, 255, 255, 0.1)' : 'transparent' }} // Standardized White Highlight for Monochrome
-            whileHover={{
-                backgroundColor: 'rgba(255,255,255,0.08)',
-            }}
+            style={{ backgroundColor: isPlaying ? 'rgba(255,255,255,0.1)' : 'transparent' }}
+            whileHover={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
             onClick={onPlay}
             transition={{ duration: 0.1 }}
         >
-            {/* Index / Playing Indicator */}
             <span
                 className="w-8 text-xs font-medium text-center"
                 style={{ color: isPlaying ? '#ffffff' : colors.textMuted }}
             >
-                {isPlaying ? (
-                    <div className="flex items-end justify-center gap-[2px] h-4">
-                        <motion.div className="w-[3px] bg-white rounded-sm" animate={{ height: ['40%', '100%', '60%', '100%', '40%'] }} transition={{ repeat: Infinity, duration: 0.8 }} />
-                        <motion.div className="w-[3px] bg-white rounded-sm" animate={{ height: ['100%', '40%', '100%', '60%', '100%'] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.2 }} />
-                        <motion.div className="w-[3px] bg-white rounded-sm" animate={{ height: ['60%', '100%', '40%', '100%', '60%'] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.4 }} />
-                    </div>
+                {!isPlaying ? (
+                    <>
+                        <span className="group-hover:hidden">{index}</span>
+                        <Play size={14} className="hidden group-hover:block mx-auto text-white" />
+                    </>
                 ) : (
-                    <span className="group-hover:hidden">{index}</span>
-                )}
-                {!isPlaying && (
-                    <Play size={14} className="hidden group-hover:block mx-auto text-white" />
+                    <div className="flex items-end justify-center gap-[2px] h-4">
+                        {[0, 1, 2].map(i => (
+                            <motion.div
+                                key={i}
+                                className="w-[3px] bg-white rounded-sm"
+                                animate={{ height: ['40%', '100%', '60%', '100%', '40%'] }}
+                                transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.2 }}
+                            />
+                        ))}
+                    </div>
                 )}
             </span>
 
-            {/* Album Art Thumbnail */}
             <div className="w-10 h-10 rounded-md mr-4 overflow-hidden flex-shrink-0 shadow-lg bg-neutral-900 border border-white/10">
                 {track.art ? (
                     <img src={track.art} alt={track.title} className="w-full h-full object-cover" />
-                ) : <div className="w-full h-full flex items-center justify-center"><Disc size={16} className="opacity-20 text-white" /></div>}
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Disc size={16} className="opacity-20 text-white" />
+                    </div>
+                )}
             </div>
 
-            {/* Title */}
             <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${isPlaying ? 'text-white' : 'text-zinc-200'}`}>
                     {track.title}
                 </p>
             </div>
 
-            {/* Artist */}
             <span className="w-36 text-xs truncate px-2 text-zinc-500 group-hover:text-zinc-400 transition-colors">
                 {track.artist}
             </span>
 
-            {/* Quality Badge */}
             {track.quality && (
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border border-white/10 ${track.quality === 'hires' || track.quality === 'flac' ? 'bg-white text-black' : 'bg-white/10 text-white/50'
-                    }`}>
+                <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border border-white/10 ${track.quality === 'hires' || track.quality === 'flac'
+                            ? 'bg-white text-black'
+                            : 'bg-white/10 text-white/50'
+                        }`}
+                >
                     {track.quality === 'hires' ? 'HI-RES' : track.quality === 'flac' ? 'FLAC' : 'HQ'}
                 </span>
             )}
 
-            {/* Duration */}
             <span className="w-14 text-xs text-right text-zinc-600 font-mono">
                 {track.duration}
             </span>
         </motion.div>
-    );
-}
-
-export function FeatureCard({ title, subtitle, isNew, colors, image, onClick, type = 'MIX' }: any) {
-    const hasImage = !!image;
-
-    return (
-        <motion.div
-            className="flex-1 min-w-[200px] h-48 rounded-2xl cursor-pointer relative overflow-hidden group border border-white/5"
-            style={{
-                backgroundColor: hasImage ? '#000' : '#111',
-            }}
-            onClick={onClick}
-            whileHover={{ y: -6 }}
-        >
-            {/* Background Image */}
-            {hasImage && (
-                <>
-                    <img
-                        src={image}
-                        alt={title}
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-60"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                </>
-            )}
-
-            {/* Content */}
-            <div className="relative z-10 h-full p-5 flex flex-col justify-end">
-                {isNew && (
-                    <span className="absolute top-4 left-4 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-white text-black">
-                        New
-                    </span>
-                )}
-                <p className="text-[10px] uppercase tracking-widest mb-1 font-bold text-white/60">
-                    {type}
-                </p>
-                <p className="text-xl font-bold leading-tight text-white mb-1 line-clamp-2">
-                    {title}
-                </p>
-                <p className="text-xs text-white/50 line-clamp-1">
-                    {subtitle}
-                </p>
-            </div>
-
-            {/* Play Button on Hover */}
-            <motion.div
-                className="absolute right-4 bottom-4 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 bg-white text-black shadow-lg"
-                initial={{ y: 10 }}
-                whileHover={{ scale: 1.1 }}
-                animate={{ y: 0 }}
-            >
-                <Play size={18} fill="black" className="ml-0.5" />
-            </motion.div>
-        </motion.div>
-    );
-}
-
-export function MoodPill({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
-    return (
-        <motion.button
-            onClick={onClick}
-            className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${active
-                ? 'bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.4)]'
-                : 'bg-transparent text-white/60 border-white/10 hover:border-white/50 hover:text-white'
-                }`}
-            whileTap={{ scale: 0.95 }}
-        >
-            {label}
-        </motion.button>
-    );
-}
-
-export function SectionHeader({ title, subtitle, action }: { title: string, subtitle?: string, action?: { label: string, onClick: () => void } }) {
-    return (
-        <div className="flex items-end justify-between mb-6 px-2 border-b border-white/5 pb-2">
-            <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
-                {subtitle && <p className="text-sm text-white/40 mt-1">{subtitle}</p>}
-            </div>
-            {action && (
-                <button
-                    onClick={action.onClick}
-                    className="text-xs font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors pb-1"
-                >
-                    {action.label}
-                </button>
-            )}
-        </div>
     );
 }
 
