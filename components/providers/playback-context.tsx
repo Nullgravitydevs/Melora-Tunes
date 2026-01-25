@@ -102,7 +102,7 @@ interface PlaybackContextType {
     activeMix: Mix | undefined;
 
     // Queue (Typed correctly)
-    queue: (JioSaavnSong | PlayableTrack)[];
+    queue: JioSaavnSong[];
     currentIndex: number;
 
     // Sleep Timer
@@ -536,14 +536,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const playInstantMix = useCallback((mix: Mix) => {
         console.log("[playInstantMix] Atomic play for:", mix.title);
 
-        // 1. Update Mixes (Add or Replace)
+        // 1. Update Mixes (Clean old instant mixes)
         setMixes(prev => {
-            const exists = prev.some(m => m.id === mix.id);
-            if (exists) {
-                return prev.map(m => m.id === mix.id ? mix : m);
-            }
-            // Logic to maintain 8 mix limit could be here, but for "Instant Play" (usually On-the-Go), we force it.
-            return [...prev, mix];
+            // STRICT: Only keep Discovery Mix + new mix
+            const filtered = prev.filter(m => m.id === DISCOVERY_MIX_ID);
+            return [...filtered, mix];
         });
 
         // 2. Set Active Mix
@@ -557,8 +554,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             audioPlayerRef.current.pause();
         }
 
-        // 4. Schedule Play (Need short tick for React state to propagate)
+        // 4. Schedule Play
         setTimeout(() => {
+            setShuffle(false); // ATOMIC RESET
             setIsPlaying(true);
         }, 100);
     }, []);
@@ -1320,19 +1318,35 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
 
     // Normalize queue for UI
-    const queue = (activeMix?.songs || []).map(s => isPlayableTrack(s) ? s.song : s);
+    const normalizedQueue = useMemo(() => {
+        return (activeMix?.songs || []).map(s =>
+            isPlayableTrack(s) ? s.song : s
+        );
+    }, [activeMix]);
+
     const currentIndex = activeMix?.currentSongIndex || 0;
 
     // We also need to ensure currentSong matches what's actually playing if we are in a mix
 
     const setQueue = useCallback((newQueue: (JioSaavnSong | PlayableTrack)[]) => {
-        if (newQueue.length === 0) {
+        if (!newQueue || newQueue.length === 0) {
             setIsPlaying(false);
             setActiveMixId(null);
             setCurrentSongUrl(null);
             audioPlayerRef.current?.pause();
+            return;
         }
-    }, []);
+
+        const mix: Mix = {
+            id: `queue-${Date.now()}`,
+            title: 'Queue',
+            color: 'blue',
+            songs: newQueue.map(s => ensurePlayableTrack(s)),
+            currentSongIndex: 0
+        };
+
+        playInstantMix(mix);
+    }, [playInstantMix]);
 
     const value = {
         mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration, shuffle, repeat,
@@ -1347,7 +1361,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         isLoaded: true,
         activeMix,
 
-        queue: activeMix?.songs || [],
+        queue: normalizedQueue,
         currentIndex: activeMix?.currentSongIndex || 0,
 
         sleepTimer, setSleepTimer,

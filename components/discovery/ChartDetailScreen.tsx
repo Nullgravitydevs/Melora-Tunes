@@ -34,6 +34,7 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
     const { playInstantMix, currentSong, isPlaying } = usePlayback();
     const [songs, setSongs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isShuffled, setIsShuffled] = useState(false);
 
     useEffect(() => {
         const fetchChart = async () => {
@@ -51,41 +52,34 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
         fetchChart();
     }, [chartId, chartTitle]);
 
-    const handlePlayAll = () => {
-        if (songs.length === 0) return;
-        const mix: Mix = {
-            id: `chart-${chartId}`,
+    const buildChartMix = (startIndex = 0, shuffled = false) => {
+        const baseSongs = shuffled
+            ? [...songs].sort(() => Math.random() - 0.5)
+            : songs;
+
+        return {
+            id: `chart-${chartId}-${Date.now()}`, // MUST be unique per session
             title: chartTitle,
             color: 'blue',
-            songs: songs.map(s => ensurePlayableTrack(s)),
-            currentSongIndex: 0
-        };
-        playInstantMix(mix);
+            songs: baseSongs.map(s => ensurePlayableTrack(s)),
+            currentSongIndex: startIndex
+        } as Mix;
+    };
+
+    const handlePlayAll = () => {
+        if (songs.length === 0) return;
+        setIsShuffled(false);
+        playInstantMix(buildChartMix(0));
     };
 
     const handleShuffle = () => {
         if (songs.length === 0) return;
-        const shuffled = [...songs].sort(() => Math.random() - 0.5);
-        const mix: Mix = {
-            id: `chart-${chartId}-shuffle`,
-            title: `${chartTitle} (Shuffled)`,
-            color: 'purple',
-            songs: shuffled.map(s => ensurePlayableTrack(s)),
-            currentSongIndex: 0
-        };
-        playInstantMix(mix);
+        setIsShuffled(true);
+        playInstantMix(buildChartMix(0, true));
     };
 
-    const handleSongClick = (song: any, index: number) => {
-        // Play from this position, queue the rest
-        const mix: Mix = {
-            id: `chart-${chartId}`,
-            title: chartTitle,
-            color: 'blue',
-            songs: songs.map(s => ensurePlayableTrack(s)),
-            currentSongIndex: index
-        };
-        playInstantMix(mix);
+    const handleSongClick = (_song: any, index: number) => {
+        playInstantMix(buildChartMix(index, isShuffled));
     };
 
     return (
@@ -138,7 +132,10 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
                             <button
                                 onClick={handleShuffle}
                                 disabled={loading || songs.length === 0}
-                                className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white/10 backdrop-blur-md transition-colors disabled:opacity-50"
+                                className={`w-14 h-14 rounded-full border flex items-center justify-center backdrop-blur-md transition-colors disabled:opacity-50 ${isShuffled
+                                    ? 'border-white bg-white/10 text-white'
+                                    : 'border-white/20 text-white hover:bg-white/10'
+                                    }`}
                             >
                                 <Shuffle size={20} />
                             </button>
@@ -149,7 +146,7 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
 
             {/* Song List */}
             <div className="flex-1 overflow-y-auto p-8 md:p-12 [&::-webkit-scrollbar]:hidden">
-                <div className="max-w-4xl">
+                <div className="max-w-4xl" style={{ contain: 'layout paint' }}>
                     {/* Header Row */}
                     <div className="flex items-center gap-4 px-3 py-2 text-xs font-bold text-white/40 uppercase tracking-widest border-b border-white/5 mb-4">
                         <span className="w-8 text-center">#</span>

@@ -33,6 +33,7 @@ export function PlaylistScreen({ playlistId, playlistTitle, playlistImage, color
     const { playInstantMix, currentSong, isPlaying } = usePlayback();
     const [songs, setSongs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isShuffled, setIsShuffled] = useState(false);
 
     useEffect(() => {
         const fetchPlaylist = async () => {
@@ -49,40 +50,39 @@ export function PlaylistScreen({ playlistId, playlistTitle, playlistImage, color
         fetchPlaylist();
     }, [playlistId]);
 
-    const handlePlayAll = () => {
-        if (songs.length === 0) return;
-        const mix: Mix = {
-            id: `playlist-${playlistId}`,
+    const totalDuration = songs.reduce(
+        (acc, s) => acc + (s.duration || 0),
+        0
+    );
+
+    const buildPlaylistMix = (startIndex = 0, shuffled = false) => {
+        const baseSongs = shuffled
+            ? [...songs].sort(() => Math.random() - 0.5)
+            : songs;
+
+        return {
+            id: `playlist-${playlistId}-${Date.now()}`, // MUST be unique per session
             title: playlistTitle,
             color: 'green',
-            songs: songs.map(s => ensurePlayableTrack(s)),
-            currentSongIndex: 0
-        };
-        playInstantMix(mix);
+            songs: baseSongs.map(s => ensurePlayableTrack(s)),
+            currentSongIndex: startIndex
+        } as Mix;
+    };
+
+    const handlePlayAll = () => {
+        if (songs.length === 0) return;
+        setIsShuffled(false);
+        playInstantMix(buildPlaylistMix(0));
     };
 
     const handleShuffle = () => {
         if (songs.length === 0) return;
-        const shuffled = [...songs].sort(() => Math.random() - 0.5);
-        const mix: Mix = {
-            id: `playlist-${playlistId}-shuffle`,
-            title: `${playlistTitle} (Shuffled)`,
-            color: 'orange',
-            songs: shuffled.map(s => ensurePlayableTrack(s)),
-            currentSongIndex: 0
-        };
-        playInstantMix(mix);
+        setIsShuffled(true);
+        playInstantMix(buildPlaylistMix(0, true));
     };
 
-    const handleSongClick = (song: any, index: number) => {
-        const mix: Mix = {
-            id: `playlist-${playlistId}`,
-            title: playlistTitle,
-            color: 'green',
-            songs: songs.map(s => ensurePlayableTrack(s)),
-            currentSongIndex: index
-        };
-        playInstantMix(mix);
+    const handleSongClick = (_song: any, index: number) => {
+        playInstantMix(buildPlaylistMix(index, isShuffled));
     };
 
     return (
@@ -122,7 +122,7 @@ export function PlaylistScreen({ playlistId, playlistTitle, playlistImage, color
                             {playlistTitle}
                         </h1>
                         <p className="text-white/60 text-sm mb-6">
-                            {songs.length} songs
+                            {songs.length} songs · {Math.floor(totalDuration / 60)} min
                         </p>
 
                         {/* Actions */}
@@ -137,7 +137,10 @@ export function PlaylistScreen({ playlistId, playlistTitle, playlistImage, color
                             <button
                                 onClick={handleShuffle}
                                 disabled={loading || songs.length === 0}
-                                className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white/10 backdrop-blur-md transition-colors disabled:opacity-50"
+                                className={`w-14 h-14 rounded-full border flex items-center justify-center backdrop-blur-md transition-colors disabled:opacity-50 ${isShuffled
+                                    ? 'border-white bg-white/10 text-white'
+                                    : 'border-white/20 text-white hover:bg-white/10'
+                                    }`}
                             >
                                 <Shuffle size={20} />
                             </button>
@@ -164,25 +167,27 @@ export function PlaylistScreen({ playlistId, playlistTitle, playlistImage, color
                     )}
 
                     {/* Songs */}
-                    {!loading && songs.map((song, i) => (
-                        <TrackRow
-                            key={song.id}
-                            index={i + 1}
-                            track={{
-                                id: song.id,
-                                title: song.name,
-                                artist: song.primaryArtists,
-                                duration: song.duration
-                                    ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0')
-                                    : '--:--',
-                                art: getArt(song),
-                                original: song
-                            }}
-                            colors={colors}
-                            isPlaying={currentSong?.id === song.id && isPlaying}
-                            onPlay={() => handleSongClick(song, i)}
-                        />
-                    ))}
+                    <div style={{ contain: 'layout paint' }}>
+                        {!loading && songs.map((song, i) => (
+                            <TrackRow
+                                key={song.id}
+                                index={i + 1}
+                                track={{
+                                    id: song.id,
+                                    title: song.name,
+                                    artist: song.primaryArtists,
+                                    duration: song.duration
+                                        ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0')
+                                        : '--:--',
+                                    art: getArt(song),
+                                    original: song
+                                }}
+                                colors={colors}
+                                isPlaying={currentSong?.id === song.id && isPlaying}
+                                onPlay={() => handleSongClick(song, i)}
+                            />
+                        ))}
+                    </div>
 
                     {/* Empty State */}
                     {!loading && songs.length === 0 && (

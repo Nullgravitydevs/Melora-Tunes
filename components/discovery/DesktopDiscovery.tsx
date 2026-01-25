@@ -11,7 +11,7 @@ import { useLyrics } from "@/hooks/useLyrics";
 import { DiscoveryEngine } from "@/lib/discovery-engine";
 import { HistoryStore, HistoryItem } from "@/lib/history-store";
 import { LanguageModal } from "@/components/windows/scenes/language-modal";
-import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2, Monitor, Globe } from "lucide-react";
+import { Search, Home, Library, Heart, Disc, Bell, Plus, Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, Shuffle, Repeat, MoreHorizontal, ChevronRight, ChevronDown, Loader2, Download, Compass, Maximize2, Monitor, Globe, ListMusic } from "lucide-react";
 import { HomeView } from "./HomeView";
 import { ArtistView } from "./ArtistView";
 import { AlbumView } from "./AlbumView";
@@ -19,6 +19,8 @@ import { ChartDetailScreen } from "./ChartDetailScreen";
 import { PlaylistScreen } from "./PlaylistScreen";
 import { TrackRow, FeatureCard, MoodPill, DiscoveryThemeColors, getArt, NavItem, PlaylistItem } from "./DiscoveryShared";
 import { MoodDetailScreen } from "./MoodDetailScreen";
+import { CollectionDetailScreen } from "./CollectionDetailScreen";
+import { DecadeDetailScreen } from "./DecadeDetailScreen";
 
 
 // Mood Categories for Explore Screen (Per Spec)
@@ -33,6 +35,48 @@ const moodCategories = [
     { id: 'travel', name: 'Travel', gradient: 'from-emerald-500 to-teal-600', icon: '✈️' },
     { id: 'feelgood', name: 'Feel Good', gradient: 'from-yellow-400 to-orange-500', icon: '☀️' }
 ];
+
+// Browse & Discover Data
+const editorialCollections = [
+    { id: 'best2024', name: 'Best of 2024', query: 'best 2024' },
+    { id: 'editorpicks', name: "Editor's Picks", query: 'top hits' },
+    { id: 'globalhits', name: 'Global Hits', query: 'global hits' },
+    { id: 'indianhits', name: 'Indian Hits', query: 'bollywood hits' },
+    { id: 'newtrending', name: 'New & Trending', query: 'new releases' }
+];
+
+const gradients = [
+    'linear-gradient(135deg, #8b5cf6, #3b82f6)',
+    'linear-gradient(135deg, #10b981, #059669)',
+    'linear-gradient(135deg, #ec4899, #db2777)',
+    'linear-gradient(135deg, #f59e0b, #d97706)',
+    'linear-gradient(135deg, #6366f1, #4f46e5)'
+];
+
+const themeMoments = [
+    { id: 'latenightdrives', name: 'Late Night Drives', query: 'night drive songs' },
+    { id: 'weekendparty', name: 'Weekend Party', query: 'party songs' },
+    { id: 'longtravel', name: 'Long Travel', query: 'travel songs' },
+    { id: 'studytime', name: 'Study Time', query: 'study music' },
+    { id: 'morningenergy', name: 'Morning Energy', query: 'morning songs' }
+];
+
+const decades = [
+    { id: '1990s', name: 'The 1990s', query: '90s hits' },
+    { id: '2000s', name: 'The 2000s', query: '2000s hits' },
+    { id: '2010s', name: 'The 2010s', query: '2010s hits' },
+    { id: '2020s', name: 'Best of 2020s', query: '2020s hits' }
+];
+
+const charts = [
+    { title: 'India Top 50', subtitle: 'Daily Chart', image: 'https://c.saavncdn.com/editorial/mh/IndiaTop50_20190108131631_500x500.jpg', color: '#3b82f6' },
+    { title: 'Global Top 50', subtitle: 'Daily Chart', image: 'https://c.saavncdn.com/editorial/mh/GlobalTop50_20190108131701_500x500.jpg', color: '#10b981' },
+    { title: 'Viral Hits', subtitle: 'Trending Now', image: 'https://c.saavncdn.com/editorial/mh/ViralHits_20190108132049_500x500.jpg', color: '#8b5cf6' },
+    { title: 'Trending Today', subtitle: 'Hot Right Now', image: 'https://c.saavncdn.com/editorial/mh/TrendingToday_20190108131922_500x500.jpg', color: '#f97316' }
+];
+
+// Browse & Discover Data
+
 
 interface DesktopDiscoveryProps {
     theme: DiscoveryTheme;
@@ -154,7 +198,7 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between px-8 py-6">
                 <button onClick={onClose} className="text-white/60 hover:text-white flex items-center gap-2 text-xs font-bold tracking-widest uppercase transition-colors">
-                    <ChevronDown size={18} /> Back
+                    <ChevronDown size={18} /> Minimize
                 </button>
             </div>
 
@@ -375,37 +419,26 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         }
     };
 
-    const [activeView, setActiveView] = useState('home');
+    type DiscoveryView = 'home' | 'search' | 'explore' | 'mood-detail' | 'browse' | 'collection-detail' | 'decade-detail' | 'chart-detail' | 'playlist-detail' | 'library' | 'artist' | 'album' | 'now-playing';
+
+    const [activeView, setActiveView] = useState<DiscoveryView>('home');
     const [activeArtist, setActiveArtist] = useState<string | null>(null);
     const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('playlist');
     const [activeRegion, setActiveRegion] = useState<string | null>(null);
     const [isLangModalOpen, setIsLangModalOpen] = useState(false);
 
-    // Category View State
-    const [activeCategory, setActiveCategory] = useState<any | null>(null);
-    const [categoryContent, setCategoryContent] = useState<{ playlists: any[], songs: any[] } | null>(null);
+
 
     // Chart & Playlist Detail States
     const [activeChart, setActiveChart] = useState<any | null>(null);
     const [activePlaylistDetail, setActivePlaylistDetail] = useState<any | null>(null);
     const [activeMood, setActiveMood] = useState<typeof moodCategories[0] | null>(null);
+    const [activeCollection, setActiveCollection] = useState<any | null>(null);
+    const [activeDecade, setActiveDecade] = useState<any | null>(null);
+    const [lastView, setLastView] = useState<DiscoveryView>('home');
 
-    const openCategory = async (cat: any) => {
-        setActiveCategory(cat);
-        setActiveView('category');
-        setCategoryContent(null);
 
-        try {
-            const [pl, s] = await Promise.all([
-                searchPlaylists(cat.name),
-                searchUnified(cat.name)
-            ]);
-            setCategoryContent({ playlists: pl, songs: s });
-        } catch (e) {
-            console.error("Category Fetch Failed", e);
-        }
-    };
 
     // MINIMALIST PALETTE (Project Linear)
     const c = {
@@ -606,6 +639,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         if (!query.trim()) return;
 
         setIsSearching(true);
+        if (activeView !== 'search') setLastView(activeView);
         setActiveView('search');
 
         try {
@@ -635,12 +669,18 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     };
 
     // NAVIGATION HELPER
+    const safeBack = (fallback: DiscoveryView) => {
+        setActiveView(lastView || fallback);
+    };
+
     const navigateToArtist = (artistName: string) => {
+        setLastView(activeView);
         setActiveArtist(artistName);
         setActiveView('artist');
     };
 
     const navigateToAlbum = (albumId: string) => {
+        setLastView(activeView);
         setActiveAlbum(albumId);
         setActiveView('album');
     };
@@ -752,6 +792,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                     whileHover={{ scale: 1.04, y: -6, boxShadow: `0 20px 50px ${c.accent}55` }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => {
+                                        setLastView('explore');
                                         setActiveMood(mood);
                                         setActiveView('mood-detail');
                                     }}
@@ -792,129 +833,179 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         colors={c}
                         onBack={() => setActiveView('explore')}
                         onOpenPlaylist={(playlist) => {
+                            setLastView('mood-detail');
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
                     />
                 ) : null;
-            case 'category':
+
+            case 'playlist-detail':
+                return activePlaylistDetail ? (
+                    <PlaylistScreen
+                        playlistId={activePlaylistDetail.id}
+                        playlistTitle={activePlaylistDetail.name || activePlaylistDetail.title}
+                        playlistImage={getArt(activePlaylistDetail)}
+                        colors={c}
+                        onBack={() => setActiveView(lastView)}
+                    />
+                ) : null;
+
+            case 'collection-detail':
+                return activeCollection ? (
+                    <CollectionDetailScreen
+                        collection={activeCollection}
+                        colors={c}
+                        onBack={() => setActiveView('browse')}
+                        onOpenPlaylist={(playlist) => {
+                            setLastView('collection-detail');
+                            setActivePlaylistDetail(playlist);
+                            setActiveView('playlist-detail');
+                        }}
+                    />
+                ) : null;
+
+            case 'chart-detail':
+                return activeChart ? (
+                    <ChartDetailScreen
+                        chartId={activeChart.id || activeChart.title}
+                        chartTitle={activeChart.title}
+                        chartImage={activeChart.image}
+                        colors={c}
+                        onBack={() => setActiveView(lastView)}
+                        onPlay={(song, list) => {
+                            // Handled internally or via context
+                        }}
+                    />
+                ) : null;
+
+            case 'decade-detail':
+                return activeDecade ? (
+                    <DecadeDetailScreen
+                        decade={activeDecade}
+                        colors={c}
+                        onBack={() => setActiveView('browse')}
+                        onOpenPlaylist={(playlist) => {
+                            setLastView('decade-detail');
+                            setActivePlaylistDetail(playlist);
+                            setActiveView('playlist-detail');
+                        }}
+                    />
+                ) : null;
+
+            case 'browse':
                 return (
-                    <div className="flex-1 flex flex-col overflow-y-auto w-full h-full bg-[#121212]">
-
-                        {/* 1. Channel Banner Header */}
-                        <div
-                            className="relative w-full h-[35vh] min-h-[300px] flex items-end p-8 md:p-12 overflow-hidden"
-                            style={{ background: activeCategory?.color || c.surface }}
-                        >
-                            <button onClick={() => setActiveView('explore')} className="absolute top-8 left-8 flex items-center gap-2 text-white/90 hover:text-white font-bold text-xs uppercase tracking-widest bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-md transition-colors z-20">
-                                <ChevronRight className="rotate-180" size={14} /> Back
-                            </button>
-
-                            {/* Abstract Shapes/Texture */}
-                            <div className="absolute inset-0 opacity-30">
-                                <div className="absolute top-[-50%] right-[-20%] w-[80%] h-[150%] bg-white/20 rotate-12 blur-3xl rounded-full" />
-                                <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[80%] bg-black/10 rotate-45 blur-2xl rounded-full" />
-                            </div>
-
-                            <div className="relative z-10 w-full max-w-4xl">
-                                <h1 className="text-6xl md:text-8xl font-black text-white mb-4 tracking-tighter drop-shadow-lg leading-none">
-                                    {activeCategory?.name}
-                                </h1>
-                                <p className="text-xl text-white/90 font-medium mb-8 max-w-lg drop-shadow-md">
-                                    Handpicked {activeCategory?.name} hits, just for you.
-                                </p>
-                                <button className="px-8 py-3 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-transform shadow-xl flex items-center gap-2">
-                                    <Play size={18} fill="black" /> Start Radio
-                                </button>
-                            </div>
+                    <div className="flex-1 px-8 py-6 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+                        {/* Header */}
+                        <div className="mb-10">
+                            <h1 className="text-4xl font-black mb-2 bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">
+                                Browse & Discover
+                            </h1>
+                            <p className="text-white/50">Explore music by themes, eras, and collections</p>
                         </div>
 
-                        {/* 2. Content Body */}
-                        <div className="flex-1 p-8 md:p-12 space-y-12">
-                            {/* Loading State */}
-                            {!categoryContent && (
-                                <div className="flex items-center justify-center h-40">
-                                    <WaveLoader />
-                                </div>
-                            )}
-
-                            {categoryContent && (
-                                <>
-                                    {/* Horizontal Playlists (Carousel) */}
-                                    <div className="w-full">
-                                        <div className="flex items-end justify-between mb-6">
-                                            <h2 className="text-xl md:text-2xl font-bold text-white">Top Playlists</h2>
-                                            <button className="text-xs font-bold text-white/50 uppercase tracking-widest hover:text-white">View All</button>
+                        {/* 1. Featured Editorial */}
+                        <section className="mb-12">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold text-white">Featured Collections</h2>
+                            </div>
+                            <div className="flex gap-4 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden">
+                                {editorialCollections.map((item, i) => (
+                                    <motion.div
+                                        key={i}
+                                        className="min-w-[240px] h-[140px] rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 p-6 flex items-end cursor-pointer group relative overflow-hidden"
+                                        whileHover={{ scale: 1.02 }}
+                                        onClick={() => {
+                                            setLastView('browse');
+                                            setActiveCollection(item);
+                                            setActiveView('collection-detail');
+                                        }}
+                                    >
+                                        <div className="absolute inset-0 opacity-20" style={{ background: gradients[i % gradients.length] }} />
+                                        <h3 className="text-2xl font-bold text-white relative z-10 leading-none">{item.name}</h3>
+                                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white text-black p-2 rounded-full">
+                                            <Play size={16} fill="black" />
                                         </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </section>
 
-                                        <div className="relative w-full overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden mask-gradient-r">
-                                            <div className="flex gap-6 w-max">
-                                                {categoryContent.playlists.map((pl: any, i: number) => (
-                                                    <div key={i} className="w-[180px] md:w-[220px] cursor-pointer group flex-shrink-0" onClick={() => {
-                                                        playInstantMix({
-                                                            id: pl.id,
-                                                            title: pl.name,
-                                                            color: activeCategory?.color || 'blue',
-                                                            songs: [],
-                                                            currentSongIndex: 0
-                                                        });
-                                                        // Auto fetch logic...
-                                                        setIsGeneratingMix(true);
-                                                        DiscoveryEngine.generateGenreMix(pl.name, activeRegion || undefined).then(mix => {
-                                                            playInstantMix(mix);
-                                                        }).finally(() => setIsGeneratingMix(false));
-                                                    }}>
-                                                        <div className="w-full aspect-square rounded-2xl bg-neutral-800 mb-4 overflow-hidden relative shadow-lg group-hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)] transition-all duration-500">
-                                                            {pl.image?.[2]?.link || pl.image ? (
-                                                                <img src={pl.image?.[2]?.link || (typeof pl.image === 'string' ? pl.image : pl.image?.[0]?.link)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                                                            ) : (
-                                                                <div className="w-full h-full bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center"><Disc size={40} className="text-white/20" /></div>
-                                                            )}
-                                                            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 backdrop-blur-[1px]">
-                                                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl transform scale-50 group-hover:scale-100 transition-transform duration-300">
-                                                                    <Play size={20} fill="black" className="ml-1 text-black" />
-                                                                </div>
-                                                            </div>
-                                                            {/* Playlist Decor Line */}
-                                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                        </div>
-                                                        <h3 className="font-bold text-white truncate text-base mb-1 group-hover:text-white/90 transition-colors">{pl.name}</h3>
-                                                        <p className="text-xs text-white/50 truncate font-medium">JioSaavn • {pl.playCount || 'Popular'}</p>
-                                                    </div>
-                                                ))}
-                                                {categoryContent.playlists.length === 0 && <p className="opacity-50 text-sm">No playlists found.</p>}
+                        {/* 2. Charts & Rankings */}
+                        <section className="mb-12">
+                            <h2 className="text-xl font-bold text-white mb-4">Charts & Rankings</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {charts.map((item, i) => (
+                                    <div
+                                        key={i}
+                                        className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
+                                        onClick={() => {
+                                            setLastView('browse');
+                                            setActiveChart(item);
+                                            setActiveView('chart-detail');
+                                        }}
+                                    >
+                                        <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                                            <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-white leading-tight">{item.title}</h3>
+                                            <p className="text-xs text-white/50 mt-1 uppercase tracking-wider">{item.subtitle}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* 3. Themes & Moments */}
+                        <section className="mb-12">
+                            <h2 className="text-xl font-bold text-white mb-4">Themes & Moments</h2>
+                            <div className="flex gap-4 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden">
+                                {themeMoments.map((item, i) => (
+                                    <div
+                                        key={i}
+                                        className="min-w-[160px] w-[160px] cursor-pointer group"
+                                        onClick={() => {
+                                            setLastView('browse');
+                                            setActiveCollection({ ...item, color: 'orange' });
+                                            setActiveView('collection-detail');
+                                        }}
+                                    >
+                                        <div className="w-full aspect-square rounded-full overflow-hidden mb-3 relative border-2 border-transparent group-hover:border-white transition-colors">
+                                            <div className="w-full h-full opacity-60" style={{ background: gradients[i % gradients.length] }} />
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <h3 className="text-lg font-bold text-white text-center px-2 drop-shadow-md">{item.name}</h3>
                                             </div>
                                         </div>
                                     </div>
+                                ))}
+                            </div>
+                        </section>
 
-                                    {/* Top Songs List */}
-                                    <div className="max-w-5xl">
-                                        <h2 className="text-xl md:text-2xl font-bold text-white mb-6">Top Songs</h2>
-                                        <div className="flex flex-col gap-1">
-                                            {categoryContent.songs.map((item: any, i: number) => (
-                                                <TrackRow
-                                                    key={item.id}
-                                                    index={i + 1}
-                                                    track={{
-                                                        id: item.id,
-                                                        title: item.name,
-                                                        artist: item.primaryArtists,
-                                                        duration: item.duration ? Math.floor(item.duration / 60) + ':' + (item.duration % 60).toString().padStart(2, '0') : '3:00',
-                                                        art: getArt(item),
-                                                        original: item
-                                                    }}
-                                                    colors={c}
-                                                    isPlaying={currentSong?.id === item.id && isPlaying}
-                                                    onPlay={() => handlePlay(item)}
-                                                />
-                                            ))}
-                                        </div>
+                        {/* 4. Decades */}
+                        <section className="mb-8">
+                            <h2 className="text-xl font-bold text-white mb-4">Rewind the Clock</h2>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {decades.map((decade, i) => (
+                                    <div
+                                        key={i}
+                                        className="h-24 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center cursor-pointer relative overflow-hidden group"
+                                        onClick={() => {
+                                            setLastView('browse');
+                                            setActiveDecade(decade);
+                                            setActiveView('decade-detail');
+                                        }}
+                                    >
+                                        <span className="text-3xl font-black text-white/20 group-hover:text-white/40 transition-colors absolute scale-150 rotate-[-10deg]">{decade.id}</span>
+                                        <span className="text-xl font-bold text-white relative z-10 group-hover:scale-110 transition-transform">{decade.name}</span>
                                     </div>
-                                </>
-                            )}
-                        </div>
+                                ))}
+                            </div>
+                        </section>
                     </div>
                 );
+
+
             case 'library':
                 return (
                     <div className="flex-1 flex flex-col p-8 overflow-y-auto">
@@ -926,13 +1017,9 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                 {playlists.map(pl => (
                                     <div key={pl.id} className="bg-white/5 p-4 rounded-xl hover:bg-white/10 cursor-pointer" onClick={() => {
-                                        playInstantMix({
-                                            id: pl.id,
-                                            title: pl.name,
-                                            color: 'blue',
-                                            songs: pl.tracks,
-                                            currentSongIndex: 0
-                                        });
+                                        setLastView('library');
+                                        setActivePlaylistDetail(pl);
+                                        setActiveView('playlist-detail');
                                     }}>
                                         <div className="w-full aspect-square bg-neutral-800 rounded-lg mb-3 flex items-center justify-center">
                                             {pl.tracks[0] ? <img src={getArt(pl.tracks[0])} className="w-full h-full object-cover rounded-lg" /> : <Library size={32} className="text-white/20" />}
@@ -992,10 +1079,12 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             if (view === 'album') navigateToAlbum(data);
                         }}
                         onPlayChart={(chart) => {
+                            setLastView('home');
                             setActiveChart(chart);
                             setActiveView('chart-detail');
                         }}
                         onOpenPlaylist={(playlist) => {
+                            setLastView('home');
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
@@ -1012,7 +1101,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <ArtistView
                         artistName={activeArtist}
                         colors={c}
-                        onBack={() => setActiveView('home')}
+                        onBack={() => setActiveView(lastView)}
                         onPlay={handlePlay}
                         onNavigate={(view: string, data: any) => {
                             if (view === 'album') navigateToAlbum(data);
@@ -1024,7 +1113,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <AlbumView
                         albumId={activeAlbum}
                         colors={c}
-                        onBack={() => setActiveView('home')}
+                        onBack={() => setActiveView(lastView)}
                         onPlay={handlePlay}
                     />
                 ) : null;
@@ -1034,7 +1123,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         song={currentSong}
                         nextSong={(activeMix?.songs || [])[(activeMix?.currentSongIndex || 0) + 1]}
                         quality={activeQuality || currentTrack?.preferredQuality || '320'}
-                        onClose={() => setActiveView('home')}
+                        onClose={() => setActiveView(lastView)}
                         playback={{
                             isPlaying, togglePlay, next, prev,
                             progress, duration, seek,
@@ -1044,27 +1133,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         onAddToOTG={addToOTG}
                     />
                 ) : <div className="flex-1 flex items-center justify-center text-white/50">No song playing</div>;
-            case 'chart-detail':
-                return activeChart ? (
-                    <ChartDetailScreen
-                        chartId={activeChart.id}
-                        chartTitle={activeChart.title || activeChart.name}
-                        chartImage={activeChart.image}
-                        colors={c}
-                        onBack={() => setActiveView('home')}
-                        onPlay={handlePlay}
-                    />
-                ) : null;
-            case 'playlist-detail':
-                return activePlaylistDetail ? (
-                    <PlaylistScreen
-                        playlistId={activePlaylistDetail.id}
-                        playlistTitle={activePlaylistDetail.title || activePlaylistDetail.name}
-                        playlistImage={activePlaylistDetail.image}
-                        colors={c}
-                        onBack={() => setActiveView('home')}
-                    />
-                ) : null;
+
         }
     };
 
@@ -1093,7 +1162,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <nav className="flex flex-col gap-1">
                         <NavItem icon={<Home size={20} />} label="Home" active={activeView === 'home'} colors={c} onClick={() => setActiveView('home')} />
                         <NavItem icon={<Search size={20} />} label="Search" active={activeView === 'search'} colors={c} onClick={() => setActiveView('search')} />
-                        <NavItem icon={<Compass size={20} />} label="Explore" active={activeView === 'explore'} colors={c} onClick={() => setActiveView('explore')} />
+                        <NavItem icon={<Compass size={20} />} label="Explore" active={activeView === 'explore' || activeView === 'mood-detail'} colors={c} onClick={() => setActiveView('explore')} />
+                        <NavItem icon={<ListMusic size={20} />} label="Browse" active={['browse', 'collection-detail', 'decade-detail', 'chart-detail', 'playlist-detail'].includes(activeView)} colors={c} onClick={() => setActiveView('browse')} />
 
                         <div className="my-2 border-t border-white/5" />
                         <NavItem icon={<Library size={20} />} label="Library" active={activeView === 'library'} colors={c} onClick={() => setActiveView('library')} />
@@ -1252,8 +1322,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
                                 {/* Text */}
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-semibold truncate hover:underline" onClick={() => navigateToArtist(item.track.song.primaryArtists)}>{item.track.song.name}</p>
-                                    <p className="text-[10px] truncate hover:text-white transition-colors" style={{ color: c.textMuted }} onClick={() => navigateToArtist(item.track.song.primaryArtists)}>{item.track.song.primaryArtists}</p>
+                                    <p className="text-xs font-semibold truncate hover:underline" onClick={() => navigateToArtist(item.track.song.primaryArtists.split(',')[0].trim())}>{item.track.song.name}</p>
+                                    <p className="text-[10px] truncate hover:text-white transition-colors" style={{ color: c.textMuted }} onClick={() => navigateToArtist(item.track.song.primaryArtists.split(',')[0].trim())}>{item.track.song.primaryArtists}</p>
                                 </div>
                             </motion.div>
                         ))}
@@ -1367,7 +1437,10 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={() => setActiveView('now-playing')} className="p-2 ml-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors">
+                            <button onClick={() => {
+                                setLastView(activeView);
+                                setActiveView('now-playing');
+                            }} className="p-2 ml-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors">
                                 <Maximize2 size={18} />
                             </button>
                             {currentSong && (
