@@ -320,7 +320,16 @@ function NowPlayingOverlay({ song, nextSong, quality, onClose, playback, onAddTo
                             <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">Queue</h3>
                             <div className="flex-1 overflow-y-auto space-y-2 pr-2 mask-gradient-b">
                                 {(playback.queue || []).slice(playback.currentIndex + 1).map((s: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => playback.seekToQueueItem?.(playback.currentIndex + 1 + i)}>
+                                    <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors group cursor-pointer"
+                                        onClick={() => {
+                                            if (playback.activeMixId) {
+                                                // Calculate strict index in the list
+                                                const absoluteIndex = playback.currentIndex + 1 + i;
+                                                playback.updateMix?.(playback.activeMixId, { currentSongIndex: absoluteIndex });
+                                                // Ensure play
+                                                if (!playback.isPlaying) playback.togglePlay();
+                                            }
+                                        }}>
                                         <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
                                             <img src={getArt(s)} className="w-full h-full object-cover" />
                                         </div>
@@ -419,7 +428,19 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         }
     };
 
-    type DiscoveryView = 'home' | 'search' | 'explore' | 'mood-detail' | 'browse' | 'collection-detail' | 'decade-detail' | 'chart-detail' | 'playlist-detail' | 'library' | 'artist' | 'album' | 'now-playing';
+    // STRICT ROOT VIEW SYSTEM
+    type RootView = 'home' | 'search' | 'explore' | 'browse' | 'library';
+
+    type DiscoveryView =
+        | RootView
+        | 'mood-detail'
+        | 'collection-detail'
+        | 'decade-detail'
+        | 'chart-detail'
+        | 'playlist-detail'
+        | 'artist'
+        | 'album'
+        | 'now-playing';
 
     const [activeView, setActiveView] = useState<DiscoveryView>('home');
     const [activeArtist, setActiveArtist] = useState<string | null>(null);
@@ -436,7 +457,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     const [activeMood, setActiveMood] = useState<typeof moodCategories[0] | null>(null);
     const [activeCollection, setActiveCollection] = useState<any | null>(null);
     const [activeDecade, setActiveDecade] = useState<any | null>(null);
-    const [lastView, setLastView] = useState<DiscoveryView>('home');
+    // STRICT: lastView can ONLY be a RootView
+    const [lastView, setLastView] = useState<RootView>('home');
 
 
 
@@ -639,7 +661,10 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         if (!query.trim()) return;
 
         setIsSearching(true);
-        if (activeView !== 'search') setLastView(activeView);
+        // STRICT: Only set lastView if current is valid root
+        if (activeView !== 'search' && ['home', 'explore', 'browse', 'library'].includes(activeView)) {
+            setLastView(activeView as RootView);
+        }
         setActiveView('search');
 
         try {
@@ -668,19 +693,20 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         }
     };
 
-    // NAVIGATION HELPER
-    const safeBack = (fallback: DiscoveryView) => {
-        setActiveView(lastView || fallback);
-    };
+    // REMOVED: safeBack (Dead Code)
 
     const navigateToArtist = (artistName: string) => {
-        setLastView(activeView);
+        // STRICT ORIGIN RESOLUTION
+        const origin = (['home', 'explore', 'browse', 'library', 'search'].includes(activeView) ? activeView : (lastView || 'home')) as RootView;
+        setLastView(origin);
         setActiveArtist(artistName);
         setActiveView('artist');
     };
 
     const navigateToAlbum = (albumId: string) => {
-        setLastView(activeView);
+        // STRICT ORIGIN RESOLUTION
+        const origin = (['home', 'explore', 'browse', 'library', 'search'].includes(activeView) ? activeView : (lastView || 'home')) as RootView;
+        setLastView(origin);
         setActiveAlbum(albumId);
         setActiveView('album');
     };
@@ -831,9 +857,13 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <MoodDetailScreen
                         mood={activeMood}
                         colors={c}
-                        onBack={() => setActiveView('explore')}
+                        onBack={() => {
+                            setActiveMood(null);
+                            setActiveView('explore');
+                        }}
                         onOpenPlaylist={(playlist) => {
-                            setLastView('mood-detail');
+                            // STRICT: Last View remains 'explore' (Root)
+                            setLastView('explore');
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
@@ -847,7 +877,15 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         playlistTitle={activePlaylistDetail.name || activePlaylistDetail.title}
                         playlistImage={getArt(activePlaylistDetail)}
                         colors={c}
-                        onBack={() => setActiveView(lastView)}
+                        onBack={() => {
+                            setActivePlaylistDetail(null);
+                            // STRICT BACK: Only allow return to valid root views
+                            if (['home', 'explore', 'browse', 'library', 'search'].includes(lastView)) {
+                                setActiveView(lastView);
+                            } else {
+                                setActiveView('home');
+                            }
+                        }}
                     />
                 ) : null;
 
@@ -856,9 +894,13 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <CollectionDetailScreen
                         collection={activeCollection}
                         colors={c}
-                        onBack={() => setActiveView('browse')}
+                        onBack={() => {
+                            setActiveCollection(null);
+                            setActiveView('browse');
+                        }}
                         onOpenPlaylist={(playlist) => {
-                            setLastView('collection-detail');
+                            // STRICT: Last View remains 'browse' (Root)
+                            setLastView('browse');
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
@@ -872,7 +914,13 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         chartTitle={activeChart.title}
                         chartImage={activeChart.image}
                         colors={c}
-                        onBack={() => setActiveView(lastView)}
+                        onBack={() => {
+                            setActiveChart(null);
+                            // STRICT BACK
+                            if (lastView === 'browse') setActiveView('browse');
+                            else if (lastView === 'home') setActiveView('home');
+                            else setActiveView('home');
+                        }}
                         onPlay={(song, list) => {
                             // Handled internally or via context
                         }}
@@ -884,9 +932,13 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <DecadeDetailScreen
                         decade={activeDecade}
                         colors={c}
-                        onBack={() => setActiveView('browse')}
+                        onBack={() => {
+                            setActiveDecade(null);
+                            setActiveView('browse');
+                        }}
                         onOpenPlaylist={(playlist) => {
-                            setLastView('decade-detail');
+                            // STRICT: Last View remains 'browse' (Root)
+                            setLastView('browse');
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
@@ -1101,7 +1153,14 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <ArtistView
                         artistName={activeArtist}
                         colors={c}
-                        onBack={() => setActiveView(lastView)}
+                        onBack={() => {
+                            // STRICT BACK
+                            if (['home', 'explore', 'browse', 'library', 'search'].includes(lastView)) {
+                                setActiveView(lastView);
+                            } else {
+                                setActiveView('home');
+                            }
+                        }}
                         onPlay={handlePlay}
                         onNavigate={(view: string, data: any) => {
                             if (view === 'album') navigateToAlbum(data);
@@ -1113,7 +1172,14 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <AlbumView
                         albumId={activeAlbum}
                         colors={c}
-                        onBack={() => setActiveView(lastView)}
+                        onBack={() => {
+                            // STRICT BACK
+                            if (['home', 'explore', 'browse', 'library', 'search'].includes(lastView)) {
+                                setActiveView(lastView);
+                            } else {
+                                setActiveView('home');
+                            }
+                        }}
                         onPlay={handlePlay}
                     />
                 ) : null;
@@ -1123,7 +1189,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         song={currentSong}
                         nextSong={(activeMix?.songs || [])[(activeMix?.currentSongIndex || 0) + 1]}
                         quality={activeQuality || currentTrack?.preferredQuality || '320'}
-                        onClose={() => setActiveView(lastView)}
+                        onClose={() => setActiveView(lastView || 'home')}
                         playback={{
                             isPlaying, togglePlay, next, prev,
                             progress, duration, seek,
@@ -1162,11 +1228,11 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     <nav className="flex flex-col gap-1">
                         <NavItem icon={<Home size={20} />} label="Home" active={activeView === 'home'} colors={c} onClick={() => setActiveView('home')} />
                         <NavItem icon={<Search size={20} />} label="Search" active={activeView === 'search'} colors={c} onClick={() => setActiveView('search')} />
-                        <NavItem icon={<Compass size={20} />} label="Explore" active={activeView === 'explore' || activeView === 'mood-detail'} colors={c} onClick={() => setActiveView('explore')} />
-                        <NavItem icon={<ListMusic size={20} />} label="Browse" active={['browse', 'collection-detail', 'decade-detail', 'chart-detail', 'playlist-detail'].includes(activeView)} colors={c} onClick={() => setActiveView('browse')} />
+                        <NavItem icon={<Compass size={20} />} label="Explore" active={activeView === 'explore' || activeView === 'mood-detail' || (activeView === 'playlist-detail' && lastView === 'explore')} colors={c} onClick={() => setActiveView('explore')} />
+                        <NavItem icon={<ListMusic size={20} />} label="Browse" active={activeView === 'browse' || ((activeView === 'collection-detail' || activeView === 'decade-detail' || activeView === 'chart-detail' || activeView === 'playlist-detail') && lastView === 'browse')} colors={c} onClick={() => setActiveView('browse')} />
 
                         <div className="my-2 border-t border-white/5" />
-                        <NavItem icon={<Library size={20} />} label="Library" active={activeView === 'library'} colors={c} onClick={() => setActiveView('library')} />
+                        <NavItem icon={<Library size={20} />} label="Library" active={activeView === 'library' || (activeView === 'playlist-detail' && lastView === 'library')} colors={c} onClick={() => setActiveView('library')} />
                     </nav>
 
                     <div className="mt-8 mb-3 flex items-center justify-between px-2">
@@ -1438,7 +1504,11 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                                 </div>
                             </div>
                             <button onClick={() => {
-                                setLastView(activeView);
+                                // STRICT NOW PLAYING: Only save lastView if it is valuable/root
+                                // Note: activeView is guaranteed !== 'now-playing' here due to parent conditional
+                                if (['home', 'explore', 'browse', 'library', 'search'].includes(activeView)) {
+                                    setLastView(activeView as RootView);
+                                }
                                 setActiveView('now-playing');
                             }} className="p-2 ml-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors">
                                 <Maximize2 size={18} />

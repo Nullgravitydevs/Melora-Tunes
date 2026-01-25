@@ -55,7 +55,7 @@ export function ArtistView({ artistName, colors, onBack, onPlay, onNavigate }: A
                 setArtistData({
                     details: {
                         name: artistName,
-                        image: getHighResArt(songs[0]?.song?.image || songs[0]?.image),
+                        image: getHighResArt(songs[0] ? getArt(songs[0]) : ''),
                         listeners: Math.floor(Math.random() * 5000000).toLocaleString() + ' Monthly Listeners'
                     },
                     topSongs: songs.slice(0, 10),
@@ -84,6 +84,11 @@ export function ArtistView({ artistName, colors, onBack, onPlay, onNavigate }: A
     }
 
     const { details, topSongs, albums } = artistData;
+
+    // STRICT: Normalize PlayableTracks
+    const playableTopSongs = topSongs.map((s: any) =>
+        ensurePlayableTrack('song' in s ? s.song : s)
+    );
 
     return (
         <div className="flex-1 h-full relative">
@@ -135,7 +140,11 @@ export function ArtistView({ artistName, colors, onBack, onPlay, onNavigate }: A
 
                                 <div className="flex gap-4">
                                     <button
-                                        onClick={() => onPlay(topSongs[0]?.original || topSongs[0], topSongs)}
+                                        onClick={() => {
+                                            if (playableTopSongs.length > 0) {
+                                                onPlay(playableTopSongs[0], playableTopSongs);
+                                            }
+                                        }}
                                         className="h-12 px-8 bg-[#1DB954] hover:bg-[#1ed760] text-black rounded-full font-bold uppercase tracking-wider flex items-center gap-2 transition-colors shadow-lg shadow-green-900/40"
                                     >
                                         <Play size={20} fill="black" /> Play
@@ -170,7 +179,10 @@ export function ArtistView({ artistName, colors, onBack, onPlay, onNavigate }: A
                                     }}
                                     colors={colors}
                                     isPlaying={currentSong?.id === item.id && isPlaying}
-                                    onPlay={() => onPlay(item, topSongs)}
+                                    onPlay={() => onPlay(
+                                        playableTopSongs[i],
+                                        playableTopSongs
+                                    )}
                                 />
                             ))}
                         </div>
@@ -185,7 +197,12 @@ export function ArtistView({ artistName, colors, onBack, onPlay, onNavigate }: A
                                     <div
                                         key={album.id}
                                         className="group cursor-pointer"
-                                        onClick={() => onNavigate && onNavigate('album', album.id)}
+                                        onClick={() => {
+                                            onNavigate?.('album', {
+                                                albumId: album.id,
+                                                from: 'artist'
+                                            });
+                                        }}
                                     >
                                         <div className="aspect-square rounded-lg bg-white/5 mb-3 overflow-hidden shadow-lg border border-white/5 relative">
                                             <img src={album.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
