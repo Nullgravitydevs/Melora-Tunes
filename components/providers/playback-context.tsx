@@ -46,9 +46,27 @@ export function ensurePlayableTrack(song: JioSaavnSong | PlayableTrack, defaultQ
     }
 
     // Convert legacy JioSaavnSong to PlayableTrack
+    // Convert legacy JioSaavnSong to PlayableTrack
+
+    // Resolve Art (Inline helper to avoid circular dep)
+    let art = '';
+    if (typeof song.image === 'string') art = song.image;
+    else if (Array.isArray(song.image)) {
+        art = song.image.find(i => i.quality === '500x500')?.link || song.image[0]?.link || '';
+    }
+
     return {
         id: song.id,
+        // STRICT METADATA (Normalized)
+        title: song.name,
+        artist: song.primaryArtists || '',
+        duration: typeof song.duration === 'string' ? parseInt(song.duration) : song.duration,
+        art: art,
+        original: song,
+
+        // Legacy
         song: song,
+
         preferredQuality: defaultQuality,
         sources: [
             { provider: 'jiosaavn', songId: song.id, quality: '320' },

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Play, Pause, ChevronLeft, Shuffle, Clock } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { Play, ChevronLeft, Shuffle, Clock } from "lucide-react";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
+import { PlayableTrack } from "@/lib/types";
 import { searchSongs } from "@/lib/jiosaavn";
 import { TrackRow, DiscoveryThemeColors, getArt } from "./DiscoveryShared";
 
@@ -36,6 +36,9 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
     const [loading, setLoading] = useState(true);
     const [isShuffled, setIsShuffled] = useState(false);
 
+    // FIXED: Stable Mix ID (Chart ID only)
+    const mixId = useRef(`chart-${chartId}`);
+
     useEffect(() => {
         const fetchChart = async () => {
             setLoading(true);
@@ -52,33 +55,39 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
         fetchChart();
     }, [chartId, chartTitle]);
 
+    // STRICT: Normalize songs ONCE
+    const playableSongs = useMemo(() => {
+        return songs.map(s => ensurePlayableTrack(s));
+    }, [songs]);
+
     const buildChartMix = (startIndex = 0, shuffled = false) => {
         const baseSongs = shuffled
-            ? [...songs].sort(() => Math.random() - 0.5)
-            : songs;
+            ? [...playableSongs].sort(() => Math.random() - 0.5)
+            : playableSongs;
 
         return {
-            id: `chart-${chartId}-${Date.now()}`, // MUST be unique per session
+            id: mixId.current, // REUSE STABLE ID
             title: chartTitle,
             color: 'blue',
-            songs: baseSongs.map(s => ensurePlayableTrack(s)),
+            songs: baseSongs,
             currentSongIndex: startIndex
         } as Mix;
     };
 
     const handlePlayAll = () => {
-        if (songs.length === 0) return;
+        if (playableSongs.length === 0) return;
         setIsShuffled(false);
-        playInstantMix(buildChartMix(0));
+        playInstantMix(buildChartMix(0, false));
     };
 
     const handleShuffle = () => {
-        if (songs.length === 0) return;
+        if (playableSongs.length === 0) return;
         setIsShuffled(true);
         playInstantMix(buildChartMix(0, true));
     };
 
     const handleSongClick = (_song: any, index: number) => {
+        // Respect current shuffle state
         playInstantMix(buildChartMix(index, isShuffled));
     };
 
@@ -117,21 +126,21 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
                             {chartTitle}
                         </h1>
                         <p className="text-white/60 text-sm mb-6">
-                            {songs.length} songs • Updated recently
+                            {playableSongs.length} songs • Updated recently
                         </p>
 
                         {/* Actions */}
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={handlePlayAll}
-                                disabled={loading || songs.length === 0}
+                                disabled={loading || playableSongs.length === 0}
                                 className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-transform flex items-center gap-3 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Play size={20} fill="black" /> Play All
                             </button>
                             <button
                                 onClick={handleShuffle}
-                                disabled={loading || songs.length === 0}
+                                disabled={loading || playableSongs.length === 0}
                                 className={`w-14 h-14 rounded-full border flex items-center justify-center backdrop-blur-md transition-colors disabled:opacity-50 ${isShuffled
                                     ? 'border-white bg-white/10 text-white'
                                     : 'border-white/20 text-white hover:bg-white/10'
@@ -162,19 +171,19 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
                     )}
 
                     {/* Songs */}
-                    {!loading && songs.map((song, i) => (
+                    {!loading && playableSongs.map((song, i) => (
                         <TrackRow
                             key={song.id}
                             index={i + 1}
                             track={{
                                 id: song.id,
-                                title: song.name,
-                                artist: song.primaryArtists,
+                                title: song.title,
+                                artist: song.artist,
                                 duration: song.duration
                                     ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0')
                                     : '--:--',
-                                art: getArt(song),
-                                original: song
+                                art: song.art,
+                                original: song.original
                             }}
                             colors={colors}
                             isPlaying={currentSong?.id === song.id && isPlaying}
@@ -183,7 +192,7 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
                     ))}
 
                     {/* Empty State */}
-                    {!loading && songs.length === 0 && (
+                    {!loading && playableSongs.length === 0 && (
                         <div className="text-center py-20 opacity-50">
                             <p className="text-xl font-bold mb-2">No songs found</p>
                             <p className="text-sm">Try again later.</p>

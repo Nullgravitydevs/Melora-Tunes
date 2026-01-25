@@ -12,13 +12,23 @@ export interface PlayableSource {
 
 export interface PlayableTrack {
     id: string; // Helper for easy access, matches song.id
-    song: JioSaavnSong; // Metadata
+
+    // STRICT FLATTENED METADATA (User Requirement)
+    title: string;
+    artist: string;
+    duration: number;
+    art: string;
+
+    // Optional Backward Compatibility / Raw Source
+    song?: JioSaavnSong;
+    original?: any; // The raw object keys
+
     sources: PlayableSource[];
     preferredQuality: AudioQuality;
-    isExplicitPreference?: boolean; // If true, overrides global 'Force Lossless'
+    isExplicitPreference?: boolean;
 }
 
 // Helper to check if an object is likely a PlayableTrack (duck typing)
 export function isPlayableTrack(obj: any): obj is PlayableTrack {
-    return obj && typeof obj === 'object' && 'sources' in obj && 'song' in obj;
+    return obj && typeof obj === 'object' && 'sources' in obj && 'title' in obj;
 }
