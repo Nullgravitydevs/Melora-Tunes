@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, Shuffle, ArrowLeft, Loader2, ListMusic } from "lucide-react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, ensurePlayableTrack } from "@/components/providers/playback-context";
 import { searchSongs, searchPlaylists } from "@/lib/jiosaavn";
 import { TrackRow, DiscoveryThemeColors, getArt } from "./DiscoveryShared";
 
 interface CollectionDetailScreenProps {
-    collection: { id: string; name: string; query: string; color?: string };
+    collection: { id: string; name: string; query: string; color?: string; language?: string }; // FIX 1: Language in prop
     colors: DiscoveryThemeColors;
     onBack: () => void;
     onOpenPlaylist?: (playlist: any) => void;
@@ -17,6 +17,8 @@ interface CollectionDetailScreenProps {
 
 export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlaylist, languageContext = 'english,hindi' }: CollectionDetailScreenProps) {
     const { playInstantMix } = usePlayback();
+    // FIX 1: Robust Context
+    const langContext = collection.language || languageContext;
     const [loading, setLoading] = useState(true);
     const [playlists, setPlaylists] = useState<any[]>([]);
     const [songs, setSongs] = useState<any[]>([]);
@@ -26,11 +28,11 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
             setLoading(true);
             try {
                 // Fetch relevant playlists
-                const p = await searchPlaylists(collection.query + " playlist", 1, 10, languageContext);
+                const p = await searchPlaylists(collection.query + " playlist", 1, 10, langContext);
                 setPlaylists(p.slice(0, 10));
 
                 // Fetch relevant songs
-                const s = await searchSongs(collection.query, 1, 25, languageContext);
+                const s = await searchSongs(collection.query, 1, 25, langContext);
                 setSongs(s || []);
             } catch (e) {
                 console.error("Collection fetch failed:", e);
@@ -39,15 +41,15 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
             }
         };
         fetchData();
-    }, [collection.id]);
+    }, [collection.id, collection.query, langContext]); // FIX 2: Dependencies
 
     const handlePlayAll = () => {
         if (songs.length > 0) {
             playInstantMix({
-                id: `collection-${collection.id}`,
+                id: `collection-${collection.id}-${Date.now()}`, // FIX 4: Unique ID
                 title: collection.name,
                 color: 'blue',
-                songs: songs,
+                songs: songs.map(s => ensurePlayableTrack(s)), // FIX 3: Safety
                 currentSongIndex: 0
             });
         }
@@ -57,10 +59,10 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
         if (songs.length > 0) {
             const shuffled = [...songs].sort(() => Math.random() - 0.5);
             playInstantMix({
-                id: `collection-${collection.id}-shuffle`,
+                id: `collection-${collection.id}-shuffle-${Date.now()}`, // FIX 4: Unique ID
                 title: collection.name,
                 color: 'blue',
-                songs: shuffled,
+                songs: shuffled.map(s => ensurePlayableTrack(s)), // FIX 3: Safety
                 currentSongIndex: 0
             });
         }
@@ -72,9 +74,10 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
             <div className="relative w-full h-[40vh] min-h-[300px] flex items-end p-8 md:p-12 overflow-hidden">
                 {/* Background Art */}
                 <div className="absolute inset-0 z-0">
-                    {songs[0] && (
+                    {/* FIX 6: Art Safety */}
+                    {songs[0] && getArt(songs[0]) && (
                         <img
-                            src={getArt(songs[0]).replace('150x150', '500x500')}
+                            src={getArt(songs[0])!.replace('150x150', '500x500')}
                             className="w-full h-full object-cover opacity-60 blur-xl scale-110"
                         />
                     )}
@@ -92,8 +95,8 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
                 {/* Content */}
                 <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-8 items-end">
                     <div className="w-48 h-48 rounded-2xl shadow-2xl overflow-hidden bg-white/10 flex items-center justify-center shrink-0">
-                        {songs[0] ? (
-                            <img src={getArt(songs[0]).replace('150x150', '500x500')} className="w-full h-full object-cover" />
+                        {songs[0] && getArt(songs[0]) ? (
+                            <img src={getArt(songs[0])!.replace('150x150', '500x500')} className="w-full h-full object-cover" />
                         ) : (
                             <ListMusic size={64} className="text-white/20" />
                         )}
@@ -163,6 +166,12 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
                 {/* Song List */}
                 <section>
                     <h2 className="text-2xl font-bold text-white mb-6">Top Songs</h2>
+                    {/* FIX 5: Empty Result UX */}
+                    {!loading && songs.length === 0 && (
+                        <p className="text-white/40 text-center py-16">
+                            No songs found for this collection.
+                        </p>
+                    )}
                     {loading ? (
                         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-white/50" /></div>
                     ) : (
@@ -181,10 +190,10 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
                                     index={i}
                                     onPlay={() => {
                                         playInstantMix({
-                                            id: `collection-${collection.id}-song-${i}`,
+                                            id: `collection-${collection.id}-song-${i}-${Date.now()}`, // FIX 4: Unique ID
                                             title: collection.name,
                                             color: 'blue',
-                                            songs: songs.slice(i),
+                                            songs: songs.slice(i).map(s => ensurePlayableTrack(s)), // FIX 3: Safety
                                             currentSongIndex: 0
                                         });
                                     }}
