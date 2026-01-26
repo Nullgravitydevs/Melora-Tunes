@@ -3,35 +3,12 @@ import { motion } from "framer-motion";
 import { Play } from "lucide-react";
 
 // Browse & Discover Data
-const editorialCollections = [
-    { id: 'best2024', name: 'Best of 2024', query: 'best 2024' },
-    { id: 'editorpicks', name: "Editor's Picks", query: 'top hits' },
-    { id: 'globalhits', name: 'Global Hits', query: 'global hits' },
-    { id: 'indianhits', name: 'Indian Hits', query: 'bollywood hits' },
-    { id: 'newtrending', name: 'New & Trending', query: 'new releases' }
-];
-
 const gradients = [
     'linear-gradient(135deg, #8b5cf6, #3b82f6)',
     'linear-gradient(135deg, #10b981, #059669)',
     'linear-gradient(135deg, #ec4899, #db2777)',
     'linear-gradient(135deg, #f59e0b, #d97706)',
     'linear-gradient(135deg, #6366f1, #4f46e5)'
-];
-
-const themeMoments = [
-    { id: 'latenightdrives', name: 'Late Night Drives', query: 'night drive songs' },
-    { id: 'weekendparty', name: 'Weekend Party', query: 'party songs' },
-    { id: 'longtravel', name: 'Long Travel', query: 'travel songs' },
-    { id: 'studytime', name: 'Study Time', query: 'study music' },
-    { id: 'morningenergy', name: 'Morning Energy', query: 'morning songs' }
-];
-
-const decades = [
-    { id: '1990s', name: 'The 1990s', query: '90s hits' },
-    { id: '2000s', name: 'The 2000s', query: '2000s hits' },
-    { id: '2010s', name: 'The 2010s', query: '2010s hits' },
-    { id: '2020s', name: 'Best of 2020s', query: '2020s hits' }
 ];
 
 interface BrowseViewProps {
@@ -59,9 +36,7 @@ export function BrowseView({
 }: BrowseViewProps) {
 
     // 1. Resolve Language Context (Same as HomeView)
-    const langContext = activeLanguage
-        ? activeLanguage
-        : selectedLanguages.join(',');
+    const langContext = activeLanguage || (selectedLanguages.length ? selectedLanguages.join(',') : 'english');
 
     const displayLanguage = activeLanguage
         ? activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)
@@ -116,7 +91,7 @@ export function BrowseView({
                             whileHover={{ scale: 1.02 }}
                             onClick={() => {
                                 setLastView('browse');
-                                setActiveCollection(item);
+                                setActiveCollection({ ...item, language: langContext });
                                 setActiveView('collection-detail');
                             }}
                         >
@@ -166,7 +141,7 @@ export function BrowseView({
                             className="min-w-[160px] w-[160px] cursor-pointer group"
                             onClick={() => {
                                 setLastView('browse');
-                                setActiveCollection({ ...item, color: 'orange' });
+                                setActiveCollection({ ...item, color: 'orange', language: langContext });
                                 setActiveView('collection-detail');
                             }}
                         >
@@ -191,7 +166,7 @@ export function BrowseView({
                             className="h-24 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center cursor-pointer relative overflow-hidden group"
                             onClick={() => {
                                 setLastView('browse');
-                                setActiveDecade(decade);
+                                setActiveDecade({ ...decade, language: langContext });
                                 setActiveView('decade-detail');
                             }}
                         >
