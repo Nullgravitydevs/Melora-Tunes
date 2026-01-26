@@ -122,11 +122,12 @@ export function HomeView({
             <div
                 className="absolute inset-0 overflow-y-auto pb-32"
                 onScroll={(e) => {
-                    // FIX 7: Performant Scroll
+                    // FIX 7: Performant Scroll (Fixed for async access)
+                    const scrollTop = e.currentTarget.scrollTop;
                     if (scrollRef.current) return;
                     scrollRef.current = true;
                     requestAnimationFrame(() => {
-                        setScrolled(e.currentTarget.scrollTop > 40);
+                        setScrolled(scrollTop > 40);
                         scrollRef.current = false;
                     });
                 }}
@@ -342,9 +343,9 @@ export function HomeView({
                                 {/* POLISH 3: Dynamic Subtitle */}
                                 <SectionHeader title="Featured Playlists" subtitle={playlistSubtitle} />
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                    {featuredPlaylists.slice(0, 6).map(p => (
+                                    {featuredPlaylists.slice(0, 6).map((p, i) => (
                                         <motion.div
-                                            key={p.id}
+                                            key={p.id || i}
                                             whileHover={{ y: -4 }}
                                             className="bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer border border-white/10 backdrop-blur-sm"
                                             onClick={() => onOpenPlaylist(p)}
