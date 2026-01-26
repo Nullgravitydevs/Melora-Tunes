@@ -1,4 +1,5 @@
 import { searchSongs, JioSaavnSong } from './jiosaavn';
+import { getArt } from '../components/discovery/DiscoveryShared';
 import { searchHiFi, HiFiSearchResult } from './hifi-client';
 import { PlayableTrack, PlayableSource, AudioQuality } from './types';
 
@@ -97,6 +98,7 @@ export async function searchUnified(query: string, language?: string, type: Sear
         const normArtist = normalizeStr(artist);
 
         return uniqueTracks.find(t => {
+            if (!t.song) return false;
             const tTitle = normalizeStr(t.song.name);
             const tArtist = normalizeStr(t.song.primaryArtists);
 
@@ -157,6 +159,10 @@ export async function searchUnified(query: string, language?: string, type: Sear
             // CREATE NEW
             uniqueTracks.push({
                 id: metadata.id, // Use Provider ID as base ID
+                title: metadata.name,
+                artist: metadata.primaryArtists,
+                duration: metadata.duration,
+                art: getArt(metadata),
                 song: metadata,
                 sources: [source],
                 preferredQuality: source.quality === 'hires' || source.quality === 'flac' ? source.quality : '320'
