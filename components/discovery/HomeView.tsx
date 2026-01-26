@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Play, Heart, Disc, Zap, ListMusic } from "lucide-react";
+import { Play, Heart, Zap } from "lucide-react";
 import {
     FeatureCard,
     SectionHeader,
@@ -13,16 +13,16 @@ import {
 import { LanguageChips } from "./desktop/LanguageChips";
 import { HistoryItem } from "@/lib/history-store";
 
-// --- Relative time formatter
+/* -------------------------------- Utils -------------------------------- */
+
 function formatRelativeTime(timestamp: number): string {
     const diff = Math.floor((Date.now() - timestamp) / 1000);
-    if (diff < 60) return 'Just now';
+    if (diff < 60) return "Just now";
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// --- Resume progress
 function PlaybackProgress({ position, duration }: { position: number; duration: number }) {
     if (!duration || !position) return null;
     return (
@@ -35,17 +35,20 @@ function PlaybackProgress({ position, duration }: { position: number; duration: 
     );
 }
 
+/* -------------------------------- Types -------------------------------- */
+
 interface HomeViewProps {
     colors: DiscoveryThemeColors;
     trending: any[];
     charts: any[];
     recent: HistoryItem[];
-    // Renamed Props
+
     trendingSingles: any[];
     latestAlbums: any[];
     featuredPlaylists: any[];
 
     loading?: boolean;
+
     onPlay: (song: any, list?: any[]) => void;
     onNavigate: (view: string, data?: any) => void;
     onPlayChart: (chart: any) => void;
@@ -58,6 +61,8 @@ interface HomeViewProps {
     onLanguageSelect: (lang: string | null) => void;
 }
 
+/* ------------------------------ Component ------------------------------- */
+
 export function HomeView({
     colors,
     trending,
@@ -68,35 +73,38 @@ export function HomeView({
     featuredPlaylists = [],
     loading,
     onPlay,
+    onNavigate,
     onPlayChart,
     onOpenPlaylist,
     onOpenAlbum,
     onResumeSong,
     activeLanguage,
     selectedLanguages,
-    onLanguageSelect,
-    onNavigate
+    onLanguageSelect
 }: HomeViewProps) {
     const [scrolled, setScrolled] = useState(false);
-    const scrollRef = useRef(false);
-    // POLISH 1: Hero Fallback
+    const scrollRAF = useRef<number | null>(null);
+
     const heroSong = trending[0] || trendingSingles[0];
 
-    // FIX 5 & 6: Dynamic Titles (Memoized for perf)
-    const albumTitle = React.useMemo(() => {
-        if (!activeLanguage) return 'New Releases';
+    /* ---------------------------- Memoized text ---------------------------- */
+
+    const albumTitle = useMemo(() => {
+        if (!activeLanguage) return "New Releases";
         return `New in ${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)}`;
     }, [activeLanguage]);
 
-    const playlistSubtitle = React.useMemo(() => {
-        if (!activeLanguage) return 'Global Picks';
+    const playlistSubtitle = useMemo(() => {
+        if (!activeLanguage) return "Global Picks";
         return `${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)} Picks`;
     }, [activeLanguage]);
 
-    const chartSubtitle = React.useMemo(() => {
-        if (!activeLanguage) return 'Today’s biggest hits';
+    const chartSubtitle = useMemo(() => {
+        if (!activeLanguage) return "Today’s biggest hits";
         return `${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)} charts`;
     }, [activeLanguage]);
+
+    /* ------------------------------ Loading ------------------------------- */
 
     if (loading) {
         return (
@@ -114,89 +122,105 @@ export function HomeView({
         );
     }
 
+    /* ------------------------------- Render ------------------------------- */
+
     return (
         <div className="flex-1 relative">
 
             {/* Sticky Header */}
             <div
-                className={`sticky top-0 z-40 px-8 py-4 transition-all ${scrolled ? 'bg-black/60 backdrop-blur-xl border-b border-white/5' : 'bg-transparent'
+                className={`sticky top-0 z-40 px-8 py-4 transition-all ${scrolled ? "bg-black/60 backdrop-blur-xl border-b border-white/5" : "bg-transparent"
                     }`}
             >
-                <span className={`text-sm font-bold transition-opacity ${scrolled ? 'opacity-100' : 'opacity-0'}`}>
+                <span
+                    className={`text-sm font-bold transition-opacity ${scrolled ? "opacity-100" : "opacity-0"
+                        }`}
+                >
                     Home
                 </span>
             </div>
 
+            {/* Scroll Container */}
             <div
                 className="absolute inset-0 overflow-y-auto pb-32"
                 onScroll={(e) => {
-                    // FIX 7: Performant Scroll (Fixed for async access)
-                    const scrollTop = e.currentTarget.scrollTop;
-                    if (scrollRef.current) return;
-                    scrollRef.current = true;
-                    requestAnimationFrame(() => {
-                        setScrolled(scrollTop > 40);
-                        scrollRef.current = false;
+                    const top = e.currentTarget.scrollTop;
+                    if (scrollRAF.current) return;
+                    scrollRAF.current = requestAnimationFrame(() => {
+                        setScrolled(top > 40);
+                        scrollRAF.current = null;
                     });
                 }}
             >
-
-                {/* HERO */}
+                {/* ------------------------------- HERO ------------------------------- */}
                 <div className="relative h-[48vh] min-h-[420px] overflow-hidden">
                     <div className="absolute inset-0 bg-black" />
+
                     {heroSong && (
                         <img
                             src={getArt(heroSong)}
                             className="absolute inset-0 w-full h-full object-cover blur-[90px] opacity-60 scale-110"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            onError={(e) => (e.currentTarget.style.display = "none")}
                         />
                     )}
-                    {/* Cinematic Top Spotlight */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-30 pointer-events-none" />
 
-                    {/* FIX 1: Hard Grounding Gradient (Anchors the huge image) */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-30" />
                     <div className="absolute bottom-0 left-0 w-full h-64 bg-gradient-to-t from-black via-black/60 to-transparent" />
 
-                    <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 flex items-end gap-12 relative z-10">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="max-w-2xl"
-                        >
-                            <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/60 mb-4">
-                                <Zap size={12} /> Trending Now
-                            </span>
-
-                            {/* FIX 2: Reduced Title Weight */}
-                            <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight mb-4">
-                                {heroSong?.name}
-                            </h1>
-
-                            {/* FIX 3: Clickable Artist */}
-                            <p
-                                className="text-lg text-white/60 mb-8 hover:text-white cursor-pointer transition-colors"
-                                onClick={() => heroSong?.primaryArtists && onNavigate('artist', heroSong.primaryArtists.split(',')[0].trim())}
+                    <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 flex items-end relative z-10">
+                        {heroSong && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="max-w-2xl"
                             >
-                                {heroSong?.primaryArtists}
-                            </p>
+                                <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/60 mb-4">
+                                    <Zap size={12} /> Trending Now
+                                </span>
 
-                            <div className="flex items-center gap-4">
-                                <button
-                                    // POLISH 2: Hero Context
-                                    onClick={() => heroSong && onPlay(heroSong, trendingSingles.length ? trendingSingles : trending)}
-                                    className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-[1.02] transition-transform flex items-center gap-3"
+                                <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight mb-4">
+                                    {heroSong.name}
+                                </h1>
+
+                                <p
+                                    className="text-lg text-white/60 mb-8 hover:text-white cursor-pointer transition-colors"
+                                    onClick={() =>
+                                        heroSong.primaryArtists &&
+                                        onNavigate(
+                                            "artist",
+                                            heroSong.primaryArtists.split(",")[0].trim()
+                                        )
+                                    }
                                 >
-                                    <Play size={18} fill="black" /> Play
-                                </button>
-                                <button className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white/10">
-                                    <Heart size={20} />
-                                </button>
-                            </div>
-                        </motion.div>
+                                    {heroSong.primaryArtists}
+                                </p>
+
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() =>
+                                            onPlay(
+                                                heroSong,
+                                                trendingSingles.length ? trendingSingles : trending
+                                            )
+                                        }
+                                        className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-[1.02] transition-transform flex items-center gap-3"
+                                    >
+                                        <Play size={18} fill="black" /> Play
+                                    </button>
+
+                                    <button
+                                        className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white/10"
+                                        aria-label="Like"
+                                    >
+                                        <Heart size={20} />
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
                     </div>
                 </div>
 
-                {/* CONTENT */}
+                {/* ------------------------------ CONTENT ------------------------------ */}
                 <div className="relative z-20">
                     <LanguageChips
                         activeLanguage={activeLanguage}
@@ -209,44 +233,34 @@ export function HomeView({
                         {/* Jump Back In */}
                         {recent.length > 0 && (
                             <section>
-                                {/* FIX 4: Narrative Cue */}
-                                <div className="flex items-center gap-2 mb-3 text-white/40">
-                                    <span className="text-[10px] uppercase tracking-widest">
-                                        Continue Listening
-                                    </span>
-                                </div>
                                 <SectionHeader title="Jump Back In" subtitle="Recently played" />
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                                     {recent
                                         .slice(0, 6)
-                                        .filter(item => item?.track?.song)
+                                        .filter(r => r?.track?.song)
                                         .map(item => {
                                             const song = item.track!.song!;
                                             return (
                                                 <motion.div
                                                     key={item.id}
                                                     whileHover={{ y: -4 }}
-                                                    className="bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer border border-white/10 backdrop-blur-sm"
+                                                    className="bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer border border-white/10"
                                                     onClick={() =>
-                                                        item.itemType === 'song'
-                                                            ? onResumeSong(item.track, item.lastPosition || 0)
-                                                            : item.itemType === 'album'
-                                                                ? onOpenAlbum(song)
-                                                                : onOpenPlaylist(song)
+                                                        onResumeSong(item.track, item.lastPosition || 0)
                                                     }
                                                 >
-                                                    <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900 relative">
+                                                    <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900">
                                                         <img
                                                             src={getArt(song)}
                                                             className="w-full h-full object-cover"
-                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                            onError={(e) =>
+                                                                (e.currentTarget.style.display = "none")
+                                                            }
                                                         />
-                                                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
                                                     </div>
                                                     <p className="text-sm font-semibold text-white truncate">
                                                         {song.name}
                                                     </p>
-                                                    {/* FIX 8: Typography Tweak */}
                                                     <p className="text-xs text-white/40 truncate">
                                                         {song.primaryArtists}
                                                     </p>
@@ -264,34 +278,32 @@ export function HomeView({
                             </section>
                         )}
 
-                        {/* New & Trending Singles */}
+                        {/* Trending Singles */}
                         {trendingSingles.length > 0 && (
                             <section>
                                 <SectionHeader title="Trending Singles" subtitle="Hot right now" />
                                 <div className="flex gap-4 overflow-x-auto pb-2">
-                                    {trendingSingles.slice(0, 10).map((item, i) => (
+                                    {trendingSingles.slice(0, 10).map(item => (
                                         <motion.div
-                                            key={item.id || i}
+                                            key={item.id}
                                             whileHover={{ y: -4 }}
-                                            // FIX 7: Smaller card, no border
                                             className="w-44 flex-shrink-0 bg-white/5 hover:bg-white/10 p-3 rounded-xl cursor-pointer"
-                                            onClick={() => item.type === 'album'
-                                                ? onOpenAlbum(item)
-                                                : item.type === 'playlist'
-                                                    ? onOpenPlaylist(item)
-                                                    : onPlay(item, trendingSingles) // FIX 4: Context
-                                            }
+                                            onClick={() => onPlay(item, trendingSingles)}
                                         >
-                                            <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900 relative">
+                                            <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900">
                                                 <img
                                                     src={getArt(item)}
                                                     className="w-full h-full object-cover"
-                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    onError={(e) =>
+                                                        (e.currentTarget.style.display = "none")
+                                                    }
                                                 />
                                             </div>
-                                            <p className="text-sm font-semibold text-white truncate">{item.name}</p>
+                                            <p className="text-sm font-semibold text-white truncate">
+                                                {item.name}
+                                            </p>
                                             <p className="text-xs text-white/40 truncate">
-                                                {item.primaryArtists || item.subtitle}
+                                                {item.primaryArtists}
                                             </p>
                                         </motion.div>
                                     ))}
@@ -302,25 +314,29 @@ export function HomeView({
                         {/* Latest Albums */}
                         {latestAlbums.length > 0 && (
                             <section>
-                                <SectionHeader title={albumTitle} subtitle="Latest Albums" />
+                                <SectionHeader title={albumTitle} subtitle="Latest albums" />
                                 <div className="flex gap-4 overflow-x-auto pb-2">
-                                    {latestAlbums.slice(0, 10).map((item, i) => (
+                                    {latestAlbums.slice(0, 10).map(item => (
                                         <motion.div
-                                            key={item.id || i}
+                                            key={item.id}
                                             whileHover={{ y: -4 }}
                                             className="w-44 flex-shrink-0 bg-white/5 hover:bg-white/10 p-3 rounded-xl cursor-pointer"
                                             onClick={() => onOpenAlbum(item)}
                                         >
-                                            <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900 relative">
+                                            <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900">
                                                 <img
                                                     src={getArt(item)}
                                                     className="w-full h-full object-cover"
-                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    onError={(e) =>
+                                                        (e.currentTarget.style.display = "none")
+                                                    }
                                                 />
                                             </div>
-                                            <p className="text-sm font-semibold text-white truncate">{item.name}</p>
+                                            <p className="text-sm font-semibold text-white truncate">
+                                                {item.name}
+                                            </p>
                                             <p className="text-xs text-white/40 truncate">
-                                                {item.primaryArtists || item.subtitle}
+                                                {item.primaryArtists}
                                             </p>
                                         </motion.div>
                                     ))}
@@ -348,21 +364,25 @@ export function HomeView({
                         {/* Featured Playlists */}
                         {featuredPlaylists.length > 0 && (
                             <section>
-                                {/* POLISH 3: Dynamic Subtitle */}
-                                <SectionHeader title="Featured Playlists" subtitle={playlistSubtitle} />
+                                <SectionHeader
+                                    title="Featured Playlists"
+                                    subtitle={playlistSubtitle}
+                                />
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                    {featuredPlaylists.slice(0, 6).map((p, i) => (
+                                    {featuredPlaylists.slice(0, 6).map(p => (
                                         <motion.div
-                                            key={p.id || i}
+                                            key={p.id}
                                             whileHover={{ y: -4 }}
-                                            className="bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer border border-white/10 backdrop-blur-sm"
+                                            className="bg-white/5 hover:bg-white/10 p-4 rounded-xl cursor-pointer border border-white/10"
                                             onClick={() => onOpenPlaylist(p)}
                                         >
-                                            <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900 relative">
+                                            <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900">
                                                 <img
                                                     src={getArt(p)}
                                                     className="w-full h-full object-cover"
-                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    onError={(e) =>
+                                                        (e.currentTarget.style.display = "none")
+                                                    }
                                                 />
                                             </div>
                                             <p className="text-sm font-semibold text-white truncate">

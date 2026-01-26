@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Search } from "lucide-react";
 import { WaveLoader } from "./WaveLoader";
 import { TrackRow } from "../DiscoveryShared";
@@ -34,12 +34,33 @@ export function SearchView({
     handlePlay
 }: SearchViewProps) {
 
+    const lastSubmittedRef = useRef<string>("");
+
     const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key !== 'Enter') return;
+        if (e.key !== "Enter") return;
+
         const value = e.currentTarget.value.trim();
-        if (!value || value === searchQuery) return;
+        if (!value) return;
+
+        // FIX 1: Prevent duplicate searches
+        if (value === lastSubmittedRef.current) return;
+        lastSubmittedRef.current = value;
+
         setSearchQuery(value);
         performSearch(value);
+    };
+
+    const handleClear = () => {
+        lastSubmittedRef.current = "";
+        setSearchQuery("");
+        setSearchResults([]);
+
+        // FIX 2: Strict safe back navigation
+        setActiveView(
+            ["home", "explore", "browse", "library"].includes(lastView)
+                ? lastView
+                : "home"
+        );
     };
 
     return (
@@ -55,27 +76,27 @@ export function SearchView({
                     style={{ backgroundColor: c.card, borderColor: c.border }}
                 >
                     <Search size={18} style={{ color: c.textMuted }} />
+
                     <input
                         type="text"
                         placeholder="Search songs, artists, albums…"
                         className="bg-transparent outline-none text-sm w-full placeholder:text-white/30"
                         style={{ color: c.text }}
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            if (!e.target.value) {
+                                lastSubmittedRef.current = "";
+                                setSearchResults([]);
+                            }
+                        }}
                         onKeyDown={handleSearchKeyDown}
                         autoFocus
                     />
+
                     {searchQuery && (
                         <button
-                            onClick={() => {
-                                setSearchQuery('');
-                                setSearchResults([]);
-                                setActiveView(
-                                    ['home', 'explore', 'browse', 'library'].includes(lastView)
-                                        ? lastView
-                                        : 'home'
-                                );
-                            }}
+                            onClick={handleClear}
                             className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white transition-colors"
                         >
                             Clear
@@ -109,11 +130,11 @@ export function SearchView({
                             const quality =
                                 item.original?.sources?.[0]?.quality ||
                                 item.original?.preferredQuality ||
-                                '320';
+                                "320";
 
                             return (
                                 <TrackRow
-                                    key={item.id}
+                                    key={item.id || `${item.title}-${i}`}
                                     index={i + 1}
                                     track={{ ...item, quality }}
                                     colors={c}
