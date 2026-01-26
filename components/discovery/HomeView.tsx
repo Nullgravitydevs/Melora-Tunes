@@ -81,14 +81,23 @@ export function HomeView({
     // POLISH 1: Hero Fallback
     const heroSong = trending[0] || trendingSingles[0];
 
-    // FIX 5 & 6: Dynamic Titles
-    const albumTitle = activeLanguage
-        ? `New in ${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)}`
-        : 'New Releases';
+    const heroSong = trending[0] || trendingSingles[0];
 
-    const playlistSubtitle = activeLanguage
-        ? `${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)} Picks`
-        : 'Global Picks';
+    // FIX 5 & 6: Dynamic Titles (Memoized for perf)
+    const albumTitle = React.useMemo(() => {
+        if (!activeLanguage) return 'New Releases';
+        return `New in ${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)}`;
+    }, [activeLanguage]);
+
+    const playlistSubtitle = React.useMemo(() => {
+        if (!activeLanguage) return 'Global Picks';
+        return `${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)} Picks`;
+    }, [activeLanguage]);
+
+    const chartSubtitle = React.useMemo(() => {
+        if (!activeLanguage) return 'Today’s biggest hits';
+        return `${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)} charts`;
+    }, [activeLanguage]);
 
     if (loading) {
         return (
@@ -167,7 +176,7 @@ export function HomeView({
                             {/* FIX 3: Clickable Artist */}
                             <p
                                 className="text-lg text-white/60 mb-8 hover:text-white cursor-pointer transition-colors"
-                                onClick={() => heroSong && onNavigate('artist', heroSong.primaryArtists)}
+                                onClick={() => heroSong?.primaryArtists && onNavigate('artist', heroSong.primaryArtists.split(',')[0].trim())}
                             >
                                 {heroSong?.primaryArtists}
                             </p>
@@ -322,7 +331,7 @@ export function HomeView({
 
                         {/* Charts */}
                         <section>
-                            <SectionHeader title="Chart Toppers" subtitle="Today’s biggest hits" />
+                            <SectionHeader title="Chart Toppers" subtitle={chartSubtitle} />
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 {charts.slice(0, 4).map(chart => (
                                     <FeatureCard
