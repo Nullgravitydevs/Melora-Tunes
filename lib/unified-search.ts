@@ -65,17 +65,17 @@ export type SearchType = 'song' | 'album' | 'artist' | 'all';
 
 const QUALITY_ORDER: AudioQuality[] = ['hires', 'flac', '320', '160', '96'];
 
-export async function searchUnified(query: string, type: SearchType = 'song'): Promise<PlayableTrack[]> {
+export async function searchUnified(query: string, language?: string, type: SearchType = 'song'): Promise<PlayableTrack[]> {
     // 1. Clean Query
     // [FIX] Don't strip "flac" or "hi-res" as they might be part of the user's intent to find specific versions
     // const cleanQuery = query.replace(/\b(flac|lossless|hi-res|high quality|320kbps|320|128kbps|128)\b/gi, '').trim();
     const cleanQuery = query.trim();
-    console.log(`[UnifiedSearch] Query: "${query}" -> Clean: "${cleanQuery}"`);
+    console.log(`[UnifiedSearch] Query: "${query}" -> Clean: "${cleanQuery}" (Lang: ${language})`);
 
     // 2. Parallel Fetch (Strictly Concurrent)
     console.log(`[UnifiedSearch] Starting parallel search for: ${cleanQuery}`);
     const [saavnResults, hifiResult] = await Promise.all([
-        searchSongs(cleanQuery).catch(err => {
+        searchSongs(cleanQuery, 1, 10, language).catch(err => {
             console.error('[UnifiedSearch] Saavn Error:', err);
             return [];
         }),
