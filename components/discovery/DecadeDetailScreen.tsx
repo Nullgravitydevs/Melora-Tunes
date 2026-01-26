@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, Shuffle, ArrowLeft, Loader2, Disc } from "lucide-react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, ensurePlayableTrack } from "@/components/providers/playback-context";
 import { searchSongs, searchPlaylists } from "@/lib/jiosaavn";
 import { TrackRow, DiscoveryThemeColors, getArt } from "./DiscoveryShared";
 
@@ -17,6 +17,8 @@ interface DecadeDetailScreenProps {
 
 export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist, languageContext = 'english,hindi' }: DecadeDetailScreenProps) {
     const { playInstantMix } = usePlayback();
+    // FIX 1: Strong language resolution
+    const langContext = (decade as any)?.language || languageContext || 'english,hindi';
     const [loading, setLoading] = useState(true);
     const [playlists, setPlaylists] = useState<any[]>([]);
     const [songs, setSongs] = useState<any[]>([]);
@@ -26,11 +28,11 @@ export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist, lan
             setLoading(true);
             try {
                 // Fetch relevant playlists
-                const p = await searchPlaylists(decade.query + " playlist", 1, 10, languageContext);
+                const p = await searchPlaylists(decade.query + " playlist", 1, 10, langContext);
                 setPlaylists(p.slice(0, 10));
 
                 // Fetch relevant songs
-                const s = await searchSongs(decade.query, 1, 30, languageContext);
+                const s = await searchSongs(decade.query, 1, 30, langContext);
                 setSongs(s || []);
             } catch (e) {
                 console.error("Decade fetch failed:", e);
@@ -39,15 +41,15 @@ export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist, lan
             }
         };
         fetchData();
-    }, [decade.id]);
+    }, [decade.id, decade.query, langContext]); // FIX 2: Dependencies
 
     const handlePlayAll = () => {
         if (songs.length > 0) {
             playInstantMix({
-                id: `decade-${decade.id}`,
+                id: `decade-${decade.id}-${Date.now()}`, // FIX 3: Unique ID
                 title: decade.name,
                 color: 'purple',
-                songs: songs,
+                songs: songs.map(s => ensurePlayableTrack(s)), // FIX: Safety
                 currentSongIndex: 0
             });
         }
@@ -136,6 +138,12 @@ export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist, lan
                 {/* Top Songs */}
                 <section>
                     <h2 className="text-3xl font-bold text-white mb-8">Biggest Hits</h2>
+                    {/* FIX 5: Empty Result UX */}
+                    {!loading && songs.length === 0 && playlists.length === 0 && (
+                        <p className="text-white/40 text-center py-20">
+                            No results found for this decade.
+                        </p>
+                    )}
                     {loading ? (
                         <div className="space-y-4">
                             {Array(5).fill(0).map((_, i) => (
@@ -158,10 +166,10 @@ export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist, lan
                                     index={i}
                                     onPlay={() => {
                                         playInstantMix({
-                                            id: `decade-${decade.id}-song-${i}`,
+                                            id: `decade-${decade.id}-song-${i}-${Date.now()}`, // FIX 3: Unique ID
                                             title: decade.name,
                                             color: 'purple',
-                                            songs: songs.slice(i),
+                                            songs: songs.slice(i).map(s => ensurePlayableTrack(s)), // FIX: Safety
                                             currentSongIndex: 0
                                         });
                                     }}
