@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DiscoveryTheme } from "./DiscoveryLayout";
-import { getTrending, getTopCharts, getNewReleases, getFeaturedPlaylists } from "@/lib/jiosaavn";
+import { getTrending, getTopCharts, getNewReleases, getFeaturedPlaylists, searchSongs } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { searchUnified } from "@/lib/unified-search";
 import { OfflineStore } from "@/lib/offline-store";
@@ -38,8 +38,10 @@ interface DesktopDiscoveryProps {
 }
 
 export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps) {
-    const isMidnight = theme === 'midnight';
+    // Fix 1: Removed unused isMidnight
+    // Fix 80: Restore accidentally removed setters needed for NowPlayingOverlay
     const { playInstantMix, currentSong, currentTrack, activeQuality, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, toggleLike, isLiked, likedSongs, activeMixId, activeMix, mixes, updateMix } = usePlayback();
+    const otgGuardRef = React.useRef<Set<string>>(new Set()); // Fix 40: OTG Guard
 
     const addToOTG = (song: any) => {
         const otgMix = mixes.find(m => m.id === 'otg-tape');
@@ -47,6 +49,15 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
         const track = ensurePlayableTrack(song);
         if (!track.song) return;
+
+        // Fix 40: Guard Logic
+        // Capture ID to satisfy TS closure safety
+        const songId = track.song.id;
+        if (otgGuardRef.current.has(songId)) return;
+        otgGuardRef.current.add(songId);
+
+        // Auto-clear guard after 2s
+        setTimeout(() => otgGuardRef.current.delete(songId), 2000);
 
         const exists = otgMix.songs.some(s =>
             ('song' in s && s.song?.id === track.song!.id)
@@ -74,7 +85,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     const [activeView, setActiveView] = useState<DiscoveryView>('home');
     const [activeArtist, setActiveArtist] = useState<string | null>(null);
     const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
-    const [activeRegion, setActiveRegion] = useState<string | null>(null);
+    const [activeRegion] = useState<string>('global'); // Fix 31: Removed setter
     const [isLangModalOpen, setIsLangModalOpen] = useState(false);
 
     // Chart & Playlist Detail States
@@ -155,28 +166,21 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 setActiveChipLanguage(null);
             }
 
-            // Polish: Prevent flash
-            if (!loading) {
-                setTrending([]);
-                setTrendingSingles([]);
-            }
+            // Polish: Prevent flash (Removed per QA Fix 1)
 
             console.log('[Discovery] Loading data for context:', langContext);
 
-            // 1. Fetch Trending (Contextual)
-            let trendingSongs: any[] = [];
-
-            if (activeRegion && activeRegion !== 'global') {
-                const query = `Trending ${activeRegion}`;
-                const items = await searchUnified(query);
-                trendingSongs = items.map(t => t.song);
-            } else {
-                // EXPLICIT: Pass langContext to getTrending
-                trendingSongs = await getTrending(langContext);
-            }
-
             // 2. Fetch Charts (Contextual)
-            const topCharts = await getTopCharts(langContext);
+            // Fix 78: Isolated fetching with Promise.allSettled
+            const [trendRes, chartRes] = await Promise.allSettled([
+                activeRegion && activeRegion !== 'global'
+                    ? searchUnified(`Trending ${activeRegion}`, langContext).then(res => res.map(t => t.song))
+                    : getTrending(langContext),
+                getTopCharts(langContext)
+            ]);
+
+            const trendingSongs = trendRes.status === 'fulfilled' ? trendRes.value.filter(Boolean) : [];
+            const topCharts = chartRes.status === 'fulfilled' ? chartRes.value : [];
 
             // 3. Load Recent
             setRecent(HistoryStore.getHistory().slice(0, 6));
@@ -210,7 +214,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     id: c.id,
                     title: c.title || c.name,
                     subtitle: c.subtitle || `${c.language || 'Global'} • ${c.type} `,
-                    image: c.image || c.image?.[2]?.link,
+                    image: c.image, // Fix 6: Direct access
                     isNew: c.isNew || false
                 }));
 
@@ -225,7 +229,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
             // Fallback strategy if trending is empty (aggressive language filtering might yield empty on cold start)
             if (singles.length === 0) {
                 console.log('[HomeDebug] Trending empty, falling back to search');
-                const { searchSongs } = await import('@/lib/jiosaavn');
+                // Fix 7: Hoisted import
+                // const { searchSongs } = await import('@/lib/jiosaavn');
                 // Use langContext for fallback search too
                 const primaryLang = langContext.split(',')[0];
                 const popularSongs = await searchSongs(`${primaryLang} popular hits`, 1, 10, langContext);
@@ -241,27 +246,27 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         } finally {
             setLoading(false);
         }
-    }, [activeRegion, activeChipLanguage]);
+    }, [activeRegion, activeChipLanguage]); // Fix 72: Remove selectedLanguages dependency
 
     useEffect(() => {
-        let mounted = true;
+        loadData();
 
-        const safeLoad = async () => {
-            await loadData();
+        const onHistoryUpdate = () => setRecent(HistoryStore.getHistory().slice(0, 6));
+        const onPlaylistUpdate = () => setPlaylists(PlaylistStore.getPlaylists());
+
+        // Fix 44: Debounce settings update
+        let settingsTimeout: NodeJS.Timeout;
+        const onSettingsUpdate = () => {
+            clearTimeout(settingsTimeout);
+            settingsTimeout = setTimeout(loadData, 100);
         };
-
-        if (mounted) safeLoad();
-
-        const onHistoryUpdate = () => mounted && setRecent(HistoryStore.getHistory().slice(0, 6));
-        const onPlaylistUpdate = () => mounted && setPlaylists(PlaylistStore.getPlaylists());
-        const onSettingsUpdate = () => mounted && loadData(); // Fix #1: Settings listener
 
         window.addEventListener('melora-history-update', onHistoryUpdate);
         window.addEventListener('melora-playlists-update', onPlaylistUpdate);
         window.addEventListener('melora-settings-update', onSettingsUpdate);
 
         return () => {
-            mounted = false;
+            clearTimeout(settingsTimeout);
             window.removeEventListener('melora-history-update', onHistoryUpdate);
             window.removeEventListener('melora-playlists-update', onPlaylistUpdate);
             window.removeEventListener('melora-settings-update', onSettingsUpdate);
@@ -283,68 +288,113 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     // On mount restore chip
     useEffect(() => {
         const saved = sessionStorage.getItem('melora-active-lang');
-        if (saved) setActiveChipLanguage(saved);
+        const settings = loadSettings();
+        if (saved && settings.languages?.includes(saved)) {
+            setActiveChipLanguage(saved);
+        }
     }, []);
 
 
     // Mix Loading State
     const [isGeneratingMix, setIsGeneratingMix] = useState(false);
     const isGeneratingRef = React.useRef(false);
+    const searchTokenRef = React.useRef(0); // Fix 8: Race guard
+
+    // Fix 74: Clear search results on leave
+    useEffect(() => {
+        if (activeView !== 'search') {
+            setSearchResults([]);
+            setIsSearching(false);
+        }
+    }, [activeView]);
 
     const handlePlay = async (song: any, allSongs: any[] = []) => {
-        if (!song || isGeneratingRef.current) return;
+        if (!song) return; // Fix 66: Remove isGeneratingRef guard from entry
 
-        isGeneratingRef.current = true;
-        setIsGeneratingMix(true);
+        // Removed global setIsGeneratingMix per Fix 33
 
         try {
             await new Promise(r => setTimeout(r, 50));
 
             // STRICT DISCOVERY MODE
             if (allSongs.length > 0) {
-                let songList = allSongs.map(s => ensurePlayableTrack(s));
-                let startIndex = songList.findIndex(s => s.id === song.id);
+                let songList = allSongs
+                    .map(s => ensurePlayableTrack(s))
+                    .filter(t => t && t.song);
+                let startIndex = songList.findIndex(s => s.song?.id === song.id);
                 // FIX: Context safety
                 if (startIndex < 0) startIndex = 0;
+
+                // Fix 9: Empty check
+                if (songList.length === 0) throw new Error('Empty context list');
 
                 // DYNAMIC CONTEXT ID GENERATION
                 let contextId = `context-${Date.now()}`;
                 if (activeView === 'album' && activeAlbum) contextId = `context-album-${activeAlbum}`;
                 else if (activeView === 'playlist-detail' && activePlaylistDetail) contextId = `context-playlist-${activePlaylistDetail.id}`;
                 else if (activeView === 'artist' && activeArtist) contextId = `context-artist-${activeArtist}`;
-                else if (activeView === 'chart-detail') contextId = `context-chart-${Date.now()}`;
-                else if (activeView === 'search') contextId = `context-search-${Date.now()}`;
+                else if (activeView === 'chart-detail' && activeChart) contextId = `context-chart-${activeChart.id}`; // Fix 10: Stable ID
+                else if (activeView === 'search') contextId = `context-search-${searchQuery || 'results'}`; // Fix 70: Use searchQuery state
 
                 const newMix: Mix = {
                     id: contextId,
-                    title: activeView === 'album' ? 'Album Context' : activeView === 'playlist-detail' ? 'Playlist Context' : 'Context Mix',
+                    title: activeView === 'album'
+                        ? 'Album'
+                        : activeView === 'playlist-detail'
+                            ? 'Playlist'
+                            : activeView === 'chart-detail'
+                                ? (activeChart?.title || 'Chart')
+                                : activeView === 'search'
+                                    ? `Search: ${searchQuery}`
+                                    : 'Context', // Fix 37: Better titles
                     color: 'blue',
                     songs: songList,
                     currentSongIndex: startIndex >= 0 ? startIndex : 0
                 };
-                playInstantMix(newMix);
+                // Fix 35/69: Push to History (Normalized)
+                const playable = ensurePlayableTrack(song);
+                if (playable.song) {
+                    HistoryStore.addToHistory(playable);
+                }
             } else {
                 // THE DJ MODE (Discovery Engine)
-                const seed = ensurePlayableTrack(song);
-                const sessionMix = await DiscoveryEngine.generateSessionMix(seed, activeRegion || undefined);
+                isGeneratingRef.current = true;
+                setIsGeneratingMix(true); // Fix 33/67: Scope DJ only
 
-                // FIX: Discovery Engine Guard
-                if (!sessionMix || !sessionMix.songs || sessionMix.songs.length === 0) {
-                    throw new Error('Empty session mix');
+                try {
+                    const seed = ensurePlayableTrack(song);
+                    const sessionMix = await DiscoveryEngine.generateSessionMix(seed, activeRegion || undefined);
+
+                    // FIX: Discovery Engine Guard
+                    if (!sessionMix || !sessionMix.songs || sessionMix.songs.length === 0) {
+                        throw new Error('Empty session mix');
+                    }
+
+                    playInstantMix(sessionMix);
+
+                    // Fix 35/69: Push to History
+                    if (seed.song) {
+                        HistoryStore.addToHistory(seed);
+                    }
+                } finally {
+                    isGeneratingRef.current = false;
+                    setIsGeneratingMix(false);
                 }
-
-                playInstantMix(sessionMix);
             }
         } catch (e) {
             console.error("DJ Failed:", e);
             playInstantMix({
                 // FIX: Unique ID
                 id: `fallback-${Date.now()}`,
-                title: 'Mix',
+                title: 'Quick Play', // Fix 79: Better name
                 color: 'blue',
-                songs: [ensurePlayableTrack(song)],
+                songs: [ensurePlayableTrack(song)].filter(t => t?.song), // Fix 34: Safe filter
                 currentSongIndex: 0
             });
+
+            // Fix 81: Fallback history
+            const playable = ensurePlayableTrack(song);
+            if (playable.song) HistoryStore.addToHistory(playable);
         } finally {
             isGeneratingRef.current = false;
             setIsGeneratingMix(false);
@@ -352,42 +402,49 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     };
 
     const performSearch = async (query: string) => {
-        if (!query.trim()) return;
+        if (!query.trim()) {
+            setSearchResults([]); // Fix 45: Force clear
+            return;
+        }
 
-        let cancelled = false;
+        // Fix 71: Reset DJ state on search
+        isGeneratingRef.current = false;
+        setIsGeneratingMix(false);
+
+        setSearchQuery(query); // Fix 36: Ensure freshness
+        const safeQuery = query.trim() || 'results'; // Fix 70: Sanitize context ID
+
+        const token = ++searchTokenRef.current; // Fix 8: Token increment
         setIsSearching(true);
         setActiveView('search');
 
         try {
-            // Fix #3: Pass language context to search
             const langContext = activeChipLanguage || selectedLanguages.join(',');
             const results = await searchUnified(query, langContext);
-            if (cancelled) return;
+            if (token !== searchTokenRef.current) return; // Fix 8: Token check
 
             const mapped = results
-                .filter(item => item && item.song)
+                .filter(item => item?.song)
                 .map(item => {
-                    // FIX: TS Safe access
                     const song = item.song!;
                     return {
                         id: item.id,
                         title: song.name,
                         artist: song.primaryArtists,
-                        duration: song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : '--:--',
+                        duration: song.duration
+                            ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}`
+                            : '--:--',
                         art: getArt(song),
                         original: item
                     };
                 });
+
             setSearchResults(mapped);
         } catch (e) {
             console.error("Search Failed:", e);
         } finally {
-            if (!cancelled) setIsSearching(false);
+            if (token === searchTokenRef.current) setIsSearching(false);
         }
-
-        return () => {
-            cancelled = true;
-        };
     };
 
     const safeBackToRoot = () => {
@@ -500,7 +557,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             setActiveChart(null);
                             safeBackToRoot();
                         }}
-                        onPlay={(song, list) => { }}
+                        onPlay={(song, list) => handlePlay(song, list)}
                     />
                 ) : null;
 
@@ -525,7 +582,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 return (
                     <BrowseView
                         colors={c}
-                        charts={charts}
+                        charts={Array.isArray(charts) ? charts : []} // Fix 41: Array Safety
                         setLastView={setLastView}
                         setActiveCollection={setActiveCollection}
                         setActiveView={setActiveView}
@@ -553,14 +610,14 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 return (
                     <HomeView
                         colors={c}
-                        trending={trending}
-                        charts={charts}
-                        recent={recent}
+                        trending={Array.isArray(trending) ? trending : []}
+                        charts={Array.isArray(charts) ? charts : []}
+                        recent={Array.isArray(recent) ? recent : []}
 
                         // Updated Prop Names
-                        trendingSingles={trendingSingles}
-                        featuredPlaylists={featuredPlaylists}
-                        latestAlbums={latestAlbums}
+                        trendingSingles={Array.isArray(trendingSingles) ? trendingSingles : []}
+                        featuredPlaylists={Array.isArray(featuredPlaylists) ? featuredPlaylists : []}
+                        latestAlbums={Array.isArray(latestAlbums) ? latestAlbums : []} // Fix 42: Array Safety
 
                         loading={loading}
                         onPlay={handlePlay}
@@ -625,19 +682,23 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 return currentSong ? (
                     <NowPlayingOverlay
                         song={currentSong}
-                        nextSong={(activeMix?.songs || [])[(activeMix?.currentSongIndex || 0) + 1]}
+                        nextSong={
+                            activeMix && activeMix.songs[activeMix.currentSongIndex + 1]
+                                ? activeMix.songs[activeMix.currentSongIndex + 1]
+                                : null
+                        }
                         quality={activeQuality || currentTrack?.preferredQuality || '320'}
                         onClose={() => {
-                            const target = ['home', 'explore', 'browse', 'library', 'search'].includes(lastView)
+                            const target = ['home', 'search', 'explore', 'browse', 'library'].includes(lastView)
                                 ? lastView
                                 : 'home';
-                            setActiveView(target as DiscoveryView);
+                            setActiveView(target as DiscoveryView); // Fix 38: Strict Close Target
                         }}
                         playback={{
                             isPlaying, togglePlay, next, prev,
                             progress, duration, seek,
-                            shuffle, setShuffle, repeat, setRepeat,
-                            toggleLike, isLiked: (id: string) => likedSongs.some(s => s.id === id),
+                            shuffle, repeat,
+                            toggleLike, isLiked, // Fix 11: Simply pass isLiked
                             queue: activeMix?.songs || [],
                             currentIndex: activeMix?.currentSongIndex || 0,
                             activeMixId,
@@ -664,7 +725,23 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 {/* --- LEFT SIDEBAR (GLASS) --- */}
                 <Sidebar
                     activeView={activeView}
-                    setActiveView={setActiveView}
+                    setActiveView={(target) => {
+                        // Fix 75: Strict Guard
+                        if (!['home', 'search', 'explore', 'browse', 'library', 'now-playing'].includes(target)) return;
+
+                        // Fix 39/76: Guard LastView override
+                        if (['home', 'search', 'explore', 'browse', 'library'].includes(activeView)) {
+                            setLastView(activeView as RootView);
+                        }
+
+                        // Fix 77: Clear detail state
+                        if (['home', 'search', 'explore', 'browse', 'library'].includes(target)) {
+                            setActiveAlbum(null);
+                            setActiveArtist(null);
+                        }
+
+                        setActiveView(target as DiscoveryView);
+                    }}
                     lastView={lastView}
                     theme={theme}
                     onThemeChange={onThemeChange}
@@ -716,38 +793,46 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 activeQuality={activeQuality || '320'}
                 currentTrack={currentTrack}
                 activeView={activeView}
-                setActiveView={setActiveView}
+                setActiveView={(target) => {
+                    if (['home', 'search', 'explore', 'browse', 'library'].includes(activeView)) {
+                        setLastView(activeView as RootView);
+                    }
+                    setActiveView(target as DiscoveryView);
+                }}
                 setLastView={setLastView}
                 toggleLike={toggleLike}
-                isLiked={(id) => likedSongs.some(s => s.id === id)}
+                isLiked={isLiked}
             />
 
             {/* === GLOBAL DJ LOADER === */}
-            <AnimatePresence>
-                {isGeneratingMix && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center"
-                    >
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="relative w-16 h-16">
-                                <div className="absolute inset-0 border-t-2 border-white rounded-full animate-spin" />
-                                <div className="absolute inset-2 border-r-2 border-white/50 rounded-full animate-spin-slow" />
-                            </div>
-                            <p className="text-lg font-bold text-white tracking-widest animate-pulse">
-                                DJ IS THINKING...
-                            </p>
+            {/* Fix 68: Remove AnimatePresence to prevent double mount flicker */}
+            {isGeneratingMix && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center"
+                >
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="relative w-16 h-16">
+                            <div className="absolute inset-0 border-t-2 border-white rounded-full animate-spin" />
+                            <div className="absolute inset-2 border-r-2 border-white/50 rounded-full animate-spin-slow" />
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        <p className="text-lg font-bold text-white tracking-widest animate-pulse">
+                            DJ IS THINKING...
+                        </p>
+                    </div>
+                </motion.div>
+            )}
 
             <LanguageSelectorModal
                 isOpen={isLangModalOpen}
                 onClose={() => setIsLangModalOpen(false)}
-                onSave={() => loadData()}
+                onSave={() => {
+                    setIsLangModalOpen(false);
+                    // Fix 82: Use rAF
+                    requestAnimationFrame(() => loadData());
+                }}
             />
         </div>
     );

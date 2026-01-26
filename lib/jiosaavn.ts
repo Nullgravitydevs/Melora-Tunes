@@ -98,11 +98,7 @@ export async function searchSongs(query: string, page: number = 1, limit: number
                     hasLyrics: item.more_info?.has_lyrics,
                     url: item.perma_url,
                     copyright: item.more_info?.copyright_text || '',
-                    image: [
-                        { quality: '500x500', link: (item.image || '').replace(/150x150|50x50/g, '500x500') },
-                        { quality: '150x150', link: (item.image || '').replace(/50x50/g, '150x150') },
-                        { quality: '50x50', link: (item.image || '').replace(/150x150/g, '50x50') }
-                    ],
+                    image: formatImage(item.image),
                     downloadUrl: [],
                     encryptedMediaUrl: encryptedUrl
                 };
@@ -186,11 +182,7 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
                     hasLyrics: 'false',
                     url: item.perma_url,
                     copyright: '',
-                    image: [
-                        { quality: '500x500', link: (item.image || '').replace(/150x150|50x50/g, '500x500') },
-                        { quality: '150x150', link: (item.image || '').replace(/50x50/g, '150x150') },
-                        { quality: '50x50', link: (item.image || '').replace(/150x150/g, '50x50') }
-                    ],
+                    image: formatImage(item.image),
                     downloadUrl: [],
                     encryptedMediaUrl: encryptedUrl
                 };
@@ -257,11 +249,7 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
                     hasLyrics: 'false',
                     url: item.perma_url,
                     copyright: '',
-                    image: [
-                        { quality: '500x500', link: (item.image || '').replace(/150x150|50x50/g, '500x500') },
-                        { quality: '150x150', link: (item.image || '').replace(/50x50/g, '150x150') },
-                        { quality: '50x50', link: (item.image || '').replace(/150x150/g, '50x50') }
-                    ],
+                    image: formatImage(item.image),
                     downloadUrl: [],
                     encryptedMediaUrl: ''
                 };
@@ -438,11 +426,7 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
                 hasLyrics: songData.has_lyrics,
                 url: songData.perma_url,
                 copyright: songData.copyright_text,
-                image: [
-                    { quality: '500x500', link: (songData.image || '').replace(/150x150|50x50/g, '500x500') },
-                    { quality: '150x150', link: (songData.image || '').replace(/50x50/g, '150x150') },
-                    { quality: '50x50', link: (songData.image || '').replace(/150x150/g, '50x50') }
-                ],
+                image: formatImage(songData.image),
                 downloadUrl: [],
                 encryptedMediaUrl: songData.encrypted_media_url || ''
             };
@@ -770,6 +754,27 @@ function normalizeLanguage(language: string | undefined): string {
         .join(',');
 }
 
+// Helper to standardize image handling (handles string vs array API ambiguity)
+function formatImage(image: any): { quality: string, link: string }[] {
+    const qualities = ['500x500', '150x150', '50x50'];
+    let baseImage = '';
+
+    if (typeof image === 'string') {
+        baseImage = image;
+    } else if (Array.isArray(image) && image.length > 0) {
+        // Find highest quality or just take the last one (usually highest)
+        const highest = image.find((i: any) => i.quality === '500x500') || image[image.length - 1];
+        baseImage = highest?.link || '';
+    }
+
+    if (!baseImage) return [];
+
+    return qualities.map(q => ({
+        quality: q,
+        link: baseImage.replace(/150x150|50x50|500x500/g, q)
+    }));
+}
+
 // Helper to map API response to JioSaavnSong
 function mapToSong(item: any): JioSaavnSong {
     const title = item.title || item.name || item.song || `[Unknown]`;
@@ -797,11 +802,7 @@ function mapToSong(item: any): JioSaavnSong {
         hasLyrics: item.more_info?.has_lyrics,
         url: item.perma_url,
         copyright: item.more_info?.copyright_text || '',
-        image: [
-            { quality: '500x500', link: (item.image || '').replace(/150x150|50x50/g, '500x500') },
-            { quality: '150x150', link: (item.image || '').replace(/50x50/g, '150x150') },
-            { quality: '50x50', link: (item.image || '').replace(/150x150/g, '50x50') }
-        ],
+        image: formatImage(item.image),
         downloadUrl: [],
         encryptedMediaUrl: encryptedUrl
     };

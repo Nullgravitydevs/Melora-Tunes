@@ -74,7 +74,8 @@ export function HomeView({
     onResumeSong,
     activeLanguage,
     selectedLanguages,
-    onLanguageSelect
+    onLanguageSelect,
+    onNavigate
 }: HomeViewProps) {
     const [scrolled, setScrolled] = useState(false);
     const scrollRef = useRef(false);

@@ -27,19 +27,27 @@ export interface DiscoveryThemeColors {
 
 // --- HELPER FUNCTIONS ---
 
-export function getArt(song: any): string {
-    if (!song) return '';
+export function getArt(item: any): string {
+    if (!item) return '';
 
-    let img = song.image || song.art || song.images;
-    if (Array.isArray(img)) {
-        img = img[img.length - 1]?.link || img[0]?.link || '';
+    const images =
+        item.image ||
+        item.images ||
+        item.art ||
+        [];
+
+    if (Array.isArray(images)) {
+        // Prefer highest quality explicitly
+        const best =
+            images.find((i: any) => i.quality === '500x500') ||
+            images.find((i: any) => i.quality === '150x150') ||
+            images[images.length - 1];
+
+        return best?.link || '';
     }
 
-    if (typeof img === 'string') {
-        return img
-            .replace(/(\d{2,3})x\1/g, '500x500')
-            .replace(/_(\d{2,3})\./g, '_500.')
-            .replace(/\/(\d{2,3})\//g, '/500/');
+    if (typeof images === 'string') {
+        return images;
     }
 
     return '';
