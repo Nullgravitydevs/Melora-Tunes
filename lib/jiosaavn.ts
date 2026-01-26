@@ -46,7 +46,7 @@ const isElectron = typeof window !== 'undefined' && /Electron/i.test(window.navi
 
 export async function searchSongs(query: string, page: number = 1, limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
     try {
-        const lang = language || 'english,hindi';
+        const lang = normalizeLanguage(language);
         console.log(`[Search] Query: "${query}", Mode: ${isElectron ? 'ELECTRON' : 'WEB'}, Lang: ${lang}`);
         let data: any;
 
@@ -117,7 +117,7 @@ export async function searchSongs(query: string, page: number = 1, limit: number
 
 export async function searchAlbums(query: string, page: number = 1, limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
     try {
-        const lang = language || 'english,hindi';
+        const lang = normalizeLanguage(language);
         console.log(`[Search Albums] Query: "${query}"`);
         let data: any;
 
@@ -205,7 +205,7 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
 
 export async function searchPlaylists(query: string, page: number = 1, limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
     try {
-        const lang = language || 'english,hindi';
+        const lang = normalizeLanguage(language);
         console.log(`[Search Playlists] Query: "${query}"`);
         let data: any;
 
@@ -568,7 +568,7 @@ async function fetchApi(params: string, useCache: boolean = false): Promise<any>
 }
 
 export async function getTopCharts(language?: string): Promise<any[]> {
-    const lang = language || 'english,hindi';
+    const lang = normalizeLanguage(language);
     const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${lang}`, true); // CACHED
     // Ensure it's an array, otherwise return empty
     return Array.isArray(data) ? data : [];
@@ -576,7 +576,7 @@ export async function getTopCharts(language?: string): Promise<any[]> {
 
 export async function getTrending(language?: string): Promise<JioSaavnSong[]> {
     try {
-        const lang = language || 'english,hindi';
+        const lang = normalizeLanguage(language);
         const data = await fetchApi(`__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4&languages=${lang}`, true); // CACHED
         if (!data || !Array.isArray(data)) {
             console.log('[getTrending] No data or not array:', typeof data);
@@ -599,7 +599,7 @@ export async function getTrending(language?: string): Promise<JioSaavnSong[]> {
 
 export async function getNewReleases(limit: number = 10, language?: string): Promise<any[]> {
     try {
-        const lang = language || 'english,hindi';
+        const lang = normalizeLanguage(language);
         // Note: content.getAlbums is often used for new releases
         const data = await fetchApi(`__call=content.getAlbums&api_version=4&_format=json&ctx=wap6dot0&n=${limit}&p=1&languages=${lang}`, true); // CACHED
 
@@ -619,7 +619,7 @@ export async function getNewReleases(limit: number = 10, language?: string): Pro
 
 export async function getFeaturedPlaylists(limit: number = 10, language?: string): Promise<any[]> {
     try {
-        const lang = language || 'english,hindi';
+        const lang = normalizeLanguage(language);
         // Using search.getPlaylistResults with empty query sometimes works for "top", but featured playlists 
         // usually come from modules. Let's try content.getFeaturedPlaylists if available or fallback to a broad search 
         // tailored to the language.
@@ -761,6 +761,15 @@ export async function getArtistStation(artistId: string): Promise<JioSaavnSong[]
     }
 }
 
+// Helper for language normalization
+function normalizeLanguage(language: string | undefined): string {
+    return (language || 'english,hindi')
+        .toLowerCase()
+        .split(',')
+        .filter(Boolean)
+        .join(',');
+}
+
 // Helper to map API response to JioSaavnSong
 function mapToSong(item: any): JioSaavnSong {
     const title = item.title || item.name || item.song || `[Unknown]`;
@@ -769,7 +778,7 @@ function mapToSong(item: any): JioSaavnSong {
     return {
         id: item.id,
         name: title,
-        type: item.type,
+        type: item.type || 'song', // Default to song as safeguard
         album: {
             id: item.more_info?.album_id || '',
             name: item.more_info?.album || '',
