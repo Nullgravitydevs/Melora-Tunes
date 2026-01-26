@@ -77,7 +77,18 @@ export function HomeView({
     onLanguageSelect
 }: HomeViewProps) {
     const [scrolled, setScrolled] = useState(false);
-    const heroSong = trending[0];
+    const scrollRef = useRef(false);
+    // POLISH 1: Hero Fallback
+    const heroSong = trending[0] || trendingSingles[0];
+
+    // FIX 5 & 6: Dynamic Titles
+    const albumTitle = activeLanguage
+        ? `New in ${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)}`
+        : 'New Releases';
+
+    const playlistSubtitle = activeLanguage
+        ? `${activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)} Picks`
+        : 'Global Picks';
 
     if (loading) {
         return (
@@ -100,7 +111,7 @@ export function HomeView({
 
             {/* Sticky Header */}
             <div
-                className={`absolute top-0 inset-x-0 z-40 px-8 py-4 transition-all ${scrolled ? 'bg-black/60 backdrop-blur-xl border-b border-white/5' : 'bg-transparent'
+                className={`sticky top-0 z-40 px-8 py-4 transition-all ${scrolled ? 'bg-black/60 backdrop-blur-xl border-b border-white/5' : 'bg-transparent'
                     }`}
             >
                 <span className={`text-sm font-bold transition-opacity ${scrolled ? 'opacity-100' : 'opacity-0'}`}>
@@ -110,7 +121,15 @@ export function HomeView({
 
             <div
                 className="absolute inset-0 overflow-y-auto pb-32"
-                onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 40)}
+                onScroll={(e) => {
+                    // FIX 7: Performant Scroll
+                    if (scrollRef.current) return;
+                    scrollRef.current = true;
+                    requestAnimationFrame(() => {
+                        setScrolled(e.currentTarget.scrollTop > 40);
+                        scrollRef.current = false;
+                    });
+                }}
             >
 
                 {/* HERO */}
@@ -140,17 +159,22 @@ export function HomeView({
                             </span>
 
                             {/* FIX 2: Reduced Title Weight */}
-                            <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-4">
+                            <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight mb-4">
                                 {heroSong?.name}
                             </h1>
 
-                            <p className="text-lg text-white/60 mb-8">
+                            {/* FIX 3: Clickable Artist */}
+                            <p
+                                className="text-lg text-white/60 mb-8 hover:text-white cursor-pointer transition-colors"
+                                onClick={() => heroSong && onNavigate('artist', heroSong.primaryArtists)}
+                            >
                                 {heroSong?.primaryArtists}
                             </p>
 
                             <div className="flex items-center gap-4">
                                 <button
-                                    onClick={() => heroSong && onPlay(heroSong)}
+                                    // POLISH 2: Hero Context
+                                    onClick={() => heroSong && onPlay(heroSong, trendingSingles.length ? trendingSingles : trending)}
                                     className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-[1.02] transition-transform flex items-center gap-3"
                                 >
                                     <Play size={18} fill="black" /> Play
@@ -246,7 +270,7 @@ export function HomeView({
                                                 ? onOpenAlbum(item)
                                                 : item.type === 'playlist'
                                                     ? onOpenPlaylist(item)
-                                                    : onPlay(item)
+                                                    : onPlay(item, trendingSingles) // FIX 4: Context
                                             }
                                         >
                                             <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-neutral-900 relative">
@@ -269,7 +293,7 @@ export function HomeView({
                         {/* Latest Albums */}
                         {latestAlbums.length > 0 && (
                             <section>
-                                <SectionHeader title="New Releases" subtitle="Latest Albums" />
+                                <SectionHeader title={albumTitle} subtitle="Latest Albums" />
                                 <div className="flex gap-4 overflow-x-auto pb-2">
                                     {latestAlbums.slice(0, 10).map((item, i) => (
                                         <motion.div
@@ -315,7 +339,8 @@ export function HomeView({
                         {/* Featured Playlists */}
                         {featuredPlaylists.length > 0 && (
                             <section>
-                                <SectionHeader title="Featured Playlists" subtitle="Curated for you" />
+                                {/* POLISH 3: Dynamic Subtitle */}
+                                <SectionHeader title="Featured Playlists" subtitle={playlistSubtitle} />
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                                     {featuredPlaylists.slice(0, 6).map(p => (
                                         <motion.div
@@ -335,7 +360,7 @@ export function HomeView({
                                                 {p.name || p.title}
                                             </p>
                                             <p className="text-xs text-white/40 truncate">
-                                                {p.subtitle || 'Curated playlist'}
+                                                {p.subtitle || playlistSubtitle}
                                             </p>
                                         </motion.div>
                                     ))}
