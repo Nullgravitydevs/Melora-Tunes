@@ -81,8 +81,6 @@ export function HomeView({
     // POLISH 1: Hero Fallback
     const heroSong = trending[0] || trendingSingles[0];
 
-    const heroSong = trending[0] || trendingSingles[0];
-
     // FIX 5 & 6: Dynamic Titles (Memoized for perf)
     const albumTitle = React.useMemo(() => {
         if (!activeLanguage) return 'New Releases';
