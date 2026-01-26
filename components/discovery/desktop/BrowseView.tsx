@@ -57,12 +57,48 @@ export function BrowseView({
     activeLanguage,
     selectedLanguages
 }: BrowseViewProps) {
+
+    // 1. Resolve Language Context (Same as HomeView)
+    const langContext = activeLanguage
+        ? activeLanguage
+        : selectedLanguages.join(',');
+
+    const displayLanguage = activeLanguage
+        ? activeLanguage.charAt(0).toUpperCase() + activeLanguage.slice(1)
+        : null;
+
+    // 2. Dynamic Collections (Language Aware)
+    const editorialCollections = [
+        { id: 'bestofyear', name: 'Best of the Year', query: `${langContext} best songs` },
+        { id: 'editorpicks', name: "Editor's Picks", query: `${langContext} hits` },
+        { id: 'globalhits', name: 'Global Hits', query: `${langContext} global hits` },
+        { id: 'indianhits', name: 'Indian Hits', query: `${langContext} indian hits` },
+        { id: 'newtrending', name: 'New & Trending', query: `${langContext} new releases` }
+    ];
+
+    // 3. Dynamic Themes
+    const themeMoments = [
+        { id: 'latenightdrives', name: 'Late Night Drives', query: `${langContext} night drive songs` },
+        { id: 'weekendparty', name: 'Weekend Party', query: `${langContext} party songs` },
+        { id: 'longtravel', name: 'Long Travel', query: `${langContext} travel songs` },
+        { id: 'studytime', name: 'Study Time', query: `${langContext} study music` },
+        { id: 'morningenergy', name: 'Morning Energy', query: `${langContext} morning songs` }
+    ];
+
+    // 4. Dynamic Decades
+    const decades = [
+        { id: '1990s', name: 'The 1990s', query: `${langContext} 90s hits` },
+        { id: '2000s', name: 'The 2000s', query: `${langContext} 2000s hits` },
+        { id: '2010s', name: 'The 2010s', query: `${langContext} 2010s hits` },
+        { id: '2020s', name: 'Best of 2020s', query: `${langContext} 2020s hits` }
+    ];
+
     return (
         <div className="flex-1 px-8 py-6 overflow-y-auto [&::-webkit-scrollbar]:hidden">
             {/* Header */}
             <div className="mb-10">
                 <h1 className="text-4xl font-black mb-2 bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">
-                    Browse & Discover
+                    {displayLanguage ? `Browse ${displayLanguage} Music` : 'Browse & Discover'}
                 </h1>
                 <p className="text-white/50">Explore music by themes, eras, and collections</p>
             </div>
