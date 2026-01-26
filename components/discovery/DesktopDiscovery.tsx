@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DiscoveryTheme } from "./DiscoveryLayout";
-import { getTrending, getTopCharts } from "@/lib/jiosaavn";
+import { getTrending, getTopCharts, getNewReleases, getFeaturedPlaylists } from "@/lib/jiosaavn";
+import { loadSettings } from "@/lib/settings";
 import { searchUnified } from "@/lib/unified-search";
 import { OfflineStore } from "@/lib/offline-store";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
@@ -29,6 +30,7 @@ import { Sidebar } from "./desktop/Sidebar";
 import { RightPanel } from "./desktop/RightPanel";
 import { FloatingPlayer } from "./desktop/FloatingPlayer";
 import { NowPlayingOverlay } from "./desktop/NowPlayingOverlay";
+import { LanguageSelectorModal } from "./desktop/LanguageSelectorModal";
 
 interface DesktopDiscoveryProps {
     theme: DiscoveryTheme;
@@ -101,9 +103,19 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     const [trending, setTrending] = useState<any[]>([]);
     const [charts, setCharts] = useState<any[]>([]);
     const [recent, setRecent] = useState<HistoryItem[]>([]);
-    const [newAndTrending, setNewAndTrending] = useState<any[]>([]);
-    const [editorialPicks, setEditorialPicks] = useState<any[]>([]);
+    const [trendingSingles, setTrendingSingles] = useState<any[]>([]); // Was newAndTrending
+
+    // Language Feed State
+    // "New Releases" -> latestAlbums
+    const [latestAlbums, setLatestAlbums] = useState<any[]>([]);
+    // "Editorial Picks" -> featuredPlaylists
+    const [featuredPlaylists, setFeaturedPlaylists] = useState<any[]>([]);
+
     const [loading, setLoading] = useState(true);
+
+    const CHIP_ALL = null;
+    const [activeChipLanguage, setActiveChipLanguage] = useState<string | null>(CHIP_ALL);
+    const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
 
     // Search State
     const [searchQuery, setSearchQuery] = useState('');
@@ -120,23 +132,46 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     const loadData = React.useCallback(async () => {
         setLoading(true);
         try {
+            // Load Settings for Languages
+            const settings = loadSettings();
+            setSelectedLanguages(settings.languages || ['english', 'hindi']);
+
+            // 3. LANGUAGE CONTEXT RESOLUTION (Single Source of Truth)
+            const langContext = activeChipLanguage
+                ? activeChipLanguage
+                : (settings.languages || ['english', 'hindi']).join(',');
+
+            console.log('[Discovery] Loading data for context:', langContext);
+
             // 1. Fetch Trending (Contextual)
             let trendingSongs: any[] = [];
+
             if (activeRegion && activeRegion !== 'global') {
                 const query = `Trending ${activeRegion}`;
                 const items = await searchUnified(query);
                 trendingSongs = items.map(t => t.song);
             } else {
-                trendingSongs = await getTrending();
+                // EXPLICIT: Pass langContext to getTrending
+                trendingSongs = await getTrending(langContext);
             }
 
-            // 2. Fetch Charts
-            const topCharts = await getTopCharts();
+            // 2. Fetch Charts (Contextual)
+            const topCharts = await getTopCharts(langContext);
 
             // 3. Load Recent
             setRecent(HistoryStore.getHistory().slice(0, 6));
 
-            // 4. Load Downloads
+            // 4. Fetch Language Specific Content
+            // Parallel fetch for speed
+            const [fetchedAlbums, fetchedPlaylists] = await Promise.all([
+                getNewReleases(10, langContext),
+                getFeaturedPlaylists(10, langContext)
+            ]);
+
+            setLatestAlbums(fetchedAlbums);
+            setFeaturedPlaylists(fetchedPlaylists);
+
+            // 5. Load Downloads
             const downloadedSongs = await OfflineStore.getAllDownloadedSongs();
             setDownloads(downloadedSongs.map(s => ({
                 id: s.id,
@@ -161,38 +196,31 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
             setCharts(usefulCharts);
 
-            let newTrendingItems = trendingSongs.slice(0, 10).map((s: any) => ({
+            // Handle pure trending singles 
+            let singles = trendingSongs.slice(0, 10).map((s: any) => ({
                 ...s,
                 type: 'single'
             }));
 
-            if (newTrendingItems.length === 0) {
+            // Fallback strategy if trending is empty (aggressive language filtering might yield empty on cold start)
+            if (singles.length === 0) {
                 console.log('[HomeDebug] Trending empty, falling back to search');
                 const { searchSongs } = await import('@/lib/jiosaavn');
-                const popularSongs = await searchSongs('popular hits', 1, 10);
-                newTrendingItems = popularSongs.map((s: any) => ({
+                // Use langContext for fallback search too
+                const popularSongs = await searchSongs('popular hits', 1, 10, langContext);
+                singles = popularSongs.map((s: any) => ({
                     ...s,
                     type: 'single'
                 }));
             }
-            setNewAndTrending(newTrendingItems);
+            setTrendingSingles(singles);
 
-            const editorialItems = topCharts
-                .filter((c: any) => c.image && c.type !== 'song')
-                .slice(0, 6)
-                .map((c: any) => ({
-                    id: c.id,
-                    name: c.title || c.name,
-                    image: c.image,
-                    type: 'playlist'
-                }));
-            setEditorialPicks(editorialItems);
         } catch (e) {
             console.error("Discovery Load Failed:", e);
         } finally {
             setLoading(false);
         }
-    }, [activeRegion]);
+    }, [activeRegion, activeChipLanguage]);
 
     useEffect(() => {
         let mounted = true;
@@ -381,6 +409,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
+                        languageContext={activeChipLanguage || selectedLanguages.join(',')}
                     />
                 ) : null;
 
@@ -411,6 +440,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
+                        languageContext={activeChipLanguage || selectedLanguages.join(',')}
                     />
                 ) : null;
 
@@ -442,6 +472,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                             setActivePlaylistDetail(playlist);
                             setActiveView('playlist-detail');
                         }}
+                        languageContext={activeChipLanguage || selectedLanguages.join(',')}
                     />
                 ) : null;
 
@@ -455,6 +486,9 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         setActiveView={setActiveView}
                         setActiveChart={setActiveChart}
                         setActiveDecade={setActiveDecade}
+                        // New Props for Language Filtering
+                        activeLanguage={activeChipLanguage}
+                        selectedLanguages={selectedLanguages}
                     />
                 );
 
@@ -477,8 +511,12 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         trending={trending}
                         charts={charts}
                         recent={recent}
-                        newAndTrending={newAndTrending}
-                        editorialPicks={editorialPicks}
+
+                        // Updated Prop Names
+                        trendingSingles={trendingSingles}
+                        featuredPlaylists={featuredPlaylists}
+                        latestAlbums={latestAlbums}
+
                         loading={loading}
                         onPlay={handlePlay}
                         onNavigate={(view, data) => {
@@ -506,6 +544,11 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         onResumeSong={(track, position) => {
                             handlePlay(track.song);
                         }}
+
+                        // New Props
+                        activeLanguage={activeChipLanguage}
+                        selectedLanguages={selectedLanguages}
+                        onLanguageSelect={setActiveChipLanguage}
                     />
                 );
             case 'artist':
@@ -539,11 +582,12 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         song={currentSong}
                         nextSong={(activeMix?.songs || [])[(activeMix?.currentSongIndex || 0) + 1]}
                         quality={activeQuality || currentTrack?.preferredQuality || '320'}
-                        onClose={() => setActiveView(
-                            ['home', 'explore', 'browse', 'library', 'search'].includes(lastView)
+                        onClose={() => {
+                            const target = ['home', 'explore', 'browse', 'library', 'search'].includes(lastView)
                                 ? lastView
-                                : 'home'
-                        )}
+                                : 'home';
+                            setActiveView(target as DiscoveryView);
+                        }}
                         playback={{
                             isPlaying, togglePlay, next, prev,
                             progress, duration, seek,
@@ -654,6 +698,12 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <LanguageSelectorModal
+                isOpen={isLangModalOpen}
+                onClose={() => setIsLangModalOpen(false)}
+                onSave={() => loadData()}
+            />
         </div>
     );
 }

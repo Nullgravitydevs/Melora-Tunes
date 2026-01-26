@@ -32,7 +32,7 @@ interface FloatingPlayerProps {
     activeQuality: string | null | undefined;
     currentTrack: any;
     activeView: string;
-    setActiveView: (view: string) => void;
+    setActiveView: (view: any) => void;
     setLastView: (view: RootView) => void;
     toggleLike: (song: any) => void;
     isLiked: (id: string) => boolean;
@@ -220,8 +220,8 @@ export function FloatingPlayer({
                     <Heart
                         size={18}
                         className={`cursor-pointer transition-colors ${isLiked(currentSong.id)
-                                ? 'text-[#e91e63] fill-[#e91e63]'
-                                : 'text-white/40 hover:text-white'
+                            ? 'text-[#e91e63] fill-[#e91e63]'
+                            : 'text-white/40 hover:text-white'
                             }`}
                         onClick={() => toggleLike(currentSong)}
                     />

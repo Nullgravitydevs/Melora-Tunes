@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Disc } from 'lucide-react';
+import { Play, Disc, ArrowRight } from 'lucide-react';
 
 // Typings (Simplified)
 export interface TrackData {
@@ -46,6 +46,67 @@ export function getArt(song: any): string {
 }
 
 // --- SHARED COMPONENTS ---
+
+export function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+    return (
+        <div className="flex items-end justify-between mb-6">
+            <div>
+                <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">{title}</h2>
+                {subtitle && <p className="text-sm text-white/50 mt-1">{subtitle}</p>}
+            </div>
+        </div>
+    );
+}
+
+export function FeatureCard({
+    title,
+    subtitle,
+    image,
+    colors,
+    onClick,
+    isNew
+}: {
+    title: string;
+    subtitle: string;
+    image?: string;
+    colors: DiscoveryThemeColors;
+    onClick: () => void;
+    isNew?: boolean;
+}) {
+    return (
+        <motion.div
+            className="relative h-64 rounded-2xl overflow-hidden cursor-pointer group"
+            whileHover={{ scale: 1.03, boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+            onClick={onClick}
+        >
+            {/* Background Image */}
+            {image ? (
+                <img src={image} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+            ) : (
+                <div className="absolute inset-0 bg-neutral-800" />
+            )}
+
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+            {/* Content */}
+            <div className="absolute bottom-0 left-0 w-full p-6">
+                {isNew && (
+                    <span className="inline-block px-2 py-1 mb-2 text-[10px] font-bold text-black bg-white rounded-full uppercase tracking-wider">
+                        New
+                    </span>
+                )}
+                <h3 className="text-xl font-bold text-white mb-1 line-clamp-1">{title}</h3>
+                <p className="text-sm text-neutral-300 line-clamp-1">{subtitle}</p>
+
+                {/* Hover Play Button */}
+                <div className="absolute bottom-6 right-6 w-12 h-12 bg-white rounded-full flex items-center justify-center opacity-0 translate-y-3 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 transition-all duration-300 shadow-2xl">
+                    <Play size={20} fill="black" className="ml-1" />
+                </div>
+            </div>
+        </motion.div>
+    );
+}
 
 export function NavItem({ icon, label, active, onClick }: {
     icon: React.ReactNode;
@@ -124,67 +185,85 @@ export function TrackRow({
 }) {
     return (
         <motion.div
-            className="flex items-center px-4 py-3 rounded-lg cursor-pointer group relative transition-colors"
-            style={{ backgroundColor: isPlaying ? 'rgba(255,255,255,0.1)' : 'transparent' }}
-            whileHover={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+            className="flex items-center px-4 py-3 rounded-lg cursor-pointer group relative transition-colors border border-transparent"
+            style={{
+                backgroundColor: isPlaying ? 'rgba(34,197,94,0.12)' : 'transparent',
+                borderColor: isPlaying ? 'rgba(34,197,94,0.35)' : 'transparent'
+            }}
+            whileHover={{
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                borderColor: 'rgba(255,255,255,0.12)',
+                scale: 1.004
+            }}
+            whileTap={{ scale: 0.995 }}
             onClick={onPlay}
-            transition={{ duration: 0.1 }}
         >
+            {isPlaying && (
+                <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-green-400 shadow-[0_0_10px_rgba(34,197,94,0.6)]" />
+            )}
+
             <span
-                className="w-8 text-xs font-medium text-center"
+                className="w-8 text-xs font-medium text-center font-mono"
                 style={{ color: isPlaying ? '#ffffff' : colors.textMuted }}
             >
                 {!isPlaying ? (
                     <>
-                        <span className="group-hover:hidden">{index}</span>
-                        <Play size={14} className="hidden group-hover:block mx-auto text-white" />
+                        <span className="group-hover:hidden opacity-50">{index}</span>
+                        <Play size={14} className="hidden group-hover:block mx-auto text-white transition-all duration-200 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100" fill="white" />
                     </>
                 ) : (
-                    <div className="flex items-end justify-center gap-[2px] h-4">
+                    <div className="flex items-end justify-center gap-[2px] h-3">
                         {[0, 1, 2].map(i => (
                             <motion.div
                                 key={i}
-                                className="w-[3px] bg-white rounded-sm"
-                                animate={{ height: ['40%', '100%', '60%', '100%', '40%'] }}
-                                transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.2 }}
+                                className="w-[3px] bg-green-400 rounded-sm"
+                                animate={{ height: ['30%', '100%', '40%', '90%', '30%'] }}
+                                transition={{ repeat: Infinity, duration: 1.1, ease: 'easeInOut', delay: i * 0.12 }}
                             />
                         ))}
                     </div>
                 )}
             </span>
 
-            <div className="w-10 h-10 rounded-md mr-4 overflow-hidden flex-shrink-0 shadow-lg bg-neutral-900 border border-white/10">
+            <div className="w-10 h-10 rounded-md mr-4 overflow-hidden flex-shrink-0 shadow-lg bg-neutral-900 border border-white/5 relative">
                 {track.art ? (
-                    <img src={track.art} alt={track.title} className="w-full h-full object-cover" />
+                    <img
+                        src={track.art}
+                        alt={track.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center">
                         <Disc size={16} className="opacity-20 text-white" />
                     </div>
                 )}
+                {isPlaying && <div className="absolute inset-0 bg-black/20" />}
             </div>
 
             <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium truncate ${isPlaying ? 'text-white' : 'text-zinc-200'}`}>
+                <p className={`text-sm font-medium truncate ${isPlaying ? 'text-green-400' : 'text-white/90'}`}>
                     {track.title}
+                </p>
+                <p className="text-xs text-white/40 truncate group-hover:text-white/60 transition-colors">
+                    {track.artist}
                 </p>
             </div>
 
-            <span className="w-36 text-xs truncate px-2 text-zinc-500 group-hover:text-zinc-400 transition-colors">
-                {track.artist}
-            </span>
-
             {track.quality && (
-                <span
-                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border border-white/10 ${track.quality === 'hires' || track.quality === 'flac'
-                            ? 'bg-white text-black'
-                            : 'bg-white/10 text-white/50'
-                        }`}
+                <span className={`hidden md:inline-flex items-center px-1.5 py-0.5 rounded ml-2 border text-[9px] font-bold tracking-wider
+                ${track.quality === 'hires'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-400/30'
+                        : track.quality === 'flac'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                            : 'bg-white/10 text-white/70 border-white/20'
+                    }`}
                 >
-                    {track.quality === 'hires' ? 'HI-RES' : track.quality === 'flac' ? 'FLAC' : 'HQ'}
+                    {track.quality === 'hires' ? 'HI-RES' : track.quality === 'flac' ? 'LOSSLESS' : 'HQ'}
                 </span>
             )}
 
-            <span className="w-14 text-xs text-right text-zinc-600 font-mono">
+            <span className="w-14 text-xs text-right text-white/30 font-mono tabular-nums">
                 {track.duration}
             </span>
         </motion.div>

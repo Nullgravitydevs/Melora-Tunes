@@ -12,9 +12,10 @@ interface DecadeDetailScreenProps {
     colors: DiscoveryThemeColors;
     onBack: () => void;
     onOpenPlaylist?: (playlist: any) => void;
+    languageContext?: string;
 }
 
-export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist }: DecadeDetailScreenProps) {
+export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist, languageContext = 'english,hindi' }: DecadeDetailScreenProps) {
     const { playInstantMix } = usePlayback();
     const [loading, setLoading] = useState(true);
     const [playlists, setPlaylists] = useState<any[]>([]);
@@ -25,11 +26,11 @@ export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist }: D
             setLoading(true);
             try {
                 // Fetch relevant playlists
-                const p = await searchPlaylists(decade.query + " playlist");
+                const p = await searchPlaylists(decade.query + " playlist", 1, 10, languageContext);
                 setPlaylists(p.slice(0, 10));
 
                 // Fetch relevant songs
-                const s = await searchSongs(decade.query, 1, 30);
+                const s = await searchSongs(decade.query, 1, 30, languageContext);
                 setSongs(s || []);
             } catch (e) {
                 console.error("Decade fetch failed:", e);

@@ -45,26 +45,29 @@ export function RightPanel({
 
     return (
         <aside
-            className="w-64 flex-shrink-0 border-l p-4 flex flex-col overflow-hidden"
+            className="w-64 flex-shrink-0 flex flex-col overflow-hidden px-4 py-5"
             style={{
                 backgroundColor: c.surface,
-                borderColor: c.border
+                borderLeft: `1px solid ${c.border}`
             }}
         >
-            <div className="flex justify-between items-center mb-6">
-                <span className="text-sm font-bold">Recent Played</span>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-semibold text-white/60 uppercase tracking-widest">
+                    Recent Played
+                </span>
                 <span
-                    className="text-[10px] cursor-pointer hover:underline font-medium"
-                    style={{ color: c.textMuted }}
+                    className="text-[10px] text-white/30 hover:text-white/60 transition-colors cursor-pointer"
                 >
-                    See All
+                    See all
                 </span>
             </div>
 
-            <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+            {/* List */}
+            <div className="flex-1 flex flex-col gap-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
                 {recent.length === 0 && (
-                    <p className="text-xs text-center opacity-50 mt-4">
-                        No recent songs
+                    <p className="text-[10px] text-center text-white/30 mt-6">
+                        Nothing played yet
                     </p>
                 )}
 
@@ -77,48 +80,39 @@ export function RightPanel({
                     return (
                         <motion.div
                             key={item.id}
-                            className="flex items-center gap-3 p-2 rounded-xl cursor-pointer group relative"
+                            className="flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer group"
                             whileHover={{
-                                backgroundColor: c.accentSoft,
-                                x: 2
+                                backgroundColor: c.accentSoft
                             }}
+                            transition={{ duration: 0.15 }}
                             onClick={() => handlePlay(song)}
-                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
                         >
-                            {/* Album Art */}
-                            <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 relative shadow-md">
-                                {art ? (
+                            {/* Art */}
+                            <div className="w-10 h-10 rounded-md overflow-hidden relative flex-shrink-0 bg-neutral-900">
+                                {art && (
                                     <img
                                         src={art}
                                         alt={song.name}
                                         className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div
-                                        className="w-full h-full"
-                                        style={{ backgroundColor: c.border }}
+                                        onError={(e) => {
+                                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                        }}
                                     />
                                 )}
-
-                                <motion.div
-                                    className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100"
-                                    transition={{ duration: 0.15 }}
-                                >
-                                    <Play size={16} fill="#fff" color="#fff" />
-                                </motion.div>
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Play size={14} fill="white" />
+                                </div>
                             </div>
 
                             {/* Text */}
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 leading-tight">
                                 <p
-                                    className="text-xs font-semibold truncate hover:underline"
-                                    onClick={(e) => handleArtistClick(e, song.primaryArtists)}
+                                    className="text-xs font-medium text-white truncate"
                                 >
                                     {song.name}
                                 </p>
                                 <p
-                                    className="text-[10px] truncate hover:text-white transition-colors"
-                                    style={{ color: c.textMuted }}
+                                    className="text-[10px] truncate text-white/40 hover:text-white/60 transition-colors"
                                     onClick={(e) => handleArtistClick(e, song.primaryArtists)}
                                 >
                                     {song.primaryArtists}
@@ -129,24 +123,25 @@ export function RightPanel({
                 })}
             </div>
 
-            {/* Downloads Card */}
-            <div className="mt-4 pt-4 border-t border-white/5">
-                <div className="bg-gradient-to-br from-white/10 to-white/5 p-4 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-white/10">
-                            <Download size={20} className="text-white" />
+            {/* Downloads */}
+            <div className="mt-5 pt-4 border-t border-white/5">
+                <div className="rounded-xl p-4 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
+                            <Download size={16} className="text-white/80" />
                         </div>
                         <div>
-                            <p className="font-bold text-sm text-white">
+                            <p className="text-sm font-semibold text-white">
                                 Downloads
                             </p>
-                            <p className="text-[10px] text-white/50 font-mono tracking-wider">
-                                OFFLINE
+                            <p className="text-[10px] uppercase tracking-widest text-white/40">
+                                Offline
                             </p>
                         </div>
                     </div>
-                    <div className="w-full h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
-                        <div className="h-full bg-white w-3/4 rounded-full opacity-50" />
+
+                    <div className="w-full h-[2px] bg-white/10 rounded-full mt-3 overflow-hidden">
+                        <div className="h-full bg-white/60 w-3/4 rounded-full" />
                     </div>
                 </div>
             </div>

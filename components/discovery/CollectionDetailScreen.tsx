@@ -12,9 +12,10 @@ interface CollectionDetailScreenProps {
     colors: DiscoveryThemeColors;
     onBack: () => void;
     onOpenPlaylist?: (playlist: any) => void;
+    languageContext?: string;
 }
 
-export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlaylist }: CollectionDetailScreenProps) {
+export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlaylist, languageContext = 'english,hindi' }: CollectionDetailScreenProps) {
     const { playInstantMix } = usePlayback();
     const [loading, setLoading] = useState(true);
     const [playlists, setPlaylists] = useState<any[]>([]);
@@ -25,11 +26,11 @@ export function CollectionDetailScreen({ collection, colors, onBack, onOpenPlayl
             setLoading(true);
             try {
                 // Fetch relevant playlists
-                const p = await searchPlaylists(collection.query + " playlist");
+                const p = await searchPlaylists(collection.query + " playlist", 1, 10, languageContext);
                 setPlaylists(p.slice(0, 10));
 
                 // Fetch relevant songs
-                const s = await searchSongs(collection.query, 1, 25);
+                const s = await searchSongs(collection.query, 1, 25, languageContext);
                 setSongs(s || []);
             } catch (e) {
                 console.error("Collection fetch failed:", e);

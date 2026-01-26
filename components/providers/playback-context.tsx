@@ -215,12 +215,23 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const activeMixIdRef = useRef<string | null>(null);
     const isStationGenerating = useRef(false);
     const currentStreamKeyRef = useRef<string | null>(null); // Track which key provided the current stream
+    const currentSongUrlRef = useRef<string | null>(null); // Track latest URL for sync comparison
+    useEffect(() => { currentSongUrlRef.current = currentSongUrl; }, [currentSongUrl]);
 
     // Toast Helper
     const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
         if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
         setToast({ id: Date.now(), message, type });
         toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+    }, []);
+
+    // Cleanup Toast on unmount
+    useEffect(() => {
+        return () => {
+            if (toastTimeoutRef.current) {
+                clearTimeout(toastTimeoutRef.current);
+            }
+        };
     }, []);
 
     // Derived State
@@ -509,7 +520,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     });
             }
         }
-    }, [progress, duration, activeMixId, isPlaying, currentSong, updateMix, bitrate]);
+    }, [progress, duration, activeMixId, isPlaying, currentSong, updateMix]);
 
     const loadMix = useCallback((mixId: string) => {
         console.log("[loadMix] Called with:", mixId, "current:", activeMixId);
@@ -863,7 +874,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // Try to find ANY version of this song that works.
         try {
             console.log(`[Resolver] Phase 3: Hail Mary for "${songName}"...`);
-            const query = `${songName} ${track.song.primaryArtists}`;
+            const query = `${songName} ${track.song?.primaryArtists || ''}`;
             const results = await searchSongs(query);
 
             if (results && results.length > 0) {
@@ -966,12 +977,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     console.warn(`[Playback] Quality Downgrade: Requested ${track.preferredQuality}, got ${result.quality}`);
                     showToast(`Playing in ${result.quality} (Requested: ${track.preferredQuality})`, 'info');
                 }
-                setCurrentSongUrl(result.url);
-                if (result.keyName) {
-                    currentStreamKeyRef.current = result.keyName;
-                    console.log(`[Playback] Active Key: ${result.keyName}`);
+                if (result.url !== currentSongUrlRef.current) {
+                    console.log(`[LoadSong] Setting URL: ${result.url.substring(0, 50)}...`);
+                    setCurrentSongUrl(result.url);
+                    setActiveQuality(result.quality);
+                    setIsPlaying(true); // Sync Fix: Ensure playback resumes
+
+                    if (result.keyName) {
+                        currentStreamKeyRef.current = result.keyName;
+                        // KeyVault.recordUsage(result.keyName); // Optional stats
+                    }
                 }
-                setActiveQuality(result.quality);
             } else {
                 throw new Error("All qualities failed");
             }
@@ -1249,16 +1265,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 // Fix: Save the full PlayableTrack (rawCurrentItem) to persist FLAC preference
                 const trackToSave = rawCurrentItem ? ensurePlayableTrack(rawCurrentItem) : ensurePlayableTrack(currentSong);
                 HistoryStore.addToHistory(trackToSave);
+                addToRecentlyPlayed(trackToSave.song); // Sync Fix: Update RightPanel state
 
                 // Signal: Verified Play (>10s)
                 SignalStore.addSignal(trackToSave, 'PLAY');
-
-                /* 
-                   STRICT DISCOVERY RULE: 
-                   Do NOT append to any background "History Mix". 
-                   History is read-only via HistoryStore.
-                   Mixes are immutable unless explicitly extended by engine.
-                */
             }, 10000);
             return () => clearTimeout(timer);
         }

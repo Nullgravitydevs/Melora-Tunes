@@ -19,9 +19,10 @@ interface MoodDetailScreenProps {
     colors: DiscoveryThemeColors;
     onBack: () => void;
     onOpenPlaylist?: (playlist: any) => void;
+    languageContext?: string;
 }
 
-export function MoodDetailScreen({ mood, colors, onBack, onOpenPlaylist }: MoodDetailScreenProps) {
+export function MoodDetailScreen({ mood, colors, onBack, onOpenPlaylist, languageContext = 'english,hindi' }: MoodDetailScreenProps) {
     const { playInstantMix } = usePlayback();
     const [loading, setLoading] = useState(true);
     const [playlists, setPlaylists] = useState<any[]>([]);
@@ -34,11 +35,11 @@ export function MoodDetailScreen({ mood, colors, onBack, onOpenPlaylist }: MoodD
             setLoading(true);
             try {
                 // Fetch playlists for this mood
-                const moodPlaylists = await searchPlaylists(`${mood.name} playlist`);
+                const moodPlaylists = await searchPlaylists(`${mood.name} playlist`, 1, 10, languageContext);
                 setPlaylists(moodPlaylists.slice(0, 8));
 
                 // Fetch songs for this mood
-                const moodSongs = await searchSongs(`${mood.name} songs`, 1, 20);
+                const moodSongs = await searchSongs(`${mood.name} songs`, 1, 20, languageContext);
                 setSongs(moodSongs);
             } catch (e) {
                 console.error("Failed to load mood content:", e);

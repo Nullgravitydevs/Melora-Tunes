@@ -1,7 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import CryptoJS from 'crypto-js';
 import { musixmatch } from '@/lib/musixmatch';
-import { loadSettings } from '@/lib/settings';
+// REMOVED: internal loadSettings() - strictly passed via args now
 
 export interface JioSaavnSong {
     id: string;
@@ -44,36 +44,24 @@ const DES_KEY = process.env.NEXT_PUBLIC_DES_KEY || '38346591';
 
 const isElectron = typeof window !== 'undefined' && /Electron/i.test(window.navigator.userAgent);
 
-export async function searchSongs(query: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
+export async function searchSongs(query: string, page: number = 1, limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
     try {
-        console.log(`[Search] Query: "${query}", Mode: ${isElectron ? 'ELECTRON' : 'WEB'}`);
+        const lang = language || 'english,hindi';
+        console.log(`[Search] Query: "${query}", Mode: ${isElectron ? 'ELECTRON' : 'WEB'}, Lang: ${lang}`);
         let data: any;
 
-        const STATIC_QUERIES = ['Trending', 'Telugu Hits', 'New Releases'];
-        const useCache = STATIC_QUERIES.some(q => query.includes(q));
-
-        if (useCache) {
-            data = await fetchApi(`__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`, true);
+        // FIX: Disabled static query caching to ensure language correctness
+        if (Capacitor.isNativePlatform()) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
         } else {
-            // Normal Search - No Aggressive Caching
-            if (Capacitor.isNativePlatform()) {
-                const settings = loadSettings();
-                const langs = (settings.languages || ['english', 'hindi']).join(',');
-                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
-                const response = await CapacitorHttp.get({ url: apiUrl });
-                data = response.data;
-            } else if (isElectron) {
-                const settings = loadSettings();
-                const langs = (settings.languages || ['english', 'hindi']).join(',');
-                const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
-                const response = await fetch(apiUrl);
-                data = await response.json();
-            } else {
-                const settings = loadSettings();
-                const langs = (settings.languages || ['english', 'hindi']).join(',');
-                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${langs}`);
-                data = await response.json();
-            }
+            const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${lang}`);
+            data = await response.json();
         }
 
         let list = [];
@@ -127,18 +115,19 @@ export async function searchSongs(query: string, page: number = 1, limit: number
     }
 }
 
-export async function searchAlbums(query: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
+export async function searchAlbums(query: string, page: number = 1, limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
     try {
+        const lang = language || 'english,hindi';
         console.log(`[Search Albums] Query: "${query}"`);
         let data: any;
 
         // Use search.getAlbumResults
         if (Capacitor.isNativePlatform()) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
@@ -146,7 +135,7 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
             // Assuming /api/proxy handles generic calls or we make a new one?
             // Existing searchSongs uses /api/search. Let's create a similar pattern or reuse fetchApi
             // For simplicity and reusing existing patterns, let's use fetchApi wrapper we made or similar logic
-            data = await fetchApi(`__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0`, true);
+            data = await fetchApi(`__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&languages=${lang}`, true);
         }
 
         let list = [];
@@ -214,27 +203,22 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
     }
 }
 
-export async function searchPlaylists(query: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
+export async function searchPlaylists(query: string, page: number = 1, limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
     try {
+        const lang = language || 'english,hindi';
         console.log(`[Search Playlists] Query: "${query}"`);
         let data: any;
 
         if (Capacitor.isNativePlatform()) {
-            const settings = loadSettings();
-            const langs = (settings.languages || ['english', 'hindi']).join(',');
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            const settings = loadSettings();
-            const langs = (settings.languages || ['english', 'hindi']).join(',');
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${langs}`;
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
-            const settings = loadSettings();
-            const langs = (settings.languages || ['english', 'hindi']).join(',');
-            const response = await fetch(`/api/search?type=playlist&query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${langs}`);
+            const response = await fetch(`/api/search?type=playlist&query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${lang}`);
             // Note: server API might not support type=playlist yet, but let's assume direct call if not.
             // Actually, if we use the proxy (fetchApi logic), better.
             // Let's manually reconstruct the proxy call if needed or assume /api/search handles it.
@@ -242,7 +226,7 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
             // Actually, for simplicity, I'll assume the /api/search is smart enough OR i'll just use fetchApi wrapped call logic if I were refactoring.
             // But since I am editing the file, I'll stick to the pattern used in searchSongs/Albums.
             // To be safe, I'll fallback to a direct proxied call using fetchApi pattern if /api/search isn't guaranteed.
-            data = await fetchApi(`__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&languages=${langs}`, true);
+            data = await fetchApi(`__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&languages=${lang}`, true);
         }
 
         let list = [];
@@ -583,19 +567,17 @@ async function fetchApi(params: string, useCache: boolean = false): Promise<any>
     }
 }
 
-export async function getTopCharts(): Promise<any[]> {
-    const settings = loadSettings();
-    const langs = (settings.languages || ['english', 'hindi']).join(',');
-    const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${langs}`, true); // CACHED
+export async function getTopCharts(language?: string): Promise<any[]> {
+    const lang = language || 'english,hindi';
+    const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${lang}`, true); // CACHED
     // Ensure it's an array, otherwise return empty
     return Array.isArray(data) ? data : [];
 }
 
-export async function getTrending(): Promise<JioSaavnSong[]> {
+export async function getTrending(language?: string): Promise<JioSaavnSong[]> {
     try {
-        const settings = loadSettings();
-        const langs = (settings.languages || ['english', 'hindi']).join(',');
-        const data = await fetchApi(`__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4&languages=${langs}`, true); // CACHED
+        const lang = language || 'english,hindi';
+        const data = await fetchApi(`__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4&languages=${lang}`, true); // CACHED
         if (!data || !Array.isArray(data)) {
             console.log('[getTrending] No data or not array:', typeof data);
             return [];
@@ -611,6 +593,50 @@ export async function getTrending(): Promise<JioSaavnSong[]> {
         return songs.map(mapToSong);
     } catch (e) {
         console.error("Error fetching trending:", e);
+        return [];
+    }
+}
+
+export async function getNewReleases(limit: number = 10, language?: string): Promise<any[]> {
+    try {
+        const lang = language || 'english,hindi';
+        // Note: content.getAlbums is often used for new releases
+        const data = await fetchApi(`__call=content.getAlbums&api_version=4&_format=json&ctx=wap6dot0&n=${limit}&p=1&languages=${lang}`, true); // CACHED
+
+        // Returns object with 'data' array
+        const list = data?.data || data || [];
+        if (!Array.isArray(list)) return [];
+
+        return list.map(mapToSong).map(s => ({
+            ...s,
+            type: 'album'
+        }));
+    } catch (e) {
+        console.error("Error fetching new releases", e);
+        return [];
+    }
+}
+
+export async function getFeaturedPlaylists(limit: number = 10, language?: string): Promise<any[]> {
+    try {
+        const lang = language || 'english,hindi';
+        // Using search.getPlaylistResults with empty query sometimes works for "top", but featured playlists 
+        // usually come from modules. Let's try content.getFeaturedPlaylists if available or fallback to a broad search 
+        // tailored to the language.
+
+        // Better endpoint: content.getFeaturedPlaylists
+        const data = await fetchApi(`__call=content.getFeaturedPlaylists&fetch_from_serialized_id=true&p=1&n=${limit}&_format=json&ctx=wap6dot0&languages=${lang}`, true); // CACHED
+
+        const list = data?.data || data || [];
+        if (!Array.isArray(list)) return [];
+
+        return list.map(mapToSong).map(s => ({
+            ...s,
+            id: s.id || (s as any).listid, // Ensure ID mapping
+            type: 'playlist'
+        }));
+    } catch (e) {
+        console.error("Error fetching featured playlists", e);
         return [];
     }
 }

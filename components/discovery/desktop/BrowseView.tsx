@@ -42,6 +42,8 @@ interface BrowseViewProps {
     setActiveView: (view: any) => void;
     setActiveChart: (chart: any) => void;
     setActiveDecade: (dec: any) => void;
+    activeLanguage: string | null;
+    selectedLanguages: string[];
 }
 
 export function BrowseView({
@@ -51,7 +53,9 @@ export function BrowseView({
     setActiveCollection,
     setActiveView,
     setActiveChart,
-    setActiveDecade
+    setActiveDecade,
+    activeLanguage,
+    selectedLanguages
 }: BrowseViewProps) {
     return (
         <div className="flex-1 px-8 py-6 overflow-y-auto [&::-webkit-scrollbar]:hidden">
