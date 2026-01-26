@@ -137,9 +137,29 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
             setSelectedLanguages(settings.languages || ['english', 'hindi']);
 
             // 3. LANGUAGE CONTEXT RESOLUTION (Single Source of Truth)
-            const langContext = activeChipLanguage
-                ? activeChipLanguage
+            // 3. LANGUAGE CONTEXT RESOLUTION (Single Source of Truth)
+            // Fix #2: If active chip is no longer in settings, reset it
+            let safeChip = activeChipLanguage;
+            if (activeChipLanguage && settings.languages && !settings.languages.includes(activeChipLanguage)) {
+                safeChip = null;
+                // Defer state update to avoid loops, or just use local var
+                // We'll update state at end or let next effect catch it, but for this load use clear
+            }
+
+            const langContext = safeChip
+                ? safeChip
                 : (settings.languages || ['english', 'hindi']).join(',');
+
+            // Verify activeChip reset in UI if needed (handled by effect below or safeChip logic)
+            if (activeChipLanguage !== safeChip) {
+                setActiveChipLanguage(null);
+            }
+
+            // Polish: Prevent flash
+            if (!loading) {
+                setTrending([]);
+                setTrendingSingles([]);
+            }
 
             console.log('[Discovery] Loading data for context:', langContext);
 
@@ -207,7 +227,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 console.log('[HomeDebug] Trending empty, falling back to search');
                 const { searchSongs } = await import('@/lib/jiosaavn');
                 // Use langContext for fallback search too
-                const popularSongs = await searchSongs('popular hits', 1, 10, langContext);
+                const primaryLang = langContext.split(',')[0];
+                const popularSongs = await searchSongs(`${primaryLang} popular hits`, 1, 10, langContext);
                 singles = popularSongs.map((s: any) => ({
                     ...s,
                     type: 'single'
@@ -233,15 +254,37 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
         const onHistoryUpdate = () => mounted && setRecent(HistoryStore.getHistory().slice(0, 6));
         const onPlaylistUpdate = () => mounted && setPlaylists(PlaylistStore.getPlaylists());
+        const onSettingsUpdate = () => mounted && loadData(); // Fix #1: Settings listener
 
         window.addEventListener('melora-history-update', onHistoryUpdate);
         window.addEventListener('melora-playlists-update', onPlaylistUpdate);
+        window.addEventListener('melora-settings-update', onSettingsUpdate);
+
         return () => {
             mounted = false;
             window.removeEventListener('melora-history-update', onHistoryUpdate);
             window.removeEventListener('melora-playlists-update', onPlaylistUpdate);
+            window.removeEventListener('melora-settings-update', onSettingsUpdate);
         };
     }, [loadData]);
+
+    // Polish #2: Persist chip language
+    useEffect(() => {
+        if (activeChipLanguage !== null) {
+            sessionStorage.setItem('melora-active-lang', activeChipLanguage);
+        } else {
+            // If expressly cleared/all, maybe remove or keep last?
+            // Let's keep last selection logic if desirable, or clear.
+            // For "ALL" (null), we usually don't persist "null" string.
+            sessionStorage.removeItem('melora-active-lang');
+        }
+    }, [activeChipLanguage]);
+
+    // On mount restore chip
+    useEffect(() => {
+        const saved = sessionStorage.getItem('melora-active-lang');
+        if (saved) setActiveChipLanguage(saved);
+    }, []);
 
 
     // Mix Loading State
@@ -316,7 +359,9 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
         setActiveView('search');
 
         try {
-            const results = await searchUnified(query);
+            // Fix #3: Pass language context to search
+            const langContext = activeChipLanguage || selectedLanguages.join(',');
+            const results = await searchUnified(query, langContext);
             if (cancelled) return;
 
             const mapped = results

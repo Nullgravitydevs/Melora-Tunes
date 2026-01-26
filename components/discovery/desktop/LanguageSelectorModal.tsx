@@ -57,6 +57,8 @@ export function LanguageSelectorModal({ isOpen, onClose, onSave }: LanguageSelec
         }
 
         saveSettings({ languages: selected });
+        // FIX: Dispatch event for immediate reload
+        window.dispatchEvent(new Event('melora-settings-update'));
         onSave();
         onClose();
     };
