@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Play, ChevronLeft, Shuffle, Clock } from "lucide-react";
 import { usePlayback, Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
-import { PlayableTrack } from "@/lib/types";
 import { searchSongs } from "@/lib/jiosaavn";
 import { TrackRow, DiscoveryThemeColors, getArt } from "./DiscoveryShared";
 
@@ -30,120 +29,139 @@ function SkeletonRow() {
     );
 }
 
-export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onBack, onPlay }: ChartDetailScreenProps) {
+export function ChartDetailScreen({
+    chartId,
+    chartTitle,
+    chartImage,
+    colors,
+    onBack
+}: ChartDetailScreenProps) {
     const { playInstantMix, currentSong, isPlaying } = usePlayback();
+
     const [songs, setSongs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isShuffled, setIsShuffled] = useState(false);
 
-    // FIXED: Stable Mix ID (Chart ID only)
+    // Stable mix id
     const mixId = useRef(`chart-${chartId}`);
 
     useEffect(() => {
+        let cancelled = false;
+
         const fetchChart = async () => {
             setLoading(true);
             try {
-                // Fetch chart songs using search (could be replaced with dedicated API)
                 const results = await searchSongs(chartTitle, 1, 50);
-                setSongs(results);
+                if (!cancelled) setSongs(results || []);
             } catch (e) {
                 console.error("Failed to load chart:", e);
+                if (!cancelled) setSongs([]);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
+
         fetchChart();
+        return () => {
+            cancelled = true;
+        };
     }, [chartId, chartTitle]);
 
-    // STRICT: Normalize songs ONCE
-    const playableSongs = useMemo(() => {
-        return songs.map(s => ensurePlayableTrack(s));
+    // Normalize playable tracks ONCE
+    const playableTracks = useMemo(() => {
+        return songs
+            .map(s => ensurePlayableTrack(s))
+            .filter((t): t is any => !!t?.song);
     }, [songs]);
 
-    const buildChartMix = (startIndex = 0, shuffled = false) => {
-        const baseSongs = shuffled
-            ? [...playableSongs].sort(() => Math.random() - 0.5)
-            : playableSongs;
+    const playableSongs = useMemo(
+        () => playableTracks.map(t => t.song),
+        [playableTracks]
+    );
+
+    const buildChartMix = (startIndex = 0, shuffled = false): Mix => {
+        const list = shuffled
+            ? [...playableTracks].sort(() => Math.random() - 0.5)
+            : playableTracks;
 
         return {
-            id: mixId.current, // REUSE STABLE ID
+            id: mixId.current,
             title: chartTitle,
-            color: 'blue',
-            songs: baseSongs,
+            color: "blue",
+            songs: list,
             currentSongIndex: startIndex
-        } as Mix;
+        };
     };
 
     const handlePlayAll = () => {
-        if (playableSongs.length === 0) return;
+        if (!playableTracks.length) return;
         setIsShuffled(false);
         playInstantMix(buildChartMix(0, false));
     };
 
     const handleShuffle = () => {
-        if (playableSongs.length === 0) return;
+        if (!playableTracks.length) return;
         setIsShuffled(true);
         playInstantMix(buildChartMix(0, true));
     };
 
-    const handleSongClick = (_song: any, index: number) => {
-        // Respect current shuffle state
+    const handleSongClick = (index: number) => {
         playInstantMix(buildChartMix(index, isShuffled));
     };
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden bg-black">
-            {/* Header */}
+
+            {/* HEADER */}
             <div
                 className="relative w-full h-[40vh] min-h-[280px] flex items-end p-8 md:p-12 overflow-hidden"
                 style={{
-                    background: `linear-gradient(to bottom, rgba(0,0,0,0.4), #000), url(${chartImage || ''}) center/cover`
+                    background: `linear-gradient(to bottom, rgba(0,0,0,0.4), #000), url(${chartImage || ""}) center/cover`
                 }}
             >
-                {/* Back Button */}
                 <button
                     onClick={onBack}
-                    className="absolute top-8 left-8 flex items-center gap-2 text-white/90 hover:text-white font-bold text-xs uppercase tracking-widest bg-black/30 px-4 py-2 rounded-full backdrop-blur-md transition-colors z-20"
+                    className="absolute top-8 left-8 flex items-center gap-2 text-white/90 hover:text-white font-bold text-xs uppercase tracking-widest bg-black/30 px-4 py-2 rounded-full backdrop-blur-md z-20"
                 >
                     <ChevronLeft size={16} /> Back
                 </button>
 
-                {/* Chart Info */}
                 <div className="relative z-10 w-full max-w-4xl flex items-end gap-8">
-                    {/* Cover */}
-                    <div className="hidden md:block w-48 h-48 rounded-xl shadow-2xl overflow-hidden bg-neutral-900 flex-shrink-0">
+                    <div className="hidden md:block w-48 h-48 rounded-xl overflow-hidden bg-neutral-900 shadow-2xl">
                         {chartImage ? (
-                            <img src={chartImage} className="w-full h-full object-cover" alt={chartTitle} />
+                            <img src={chartImage} className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-6xl">📊</div>
                         )}
                     </div>
 
-                    {/* Text */}
                     <div className="flex-1">
-                        <span className="text-xs font-bold uppercase tracking-widest text-white/60 mb-2 block">Chart</span>
-                        <h1 className="text-5xl md:text-6xl font-black text-white mb-4 tracking-tight leading-none">
+                        <span className="text-xs font-bold uppercase tracking-widest text-white/60 mb-2 block">
+                            Chart
+                        </span>
+                        <h1 className="text-5xl md:text-6xl font-black text-white mb-4">
                             {chartTitle}
                         </h1>
                         <p className="text-white/60 text-sm mb-6">
-                            {playableSongs.length} songs • Updated recently
+                            {playableSongs.length} songs
                         </p>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={handlePlayAll}
-                                disabled={loading || playableSongs.length === 0}
-                                className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-transform flex items-center gap-3 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={loading || !playableTracks.length}
+                                className="h-14 px-8 bg-white text-black rounded-full font-bold uppercase tracking-widest flex items-center gap-3 disabled:opacity-50"
                             >
                                 <Play size={20} fill="black" /> Play All
                             </button>
+
                             <button
                                 onClick={handleShuffle}
-                                disabled={loading || playableSongs.length === 0}
-                                className={`w-14 h-14 rounded-full border flex items-center justify-center backdrop-blur-md transition-colors disabled:opacity-50 ${isShuffled
-                                    ? 'border-white bg-white/10 text-white'
-                                    : 'border-white/20 text-white hover:bg-white/10'
+                                disabled={loading || !playableTracks.length}
+                                className={`w-14 h-14 rounded-full border flex items-center justify-center
+                                    ${isShuffled
+                                        ? "border-white bg-white/10"
+                                        : "border-white/20 hover:bg-white/10"
                                     }`}
                             >
                                 <Shuffle size={20} />
@@ -153,45 +171,47 @@ export function ChartDetailScreen({ chartId, chartTitle, chartImage, colors, onB
                 </div>
             </div>
 
-            {/* Song List */}
+            {/* SONG LIST */}
             <div className="flex-1 overflow-y-auto p-8 md:p-12 [&::-webkit-scrollbar]:hidden">
-                <div className="max-w-4xl" style={{ contain: 'layout paint' }}>
-                    {/* Header Row */}
+                <div className="max-w-4xl">
+
                     <div className="flex items-center gap-4 px-3 py-2 text-xs font-bold text-white/40 uppercase tracking-widest border-b border-white/5 mb-4">
                         <span className="w-8 text-center">#</span>
                         <span className="flex-1">Title</span>
                         <Clock size={14} />
                     </div>
 
-                    {/* Loading */}
                     {loading && (
                         <div className="space-y-2">
-                            {[...Array(10)].map((_, i) => <SkeletonRow key={i} />)}
+                            {[...Array(10)].map((_, i) => (
+                                <SkeletonRow key={i} />
+                            ))}
                         </div>
                     )}
 
-                    {/* Songs */}
-                    {!loading && playableSongs.map((song, i) => (
-                        <TrackRow
-                            key={song.id}
-                            index={i + 1}
-                            track={{
-                                id: song.id,
-                                title: song.title,
-                                artist: song.artist,
-                                duration: song.duration
-                                    ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0')
-                                    : '--:--',
-                                art: song.art,
-                                original: song.original
-                            }}
-                            colors={colors}
-                            isPlaying={currentSong?.id === song.id && isPlaying}
-                            onPlay={() => handleSongClick(song, i)}
-                        />
-                    ))}
+                    {!loading &&
+                        playableSongs.map((song, i) => (
+                            <TrackRow
+                                key={song.id}
+                                index={i + 1}
+                                track={{
+                                    id: song.id,
+                                    title: song.name,
+                                    artist: song.primaryArtists,
+                                    duration: song.duration
+                                        ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, "0")}`
+                                        : "--:--",
+                                    art: getArt(song),
+                                    original: song
+                                }}
+                                colors={colors}
+                                isPlaying={
+                                    (currentSong as any)?.song?.id === song.id && isPlaying
+                                }
+                                onPlay={() => handleSongClick(i)}
+                            />
+                        ))}
 
-                    {/* Empty State */}
                     {!loading && playableSongs.length === 0 && (
                         <div className="text-center py-20 opacity-50">
                             <p className="text-xl font-bold mb-2">No songs found</p>

@@ -183,7 +183,7 @@ export function PlaylistScreen({ playlistId, playlistTitle, playlistImage, color
                                     original: song
                                 }}
                                 colors={colors}
-                                isPlaying={currentSong?.id === song.id && isPlaying}
+                                isPlaying={(currentSong as any)?.song?.id === song.id && isPlaying}
                                 onPlay={() => handleSongClick(song, i)}
                             />
                         ))}
