@@ -10,8 +10,7 @@ interface SearchViewProps {
     searchResults: any[];
     setSearchResults: (results: any[]) => void;
     isSearching: boolean;
-    activeView: string;
-    setActiveView: (view: any) => void;
+    setActiveView: (view: string) => void;
     lastView: string;
     colors: any;
     currentSong: any;
@@ -28,7 +27,7 @@ export function SearchView({
     isSearching,
     setActiveView,
     lastView,
-    colors: c,
+    colors,
     currentSong,
     isPlaying,
     handlePlay
@@ -36,18 +35,26 @@ export function SearchView({
 
     const lastSubmittedRef = useRef<string>("");
 
-    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key !== "Enter") return;
+    /* =========================
+       SEARCH HANDLERS
+    ========================= */
 
-        const value = e.currentTarget.value.trim();
-        if (!value) return;
+    const submitSearch = (value: string) => {
+        const q = value.trim();
+        if (!q) return;
 
-        // FIX 1: Prevent duplicate searches
-        if (value === lastSubmittedRef.current) return;
-        lastSubmittedRef.current = value;
+        // Prevent duplicate submissions
+        if (q === lastSubmittedRef.current) return;
 
-        setSearchQuery(value);
-        performSearch(value);
+        lastSubmittedRef.current = q;
+        setSearchQuery(q);
+        performSearch(q);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") {
+            submitSearch(e.currentTarget.value);
+        }
     };
 
     const handleClear = () => {
@@ -55,7 +62,7 @@ export function SearchView({
         setSearchQuery("");
         setSearchResults([]);
 
-        // FIX 2: Strict safe back navigation
+        // Safe back navigation
         setActiveView(
             ["home", "explore", "browse", "library"].includes(lastView)
                 ? lastView
@@ -63,41 +70,52 @@ export function SearchView({
         );
     };
 
+    /* =========================
+       RENDER
+    ========================= */
+
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
 
-            {/* Search Bar */}
+            {/* SEARCH BAR */}
             <div
                 className="px-6 py-4 sticky top-0 z-20 backdrop-blur-xl"
-                style={{ backgroundColor: c.surface, borderBottom: `1px solid ${c.border}` }}
+                style={{
+                    backgroundColor: colors.surface,
+                    borderBottom: `1px solid ${colors.border}`
+                }}
             >
                 <div
-                    className="flex items-center gap-3 px-4 py-3 rounded-2xl border transition-colors"
-                    style={{ backgroundColor: c.card, borderColor: c.border }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-2xl border"
+                    style={{
+                        backgroundColor: colors.card,
+                        borderColor: colors.border
+                    }}
                 >
-                    <Search size={18} style={{ color: c.textMuted }} />
+                    <Search size={18} style={{ color: colors.textMuted }} />
 
                     <input
                         type="text"
+                        value={searchQuery}
                         placeholder="Search songs, artists, albums…"
                         className="bg-transparent outline-none text-sm w-full placeholder:text-white/30"
-                        style={{ color: c.text }}
-                        value={searchQuery}
+                        style={{ color: colors.text }}
+                        autoFocus
                         onChange={(e) => {
-                            setSearchQuery(e.target.value);
-                            if (!e.target.value) {
+                            const v = e.target.value;
+                            setSearchQuery(v);
+                            if (!v.trim()) {
                                 lastSubmittedRef.current = "";
                                 setSearchResults([]);
                             }
                         }}
-                        onKeyDown={handleSearchKeyDown}
-                        autoFocus
+                        onKeyDown={handleKeyDown}
                     />
 
                     {searchQuery && (
                         <button
                             onClick={handleClear}
-                            className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                            className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white"
                         >
                             Clear
                         </button>
@@ -105,7 +123,7 @@ export function SearchView({
                 </div>
             </div>
 
-            {/* Searching */}
+            {/* SEARCHING */}
             {isSearching && (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4">
                     <WaveLoader />
@@ -115,7 +133,7 @@ export function SearchView({
                 </div>
             )}
 
-            {/* Results */}
+            {/* RESULTS */}
             {!isSearching && searchResults.length > 0 && (
                 <div className="flex-1 px-6 py-4 overflow-y-auto [&::-webkit-scrollbar]:hidden">
                     <div className="flex items-end justify-between mb-6 px-2">
@@ -128,16 +146,16 @@ export function SearchView({
                     <div className="flex flex-col gap-1">
                         {searchResults.map((item, i) => {
                             const quality =
-                                item.original?.sources?.[0]?.quality ||
                                 item.original?.preferredQuality ||
+                                item.original?.sources?.[0]?.quality ||
                                 "320";
 
                             return (
                                 <TrackRow
-                                    key={item.id || `${item.title}-${i}`}
+                                    key={item.id ?? `${item.title}-${i}`}
                                     index={i + 1}
                                     track={{ ...item, quality }}
-                                    colors={c}
+                                    colors={colors}
                                     isPlaying={currentSong?.id === item.id && isPlaying}
                                     onPlay={() => handlePlay(item.original)}
                                 />
@@ -147,7 +165,7 @@ export function SearchView({
                 </div>
             )}
 
-            {/* No Results */}
+            {/* NO RESULTS */}
             {!isSearching && searchQuery && searchResults.length === 0 && (
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center max-w-sm">
@@ -162,7 +180,7 @@ export function SearchView({
                 </div>
             )}
 
-            {/* Idle */}
+            {/* IDLE */}
             {!isSearching && !searchQuery && (
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center max-w-sm">

@@ -8,15 +8,16 @@ import {
     Plus,
     Heart,
     Globe,
-    Monitor
+    Monitor,
+    Disc
 } from "lucide-react";
 
-import { NavItem, PlaylistItem } from "../DiscoveryShared";
+import { NavItem, PlaylistItem, DiscoveryThemeColors } from "../DiscoveryShared";
 import { DiscoveryTheme } from "../DiscoveryLayout";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
 import { Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
 
-type RootView = 'home' | 'search' | 'explore' | 'browse' | 'library';
+type RootView = "home" | "search" | "explore" | "browse" | "library";
 
 interface SidebarProps {
     activeView: string;
@@ -29,12 +30,7 @@ interface SidebarProps {
     activeMixId: string | null;
     playInstantMix: (mix: Mix) => void;
     setIsLangModalOpen: (val: boolean) => void;
-    colors: {
-        surface: string;
-        border: string;
-        textMuted: string;
-        bg: string;
-    };
+    colors: DiscoveryThemeColors;
 }
 
 export function Sidebar({
@@ -51,128 +47,82 @@ export function Sidebar({
     colors: c
 }: SidebarProps) {
 
-    const playLikedSongs = useCallback(() => {
-        if (!likedSongs || likedSongs.length === 0) return;
-
+    const playListMix = useCallback((id: string, title: string, songs: any[]) => {
+        if (!songs || songs.length === 0) return;
         playInstantMix({
-            id: 'liked-songs',
-            title: 'Liked Songs',
-            color: 'pink',
-            songs: likedSongs.map(s => ensurePlayableTrack(s)),
-            currentSongIndex: 0
-        });
-    }, [likedSongs, playInstantMix]);
-
-    const playPlaylist = useCallback((pl: Playlist) => {
-        if (!pl.tracks || pl.tracks.length === 0) return;
-
-        playInstantMix({
-            id: pl.id,
-            title: pl.name,
-            color: 'blue',
-            songs: pl.tracks,
+            id,
+            title,
+            color: "blue",
+            songs: songs.map(s => ensurePlayableTrack(s)),
             currentSongIndex: 0
         });
     }, [playInstantMix]);
 
     const createPlaylist = useCallback(() => {
-        const name = prompt('Playlist name:');
-        if (name?.trim()) {
-            PlaylistStore.createPlaylist(name.trim());
-        }
+        const name = prompt("Playlist name:");
+        if (name?.trim()) PlaylistStore.createPlaylist(name.trim());
     }, []);
+
+    const isViewActive = (view: RootView) => {
+        if (activeView === view) return true;
+        // Detail view logic
+        if (view === "explore" && ["mood-detail", "playlist-detail"].includes(activeView) && lastView === "explore") return true;
+        if (view === "browse" && ["collection-detail", "decade-detail", "chart-detail", "playlist-detail"].includes(activeView) && lastView === "browse") return true;
+        if (view === "library" && ["playlist-detail"].includes(activeView) && lastView === "library") return true;
+        return false;
+    };
 
     return (
         <aside
-            className="w-60 flex-shrink-0 flex flex-col border-r p-5 transition-colors"
+            className="w-64 flex-shrink-0 flex flex-col border-r h-full transition-colors relative z-20"
             style={{ backgroundColor: c.surface, borderColor: c.border }}
         >
-            {/* Logo */}
-            <div className="flex items-center mb-8 pl-1">
-                <span className="text-2xl font-bold tracking-tighter uppercase text-white">
-                    Melora Tunes
-                </span>
+            {/* Header */}
+            <div className="h-16 flex items-center px-6 mb-2">
+                <div className="flex items-center gap-3 opacity-90">
+                    <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
+                        <Disc size={16} className="text-black" />
+                    </div>
+                    <span className="text-lg font-bold tracking-tight text-white">
+                        Melora
+                    </span>
+                </div>
             </div>
 
-            {/* Nav */}
-            <nav className="flex flex-col gap-1">
-                <NavItem
-                    icon={<Home size={20} />}
-                    label="Home"
-                    active={activeView === 'home'}
-                    onClick={() => setActiveView('home')}
-                />
-                <NavItem
-                    icon={<Search size={20} />}
-                    label="Search"
-                    active={activeView === 'search'}
-                    onClick={() => setActiveView('search')}
-                />
-                <NavItem
-                    icon={<Compass size={20} />}
-                    label="Explore"
-                    active={
-                        activeView === 'explore' ||
-                        activeView === 'mood-detail' ||
-                        (activeView === 'playlist-detail' && lastView === 'explore')
-                    }
-                    onClick={() => setActiveView('explore')}
-                />
-                <NavItem
-                    icon={<ListMusic size={20} />}
-                    label="Browse"
-                    active={
-                        activeView === 'browse' ||
-                        activeView === 'collection-detail' ||
-                        activeView === 'decade-detail' ||
-                        activeView === 'chart-detail' ||
-                        (activeView === 'playlist-detail' && lastView === 'browse')
-                    }
-                    onClick={() => setActiveView('browse')}
-                />
+            {/* Navigation */}
+            <nav className="flex flex-col gap-1 px-3">
+                <NavItem icon={<Home size={18} />} label="Home" active={activeView === "home"} onClick={() => setActiveView("home")} />
+                <NavItem icon={<Search size={18} />} label="Search" active={activeView === "search"} onClick={() => setActiveView("search")} />
+                <NavItem icon={<Compass size={18} />} label="Explore" active={isViewActive("explore")} onClick={() => setActiveView("explore")} />
+                <NavItem icon={<ListMusic size={18} />} label="Browse" active={isViewActive("browse")} onClick={() => setActiveView("browse")} />
 
-                <div className="my-2 border-t border-white/5" />
+                <div className="my-3 border-t mx-3" style={{ borderColor: c.border }} />
 
-                <NavItem
-                    icon={<Library size={20} />}
-                    label="Library"
-                    active={
-                        activeView === 'library' ||
-                        (activeView === 'playlist-detail' && lastView === 'library')
-                    }
-                    onClick={() => setActiveView('library')}
-                />
+                <NavItem icon={<Library size={18} />} label="My Library" active={isViewActive("library")} onClick={() => setActiveView("library")} />
             </nav>
 
-            {/* Library Header */}
-            <div className="mt-8 mb-3 flex items-center justify-between px-2">
-                <span
-                    className="text-[10px] font-bold uppercase tracking-widest"
-                    style={{ color: c.textMuted }}
-                >
-                    Library
+            {/* Library Section */}
+            <div className="mt-6 px-6 mb-2 flex items-center justify-between group">
+                <span className="text-[11px] font-bold uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity" style={{ color: c.text }}>
+                    Playlists
                 </span>
-                <Plus
-                    size={14}
-                    style={{ color: c.textMuted }}
-                    className="cursor-pointer hover:opacity-100 transition-opacity"
-                    onClick={createPlaylist}
-                />
+                <button onClick={createPlaylist} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Plus size={14} style={{ color: c.text }} />
+                </button>
             </div>
 
-            {/* Playlist List */}
-            <div className="flex-1 flex flex-col gap-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+            <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-0.5 scrollbar-none">
                 <PlaylistItem
                     icon={<Heart size={14} />}
                     title="Liked Songs"
                     subtitle={`${likedSongs?.length || 0} songs`}
                     colors={c}
-                    active={activeMixId === 'liked-songs'}
-                    onClick={playLikedSongs}
+                    active={activeMixId === "liked-songs"}
+                    onClick={() => playListMix("liked-songs", "Liked Songs", likedSongs)}
                 />
 
                 {playlists
-                    .filter(pl => pl.id !== 'discovery-mix')
+                    .filter(pl => pl.id !== "discovery-mix")
                     .map(pl => (
                         <PlaylistItem
                             key={pl.id}
@@ -180,58 +130,37 @@ export function Sidebar({
                             subtitle={`${pl.tracks.length} songs`}
                             colors={c}
                             active={activeMixId === pl.id}
-                            onClick={() => playPlaylist(pl)}
+                            icon={<Disc size={14} />}
+                            onClick={() => playListMix(pl.id, pl.name, pl.tracks)}
                         />
                     ))}
-
-                {playlists.length === 0 && (
-                    <p className="text-[10px] text-center opacity-50 mt-4">
-                        No playlists yet
-                    </p>
-                )}
             </div>
 
-            {/* Footer Controls */}
-            <div
-                className="pt-4 mt-2 border-t flex justify-center gap-3 opacity-50 hover:opacity-100 transition-opacity"
-                style={{ borderColor: c.border }}
-            >
-                <button
-                    onClick={() => setIsLangModalOpen(true)}
-                    className="w-4 h-4 rounded flex items-center justify-center border border-gray-500 hover:border-white text-gray-500 hover:text-white transition-colors"
-                    title="Music Languages"
-                >
-                    <Globe size={10} />
-                </button>
+            {/* Footer */}
+            <div className="p-4 border-t flex items-center justify-between" style={{ borderColor: c.border }}>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setIsLangModalOpen(true)}
+                        className="p-2 rounded-md hover:bg-white/10 transition-colors"
+                        title="Music Languages"
+                    >
+                        <Globe size={16} className="text-white/60" />
+                    </button>
+                    <button
+                        onClick={() => {
+                            localStorage.removeItem("melora-setup-complete");
+                            window.dispatchEvent(new CustomEvent("melora-mode-change", { detail: "WELCOME" }));
+                        }}
+                        className="p-2 rounded-md hover:bg-white/10 transition-colors"
+                        title="Switch Mode"
+                    >
+                        <Monitor size={16} className="text-white/60" />
+                    </button>
+                </div>
 
-                <button
-                    onClick={() => {
-                        localStorage.removeItem('melora-setup-complete');
-                        window.dispatchEvent(
-                            new CustomEvent('melora-mode-change', { detail: 'WELCOME' })
-                        );
-                    }}
-                    className="w-4 h-4 rounded flex items-center justify-center border border-gray-500 hover:border-white text-gray-500 hover:text-white transition-colors"
-                    title="Switch Mode"
-                >
-                    <Monitor size={10} />
-                </button>
-
-                <button
-                    onClick={() => onThemeChange('midnight')}
-                    className={`w-4 h-4 rounded-full bg-black border ${theme === 'midnight'
-                            ? 'ring-2 ring-white ring-offset-2 ring-offset-black'
-                            : 'border-gray-600'
-                        }`}
-                />
-
-                <button
-                    onClick={() => onThemeChange('polar')}
-                    className={`w-4 h-4 rounded-full bg-white border ${theme === 'polar'
-                            ? 'ring-2 ring-black ring-offset-2 ring-offset-white'
-                            : 'border-gray-300'
-                        }`}
-                />
+                <div className="text-[10px] text-white/20 font-mono">
+                    v0.1.0-beta
+                </div>
             </div>
         </aside>
     );
