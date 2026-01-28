@@ -1,20 +1,21 @@
-import { PlayableTrack, isPlayableTrack } from './types';
-import { SignalStore, WEIGHTS } from './signal-store';
+import { PlayableTrack } from './types';
+import { SignalStore } from './signal-store';
 import { HistoryStore } from './history-store';
 import { getTrending, searchSongs, getSongDetails } from './jiosaavn';
 import { searchUnified } from './unified-search';
 import { Mix } from '@/components/providers/playback-context';
+import { ensurePlayableTrack } from '@/lib/track-utils';
 
 // --- STRICT NORMALIZATION ---
 export function normalizeIdentity(title: string, artist: string): string {
-    const t = (title || '').toLowerCase()
-        .split('(')[0] // Remove brackets
-        .split('[')[0]
-        .split('-')[0] // Remove hyphens (Risk: "Song - Remix" -> "Song") - Acceptable for dedup
+    const clean = (s: string) => (s || '').toLowerCase()
+        .replace(/\(feat.*?\)/g, '')
+        .replace(/\[live\]/g, '')
+        .replace(/remix/g, '')
         .replace(/[^a-z0-9]/g, '')
         .trim();
-    const a = (artist || '').toLowerCase().split(',')[0].replace(/[^a-z0-9]/g, '').trim();
-    return `${t}|${a}`;
+
+    return `${clean(title)}|${clean(artist)}`;
 }
 
 export class DiscoveryEngine {
@@ -35,12 +36,15 @@ export class DiscoveryEngine {
     static async generateSessionMix(seed: PlayableTrack, region?: string): Promise<Mix> {
         console.log(`💿 The DJ: Spinning new mix for ${seed.title} [Region: ${region || 'Global'}]`);
 
+        // INHERIT QUALITY
+        const targetQuality = seed.preferredQuality || '320';
+
         // 1. Fetch Ingredients (Parallel)
         const [taste, regional, adjacent, wildcards] = await Promise.all([
-            this.getTasteCandidates(),
-            this.getRegionalCandidates(region),
-            this.getAdjacentCandidates(seed),
-            this.getWildcardCandidates(region)
+            this.getTasteCandidates(targetQuality),
+            this.getRegionalCandidates(targetQuality, region),
+            this.getAdjacentCandidates(seed, targetQuality),
+            this.getWildcardCandidates(targetQuality, region)
         ]);
 
         // 2. Mix Formulation (Target size ~20 songs)
@@ -66,7 +70,7 @@ export class DiscoveryEngine {
 
         // 4. Session Scoped Mix
         return {
-            id: `discovery-mix-${Date.now()}`, // UNIQUE SESSION ID
+            id: 'discovery-mix', // STABLE ID
             title: region ? `${region.charAt(0).toUpperCase() + region.slice(1)} Mix` : "Discovery Mix",
             color: 'blue',
             songs: finalMix,
@@ -124,7 +128,7 @@ export class DiscoveryEngine {
 
     // --- Ingredient Sourcing ---
 
-    private static async getTasteCandidates(): Promise<PlayableTrack[]> {
+    private static async getTasteCandidates(quality: any): Promise<PlayableTrack[]> {
         const topIds = SignalStore.getTopTaste(10);
         if (topIds.length === 0) return [];
 
@@ -133,102 +137,114 @@ export class DiscoveryEngine {
         for (const id of topIds.slice(0, 5)) {
             try {
                 const song = await getSongDetails(id);
-                if (song) candidates.push({
-                    title: song.name, // STRICT MAPPING
-                    artist: song.primaryArtists,
-                    duration: typeof song.duration === 'string' ? parseInt(song.duration) : song.duration,
-                    art: song.image?.[0]?.link || '',
-                    song,
-                    id: song.id,
-                    preferredQuality: '320',
-                    sources: []
-                });
+                if (song) {
+                    candidates.push(ensurePlayableTrack(song, quality));
+                }
             } catch (e) { }
         }
         return candidates;
     }
 
-    private static async getRegionalCandidates(region?: string): Promise<PlayableTrack[]> {
+    private static async getRegionalCandidates(quality: any, region?: string): Promise<PlayableTrack[]> {
         try {
             if (region && region.toLowerCase() !== 'global') {
                 const query = `${region} Hit Songs`;
                 const results = await searchUnified(query);
-                return results;
+                return results.map(r => ensurePlayableTrack(r, quality));
             } else {
                 const trending = await getTrending();
-                return trending.map(s => ({
-                    title: s.name, // STRICT MAPPING
-                    artist: s.primaryArtists,
-                    duration: typeof s.duration === 'string' ? parseInt(s.duration) : s.duration,
-                    art: s.image?.[0]?.link || '',
-                    song: s,
-                    id: s.id,
-                    preferredQuality: '320',
-                    sources: []
-                }));
+                return trending.map(s => ensurePlayableTrack(s, quality));
             }
         } catch (e) { return []; }
     }
 
-    private static async getAdjacentCandidates(seed: PlayableTrack): Promise<PlayableTrack[]> {
+    private static async getAdjacentCandidates(seed: PlayableTrack, quality: any): Promise<PlayableTrack[]> {
         try {
-            // Search for Artist
-            const artist = seed.artist.split(',')[0].trim(); // Use seed.artist
-            const results = await searchUnified(artist);
-            // Filter out the seed itself
-            return results.filter(s => s.id !== seed.id);
+            // Search for Artist Context
+            const artist = seed.artist.split(',')[0].split('&')[0].trim();
+            const query = `${artist} similar songs`;
+            const results = await searchUnified(query);
+
+            // Filter out seed
+            const filtered = results.filter(s => s.id !== seed.id);
+
+            // Minor shuffle for diversity
+            return filtered
+                .sort(() => 0.5 - Math.random())
+                .map(s => ensurePlayableTrack(s, quality));
         } catch (e) { return []; }
     }
 
-    private static async getWildcardCandidates(region?: string): Promise<PlayableTrack[]> {
-        // High Quality Wildcards - biased by region if present
-        const baseTerms = ['Top', 'Viral', 'New', 'Hifi', 'Master', 'Essential', 'Best of'];
-        const term = baseTerms[Math.floor(Math.random() * baseTerms.length)];
-        const query = region ? `${region} ${term}` : term;
+    private static async getWildcardCandidates(quality: any, region?: string): Promise<PlayableTrack[]> {
+        // High Quality Wildcards - biased by Taste primarily
+        const tasteIds = SignalStore.getTopTaste(3);
 
-        try {
-            const results = await searchUnified(query);
-            // Strict Filter: Remove Junk
-            const clean = results.filter(track => {
-                const name = track.title.toLowerCase(); // Use track.title
-                const junk = ['remix', 'lofi', 'slowed', 'reverb', 'cover', 'live at', 'demo'];
-                if (junk.some(j => name.includes(j))) return false;
-                return true;
-            });
+        let results: PlayableTrack[] = [];
 
-            return clean.sort(() => 0.5 - Math.random()); // Randomize
-        } catch (e) { return []; }
+        // 1. Try Taste-based discovery first
+        if (tasteIds.length > 0) {
+            const randomTasteId = tasteIds[Math.floor(Math.random() * tasteIds.length)];
+            try {
+                const song = await getSongDetails(randomTasteId);
+                if (song) {
+                    const artist = song.primaryArtists.split(',')[0];
+                    const query = `${artist} radio`;
+                    const tasteResults = await searchUnified(query);
+                    results = tasteResults;
+                }
+            } catch (e) { }
+        }
+
+        // 2. Fallback to Keyword Wildcards
+        if (results.length === 0) {
+            const baseTerms = ['Top', 'Viral', 'New', 'Hifi', 'Master', 'Essential', 'Best of'];
+            const term = baseTerms[Math.floor(Math.random() * baseTerms.length)];
+            const query = region ? `${region} ${term}` : term;
+            try {
+                results = await searchUnified(query);
+            } catch (e) { }
+        }
+
+        const clean = results.filter(track => {
+            const name = track.title.toLowerCase();
+            const junk = ['remix', 'lofi', 'slowed', 'reverb', 'cover', 'live at', 'demo'];
+            if (junk.some(j => name.includes(j))) return false;
+            return true;
+        });
+
+        return clean.sort(() => 0.5 - Math.random()).map(s => ensurePlayableTrack(s, quality));
     }
 
     // --- The Filter (Deduplication & Anti-Loop) ---
 
     private static smartShuffle(pool: PlayableTrack[], seed: PlayableTrack): PlayableTrack[] {
-        const history = HistoryStore.getHistory(); // Full available history
-        // STRICT 24H RULE: Filter out ALL recent history available in store
-        const recentIds = new Set(history.map(h => h.id));
+        const history = HistoryStore.getHistory();
+
+        // STRICT 24H RULE: Only block last 24 tracks played
+        // Actually, just last 24 items in history stack is good enough proxy.
+        const recentHistory = history.slice(0, 24);
+        const recentIdentities = new Set(recentHistory.map(h => normalizeIdentity(h.track.title, h.track.artist)));
 
         const unique = new Map<string, PlayableTrack>();
         const artistCounts = new Map<string, number>();
 
         // Add SEED first manually to ensure it exists
-        unique.set(normalizeIdentity(seed.title, seed.artist), seed); // Use seed.title
+        unique.set(normalizeIdentity(seed.title, seed.artist), seed);
 
-        const seedArtist = seed.artist.split(',')[0].trim(); // Use seed.artist
+        const seedArtist = seed.artist.split(',')[0].split('&')[0].trim();
         artistCounts.set(seedArtist, 1);
 
         for (const track of pool) {
-            // SKIP Seed (already added)
-            // if (track.id === seed.id) continue; // ID check might fail if different providers
+            const identity = normalizeIdentity(track.title, track.artist);
 
-            // 1. Anti-Loop (Recent History)
-            if (recentIds.has(track.id)) continue;
+            // 1. Anti-Loop (Recent History Identity Check)
+            if (recentIdentities.has(identity)) continue;
 
-            // 2. Normalization Identity Check
-            const identity = normalizeIdentity(track.title, track.artist); // Use track.title
+            // 2. Dedup in current mix
             if (unique.has(identity)) continue;
 
             // 3. Artist Cap (Max 2 per mix)
-            const artist = track.artist.split(',')[0].trim(); // Use track.artist
+            const artist = track.artist.split(',')[0].split('&')[0].trim();
             const count = artistCounts.get(artist) || 0;
             if (count >= 2) continue; // Strict Cap
 
@@ -240,12 +256,6 @@ export class DiscoveryEngine {
         // Convert to array
         const result = Array.from(unique.values());
 
-        // Ensure Seed is #1
-        // (It was added first to the map, but Map order is insertion order usually.
-        // But let's be explicit)
-        // Ensure Seed is #1
-        // (It was added first to the map, but Map order is insertion order usually.
-        // But let's be explicit)
         const seedIdentity = normalizeIdentity(seed.title, seed.artist);
         const seedTrack = unique.get(seedIdentity);
 

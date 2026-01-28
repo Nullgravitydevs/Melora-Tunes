@@ -38,64 +38,9 @@ interface ToastState {
 
 
 // Upgrade helper
-export function ensurePlayableTrack(song: any, defaultQuality: AudioQuality = '320'): PlayableTrack {
-    // 1. If it's explicitly a PlayableTrack (Strict Check)
-    if (isPlayableTrack(song)) {
-        return song;
-    }
-
-    // 2. ROBUST RECOVERY: Check for "soft" PlayableTrack (missing strict props or prototype issues)
-    // If it has 'preferredQuality' and 'sources', treat it as valid even if 'title' check failed.
-    if (song && song.preferredQuality && Array.isArray(song.sources)) {
-        return song as PlayableTrack;
-    }
-
-    // 3. Convert Legacy/Raw Object (JioSaavnSong or malformed)
-    // Robust extraction: Handle .name vs .title mismatch
-    const title = song.title || song.name || 'Unknown Track';
-    const artist = song.artist || song.primaryArtists || 'Unknown Artist';
-    const duration = typeof song.duration === 'string' ? parseInt(song.duration) : (song.duration || 0);
-
-    // Resolve Art
-    let art = song.art || '';
-    if (!art && song.image) {
-        if (typeof song.image === 'string') art = song.image;
-        else if (Array.isArray(song.image)) {
-            art = song.image.find((i: any) => i.quality === '500x500')?.link || song.image[0]?.link || '';
-        }
-    }
-
-    // ROBUST ID GENERATION
-    // If it already has a compound ID (e.g. from OfflineStore), use it. 
-    // Otherwise, bind it to the source provider to prevent collision.
-    const sourceProvider = (song as any).source || 'jiosaavn';
-    const stableId = (song as any).stableId || (String(song.id).includes(':') ? song.id : `${song.id}:${sourceProvider}`);
-
-    return {
-        id: stableId,
-        title: title,
-        artist: artist,
-        duration: duration,
-        art: art,
-        original: song,
-        song: song.song || song, // Preserve nested song if it exists
-
-        // If 'preferredQuality' exists on input, KEEP IT! Don't downgrade.
-        preferredQuality: song.preferredQuality || defaultQuality,
-
-        sources: song.sources || (() => {
-            const inferred = (song.sources && song.sources[0]?.provider) || song.source || 'jiosaavn';
-            if (inferred === 'jiosaavn') {
-                return [
-                    { provider: 'jiosaavn', songId: song.id, quality: '320' },
-                    { provider: 'jiosaavn', songId: song.id, quality: '160' },
-                    { provider: 'jiosaavn', songId: song.id, quality: '96' }
-                ];
-            }
-            return [];
-        })()
-    };
-}
+// [REFACTORED] Moved to lib/track-utils.ts to resolve circular dependency with DiscoveryEngine
+import { ensurePlayableTrack } from "@/lib/track-utils";
+export { ensurePlayableTrack };
 
 export interface Mix {
     id: string;
@@ -1241,6 +1186,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         // Optimistic update
         updateMix(activeMix.id, { currentSongIndex: nextIndex });
+
+        // [SignalStore] Record Skip/Next Action
+        if (currentTrack) {
+            const durationPlayed = audioPlayerRef.current?.getCurrentTime() || 0;
+            // Pass duration to let store decide if it's Early/Late skip
+            SignalStore.addSignal(currentTrack, 'SKIP', 'discovery', durationPlayed);
+        }
+
         // Use timeout to allow state to settle? Not strictly needed if `updateMix` triggers effect.
         if (!isPlaying) setIsPlaying(true);
     }, [repeat, shuffle, isPlaying, updateMix, stopAtEndOfSong, pause]);
@@ -1339,7 +1292,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 addToRecentlyPlayed(trackToSave); // [FIX Bug 18] Pass PlayableTrack
 
                 // Signal: Verified Play (>10s)
-                SignalStore.addSignal(trackToSave, 'PLAY');
+                // Pass arbitrary >10 duration to satisfy signature, though verified play implies positive weight anyway
+                SignalStore.addSignal(trackToSave, 'PLAY', 'discovery', 30);
             }, 10000);
             return () => clearTimeout(timer);
         }
@@ -1527,9 +1481,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 crossfadeDuration={crossfadeDuration}
                 eqBands={eq.isEnabled ? eq.bands : undefined} // Only pass bands if enabled
                 onEnded={() => {
-                    // [FIX Bug 13] Use currentTrack to log correct context if available
-                    if (currentTrack?.song) recordPlay(currentTrack.song, duration);
-                    else if (currentSong) recordPlay(currentSong, duration);
+                    // [SignalStore] Full Listen
+                    if (currentTrack) {
+                        SignalStore.addSignal(currentTrack, 'PLAY', 'discovery', duration);
+                    }
                     next();
                 }}
                 onProgress={({ played, playedSeconds }) => {
