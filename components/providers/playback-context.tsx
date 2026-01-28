@@ -38,41 +38,62 @@ interface ToastState {
 
 
 // Upgrade helper
-export function ensurePlayableTrack(song: JioSaavnSong | PlayableTrack, defaultQuality: AudioQuality = '320'): PlayableTrack {
+export function ensurePlayableTrack(song: any, defaultQuality: AudioQuality = '320'): PlayableTrack {
+    // 1. If it's explicitly a PlayableTrack (Strict Check)
     if (isPlayableTrack(song)) {
-        // [STRICT] If it's already a PlayableTrack, DO NOT touch it.
-        // It might have Hi-Res sources or explicit quality selection.
         return song;
     }
 
-    // Convert legacy JioSaavnSong to PlayableTrack
-    // Convert legacy JioSaavnSong to PlayableTrack
-
-    // Resolve Art (Inline helper to avoid circular dep)
-    let art = '';
-    if (typeof song.image === 'string') art = song.image;
-    else if (Array.isArray(song.image)) {
-        art = song.image.find(i => i.quality === '500x500')?.link || song.image[0]?.link || '';
+    // 2. ROBUST RECOVERY: Check for "soft" PlayableTrack (missing strict props or prototype issues)
+    // If it has 'preferredQuality' and 'sources', treat it as valid even if 'title' check failed.
+    if (song && song.preferredQuality && Array.isArray(song.sources)) {
+        return song as PlayableTrack;
     }
 
+    // 3. Convert Legacy/Raw Object (JioSaavnSong or malformed)
+    // Robust extraction: Handle .name vs .title mismatch
+    const title = song.title || song.name || 'Unknown Track';
+    const artist = song.artist || song.primaryArtists || 'Unknown Artist';
+    const duration = typeof song.duration === 'string' ? parseInt(song.duration) : (song.duration || 0);
+
+    // Resolve Art
+    let art = song.art || '';
+    if (!art && song.image) {
+        if (typeof song.image === 'string') art = song.image;
+        else if (Array.isArray(song.image)) {
+            art = song.image.find((i: any) => i.quality === '500x500')?.link || song.image[0]?.link || '';
+        }
+    }
+
+    // ROBUST ID GENERATION
+    // If it already has a compound ID (e.g. from OfflineStore), use it. 
+    // Otherwise, bind it to the source provider to prevent collision.
+    const sourceProvider = (song as any).source || 'jiosaavn';
+    const stableId = (song as any).stableId || (String(song.id).includes(':') ? song.id : `${song.id}:${sourceProvider}`);
+
     return {
-        id: song.id,
-        // STRICT METADATA (Normalized)
-        title: song.name,
-        artist: song.primaryArtists || '',
-        duration: typeof song.duration === 'string' ? parseInt(song.duration) : song.duration,
+        id: stableId,
+        title: title,
+        artist: artist,
+        duration: duration,
         art: art,
         original: song,
+        song: song.song || song, // Preserve nested song if it exists
 
-        // Legacy
-        song: song,
+        // If 'preferredQuality' exists on input, KEEP IT! Don't downgrade.
+        preferredQuality: song.preferredQuality || defaultQuality,
 
-        preferredQuality: defaultQuality,
-        sources: [
-            { provider: 'jiosaavn', songId: song.id, quality: '320' },
-            { provider: 'jiosaavn', songId: song.id, quality: '160' },
-            { provider: 'jiosaavn', songId: song.id, quality: '96' }
-        ]
+        sources: song.sources || (() => {
+            const inferred = (song.sources && song.sources[0]?.provider) || song.source || 'jiosaavn';
+            if (inferred === 'jiosaavn') {
+                return [
+                    { provider: 'jiosaavn', songId: song.id, quality: '320' },
+                    { provider: 'jiosaavn', songId: song.id, quality: '160' },
+                    { provider: 'jiosaavn', songId: song.id, quality: '96' }
+                ];
+            }
+            return [];
+        })()
     };
 }
 
@@ -132,8 +153,8 @@ interface PlaybackContextType {
     setCrossfadeDuration: (duration: number) => void;
 
     // Audio Quality
-    bitrate: 'flac' | '320' | '160' | '96';
-    setBitrate: (bitrate: 'flac' | '320' | '160' | '96') => void;
+    bitrate: AudioQuality;
+    setBitrate: (bitrate: AudioQuality) => void;
 
     // Hi-Res Override - REMOVED (Use bitrate: 'flac' instead)
 
@@ -187,7 +208,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [shuffle, setShuffle] = useState(false);
     const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
-    const [bitrate, setSelectBitrate] = useState<'flac' | '320' | '160' | '96'>('320'); // Default 320 for init
+    const [bitrate, setSelectBitrate] = useState<AudioQuality>('320'); // Default 320 for init
     // forceLossless REMOVED - use bitrate: 'flac' instead
     const [sleepTimer, setSleepTimer] = useState<{ endTime: number; duration: number } | null>(null);
     const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
@@ -215,7 +236,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const activeMixIdRef = useRef<string | null>(null);
     const isStationGenerating = useRef(false);
     const currentStreamKeyRef = useRef<string | null>(null); // Track which key provided the current stream
+    const toastOnceRef = useRef(false); // [FIX Bug 10] Prevent toast spam
     const currentSongUrlRef = useRef<string | null>(null); // Track latest URL for sync comparison
+    const nextPreloadRequestId = useRef(0); // [FIX Bug 15] Preload race condition guard
+    const downgradeToastRef = useRef<string | null>(null); // [FIX Bug 20] Throttle downgrade toasts
     useEffect(() => { currentSongUrlRef.current = currentSongUrl; }, [currentSongUrl]);
 
     // Toast Helper
@@ -240,6 +264,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // Explicit return type to force narrowing
     const currentSong: JioSaavnSong | undefined = isPlayableTrack(rawCurrentItem) ? rawCurrentItem.song : rawCurrentItem;
 
+    // Define currentTrack derived value correctly
+    // If raw item is PlayableTrack, use it. If not, upgrade it with current Global Preference.
+    const currentTrack = useMemo(() => {
+        if (!rawCurrentItem) return undefined;
+        if (isPlayableTrack(rawCurrentItem)) return rawCurrentItem;
+        return ensurePlayableTrack(rawCurrentItem, bitrate as AudioQuality);
+    }, [rawCurrentItem, bitrate]);
+
     // --- Persistence ---
     const DISCOVERY_MIX_ID = 'discovery-mix';
 
@@ -252,7 +284,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 const sanitized = parsed.map((m: Mix) => ({
                     ...m,
                     songs: m.songs.filter(s => {
-                        const song = isPlayableTrack(s) ? s.song : s;
+                        const song = isPlayableTrack(s) ? (s.song || s.original) : s;
+                        if (!song) return false;
                         return !song.id.startsWith('mock-') && !song.name.startsWith('Track ');
                     })
                 })).filter((m: Mix) => {
@@ -338,16 +371,25 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [recentlyPlayed]);
 
     // Toggle like function
+    // Toggle like function
+    // Toggle like function
     const toggleLike = useCallback((item: JioSaavnSong | PlayableTrack) => {
-        const song = 'song' in item ? item.song : item;
+        // [FIX Bug 12] Normalize to PlayableTrack to preserve fidelity signals
+        const track = ensurePlayableTrack(item);
+        const song = track.song; // Extract the inner JioSaavnSong
+
+        if (!track || !track.id) return;
+
+        // Guard: If song is missing, abort (prevents TS error)
+        if (!song) return;
+
         setLikedSongs(prev => {
+            // Check against song ID (inner ID) because likedSongs is JioSaavnSong[]
             const exists = prev.some(s => s.id === song.id);
             if (exists) {
                 return prev.filter(s => s.id !== song.id);
             } else {
-                // Signal: Explicit Taste (LIKE)
-                const s = 'song' in item ? item.song : item;
-                const track = ensurePlayableTrack(s);
+                // Signal: Explicit Taste (LIKE) - Log the FULL track with quality info
                 SignalStore.addSignal(track, 'LIKE');
                 return [song, ...prev];
             }
@@ -361,8 +403,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         return likedSongs.some(s => s.id === songId);
     }, [likedSongs]);
 
+    // [FIX Bug 20] Reset downgrade guard on song change
+    useEffect(() => {
+        if (currentTrack?.id) {
+            downgradeToastRef.current = null;
+        }
+    }, [currentTrack?.id]);
+
     // Add to recently played (called on song play)
-    const addToRecentlyPlayed = useCallback((song: JioSaavnSong) => {
+    const addToRecentlyPlayed = useCallback((track: PlayableTrack | JioSaavnSong) => {
+        // [FIX Bug 18] Handle PlayableTrack to preserve quality info if passed
+        const song = isPlayableTrack(track) ? track.song : track;
+
+        if (!song) return; // Guard against undefined song
+
         setRecentlyPlayed(prev => {
             const filtered = prev.filter(s => s.id !== song.id);
             return [song, ...filtered].slice(0, 20); // Keep last 20
@@ -491,19 +545,18 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
                             // Merge Strategy: Append new songs (excluding duplication)
                             // Merge Strategy: Append new songs (excluding duplication)
-                            const newSongs = newMix.songs.filter(s => {
-                                const sTrack = isPlayableTrack(s) ? s : ensurePlayableTrack(s);
+                            // Merge Strategy: Append new songs (excluding duplication)
+                            const newSongs = newMix.songs
+                                .map(s => ensurePlayableTrack(s, bitrate as AudioQuality)) // [FIX Bug 9] Normalize immediately
+                                .filter(sTrack => {
+                                    // [FIX Bug 19] Strict deduplication using PlayableTrack IDs
+                                    if (sTrack.id === seed.id || sTrack.song.id === seed.song.id) return false;
 
-                                // Exclude the seed itself if it's identical to current playback
-                                if (sTrack.id === seed.id || sTrack.song.id === seed.song.id) return false;
-
-                                // Exclude duplicates existing in the mix
-                                return !currentMix.songs.some(existing => {
-                                    const e = isPlayableTrack(existing) ? existing.song : existing;
-                                    const c = sTrack.song;
-                                    return e.id === c.id;
+                                    return !currentMix.songs.some(existing => {
+                                        const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
+                                        return e === sTrack.id;
+                                    });
                                 });
-                            });
 
                             if (newSongs.length > 0) {
                                 console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
@@ -563,32 +616,43 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [activeMixId]);
 
     const playInstantMix = useCallback((mix: Mix) => {
+        if (!mix.songs.length) return;
         console.log("[playInstantMix] Atomic play for:", mix.title);
 
-        // 1. Update Mixes (Clean old instant mixes)
+        // 1. Normalize songs FIRST
+        const normalizedSongs = mix.songs.map(s =>
+            isPlayableTrack(s) ? s : ensurePlayableTrack(s, bitrate as AudioQuality)
+        );
+
+        const safeMix: Mix = {
+            ...mix,
+            songs: normalizedSongs,
+            currentSongIndex: 0
+        };
+
+        // 2. Replace mixes atomically
         setMixes(prev => {
-            // STRICT: Only keep Discovery Mix + new mix
             const filtered = prev.filter(m => m.id === DISCOVERY_MIX_ID);
-            return [...filtered, mix];
+            return [...filtered, safeMix];
         });
 
-        // 2. Set Active Mix
-        setActiveMixId(mix.id);
+        // 3. Set active mix
+        setActiveMixId(safeMix.id);
 
-        // 3. Reset Player State immediately
+        // 4. HARD RESET PLAYER
         setIsPlaying(false);
         setCurrentSongUrl(null);
-        if (audioPlayerRef.current) {
-            audioPlayerRef.current.seekTo(0);
-            audioPlayerRef.current.pause();
-        }
+        audioPlayerRef.current?.pause();
+        audioPlayerRef.current?.seekTo(0);
 
-        // 4. Schedule Play
+        // 5. PLAY AFTER STATE SETTLES
         setTimeout(() => {
-            setShuffle(false); // ATOMIC RESET
+            setShuffle(false);
             setIsPlaying(true);
-        }, 100);
-    }, []);
+        }, 200);
+    }, [bitrate]);
+
+
 
     const play = useCallback(() => {
         console.log("[play] Called, activeMixId:", activeMixId);
@@ -635,6 +699,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         const track = ensurePlayableTrack(songOrTrack, currentBitrate);
 
         const songMetadata = track.song;
+        if (!songMetadata) {
+            console.error("[Download] Failed: Missing song metadata in PlayableTrack");
+            return false;
+        }
 
         try {
             const targetQuality = track.preferredQuality;
@@ -814,8 +882,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     if (url) {
                         console.log(`[Resolver] ✓ Offline hit (${q})`);
                         // Toast only if downgrade
-                        if (q !== targetQ) {
+                        if (q !== targetQ && !toastOnceRef.current) {
                             showToast(`Playing Offline ${q} (Requested ${targetQ})`, 'info');
+                            toastOnceRef.current = true;
                         }
                         return { url, quality: q };
                     }
@@ -824,6 +893,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         // --- PHASE 2: ONLINE (Exact -> Lower) ---
+        let hiFiResolved = false; // [FIX Bug 4] Lock to prevent overwrite
+
         for (const q of degradationPath) {
             // Check if this quality step requires HiFi or JioSaavn
             // HiFi: hires, flac
@@ -832,37 +903,52 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
             let result: { url: string, quality: AudioQuality, keyName?: string } | null = null;
 
+            // Optimization: If Hi-Res already succeeded in a previous loop cycle (e.g. strict match),
+            // but we are still looping? Actually, if it succeeded, we return.
+            // But if Hi-Res succeeded but returned 'flac' when we asked 'hires', we might loop to 'flac'.
+            // If we are now at 'flac' and hiFiResolved is true, we should reuse that result?
+            // Simpler: If Hi-Fi succeeded, we are good.
+            if (hiFiResolved) break;
+
             if (isHiFi) {
                 // Try HiFi Source
                 result = await tryHiFi(track, true); // Allow search
                 // Verify result matches q (search might return diff quality)
                 if (result && result.quality !== q && degradationPath.indexOf(result.quality) === -1) {
-                    // Result implies success but quality might be lower than current step? 
-                    // tryHiFi returns what it found. If we are asking for 'flac' and it finds 'flac', good.
-                    // If we ask for 'hires' and it finds 'flac', that corresponds to the NEXT step in loop.
-                    // So we should only accept if it matches Q, OR if we rely on loop to find it naturally?
-                    // Optimization: If tryHiFi found *something* valid in our path, take it.
-                    if (degradationPath.includes(result.quality)) {
-                        // Accept it, but let the loop logic/toast handle exact match check?
-                        // Actually, if we found 'flac' while looking for 'hires', we can just return it 
-                        // and let the downgrade toast trigger below.
-                    } else {
-                        result = null;
-                    }
+                    // Mismatch logic...
+                    result = null;
+                }
+
+                if (result?.url) {
+                    hiFiResolved = true;
+                    // Strict return here? YES.
+                    // If we found ANY HiFi stream, we trust it over JioSaavn.
+                    // Even if we asked for HiRes and got FLAC, and checks passed.
                 }
             } else {
                 // Try JioSaavn
-                result = await tryJioSaavn(track.song, q);
+                // [FIX Bug 4] Do NOT downgrade to Saavn if we already found HiFi (shouldn't happen due to break, but safety)
+                if (!hiFiResolved) {
+                    result = await tryJioSaavn(track.song, q);
+                }
             }
 
             if (result) {
                 console.log(`[Resolver] ✓ Online Success: ${result.quality}`);
 
                 // --- TRUTH TOAST ---
-                if (result.quality !== targetQ) {
-                    const prettyReq = targetQ === 'flac' ? 'FLAC' : targetQ === 'hires' ? 'Hi-Res' : targetQ;
-                    const prettyGot = result.quality === 'flac' ? 'FLAC' : result.quality === 'hires' ? 'Hi-Res' : result.quality;
-                    showToast(`Streaming ${prettyGot} (${prettyReq} unavailable)`, 'info');
+                if (result.quality !== targetQ && !toastOnceRef.current) {
+                    // [FIX Bug 20] Throttle duplicate downgrade toasts
+                    const songName = track.song.name;
+                    const key = `${songName}:${targetQ}:${result.quality}`;
+
+                    if (downgradeToastRef.current !== key) {
+                        downgradeToastRef.current = key;
+                        const prettyReq = targetQ === 'flac' ? 'FLAC' : targetQ === 'hires' ? 'Hi-Res' : targetQ;
+                        const prettyGot = result.quality === 'flac' ? 'FLAC' : result.quality === 'hires' ? 'Hi-Res' : result.quality;
+                        showToast(`Streaming ${prettyGot} (${prettyReq} unavailable)`, 'info');
+                        toastOnceRef.current = true;
+                    }
                 }
 
                 return result;
@@ -892,7 +978,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                         // Use standard 160kbps for safety
                         const url = getAudioUrl(match, '160');
                         if (url) {
-                            showToast("Source repaired automatically", 'info');
+                            if (!toastOnceRef.current) {
+                                showToast("Source repaired automatically", 'info');
+                                toastOnceRef.current = true;
+                            }
                             return { url, quality: '160' };
                         }
                     }
@@ -906,7 +995,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         return null;
     }, [showToast]);
 
-    const loadSongUrl = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack | undefined, overrideQuality?: string) => {
+    const loadSongUrl = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack | undefined, overrideQuality?: AudioQuality) => {
         // Cleanup old URL if it's a blob to prevent memory leaks
         setCurrentSongUrl((prevUrl) => {
             if (prevUrl && prevUrl.startsWith('blob:')) {
@@ -914,6 +1003,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             }
             return null; // Temporarily clear while loading
         });
+        setActiveQuality(null); // Reset quality badge while resolving
         currentStreamKeyRef.current = null; // Reset key ref
 
         if (!songOrTrack) {
@@ -1010,37 +1100,18 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
 
 
-    const setBitrate = useCallback((newBitrate: 'flac' | '320' | '160' | '96') => {
+    const setBitrate = useCallback((newBitrate: AudioQuality) => {
         setSelectBitrate(newBitrate);
         saveSettings({ bitrate: newBitrate });
-        if (currentSong) {
-            // Check if we need to reload logic or just URL
-            // Simply re-loading URL with new bitrate preference
-            loadSongUrl(currentSong, newBitrate);
+        // [FIX Bug 16] Reload using currentTrack to preserve source metadata
+        if (currentTrack) {
+            loadSongUrl(currentTrack, newBitrate);
         }
-    }, [currentSong, loadSongUrl]);
+    }, [currentTrack, loadSongUrl]);
 
     // Effect to load URL when song changes
-    useEffect(() => {
-        if (currentSong) {
-            loadSongUrl(currentSong);
+    // MOVED: To line 1390+ to respect currentTrack scope
 
-            // SponsorBlock: Fetch segments if it looks like a YouTube ID
-            setSkipSegments([]);
-            if (currentSong.id && currentSong.id.length === 11 && !currentSong.id.includes('-') && !currentSong.id.includes(' ')) {
-                getSkipSegments(currentSong.id).then(segs => {
-                    if (segs.length > 0) console.log(`Loaded ${segs.length} skip segments`);
-                    setSkipSegments(segs);
-                });
-            } else if (currentSong.type === 'video') {
-                // Explicit video type from my hybrid search
-                getSkipSegments(currentSong.id).then(setSkipSegments);
-            }
-        } else {
-            setCurrentSongUrl(null);
-            setSkipSegments([]);
-        }
-    }, [currentSong, loadSongUrl]);
 
     // Sleep Timer Countdown
     useEffect(() => {
@@ -1265,7 +1336,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 // Fix: Save the full PlayableTrack (rawCurrentItem) to persist FLAC preference
                 const trackToSave = rawCurrentItem ? ensurePlayableTrack(rawCurrentItem) : ensurePlayableTrack(currentSong);
                 HistoryStore.addToHistory(trackToSave);
-                addToRecentlyPlayed(trackToSave.song); // Sync Fix: Update RightPanel state
+                addToRecentlyPlayed(trackToSave); // [FIX Bug 18] Pass PlayableTrack
 
                 // Signal: Verified Play (>10s)
                 SignalStore.addSignal(trackToSave, 'PLAY');
@@ -1275,7 +1346,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [currentSong?.id, isPlaying, rawCurrentItem]);
 
     const seek = useCallback((amount: number) => {
-        audioPlayerRef.current?.seekTo(amount);
+        // Fix: Explicitly specify 'seconds' to prevent ReactPlayer from interpreting <1 as fraction (percentage)
+        // This stops accidental jumps to 90% when seeking to 0.9s
+        audioPlayerRef.current?.seekTo(amount, 'seconds');
     }, []);
 
 
@@ -1286,6 +1359,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // Actually currentSong is state. We need to make sure wherever setCurrentSong is called, we unwrap.
     // Check `loadMix`, `next`, `prev` etc.
     // We already fixed `next` logic earlier.
+
+
+    // [FIX Bug 5] Reset load request ID when switching mixes to prevent old mix's pending load from overwriting new mix state
+    useEffect(() => {
+        loadRequestId.current++;
+        nextPreloadRequestId.current++; // [FIX Bug 15] Also reset preload guard
+    }, [activeMixId]);
 
     // Fix nextSongUrl logic to be async-safe
     useEffect(() => {
@@ -1313,16 +1393,22 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         let cancelled = false;
+        const requestId = ++nextPreloadRequestId.current; // [FIX Bug 15]
 
         const loadNext = async () => {
             try {
-                // We want to preload the NEXT song with the SAME quality settings as current? Or per its pref?
-                // Logic: Resolve using same robust logic as loadSongUrl but simplified for preloading string.
-                const track = ensurePlayableTrack(nextItem, bitrate as AudioQuality);
+                // [FIX Bug 6] Inherit quality from current track if possible
+                // If I am listening to FLAC, preload next song in FLAC too.
+                const targetQ = currentTrack?.preferredQuality || (bitrate as AudioQuality);
+                const track = ensurePlayableTrack(nextItem, targetQ);
 
                 // Use Resolver
                 const result = await resolvePlayableUrl(track);
-                if (!cancelled && result?.url) {
+
+                // [FIX Bug 15] Preload Guard
+                if (cancelled || requestId !== nextPreloadRequestId.current) return;
+
+                if (result?.url) {
                     setNextSongUrl(result.url);
                 }
             } catch (e) {
@@ -1333,16 +1419,36 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         loadNext();
 
         return () => { cancelled = true; };
-    }, [activeMixId, mixes, bitrate, resolvePlayableUrl, currentSong?.id, currentSongUrl]); // Re-run when current song changes (index shift) or settings change
+    }, [activeMixId, mixes, bitrate, resolvePlayableUrl, currentSong?.id, currentSongUrl, currentTrack]); // Added currentTrack dep
 
-    // Define currentTrack derived value correctly
-    // If raw item is PlayableTrack, use it. If not, upgrade it with current Global Preference.
-    const currentTrack = useMemo(() => {
-        if (!rawCurrentItem) return undefined;
-        if (isPlayableTrack(rawCurrentItem)) return rawCurrentItem;
-        return ensurePlayableTrack(rawCurrentItem, bitrate as AudioQuality);
-    }, [rawCurrentItem, bitrate]);
 
+
+
+
+    // Effect to load URL when song changes
+    useEffect(() => {
+        // [FIX - Bug 3] Use currentTrack to preserve rich metadata (quality/sources)
+        if (currentTrack) {
+            toastOnceRef.current = false; // [FIX Bug 10] Reset toast guard on new song
+            loadSongUrl(currentTrack);
+
+            // SponsorBlock: Fetch segments if it looks like a YouTube ID
+            // [FIX Bug 14] Use inner song ID to avoid compound IDs (e.g. 123:tidal)
+            const ytId = currentTrack.song?.id;
+            setSkipSegments([]);
+            if (ytId && ytId.length === 11 && !ytId.includes('-') && !ytId.includes(' ')) {
+                getSkipSegments(ytId).then(segs => {
+                    if (segs.length > 0) console.log(`Loaded ${segs.length} skip segments`);
+                    setSkipSegments(segs);
+                });
+            } else if (currentTrack.song?.type === 'video') {
+                getSkipSegments(ytId || currentTrack.id).then(setSkipSegments);
+            }
+        } else {
+            setCurrentSongUrl(null);
+            setSkipSegments([]);
+        }
+    }, [currentTrack, loadSongUrl]);
 
 
     // Normalize queue for UI
@@ -1421,7 +1527,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 crossfadeDuration={crossfadeDuration}
                 eqBands={eq.isEnabled ? eq.bands : undefined} // Only pass bands if enabled
                 onEnded={() => {
-                    if (currentSong) recordPlay(currentSong, duration);
+                    // [FIX Bug 13] Use currentTrack to log correct context if available
+                    if (currentTrack?.song) recordPlay(currentTrack.song, duration);
+                    else if (currentSong) recordPlay(currentSong, duration);
                     next();
                 }}
                 onProgress={({ played, playedSeconds }) => {
@@ -1445,10 +1553,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     }
                 }}
                 onDuration={setDuration}
-                title={cleanTrackTitle(decodeHtml(currentSong?.name || ""))}
-                artist={decodeHtml(currentSong?.primaryArtists || "")}
-                album={decodeHtml(currentSong?.album?.name || "")}
-                artwork={currentSong?.image?.[0]?.link}
+                // [FIX Bug 17] Use currentTrack props for UI consistency (fixes compound ID flashing)
+                title={cleanTrackTitle(decodeHtml(currentTrack?.song?.name || ""))}
+                artist={decodeHtml(currentTrack?.song?.primaryArtists || "")}
+                album={decodeHtml(currentTrack?.song?.album?.name || "")}
+                artwork={currentTrack?.song?.image?.[0]?.link}
                 onError={(msg) => handlePlaybackError(msg)}
             />
 

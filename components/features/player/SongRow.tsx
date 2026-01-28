@@ -12,7 +12,7 @@ interface SongRowProps {
     isCurrentSong?: boolean;
     isLiked?: boolean;
     showIndex?: boolean;
-    showQuality?: boolean;
+    // NOTE: Quality badges removed. Quality is shown ONLY in player (activeQuality).
     showDuration?: boolean;
     onClick?: () => void;
     onLikeToggle?: () => void;
@@ -20,22 +20,8 @@ interface SongRowProps {
     className?: string;
 }
 
-// Quality badge based on song source
-const getQualityBadge = (song: JioSaavnSong): { label: string; color: string } | null => {
-    const source = (song as any)?.source;
-    const quality = (song as any)?._quality;
-
-    if (source === 'tidal' || source === 'qobuz') {
-        return { label: 'Hi-Res', color: 'bg-amber-500 text-black' };
-    }
-    if (quality === '24-bit' || quality === 'FLAC') {
-        return { label: 'FLAC', color: 'bg-purple-500 text-white' };
-    }
-    if (quality === '320kbps') {
-        return { label: '320', color: 'bg-green-500/80 text-white' };
-    }
-    return null;
-};
+// NOTE: getQualityBadge removed. Quality badges are shown ONLY in the player via activeQuality.
+// Song lists, search results, and queues do NOT display quality.
 
 const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -50,7 +36,6 @@ export function SongRow({
     isCurrentSong = false,
     isLiked = false,
     showIndex = true,
-    showQuality = true,
     showDuration = true,
     onClick,
     onLikeToggle,
@@ -61,7 +46,6 @@ export function SongRow({
         || song.image?.[0]?.link
         || '';
 
-    const qualityBadge = showQuality ? getQualityBadge(song) : null;
     const duration = typeof song.duration === 'string' ? parseInt(song.duration) : song.duration;
 
     return (
@@ -110,12 +94,7 @@ export function SongRow({
                 </p>
             </div>
 
-            {/* Quality Badge */}
-            {qualityBadge && (
-                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${qualityBadge.color}`}>
-                    {qualityBadge.label}
-                </span>
-            )}
+            {/* Quality Badge REMOVED - quality is shown only in player via activeQuality */}
 
             {/* Duration */}
             {showDuration && duration > 0 && (

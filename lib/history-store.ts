@@ -1,7 +1,8 @@
-import { PlayableTrack, isPlayableTrack } from './types';
+import { PlayableTrack } from './types';
+import { db } from './indexed-db';
 
-const HISTORY_KEY = 'melora_history';
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 500;  // Upgraded from 50
+const STORE_NAME = 'history';
 
 export interface HistoryItem {
     id: string; // STRICTLY track.id (Stable Identity)
@@ -13,111 +14,99 @@ export interface HistoryItem {
         source: 'discovery' | 'playlist' | 'album' | 'search' | 'offline';
         id?: string; // playlist/album id
     };
+    preferredQuality?: string; // Persisted Preference
 }
 
-export const HistoryStore = {
-    getHistory: (): HistoryItem[] => {
-        if (typeof window === 'undefined') return [];
+class HistoryStoreClass {
+    private cache: HistoryItem[] = [];
+    private initialized = false;
+
+    constructor() { }
+
+    async init() {
+        if (this.initialized) return;
         try {
-            const raw = localStorage.getItem(HISTORY_KEY);
-            if (!raw) return [];
+            if (typeof window === 'undefined') return;
 
-            const parsed = JSON.parse(raw);
+            // 1. Load from IDB
+            const allItems = await db.getAll<HistoryItem>(STORE_NAME);
 
-            // Rule 3: Legacy Data Normalization (On Read)
-            // If data looks wrong, normalize it instantly
-            const normalized = parsed.map((item: any) => {
-                // Ensure track shape is PlayableTrack
-                let track = item.track;
-                if (!track) return null;
+            // 2. Sort by playedAt desc
+            this.cache = allItems.sort((a, b) => b.playedAt - a.playedAt);
 
-                // Handle raw song vs PlayableTrack
-                if (!('song' in track) && ('name' in track || 'id' in track)) {
-                    track = { song: track, id: track.id, preferredQuality: '320' };
-                }
+            // 3. Prune if needed (keep top 500)
+            if (this.cache.length > MAX_HISTORY) {
+                const toDelete = this.cache.slice(MAX_HISTORY);
+                this.cache = this.cache.slice(0, MAX_HISTORY);
+                // Async clean
+                toDelete.forEach(item => db.delete(STORE_NAME, item.id).catch(console.error));
+            }
 
-                return {
-                    id: track.id, // Enforce Stable ID (Rule 1)
-                    track: track,
-                    playedAt: item.playedAt || Date.now(),
-                    lastPosition: item.lastPosition || 0,
-                    itemType: item.itemType || 'song',
-                    context: item.context || { source: 'discovery' }
-                };
-            }).filter(Boolean);
-
-            return normalized;
-        } catch (e) {
-            console.error("Failed to load history", e);
-            return [];
-        }
-    },
-
-    addToHistory: (track: PlayableTrack, context: HistoryItem['context'] = { source: 'discovery' }) => {
-        if (typeof window === 'undefined') return;
-        try {
-            const history = HistoryStore.getHistory();
-
-            // Rule 4: Deduplication Logic (Strict + Fuzzy)
-            const normalize = (str: string) => str?.toLowerCase().split('(')[0].replace(/[^a-z0-9]/g, '') || '';
-            const targetKey = normalize(track.song.name) + normalize(track.song.primaryArtists);
-
-            // Remove existing instances to bump (Rule 4)
-            const filtered = history.filter(h => {
-                const hName = h.track.song.name || "";
-                const hArtist = h.track.song.primaryArtists || "";
-                const hKey = normalize(hName) + normalize(hArtist);
-
-                return h.id !== track.id && hKey !== targetKey;
-            });
-
-            // Add new with Stable ID
-            const newItem: HistoryItem = {
-                id: track.id, // Stable Identity
-                track,
-                playedAt: Date.now(),
-                lastPosition: 0,
-                itemType: 'song',
-                context // Rule 5: Context persistence
-            };
-
-            const updated = [newItem, ...filtered].slice(0, MAX_HISTORY);
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-
-            // Dispatch event for UI updates
+            this.initialized = true;
+            console.log(`[HistoryStore] Initialized with ${this.cache.length} items`);
             window.dispatchEvent(new Event('melora-history-update'));
         } catch (e) {
-            console.error("Failed to save history", e);
+            console.error("Failed to init history", e);
+            // Fallback: Cache is empty
         }
-    },
-
-    clearHistory: () => {
-        if (typeof window === 'undefined') return;
-        localStorage.removeItem(HISTORY_KEY);
-        window.dispatchEvent(new Event('melora-history-update'));
-    },
-
-    // Update playback position for a track (for resume)
-    updatePosition: (trackId: string, position: number) => {
-        if (typeof window === 'undefined') return;
-        try {
-            const history = HistoryStore.getHistory();
-            const updated = history.map(h => {
-                if (h.id === trackId) {
-                    return { ...h, lastPosition: Math.floor(position) };
-                }
-                return h;
-            });
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-        } catch (e) {
-            console.error("Failed to update position", e);
-        }
-    },
-
-    // Get last position for a track
-    getPosition: (trackId: string): number => {
-        const history = HistoryStore.getHistory();
-        const item = history.find(h => h.id === trackId);
-        return item?.lastPosition || 0;
     }
-};
+
+    getHistory(): HistoryItem[] {
+        return this.cache;
+    }
+
+    addToHistory(track: PlayableTrack, context: HistoryItem['context'] = { source: 'discovery' }) {
+        if (typeof window === 'undefined') return;
+
+        // Optimistic Update (RAM)
+        const newItem: HistoryItem = {
+            id: track.id,
+            track,
+            playedAt: Date.now(),
+            lastPosition: 0,
+            itemType: 'song',
+            context,
+            preferredQuality: track.preferredQuality // Key for Loophole Fix
+        };
+
+        // Remove existing (Dedupe / Last Played Wins)
+        this.cache = this.cache.filter(h => h.id !== track.id);
+
+        // Add to top
+        this.cache.unshift(newItem);
+
+        // Cap limit
+        if (this.cache.length > MAX_HISTORY) {
+            const removed = this.cache.pop();
+            if (removed) db.delete(STORE_NAME, removed.id).catch(() => { });
+        }
+
+        // Notify UI
+        window.dispatchEvent(new Event('melora-history-update'));
+
+        // Async Persist
+        db.put(STORE_NAME, newItem).catch(e => console.error("History save failed", e));
+    }
+
+    clearHistory() {
+        this.cache = [];
+        window.dispatchEvent(new Event('melora-history-update'));
+        db.clear(STORE_NAME).catch(console.error);
+    }
+
+    updatePosition(trackId: string, position: number) {
+        const item = this.cache.find(h => h.id === trackId);
+        if (item) {
+            item.lastPosition = Math.floor(position);
+            // Debounce save? IDB might be okay with frequent writes if small
+            // but let's just save for resume functionality
+            db.put(STORE_NAME, item).catch(() => { });
+        }
+    }
+
+    getPosition(trackId: string): number {
+        return this.cache.find(h => h.id === trackId)?.lastPosition || 0;
+    }
+}
+
+export const HistoryStore = new HistoryStoreClass();

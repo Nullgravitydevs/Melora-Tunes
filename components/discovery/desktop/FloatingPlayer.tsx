@@ -57,24 +57,63 @@ export function FloatingPlayer({
     toggleLike,
     isLiked
 }: FloatingPlayerProps) {
-    if (!currentSong || activeView === 'now-playing') return null;
+    // Local state for dragging (scrubbing)
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [dragProgress, setDragProgress] = React.useState(0);
+    const progressBarRef = React.useRef<HTMLDivElement>(null);
+
+    // Audio Quality Logic
+    // Use activeQuality strictly. If it's null (resolving), render nothing.
+    const displayQuality = activeQuality;
 
     const art = useMemo(() => getArt(currentSong), [currentSong]);
 
-    const progressPct = useMemo(
-        () => (duration > 0 ? Math.min(1, Math.max(0, progress / duration)) : 0),
-        [progress, duration]
-    );
+    // Derived progress for UI
+    const currentProgress = isDragging ? dragProgress : progress;
+    const progressPct = duration > 0 ? Math.min(1, Math.max(0, currentProgress / duration)) : 0;
 
-    const handleSeek = useCallback(
-        (e: React.MouseEvent<HTMLDivElement>) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-            seek(pct * duration);
-        },
-        [seek, duration]
-    );
+    // Time Formatter
+    const formatTime = (seconds: number) => {
+        if (!isFinite(seconds) || isNaN(seconds)) return "0:00";
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds) % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
 
+    // Scrubbing Logic
+    const calculateProgress = (clientX: number) => {
+        if (!progressBarRef.current || duration <= 0) return 0;
+        const rect = progressBarRef.current.getBoundingClientRect();
+        const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+        return pct * duration;
+    };
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        // Prevent bubbling to parent Click listeners (which might open Now Playing)
+        e.preventDefault();
+        e.stopPropagation();
+
+        setIsDragging(true);
+        const newProgress = calculateProgress(e.clientX);
+        setDragProgress(newProgress);
+        e.currentTarget.setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!isDragging) return;
+        const newProgress = calculateProgress(e.clientX);
+        setDragProgress(newProgress);
+    };
+
+    const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!isDragging) return;
+        setIsDragging(false);
+        const newProgress = calculateProgress(e.clientX);
+        seek(newProgress);
+        e.currentTarget.releasePointerCapture(e.pointerId);
+    };
+
+    // Volume Logic
     const handleVolume = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -90,6 +129,8 @@ export function FloatingPlayer({
         }
         setActiveView('now-playing');
     }, [activeView, setLastView, setActiveView]);
+
+    if (!currentSong || activeView === 'now-playing') return null;
 
     return (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-4 pointer-events-none">
@@ -126,9 +167,7 @@ export function FloatingPlayer({
                             >
                                 {currentSong.name}
                             </p>
-                            <QualityBadge
-                                quality={activeQuality || currentTrack?.preferredQuality || '320'}
-                            />
+                            <QualityBadge quality={displayQuality} />
                         </div>
                         <p className="text-xs text-white/50 truncate">
                             {currentSong.primaryArtists}
@@ -166,25 +205,35 @@ export function FloatingPlayer({
                     {/* Progress */}
                     <div className="w-72 flex items-center gap-2">
                         <span className="text-[9px] text-white/50 font-mono w-7 text-right">
-                            {Math.floor(progress / 60)}:{(Math.floor(progress) % 60).toString().padStart(2, '0')}
+                            {formatTime(currentProgress)}
                         </span>
 
                         <div
-                            className="flex-1 h-1.5 bg-white/15 rounded-full cursor-pointer relative overflow-hidden"
-                            onClick={handleSeek}
+                            ref={progressBarRef}
+                            className="flex-1 h-1.5 bg-white/15 rounded-full cursor-pointer relative overflow-hidden group py-2 my-[-8px] bg-clip-content"
+                            onPointerDown={handlePointerDown}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            onPointerLeave={handlePointerUp}
                         >
+                            {/* Background Track */}
+                            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-white/15 rounded-full" />
+
+                            {/* Fill */}
                             <div
-                                className="absolute inset-0 bg-white origin-left"
-                                style={{ transform: `scaleX(${progressPct})` }}
+                                className="absolute top-1/2 -translate-y-1/2 left-0 h-1.5 bg-white origin-left rounded-full"
+                                style={{ width: `${progressPct * 100}%` }}
                             />
+
+                            {/* Knob (Visible on Hover/Drag) */}
                             <div
-                                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md"
+                                className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md transition-opacity ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                                 style={{ left: `${progressPct * 100}%`, transform: 'translate(-50%, -50%)' }}
                             />
                         </div>
 
                         <span className="text-[9px] text-white/50 font-mono w-7">
-                            {Math.floor(duration / 60)}:{(Math.floor(duration) % 60).toString().padStart(2, '0')}
+                            {formatTime(duration)}
                         </span>
                     </div>
                 </div>

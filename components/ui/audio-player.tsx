@@ -25,7 +25,7 @@ interface AudioPlayerProps {
 }
 
 export interface AudioPlayerRef {
-    seekTo: (amount: number) => void;
+    seekTo: (amount: number, type?: 'seconds' | 'fraction') => void;
     getCurrentTime: () => number;
     play: () => void;
     pause: () => void;
@@ -147,13 +147,18 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     }, [initAudioGraph]);
 
     useImperativeHandle(ref, () => ({
-        seekTo: (amount: number) => {
+        seekTo: (amount: number, type?: 'seconds' | 'fraction') => {
             const active = getActive();
             if (active) {
-                if (active.duration) {
-                    active.currentTime = amount * active.duration;
-                } else if (amount === 0) {
-                    active.currentTime = 0;
+                if (type === 'seconds') {
+                    active.currentTime = amount;
+                } else {
+                    // Default: Fraction
+                    if (active.duration) {
+                        active.currentTime = amount * active.duration;
+                    } else if (amount === 0) {
+                        active.currentTime = 0;
+                    }
                 }
             }
         },

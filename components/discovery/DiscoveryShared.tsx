@@ -65,13 +65,25 @@ export function getArt(item: any): string {
    SHARED UI
 ========================= */
 
-export function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+/* =========================
+   SHARED UI
+========================= */
+
+export function SectionHeader({ title, subtitle, onSeeAll }: { title: string; subtitle?: string; onSeeAll?: () => void }) {
     return (
         <div className="flex items-end justify-between mb-6">
             <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
-                {subtitle && <p className="text-sm text-white/50 mt-1">{subtitle}</p>}
+                <h2 className="text-2xl font-bold text-white tracking-tight leading-none">{title}</h2>
+                {subtitle && <p className="text-sm text-white/50 mt-1.5 font-medium tracking-wide">{subtitle}</p>}
             </div>
+            {onSeeAll && (
+                <button
+                    onClick={onSeeAll}
+                    className="text-xs font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors pb-1 border-b border-transparent hover:border-white/20"
+                >
+                    See All
+                </button>
+            )}
         </div>
     );
 }
@@ -91,36 +103,40 @@ export function FeatureCard({
 }) {
     return (
         <motion.div
-            className="relative h-64 rounded-2xl overflow-hidden cursor-pointer group"
-            whileHover={{ scale: 1.03 }}
+            className="relative h-64 rounded-2xl overflow-hidden cursor-pointer group shadow-lg bg-neutral-900 border border-white/5"
+            whileHover={{ y: -8, scale: 1.02 }}
             onClick={onClick}
         >
             {image ? (
                 <img
                     src={image}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
             ) : (
                 <div className="absolute inset-0 bg-neutral-800" />
             )}
 
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
 
-            <div className="absolute bottom-0 left-0 w-full p-6">
+            <div className="absolute bottom-0 left-0 w-full p-6 z-10">
                 {isNew && (
-                    <span className="inline-block px-2 py-1 mb-2 text-[10px] font-bold bg-white text-black rounded-full uppercase">
+                    <span className="inline-block px-2.5 py-1 mb-3 text-[10px] font-bold bg-white text-black rounded-full uppercase tracking-wide">
                         New
                     </span>
                 )}
-                <h3 className="text-xl font-bold text-white truncate">{title}</h3>
-                <p className="text-sm text-white/60 truncate">{subtitle}</p>
-
-                <div className="absolute bottom-6 right-6 w-12 h-12 bg-white rounded-full
-                    flex items-center justify-center opacity-0 group-hover:opacity-100
-                    transition-all shadow-xl pointer-events-none">
-                    <Play size={20} fill="black" />
-                </div>
+                <h3 className="text-xl font-bold text-white truncate leading-tight mb-1">{title}</h3>
+                <p className="text-sm text-white/60 truncate font-medium">{subtitle}</p>
             </div>
+
+            {/* Hover Play Button */}
+            <div className="absolute bottom-6 right-6 w-12 h-12 bg-green-500 rounded-full
+                flex items-center justify-center opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0
+                transition-all duration-300 shadow-xl z-20">
+                <Play size={22} fill="black" className="text-black ml-0.5" />
+            </div>
+
+            {/* Hover Glow */}
+            <div className="absolute -inset-1 bg-white/10 opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 pointer-events-none" />
         </motion.div>
     );
 }
@@ -144,14 +160,14 @@ export function TrackRow({
 }) {
     return (
         <motion.div
-            className="flex items-center px-4 py-3 rounded-lg cursor-pointer group relative border border-transparent"
+            className="flex items-center px-4 py-3 rounded-xl cursor-pointer group relative border border-transparent transition-all duration-200"
+            initial={{ backgroundColor: 'rgba(255,255,255,0)' }}
             style={{
-                backgroundColor: isPlaying ? 'rgba(34,197,94,0.12)' : 'transparent',
-                borderColor: isPlaying ? 'rgba(34,197,94,0.35)' : 'transparent'
+                backgroundColor: isPlaying ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0)',
             }}
             whileHover={{
-                backgroundColor: 'rgba(255,255,255,0.06)',
-                borderColor: 'rgba(255,255,255,0.12)'
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                y: -1
             }}
             onClick={(e) => {
                 if ((e.target as HTMLElement).closest('button')) return;
@@ -159,12 +175,12 @@ export function TrackRow({
             }}
         >
             {isPlaying && (
-                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-green-400 rounded-full" />
+                <div className="absolute left-0 top-3 bottom-3 w-[3px] bg-green-500 rounded-r-full shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
             )}
 
             <span
-                className="w-8 text-xs text-center font-mono"
-                style={{ color: isPlaying ? '#fff' : colors.textMuted }}
+                className="w-8 text-xs text-center font-bold tracking-tighter"
+                style={{ color: isPlaying ? '#22c55e' : colors.textMuted }}
             >
                 {!isPlaying ? (
                     <>
@@ -331,4 +347,11 @@ export function PlaylistItem({
             )}
         </div>
     );
+}
+
+export function decodeHtml(html: string) {
+    if (!html) return "";
+    const txt = document.createElement("textarea");
+    txt.innerHTML = html;
+    return txt.value;
 }

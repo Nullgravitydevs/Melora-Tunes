@@ -28,7 +28,8 @@ export function FloatingPlayer({
         duration,
         volume,
         setVolume,
-        seek
+        seek,
+        activeQuality
     } = usePlayback();
 
     if (!currentSong) return null;
@@ -37,9 +38,8 @@ export function FloatingPlayer({
         || currentSong.image?.[0]?.link
         || '';
 
-    const quality = (currentSong as any)?._quality || '';
-    const source = (currentSong as any)?.source;
-    const isHiFi = source === 'tidal' || source === 'qobuz';
+    // Use activeQuality as single source of truth (DO NOT infer from _quality or source)
+    const quality = activeQuality;
 
     const formatTime = (seconds: number) => {
         if (isNaN(seconds) || seconds === Infinity) return "0:00";
@@ -83,15 +83,15 @@ export function FloatingPlayer({
                     </p>
                 </div>
 
-                {/* Quality Badge */}
-                {(quality || isHiFi) && (
+                {/* Quality Badge - Only show if activeQuality is set */}
+                {quality && (
                     <div className="flex items-center gap-1 text-[10px] font-bold">
-                        {isHiFi && (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-500 text-black">Hi-Res</span>
-                        )}
-                        {quality && !isHiFi && (
-                            <span className="px-1.5 py-0.5 rounded bg-green-500/80 text-white">{quality}</span>
-                        )}
+                        <span className={`px-1.5 py-0.5 rounded ${quality === 'hires' ? 'bg-amber-500 text-black' :
+                                quality === 'flac' ? 'bg-white/90 text-black' :
+                                    'bg-green-500/80 text-white'
+                            }`}>
+                            {quality === 'hires' ? 'HI-RES' : quality === 'flac' ? 'LOSSLESS' : 'HQ'}
+                        </span>
                     </div>
                 )}
 

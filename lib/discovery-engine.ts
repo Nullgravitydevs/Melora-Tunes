@@ -7,13 +7,13 @@ import { Mix } from '@/components/providers/playback-context';
 
 // --- STRICT NORMALIZATION ---
 export function normalizeIdentity(title: string, artist: string): string {
-    const t = title.toLowerCase()
+    const t = (title || '').toLowerCase()
         .split('(')[0] // Remove brackets
         .split('[')[0]
         .split('-')[0] // Remove hyphens (Risk: "Song - Remix" -> "Song") - Acceptable for dedup
         .replace(/[^a-z0-9]/g, '')
         .trim();
-    const a = artist.toLowerCase().split(',')[0].replace(/[^a-z0-9]/g, '').trim();
+    const a = (artist || '').toLowerCase().split(',')[0].replace(/[^a-z0-9]/g, '').trim();
     return `${t}|${a}`;
 }
 
@@ -33,7 +33,7 @@ export class DiscoveryEngine {
      * @param region - Optional region/language filter (e.g. 'telugu', 'hindi', 'english')
      */
     static async generateSessionMix(seed: PlayableTrack, region?: string): Promise<Mix> {
-        console.log(`💿 The DJ: Spinning new mix for ${seed.song.name} [Region: ${region || 'Global'}]`);
+        console.log(`💿 The DJ: Spinning new mix for ${seed.title} [Region: ${region || 'Global'}]`);
 
         // 1. Fetch Ingredients (Parallel)
         const [taste, regional, adjacent, wildcards] = await Promise.all([
@@ -133,7 +133,16 @@ export class DiscoveryEngine {
         for (const id of topIds.slice(0, 5)) {
             try {
                 const song = await getSongDetails(id);
-                if (song) candidates.push({ song, id: song.id, preferredQuality: '320', sources: [] });
+                if (song) candidates.push({
+                    title: song.name, // STRICT MAPPING
+                    artist: song.primaryArtists,
+                    duration: typeof song.duration === 'string' ? parseInt(song.duration) : song.duration,
+                    art: song.image?.[0]?.link || '',
+                    song,
+                    id: song.id,
+                    preferredQuality: '320',
+                    sources: []
+                });
             } catch (e) { }
         }
         return candidates;
@@ -147,7 +156,16 @@ export class DiscoveryEngine {
                 return results;
             } else {
                 const trending = await getTrending();
-                return trending.map(s => ({ song: s, id: s.id, preferredQuality: '320', sources: [] }));
+                return trending.map(s => ({
+                    title: s.name, // STRICT MAPPING
+                    artist: s.primaryArtists,
+                    duration: typeof s.duration === 'string' ? parseInt(s.duration) : s.duration,
+                    art: s.image?.[0]?.link || '',
+                    song: s,
+                    id: s.id,
+                    preferredQuality: '320',
+                    sources: []
+                }));
             }
         } catch (e) { return []; }
     }
@@ -155,7 +173,7 @@ export class DiscoveryEngine {
     private static async getAdjacentCandidates(seed: PlayableTrack): Promise<PlayableTrack[]> {
         try {
             // Search for Artist
-            const artist = seed.song.primaryArtists.split(',')[0].trim();
+            const artist = seed.artist.split(',')[0].trim(); // Use seed.artist
             const results = await searchUnified(artist);
             // Filter out the seed itself
             return results.filter(s => s.id !== seed.id);
@@ -172,7 +190,7 @@ export class DiscoveryEngine {
             const results = await searchUnified(query);
             // Strict Filter: Remove Junk
             const clean = results.filter(track => {
-                const name = track.song.name.toLowerCase();
+                const name = track.title.toLowerCase(); // Use track.title
                 const junk = ['remix', 'lofi', 'slowed', 'reverb', 'cover', 'live at', 'demo'];
                 if (junk.some(j => name.includes(j))) return false;
                 return true;
@@ -193,9 +211,9 @@ export class DiscoveryEngine {
         const artistCounts = new Map<string, number>();
 
         // Add SEED first manually to ensure it exists
-        unique.set(normalizeIdentity(seed.song.name, seed.song.primaryArtists), seed);
+        unique.set(normalizeIdentity(seed.title, seed.artist), seed); // Use seed.title
 
-        const seedArtist = seed.song.primaryArtists.split(',')[0].trim();
+        const seedArtist = seed.artist.split(',')[0].trim(); // Use seed.artist
         artistCounts.set(seedArtist, 1);
 
         for (const track of pool) {
@@ -206,11 +224,11 @@ export class DiscoveryEngine {
             if (recentIds.has(track.id)) continue;
 
             // 2. Normalization Identity Check
-            const identity = normalizeIdentity(track.song.name, track.song.primaryArtists);
+            const identity = normalizeIdentity(track.title, track.artist); // Use track.title
             if (unique.has(identity)) continue;
 
             // 3. Artist Cap (Max 2 per mix)
-            const artist = track.song.primaryArtists.split(',')[0].trim();
+            const artist = track.artist.split(',')[0].trim(); // Use track.artist
             const count = artistCounts.get(artist) || 0;
             if (count >= 2) continue; // Strict Cap
 
@@ -225,7 +243,10 @@ export class DiscoveryEngine {
         // Ensure Seed is #1
         // (It was added first to the map, but Map order is insertion order usually.
         // But let's be explicit)
-        const seedIdentity = normalizeIdentity(seed.song.name, seed.song.primaryArtists);
+        // Ensure Seed is #1
+        // (It was added first to the map, but Map order is insertion order usually.
+        // But let's be explicit)
+        const seedIdentity = normalizeIdentity(seed.title, seed.artist);
         const seedTrack = unique.get(seedIdentity);
 
         // Remove seed from result to shuffle the rest

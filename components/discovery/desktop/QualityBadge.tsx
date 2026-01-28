@@ -9,21 +9,24 @@ const qualityTooltips: any = {
     '96': { title: '📻 Data Saver', desc: 'LQ · 96 kbps' },
 };
 
-export function QualityBadge({ quality }: { quality: string }) {
-    const norm = quality?.toLowerCase().trim() || '320';
-    let q = '160';
+export function QualityBadge({ quality }: { quality: string | null | undefined }) {
+    if (!quality) return null;
+
+    const norm = quality.toLowerCase().trim();
+    let q = '320';
     if (norm.includes('hires') || norm.includes('24bit') || norm.includes('master')) q = 'hires';
     else if (norm.includes('flac') || norm.includes('lossless') || norm === 'cd') q = 'flac';
     else if (norm === '320' || norm.includes('hq') || norm.includes('high')) q = '320';
     else if (norm === '96' || norm.includes('lq')) q = '96';
     else if (norm === '160' || norm.includes('mq')) q = '160';
+
     const info = qualityTooltips[q];
     const [show, setShow] = useState(false);
 
     return (
         <div className="relative flex items-center" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded cursor-help ${q === 'hires' || q === 'flac' ? 'bg-white text-black' : 'bg-white/10 text-white/70'} `}>
-                {q === 'hires' ? 'HI-RES' : q === 'flac' ? 'FLAC' : q === '320' ? 'HQ' : 'MQ'}
+                {q === 'hires' ? 'HI-RES' : q === 'flac' ? 'LOSSLESS' : q === '320' ? 'HQ' : 'MQ'}
             </span>
             {/* Tooltip */}
             {show && (

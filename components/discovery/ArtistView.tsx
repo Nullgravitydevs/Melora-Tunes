@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { ChevronLeft, Play, Check } from "lucide-react";
-import { TrackRow, SectionHeader, DiscoveryThemeColors, getArt } from "./DiscoveryShared";
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, Play, Check, Disc, Shuffle } from "lucide-react";
+import { TrackRow, SectionHeader, DiscoveryThemeColors, getArt, decodeHtml } from "./DiscoveryShared";
 import { usePlayback, ensurePlayableTrack } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
+import { JioSaavnSong } from "@/lib/jiosaavn";
+import { PlayableTrack } from "@/lib/types";
 
 // High-res artwork helper
 function getHighResArt(img: any) {
@@ -24,8 +26,16 @@ interface ArtistViewProps {
     artistName: string;
     colors: DiscoveryThemeColors;
     onBack: () => void;
-    onPlay: (song: any, list?: any[]) => void;
+    onPlay: (song: JioSaavnSong, list?: JioSaavnSong[]) => void;
     onNavigate?: (view: string, data: any) => void;
+}
+
+interface ArtistDataState {
+    name: string;
+    image?: string;
+    listeners?: string;
+    topSongs: JioSaavnSong[];
+    albums: { id: string; name: string; image: string; year: string }[];
 }
 
 export function ArtistView({
@@ -36,17 +46,12 @@ export function ArtistView({
     onNavigate
 }: ArtistViewProps) {
     const { currentSong, isPlaying } = usePlayback();
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     const [loading, setLoading] = useState(true);
     const [scrolled, setScrolled] = useState(false);
 
-    const [artistData, setArtistData] = useState<{
-        name: string;
-        image?: string;
-        listeners?: string;
-        topSongs: any[];
-        albums: any[];
-    }>({
+    const [artistData, setArtistData] = useState<ArtistDataState>({
         name: artistName,
         topSongs: [],
         albums: []
@@ -59,16 +64,18 @@ export function ArtistView({
         const loadArtist = async () => {
             setLoading(true);
             try {
+                // Determine if artistName is actually a "Query" or a pure name.
+                // We searchUnified which returns songs.
                 const results = await searchUnified(artistName);
 
                 const songs = results
-                    .map(r => r?.song)
-                    .filter((s): s is any => !!s);
+                    .map(r => r?.song as JioSaavnSong)
+                    .filter((s): s is JioSaavnSong => !!s);
 
                 if (!songs.length) {
                     if (!cancelled) {
                         setArtistData({
-                            name: artistName,
+                            name: artistName, // Keep original query name if nothing found
                             topSongs: [],
                             albums: []
                         });
@@ -76,24 +83,35 @@ export function ArtistView({
                     return;
                 }
 
+                // Extract unique albums from song list
                 const albumMap = new Map<string, any>();
                 songs.forEach(song => {
                     if (song.album?.id && !albumMap.has(song.album.id)) {
                         albumMap.set(song.album.id, {
                             id: song.album.id,
-                            name: song.album.name,
-                            image: getHighResArt(song.image)
+                            name: decodeHtml(song.album.name),
+                            image: getHighResArt(song.image),
+                            year: song.year || ''
                         });
                     }
                 });
 
                 if (!cancelled) {
+                    // Try to find the best image for the artist (usually from first song)
+                    const heroArt = getHighResArt(getArt(songs[0]));
+
+                    // Decode the artist name from the first result for better presentation
+                    // But assume the first song's primary artist MIGHT be the search term
+                    // Ideally we should match the artistName to the song's artists
+                    // distinctArtistName is safer
+                    const likelyName = decodeHtml(songs[0].primaryArtists.split(',')[0]);
+
                     setArtistData({
-                        name: artistName,
-                        image: getHighResArt(getArt(songs[0])),
-                        listeners: `${songs.length} tracks`,
+                        name: likelyName || decodeHtml(artistName),
+                        image: heroArt,
+                        listeners: `${songs.length}+ Popular Tracks`,
                         topSongs: songs.slice(0, 10),
-                        albums: Array.from(albumMap.values()).slice(0, 6)
+                        albums: Array.from(albumMap.values()).slice(0, 8)
                     });
                 }
             } catch (e) {
@@ -116,7 +134,7 @@ export function ArtistView({
 
     if (loading) {
         return (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center bg-black">
                 <div className="animate-spin w-8 h-8 border-2 border-white rounded-full border-t-transparent" />
             </div>
         );
@@ -125,91 +143,128 @@ export function ArtistView({
     // ─── NORMALIZE PLAYABLE SONGS ─────────────────────
     const playableSongs = artistData.topSongs
         .map(s => ensurePlayableTrack(s))
-        .filter((t): t is any => !!t?.song)
-        .map(t => t.song);
+        .filter((t): t is PlayableTrack => !!t && !!t.song)
+        .map(t => t.song!);
 
     return (
-        <div className="flex-1 h-full relative bg-black">
+        <div className="flex-1 h-full relative bg-black overflow-hidden">
 
             {/* STICKY HEADER */}
             <div
-                className={`absolute top-0 left-0 right-0 z-50 h-20 flex items-center px-6 gap-6 transition-all
-                ${scrolled ? 'bg-black/90 backdrop-blur-xl border-b border-white/5' : 'bg-transparent'}`}
+                className={`absolute top-0 left-0 right-0 z-50 h-20 flex items-center px-6 gap-6 transition-all duration-300
+                ${scrolled ? 'bg-black/80 backdrop-blur-xl border-b border-white/5' : 'bg-transparent'}`}
             >
                 <button
                     onClick={onBack}
-                    className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur flex items-center justify-center"
+                    className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur flex items-center justify-center transition-colors border border-white/5"
                 >
                     <ChevronLeft size={22} className="text-white" />
                 </button>
 
                 <span
-                    className={`text-xl font-bold text-white transition-opacity
-                    ${scrolled ? 'opacity-100' : 'opacity-0'}`}
+                    className={`text-xl font-bold text-white transition-all duration-300 transform
+                    ${scrolled ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
                 >
                     {artistData.name}
                 </span>
             </div>
 
             <div
-                className="absolute inset-0 overflow-y-auto pb-32 [&::-webkit-scrollbar]:hidden"
+                ref={scrollRef}
+                className="absolute inset-0 overflow-y-auto pb-32 [&::-webkit-scrollbar]:hidden scroll-smooth"
                 onScroll={handleScroll}
             >
 
-                {/* HERO */}
-                <div className="relative h-[40vh] min-h-[300px] w-full">
-                    <div className="absolute inset-0">
+                {/* HERO SECTION */}
+                <div className="relative h-[45vh] min-h-[350px] w-full group">
+                    {/* Dynamic Blur Backdrop */}
+                    <div className="absolute inset-0 z-0 overflow-hidden">
                         {artistData.image && (
-                            <img
+                            <motion.img
+                                initial={{ opacity: 0, scale: 1.1 }}
+                                animate={{ opacity: 0.6, scale: 1 }}
+                                transition={{ duration: 1.5 }}
                                 src={artistData.image}
-                                className="w-full h-full object-cover opacity-60"
+                                className="w-full h-full object-cover blur-3xl opacity-50"
                             />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20" />
-                        <div className="absolute inset-0 backdrop-blur-sm bg-black/30" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20" />
+                        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
                     </div>
 
                     <div className="absolute bottom-0 left-0 w-full p-8 z-10 flex items-end gap-8">
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="w-48 h-48 rounded-full border-4 border-black overflow-hidden shadow-2xl"
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="w-48 h-48 rounded-full border-4 border-black/50 overflow-hidden shadow-2xl relative shrink-0"
                         >
-                            {artistData.image && (
+                            {artistData.image ? (
                                 <img
                                     src={artistData.image}
                                     className="w-full h-full object-cover"
                                 />
+                            ) : (
+                                <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
+                                    <Disc size={40} className="text-white/20" />
+                                </div>
                             )}
                         </motion.div>
 
-                        <div>
-                            <div className="flex items-center gap-2 mb-2 text-white/60 text-xs font-bold uppercase tracking-widest">
-                                <span className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                        <div className="flex-1 min-w-0">
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                                className="flex items-center gap-2 mb-3 text-white/70 text-xs font-bold uppercase tracking-widest"
+                            >
+                                <span className="w-4 h-4 rounded-full bg-[#1DA1F2] flex items-center justify-center shadow-lg shadow-blue-500/20">
                                     <Check size={10} className="text-white" strokeWidth={4} />
                                 </span>
                                 Verified Artist
-                            </div>
+                            </motion.div>
 
-                            <h1 className="text-6xl font-black text-white mb-2">
-                                {artistData.name}
-                            </h1>
+                            <motion.h1
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight drop-shadow-2xl"
+                            >
+                                {decodeHtml(artistData.name)}
+                            </motion.h1>
 
                             {artistData.listeners && (
-                                <p className="text-white/70 mb-6">
+                                <p className="text-white/60 mb-6 font-medium">
                                     {artistData.listeners}
                                 </p>
                             )}
 
                             {playableSongs.length > 0 && (
-                                <button
-                                    onClick={() => onPlay(playableSongs[0], playableSongs)}
-                                    className="h-12 px-8 bg-[#1DB954] hover:bg-[#1ed760]
-                                    text-black rounded-full font-bold uppercase tracking-wider
-                                    flex items-center gap-2 shadow-lg"
-                                >
-                                    <Play size={18} fill="black" /> Play
-                                </button>
+                                <div className="flex items-center gap-4">
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => onPlay(playableSongs[0], playableSongs)}
+                                        className="h-12 px-8 bg-white hover:bg-neutral-200
+                                        text-black rounded-full font-bold uppercase tracking-wider
+                                        flex items-center gap-2 shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                                    >
+                                        <Play size={20} fill="black" /> Play
+                                    </motion.button>
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => {
+                                            // Shuffle play
+                                            const shuffled = [...playableSongs].sort(() => 0.5 - Math.random());
+                                            onPlay(shuffled[0], shuffled);
+                                        }}
+                                        className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20
+                                        flex items-center justify-center backdrop-blur-md border border-white/10"
+                                    >
+                                        <Shuffle size={20} className="text-white" />
+                                    </motion.button>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -220,8 +275,8 @@ export function ArtistView({
 
                     {/* TOP SONGS */}
                     {playableSongs.length > 0 && (
-                        <section className="max-w-5xl">
-                            <SectionHeader title="Popular" />
+                        <section className="max-w-6xl">
+                            <SectionHeader title="Popular" subtitle="Top hits and fan favorites" />
                             <div className="flex flex-col gap-1">
                                 {playableSongs.map((song, i) => (
                                     <TrackRow
@@ -229,16 +284,17 @@ export function ArtistView({
                                         index={i + 1}
                                         track={{
                                             id: song.id,
-                                            title: song.name,
-                                            artist: song.primaryArtists,
+                                            title: decodeHtml(song.name),
+                                            artist: decodeHtml(song.primaryArtists),
                                             duration: song.duration
                                                 ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, '0')}`
                                                 : '--:--',
                                             art: getHighResArt(song.image),
+                                            quality: 'hq', // Assume HQ for discovery
                                             original: song
                                         }}
                                         colors={colors}
-                                        isPlaying={(currentSong as any)?.song?.id === song.id && isPlaying}
+                                        isPlaying={currentSong?.id === song.id && isPlaying}
                                         onPlay={() => onPlay(song, playableSongs)}
                                     />
                                 ))}
@@ -249,27 +305,35 @@ export function ArtistView({
                     {/* ALBUMS */}
                     {artistData.albums.length > 0 && (
                         <section>
-                            <SectionHeader title="Discography" />
+                            <SectionHeader title="Discography" subtitle="Albums and Singles" />
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                                 {artistData.albums.map(album => (
-                                    <div
+                                    <motion.div
                                         key={album.id}
-                                        className="cursor-pointer"
+                                        whileHover={{ y: -5 }}
+                                        className="cursor-pointer group"
                                         onClick={() => onNavigate?.('album', album.id)}
                                     >
-                                        <div className="aspect-square rounded-lg bg-white/5 mb-3 overflow-hidden">
+                                        <div className="aspect-square rounded-lg bg-neutral-900 mb-3 overflow-hidden shadow-lg border border-white/5 relative">
                                             <img
                                                 src={album.image}
-                                                className="w-full h-full object-cover hover:scale-105 transition-transform"
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                             />
+                                            {/* Hover Overlay */}
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg transform scale-50 group-hover:scale-100 transition-transform duration-200">
+                                                    <Disc size={20} className="text-black" />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-sm font-bold text-white truncate">
+                                        <p className="text-sm font-bold text-white truncate group-hover:text-green-400 transition-colors">
                                             {album.name}
                                         </p>
-                                        <p className="text-xs text-white/50">
-                                            Album
-                                        </p>
-                                    </div>
+                                        <div className="flex items-center justify-between text-xs text-white/50 mt-1">
+                                            <span>Album</span>
+                                            <span>{album.year}</span>
+                                        </div>
+                                    </motion.div>
                                 ))}
                             </div>
                         </section>

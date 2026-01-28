@@ -9,13 +9,16 @@ import {
     Heart,
     Globe,
     Monitor,
-    Disc
+    Disc,
+    Settings
 } from "lucide-react";
 
 import { NavItem, PlaylistItem, DiscoveryThemeColors } from "../DiscoveryShared";
 import { DiscoveryTheme } from "../DiscoveryLayout";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
 import { Mix, ensurePlayableTrack } from "@/components/providers/playback-context";
+import { JioSaavnSong } from "@/lib/jiosaavn";
+import { PlayableTrack } from "@/lib/types";
 
 type RootView = "home" | "search" | "explore" | "browse" | "library";
 
@@ -26,11 +29,12 @@ interface SidebarProps {
     theme: DiscoveryTheme;
     onThemeChange: (t: DiscoveryTheme) => void;
     playlists: Playlist[];
-    likedSongs: any[];
+    likedSongs: (JioSaavnSong | PlayableTrack)[];
     activeMixId: string | null;
     playInstantMix: (mix: Mix) => void;
     setIsLangModalOpen: (val: boolean) => void;
     colors: DiscoveryThemeColors;
+    onOpenSettings: () => void;
 }
 
 export function Sidebar({
@@ -44,10 +48,11 @@ export function Sidebar({
     activeMixId,
     playInstantMix,
     setIsLangModalOpen,
-    colors: c
+    colors: c,
+    onOpenSettings
 }: SidebarProps) {
 
-    const playListMix = useCallback((id: string, title: string, songs: any[]) => {
+    const playListMix = useCallback((id: string, title: string, songs: (JioSaavnSong | PlayableTrack)[]) => {
         if (!songs || songs.length === 0) return;
         playInstantMix({
             id,
@@ -155,6 +160,13 @@ export function Sidebar({
                         title="Switch Mode"
                     >
                         <Monitor size={16} className="text-white/60" />
+                    </button>
+                    <button
+                        onClick={onOpenSettings}
+                        className="p-2 rounded-md hover:bg-white/10 transition-colors"
+                        title="Settings"
+                    >
+                        <Settings size={16} className="text-white/60" />
                     </button>
                 </div>
 

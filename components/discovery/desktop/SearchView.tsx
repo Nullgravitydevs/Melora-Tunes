@@ -1,21 +1,26 @@
-import React, { useRef } from "react";
-import { Search } from "lucide-react";
+import React, { useRef, useEffect } from "react";
+import { Search, X, Disc } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { WaveLoader } from "./WaveLoader";
-import { TrackRow } from "../DiscoveryShared";
+import { TrackRow, DiscoveryThemeColors } from "../DiscoveryShared";
+import { JioSaavnSong } from "@/lib/jiosaavn";
+import { QualitySelector, QualityFilterType } from "@/components/ui/quality-selector";
 
 interface SearchViewProps {
     searchQuery: string;
     setSearchQuery: (q: string) => void;
     performSearch: (q: string) => void;
-    searchResults: any[];
-    setSearchResults: (results: any[]) => void;
+    searchResults: JioSaavnSong[];
+    setSearchResults: (results: JioSaavnSong[]) => void;
     isSearching: boolean;
     setActiveView: (view: string) => void;
     lastView: string;
-    colors: any;
-    currentSong: any;
+    colors: DiscoveryThemeColors;
+    currentSong: JioSaavnSong | null;
     isPlaying: boolean;
     handlePlay: (song: any) => void;
+    quality: QualityFilterType;
+    setQuality: (q: QualityFilterType) => void;
 }
 
 export function SearchView({
@@ -30,10 +35,20 @@ export function SearchView({
     colors,
     currentSong,
     isPlaying,
-    handlePlay
+    handlePlay,
+    quality,
+    setQuality,
 }: SearchViewProps) {
 
     const lastSubmittedRef = useRef<string>("");
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Auto-focus logic
+    useEffect(() => {
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, []);
 
     /* =========================
        SEARCH HANDLERS
@@ -43,7 +58,7 @@ export function SearchView({
         const q = value.trim();
         if (!q) return;
 
-        // Prevent duplicate submissions
+        // Prevent duplicate submissions to API
         if (q === lastSubmittedRef.current) return;
 
         lastSubmittedRef.current = q;
@@ -61,8 +76,12 @@ export function SearchView({
         lastSubmittedRef.current = "";
         setSearchQuery("");
         setSearchResults([]);
+        // Don't auto-navigate back on clear, just reset state.
+        // Let user decide to go back or type again.
+        if (inputRef.current) inputRef.current.focus();
+    };
 
-        // Safe back navigation
+    const handleBack = () => {
         setActiveView(
             ["home", "explore", "browse", "library"].includes(lastView)
                 ? lastView
@@ -75,18 +94,18 @@ export function SearchView({
     ========================= */
 
     return (
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col h-full bg-black/50 backdrop-blur-3xl relative overflow-hidden">
 
-            {/* SEARCH BAR */}
+            {/* SEARCH HEADER */}
             <div
-                className="px-6 py-4 sticky top-0 z-20 backdrop-blur-xl"
+                className="px-6 py-4 sticky top-0 z-30 flex items-center gap-4"
                 style={{
-                    backgroundColor: colors.surface,
-                    borderBottom: `1px solid ${colors.border}`
+                    borderBottom: `1px solid ${colors.border}`,
+                    background: `linear-gradient(to bottom, ${colors.surface} 0%, transparent 100%)`
                 }}
             >
                 <div
-                    className="flex items-center gap-3 px-4 py-3 rounded-2xl border"
+                    className="flex-1 flex items-center gap-3 px-4 py-3 rounded-2xl border transition-colors duration-300 focus-within:border-white/40"
                     style={{
                         backgroundColor: colors.card,
                         borderColor: colors.border
@@ -95,15 +114,16 @@ export function SearchView({
                     <Search size={18} style={{ color: colors.textMuted }} />
 
                     <input
+                        ref={inputRef}
                         type="text"
                         value={searchQuery}
-                        placeholder="Search songs, artists, albums…"
-                        className="bg-transparent outline-none text-sm w-full placeholder:text-white/30"
+                        placeholder="What do you want to listen to?"
+                        className="bg-transparent outline-none text-sm w-full font-medium placeholder:text-white/30"
                         style={{ color: colors.text }}
-                        autoFocus
                         onChange={(e) => {
                             const v = e.target.value;
                             setSearchQuery(v);
+                            // Clear results immediately on empty input
                             if (!v.trim()) {
                                 lastSubmittedRef.current = "";
                                 setSearchResults([]);
@@ -115,85 +135,117 @@ export function SearchView({
                     {searchQuery && (
                         <button
                             onClick={handleClear}
-                            className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white"
+                            className="p-1 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-colors"
                         >
-                            Clear
+                            <X size={14} />
                         </button>
                     )}
                 </div>
+
+                <QualitySelector value={quality} onChange={setQuality} />
             </div>
 
-            {/* SEARCHING */}
-            {isSearching && (
-                <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                    <WaveLoader />
-                    <p className="text-xs uppercase tracking-widest text-white/40">
-                        Searching
-                    </p>
-                </div>
-            )}
+            {/* CONTENT AREA */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden relative scrollbar-hide">
+                <AnimatePresence mode="wait">
 
-            {/* RESULTS */}
-            {!isSearching && searchResults.length > 0 && (
-                <div className="flex-1 px-6 py-4 overflow-y-auto [&::-webkit-scrollbar]:hidden">
-                    <div className="flex items-end justify-between mb-6 px-2">
-                        <h2 className="text-2xl font-bold text-white">Top Results</h2>
-                        <span className="text-[10px] uppercase tracking-widest text-white/40">
-                            {searchResults.length} songs
-                        </span>
-                    </div>
+                    {/* LOADING STATE */}
+                    {isSearching && (
+                        <motion.div
+                            key="loader"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white/40"
+                        >
+                            <WaveLoader />
+                            <span className="text-xs uppercase tracking-widest animate-pulse">Searching...</span>
+                        </motion.div>
+                    )}
 
-                    <div className="flex flex-col gap-1">
-                        {searchResults.map((item, i) => {
-                            const quality =
-                                item.original?.preferredQuality ||
-                                item.original?.sources?.[0]?.quality ||
-                                "320";
+                    {/* RESULTS STATE */}
+                    {!isSearching && searchResults.length > 0 && (
+                        <motion.div
+                            key="results"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            className="px-6 pb-32"
+                        >
+                            <div className="flex items-center justify-between py-6 sticky top-0 bg-transparent z-10">
+                                <h2 className="text-xl font-bold text-white">Top Results</h2>
+                                <span className="text-xs font-medium text-white/40 bg-white/5 px-2 py-1 rounded-md">
+                                    {searchResults.length} FOUND
+                                </span>
+                            </div>
 
-                            return (
-                                <TrackRow
-                                    key={item.id ?? `${item.title}-${i}`}
-                                    index={i + 1}
-                                    track={{ ...item, quality }}
-                                    colors={colors}
-                                    isPlaying={currentSong?.id === item.id && isPlaying}
-                                    onPlay={() => handlePlay(item.original)}
-                                />
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
+                            <div className="flex flex-col gap-1">
+                                {searchResults.map((item, i) => {
+                                    // Quality badges are NOT shown in search results.
+                                    // Quality is only known after playback resolution (activeQuality).
 
-            {/* NO RESULTS */}
-            {!isSearching && searchQuery && searchResults.length === 0 && (
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center max-w-sm">
-                        <Search size={48} className="mx-auto mb-4 opacity-40" />
-                        <h2 className="text-xl font-bold text-white mb-2">
-                            Nothing found
-                        </h2>
-                        <p className="text-sm text-white/50">
-                            Try a different song, artist, or album.
-                        </p>
-                    </div>
-                </div>
-            )}
+                                    const playable = item as any;
+                                    // HONEST BADGE: Only show if we actually HAVE the source
+                                    const hasHiRes = playable.sources?.some((s: any) => s.quality === 'hires');
+                                    const hasFlac = playable.sources?.some((s: any) => s.quality === 'flac');
 
-            {/* IDLE */}
-            {!isSearching && !searchQuery && (
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center max-w-sm">
-                        <Search size={48} className="mx-auto mb-4 opacity-40" />
-                        <h2 className="text-xl font-bold text-white mb-2">
-                            Search Melora
-                        </h2>
-                        <p className="text-sm text-white/50">
-                            Find music in studio-quality audio.
-                        </p>
-                    </div>
-                </div>
-            )}
+                                    const qualityBadge = hasHiRes ? 'hires' : (hasFlac ? 'flac' : undefined);
+
+                                    return (
+                                        <TrackRow
+                                            key={item.id || `search-${i}`}
+                                            index={i + 1}
+                                            track={{ ...item, quality: qualityBadge } as any}
+                                            colors={colors}
+                                            isPlaying={currentSong?.id === item.id && isPlaying}
+                                            onPlay={() => handlePlay(item)}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* NO RESULTS STATE */}
+                    {!isSearching && searchQuery && searchResults.length === 0 && (
+                        <motion.div
+                            key="no-results"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 flex flex-col items-center justify-center text-center p-8"
+                        >
+                            <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                                <Search size={40} className="text-white/20" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">No matches found</h3>
+                            <p className="text-white/40 max-w-xs text-sm">
+                                We couldn't find any songs matching "{searchQuery}". Try searching for an artist or album name.
+                            </p>
+                        </motion.div>
+                    )}
+
+                    {/* IDLE STATE */}
+                    {!isSearching && !searchQuery && (
+                        <motion.div
+                            key="idle"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 flex flex-col items-center justify-center text-center p-8"
+                        >
+                            <div className="w-24 h-24 rounded-full bg-linear-to-br from-purple-500/20 to-blue-500/10 flex items-center justify-center mb-6 ring-1 ring-white/10">
+                                <Disc size={40} className="text-white/30 animate-[spin_10s_linear_infinite]" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">Play whatever you want</h3>
+                            <p className="text-white/40 max-w-xs text-sm">
+                                Search for songs, unknown artists, albums, or even lyrics.
+                            </p>
+                        </motion.div>
+                    )}
+
+                </AnimatePresence>
+            </div>
         </div>
     );
 }

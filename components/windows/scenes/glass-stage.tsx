@@ -23,6 +23,7 @@ import {
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { ThemeKey } from "@/components/ui/desktop-player";
+import { QualityBadge } from "@/components/discovery/desktop/QualityBadge";
 import Image from "next/image";
 
 // --- Custom Styles (Crystal Clear Onyx) ---
@@ -243,7 +244,7 @@ export function GlassStage({
         progress, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, mixes, addMix,
         updateMix, deleteMix, activeMixId, play,
         likedSongs, toggleLike, isLiked, recentlyPlayed, eq, isDownloaded,
-        downloadSong, removeDownload
+        downloadSong, removeDownload, activeQuality
     } = usePlayback();
 
     // --- Navigation State ---
@@ -1112,11 +1113,8 @@ export function GlassStage({
                                 ) : searchQuery ? (
                                     <div className="space-y-2">
                                         {groupedResults.slice(0, showAllResults ? undefined : 10).map((track, i) => {
-                                            // Derive Quality Badge
-                                            let badge = undefined;
-                                            if (track.sources.some(s => s.quality === 'hires')) badge = '24-BIT';
-                                            else if (track.sources.some(s => s.quality === 'flac')) badge = 'FLAC';
-                                            else if (track.sources.some(s => s.quality === '320')) badge = '320';
+                                            // Quality badges are NOT shown in search results.
+                                            // Quality is only known after playback resolution (activeQuality).
 
                                             return (
                                                 <SongRow
@@ -1125,7 +1123,6 @@ export function GlassStage({
                                                     index={i + 1}
                                                     isPlaying={currentSong?.id === track.id && isPlaying}
                                                     isLiked={isLiked(track.id)}
-                                                    quality={badge}
                                                     onPlay={() => handleSongClick(track)}
                                                     onLike={() => toggleLike(track.song)}
                                                     onContextMenu={(e) => handleContextMenu(e, track.song)}
@@ -1511,7 +1508,10 @@ export function GlassStage({
                             />
                         </div>
                         <div className="min-w-0 cursor-pointer">
-                            <p className="text-sm font-medium text-white truncate">{decodeHtml(currentSong.name)}</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-white truncate">{decodeHtml(currentSong.name)}</p>
+                                <QualityBadge quality={activeQuality} />
+                            </div>
                             <p className="text-xs text-gray-400 truncate">{decodeHtml(currentSong.primaryArtists)}</p>
                         </div>
                         <button className={`ml-2 ${isLiked(currentSong.id) ? 'text-green-500' : 'text-gray-500 hover:text-white'}`} onClick={(e) => { e.stopPropagation(); toggleLike(currentTrack || currentSong); }}>

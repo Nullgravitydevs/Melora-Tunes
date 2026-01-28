@@ -19,7 +19,7 @@ import { QualityBadge } from "./QualityBadge";
 interface NowPlayingProps {
     song: any;
     nextSong: any;
-    quality: string;
+    quality: string | null | undefined;
     onClose: () => void;
     playback: any;
     onAddToOTG: (s: any) => void;
@@ -77,12 +77,7 @@ export function NowPlayingOverlay({
         playback.seek(pct * playback.duration);
     }, [playback]);
 
-    const normalizedQuality = useMemo(() => {
-        const q = quality?.toLowerCase() || '320';
-        if (q.includes('hires') || q.includes('24')) return 'hires';
-        if (q.includes('flac') || q.includes('lossless') || q === 'cd') return 'flac';
-        return '320';
-    }, [quality]);
+
 
     return (
         <motion.div
@@ -196,7 +191,7 @@ export function NowPlayingOverlay({
 
                     {/* Quality */}
                     <div className="pt-4">
-                        <QualityBadge quality={normalizedQuality} />
+                        <QualityBadge quality={quality} />
                     </div>
                 </div>
 

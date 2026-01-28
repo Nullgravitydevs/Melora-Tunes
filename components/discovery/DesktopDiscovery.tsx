@@ -12,6 +12,7 @@ import { loadSettings } from "@/lib/settings";
 import { searchUnified } from "@/lib/unified-search";
 import { OfflineStore } from "@/lib/offline-store";
 import { PlaylistStore, Playlist } from "@/lib/playlist-store";
+import { QualityFilterType } from "@/lib/types";
 import {
     usePlayback,
     Mix,
@@ -41,6 +42,7 @@ import { RightPanel } from "./desktop/RightPanel";
 import { FloatingPlayer } from "./desktop/FloatingPlayer";
 import { NowPlayingOverlay } from "./desktop/NowPlayingOverlay";
 import { LanguageSelectorModal } from "./desktop/LanguageSelectorModal";
+import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 
 /* ================= TYPES ================= */
 
@@ -133,16 +135,36 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [loading, setLoading] = useState(true);
 
-    /* ================= LANGUAGE ================= */
+    /* ================= LANGUAGE & SETTINGS ================= */
 
+    const [userName, setUserName] = useState<string>("");
     const [activeChipLanguage, setActiveChipLanguage] = useState<string | null>(null);
     const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
     const [isLangModalOpen, setIsLangModalOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     /* ================= SEARCH ================= */
 
+
+
     const [searchQuery, setSearchQuery] = useState("");
+    const [searchQuality, setSearchQuality] = useState<QualityFilterType>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('melora-quality-pref') as QualityFilterType) || 'auto';
+        }
+        return 'auto';
+    });
     const [searchResults, setSearchResults] = useState<any[]>([]);
+
+    // Persist Quality Preference
+    useEffect(() => {
+        localStorage.setItem('melora-quality-pref', searchQuality);
+        // FIX: Re-trigger search immediately when quality changes
+        if (searchQuery.trim()) {
+            performSearch(searchQuery);
+        }
+    }, [searchQuality]);
+
     const [isSearching, setIsSearching] = useState(false);
     const searchTokenRef = useRef(0);
 
@@ -183,6 +205,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
             const settings = loadSettings();
             const langs = settings.languages || ["english", "hindi"];
             setSelectedLanguages(langs);
+            setUserName(settings.userName || "");
 
             // Strict Language Context: If chip is selected but not in settings, reset
             let safeChip = activeChipLanguage;
@@ -203,12 +226,22 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
             const topCharts =
                 chartRes.status === "fulfilled" ? chartRes.value : [];
 
-            setTrending(trendingSongs.slice(0, 10));
+            // FILTER: Ensure trending songs actually match the requested language context
+            // JioSaavn's trending API often leaks global/Hindi hits regardless of language param
+            const allowedLangs = langContext.toLowerCase().split(',').map(s => s.trim());
+            const filteredTrending = trendingSongs.filter((s: any) =>
+                s.language && allowedLangs.includes(s.language.toLowerCase())
+            );
 
-            let singles = trendingSongs.slice(0, 10);
+            // Use filtered list, or empty to trigger fallback search
+            setTrending(filteredTrending.slice(0, 10));
+
+            let singles = filteredTrending.slice(0, 10);
             if (!singles.length) {
+                // FALLBACK: Use primary context language for search to match user preference
+                const primaryLang = langContext.split(',')[0] || "english";
                 const fallback = await searchSongs(
-                    `${langs[0]} popular hits`,
+                    `${primaryLang} popular hits`,
                     1,
                     10,
                     langContext
@@ -227,10 +260,18 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
             );
 
             const [albums, playlists] = await Promise.all([
-                getNewReleases(10, langContext),
+                getNewReleases(20, langContext), // Fetch more to account for filter
                 getFeaturedPlaylists(10, langContext)
             ]);
-            setLatestAlbums(albums);
+
+            // Filter out singles and trailers masquerading as albums
+            const validAlbums = albums.filter((a: any) =>
+                (a.type === 'album' || !a.type) &&
+                !a.name?.toLowerCase().includes('trailer') &&
+                !a.title?.toLowerCase().includes('trailer')
+            ).slice(0, 10);
+
+            setLatestAlbums(validAlbums);
             setFeaturedPlaylists(playlists);
 
             setRecent(HistoryStore.getHistory().slice(0, 6));
@@ -254,7 +295,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
     }, [activeChipLanguage]);
 
     useEffect(() => {
-        loadData();
+        // Initialize History Store (Migrate/Load from IndexedDB)
+        HistoryStore.init().then(loadData);
 
         // Listeners for global updates
         const onHistoryUpdate = () => setRecent(HistoryStore.getHistory().slice(0, 6));
@@ -293,9 +335,34 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 const index =
                     list.findIndex(t => t.song!.id === song.id) || 0;
 
+                // STABLE MIX ID GENERATION
+                let mixId = `mix-${activeView}`;
+                let mixTitle = "Context";
+
+                if (activeView === "album" && activeAlbum) {
+                    mixId = `album:${activeAlbum}`;
+                    mixTitle = "Album";
+                } else if (activeView === "playlist-detail" && activePlaylistDetail) {
+                    mixId = `playlist:${activePlaylistDetail.id}`;
+                    mixTitle = activePlaylistDetail.name || "Playlist";
+                } else if (activeView === "artist" && activeArtist) {
+                    mixId = `artist:${activeArtist}`; // Note: Artist top songs context
+                    mixTitle = "Top Songs";
+                } else if (activeView === "chart-detail" && activeChart) {
+                    mixId = `chart:${activeChart.id || activeChart.title}`;
+                    mixTitle = activeChart.title || "Chart";
+                } else if (activeView === "search") {
+                    mixId = `search:${searchQuery.trim().toLowerCase()}`;
+                    mixTitle = `Search: ${searchQuery}`;
+                } else {
+                    // Fallback for ephemeral contexts (e.g. Home trending)
+                    // We use the first song ID to keep it somewhat stable for the same session
+                    mixId = `context:${list[0]?.song?.id || Date.now()}`;
+                }
+
                 const mix: Mix = {
-                    id: `context-${Date.now()}`,
-                    title: "Context",
+                    id: mixId,
+                    title: mixTitle,
                     color: "blue",
                     songs: list,
                     currentSongIndex: index
@@ -344,7 +411,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
 
         try {
             const lang = activeChipLanguage || selectedLanguages.join(",");
-            const res = await searchUnified(q, lang);
+            const res = await searchUnified(q, lang, 'song', searchQuality); // Pass quality preference
             if (token !== searchTokenRef.current) return;
 
             setSearchResults(
@@ -411,6 +478,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         activeLanguage={activeChipLanguage}
                         selectedLanguages={selectedLanguages}
                         onLanguageSelect={setActiveChipLanguage}
+                        userName={userName}
                     />
                 );
 
@@ -426,9 +494,11 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                         setActiveView={(v) => setActiveView(v as DiscoveryView)}
                         lastView={lastView}
                         colors={colors}
-                        currentSong={currentSong}
+                        currentSong={currentSong ?? null}
                         isPlaying={isPlaying}
                         handlePlay={handlePlay}
+                        quality={searchQuality}
+                        setQuality={setSearchQuality}
                     />
                 );
 
@@ -537,12 +607,8 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 return currentSong ? (
                     <NowPlayingOverlay
                         song={currentSong}
-                        nextSong={
-                            activeMix && activeMix.songs[activeMix.currentSongIndex + 1]
-                                ? activeMix.songs[activeMix.currentSongIndex + 1]
-                                : null
-                        }
-                        quality={activeQuality || currentTrack?.preferredQuality || "320"}
+                        nextSong={activeMix?.songs[activeMix.currentSongIndex + 1] ?? null}
+                        quality={activeQuality}
                         onClose={() => setActiveView(lastView)}
                         playback={{
                             isPlaying, togglePlay, next, prev,
@@ -578,6 +644,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                     playInstantMix={playInstantMix}
                     setIsLangModalOpen={setIsLangModalOpen}
                     colors={colors}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
                 />
 
                 <main className="flex-1 relative overflow-hidden">
@@ -617,7 +684,7 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 seek={seek}
                 volume={volume}
                 setVolume={setVolume}
-                activeQuality={activeQuality || "320"}
+                activeQuality={activeQuality}
                 currentTrack={currentTrack}
                 activeView={activeView}
                 setActiveView={setActiveView}
@@ -640,6 +707,26 @@ export function DesktopDiscovery({ theme, onThemeChange }: DesktopDiscoveryProps
                 onSave={() => {
                     setIsLangModalOpen(false);
                     loadData();
+                }}
+            />
+
+            <DesktopSettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                currentLayout="discovery"
+                onSwitchLayout={(mode) => {
+                    // Handle layout switching
+                    if (typeof window !== 'undefined') {
+                        // If switching to deck/ipod, we might need a full reload or mode switch event
+                        // For now, let's assume specific logic or just log it/reload
+                        if (mode !== 'discovery') {
+                            const confirmSwitch = confirm(`Switching to ${mode} mode will reload the application. Continue?`);
+                            if (confirmSwitch) {
+                                localStorage.setItem("melora-preferred-layout", mode);
+                                window.location.reload();
+                            }
+                        }
+                    }
                 }}
             />
         </div>

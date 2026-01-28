@@ -6,8 +6,9 @@
  * 3. NO Loose Qualities (HI_RES/LOSSLESS Only)
  */
 
-import { Capacitor } from '@capacitor/core';
+
 import { getHiFiStreamUrl } from './hifi'; // Client-side scraper
+import { HiFiLimiter } from './rate-limiter';
 
 export interface HiFiTrack {
     id: string;
@@ -45,43 +46,45 @@ export interface HiFiSearchResult {
  * Note: Still uses server proxy for SEARCH METADATA only (Safe)
  */
 export async function searchHiFi(query: string, source?: 'tidal' | 'qobuz'): Promise<HiFiSearchResult | null> {
-    if (Capacitor.isNativePlatform()) return null; // HiFi disabled on mobile
-    if (!query.trim()) return null;
+    return HiFiLimiter.add(async () => {
+        // Hi-Res now enabled on ALL platforms (Desktop + Mobile)
+        if (!query.trim()) return null;
 
-    try {
-        let url = `/api/hifi?type=search&q=${encodeURIComponent(query)}`;
-        if (source) url += `&source=${source}`;
+        try {
+            let url = `/api/hifi?type=search&q=${encodeURIComponent(query)}`;
+            if (source) url += `&source=${source}`;
 
-        const res = await fetch(url);
-        if (!res.ok) return null;
+            const res = await fetch(url);
+            if (!res.ok) return null;
 
-        const data = await res.json();
-        if (data.success && data.tracks) {
-            // STRICT FILTERING RULE:
-            // 1. Allow ONLY 'tidal' and 'qobuz' sources
-            // 2. Allow ONLY 'HI_RES_LOSSLESS' and 'LOSSLESS' qualities
-            // Discard everything else (HIGH, LOW, AAC).
-            const validTracks: HiFiTrack[] = [];
+            const data = await res.json();
+            if (data.success && data.tracks) {
+                // STRICT FILTERING RULE:
+                // 1. Allow ONLY 'tidal' and 'qobuz' sources
+                // 2. Allow ONLY 'HI_RES_LOSSLESS' and 'LOSSLESS' qualities
+                // Discard everything else (HIGH, LOW, AAC).
+                const validTracks: HiFiTrack[] = [];
 
-            for (const t of data.tracks) {
-                if (t.source !== 'tidal' && t.source !== 'qobuz') continue;
+                for (const t of data.tracks) {
+                    if (t.source !== 'tidal' && t.source !== 'qobuz') continue;
 
-                // Strict Quality Check
-                if (t.quality === 'HI_RES_LOSSLESS' || t.quality === 'LOSSLESS') {
-                    validTracks.push(t as HiFiTrack);
+                    // Strict Quality Check
+                    if (t.quality === 'HI_RES_LOSSLESS' || t.quality === 'LOSSLESS') {
+                        validTracks.push(t as HiFiTrack);
+                    }
                 }
-            }
 
-            return {
-                ...data,
-                tracks: validTracks
-            };
+                return {
+                    ...data,
+                    tracks: validTracks
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error('[HiFi Client] Search error:', error);
+            return null;
         }
-        return null;
-    } catch (error) {
-        console.error('[HiFi Client] Search error:', error);
-        return null;
-    }
+    }); // End Limiter
 }
 
 /**
@@ -90,15 +93,17 @@ export async function searchHiFi(query: string, source?: 'tidal' | 'qobuz'): Pro
  * NEVER calls /api/hifi?type=stream
  */
 export async function getHiFiStream(trackId: string, source: 'tidal' | 'qobuz'): Promise<{ url: string; quality: string; keyName: string } | null> {
-    try {
-        console.log(`[HiFi Client] Resolving stream CLIENT-SIDE for ${source}:${trackId}`);
-        // Use the client-side mirror scraper directly
-        // This avoids the server proxy ban risk
-        return await getHiFiStreamUrl(trackId, source);
-    } catch (error) {
-        console.error('[HiFi Client] Stream error:', error);
-        return null;
-    }
+    return HiFiLimiter.add(async () => {
+        try {
+            console.log(`[HiFi Client] Resolving stream CLIENT-SIDE for ${source}:${trackId}`);
+            // Use the client-side mirror scraper directly
+            // This avoids the server proxy ban risk
+            return await getHiFiStreamUrl(trackId, source);
+        } catch (error) {
+            console.error('[HiFi Client] Stream error:', error);
+            return null;
+        }
+    }, true); // High Priority for Playback
 }
 
 /**
@@ -147,25 +152,27 @@ export function hifiTrackToSong(track: HiFiTrack): any {
  * Get album tracks from HiFi (Tidal/Qobuz)
  */
 export async function getHiFiAlbum(albumId: string, source: 'tidal' | 'qobuz'): Promise<any[] | null> {
-    try {
-        const res = await fetch(`/api/hifi?type=album&id=${albumId}&source=${source}`);
-        if (!res.ok) return null;
+    return HiFiLimiter.add(async () => {
+        try {
+            const res = await fetch(`/api/hifi?type=album&id=${albumId}&source=${source}`);
+            if (!res.ok) return null;
 
-        const data = await res.json();
-        if (data.success && Array.isArray(data.tracks)) {
-            // Apply strict filter here too
-            const valid = data.tracks
-                .filter((t: any) =>
-                    (t.source === 'tidal' || t.source === 'qobuz') &&
-                    (t.quality === 'HI_RES_LOSSLESS' || t.quality === 'LOSSLESS')
-                )
-                .map((t: any) => hifiTrackToSong(t as HiFiTrack));
+            const data = await res.json();
+            if (data.success && Array.isArray(data.tracks)) {
+                // Apply strict filter here too
+                const valid = data.tracks
+                    .filter((t: any) =>
+                        (t.source === 'tidal' || t.source === 'qobuz') &&
+                        (t.quality === 'HI_RES_LOSSLESS' || t.quality === 'LOSSLESS')
+                    )
+                    .map((t: any) => hifiTrackToSong(t as HiFiTrack));
 
-            return valid;
+                return valid;
+            }
+            return null;
+        } catch (error) {
+            console.error('[HiFi Client] Album error:', error);
+            return null;
         }
-        return null;
-    } catch (error) {
-        console.error('[HiFi Client] Album error:', error);
-        return null;
-    }
+    }); // End Limiter
 }

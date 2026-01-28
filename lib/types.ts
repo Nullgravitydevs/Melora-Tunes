@@ -3,6 +3,7 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 
 // --- Audio Quality Abstraction ---
 export type AudioQuality = 'hires' | 'flac' | '320' | '160' | '96';
+export type QualityFilterType = 'auto' | 'hires' | 'flac' | '320';
 
 export interface PlayableSource {
     provider: 'jiosaavn' | 'ytmusic' | 'tidal' | 'qobuz';

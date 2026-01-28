@@ -89,8 +89,14 @@ export async function searchSongs(query: string, page: number = 1, limit: number
                     releaseDate: item.more_info?.release_date || '',
                     duration: parseInt(item.more_info?.duration || item.duration || '0'),
                     label: item.more_info?.label || '',
-                    primaryArtists: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.name).join(', ') || item.subtitle || '',
-                    primaryArtistsId: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.id).join(', ') || '',
+                    // FIX: Check multiple paths for artist - JioSaavn API is inconsistent
+                    primaryArtists:
+                        item.more_info?.artistMap?.primary_artists?.map((a: any) => a.name).join(', ') ||
+                        item.more_info?.primary_artists ||
+                        item.primary_artists ||
+                        item.subtitle ||
+                        '',
+                    primaryArtistsId: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.id).join(', ') || item.more_info?.primary_artists_id || '',
                     featuredArtists: '',
                     explicitContent: item.explicit_content,
                     playCount: parseInt(item.play_count || '0'),
@@ -553,7 +559,11 @@ async function fetchApi(params: string, useCache: boolean = false): Promise<any>
 
 export async function getTopCharts(language?: string): Promise<any[]> {
     const lang = normalizeLanguage(language);
-    const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${lang}`, true); // CACHED
+    // Charts are often specific to a region/language. If multiple are passed, 
+    // the API might default to Global. We enforce the primary (first) language 
+    // to ensure the "Language Based" requirement is met.
+    const primaryLang = lang.split(',')[0];
+    const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${primaryLang}`, true); // CACHED
     // Ensure it's an array, otherwise return empty
     return Array.isArray(data) ? data : [];
 }
@@ -585,13 +595,31 @@ export async function getNewReleases(limit: number = 10, language?: string): Pro
     try {
         const lang = normalizeLanguage(language);
         // Note: content.getAlbums is often used for new releases
-        const data = await fetchApi(`__call=content.getAlbums&api_version=4&_format=json&ctx=wap6dot0&n=${limit}&p=1&languages=${lang}`, true); // CACHED
+        // Note: content.getAlbums is often used for new releases
+        // CRITICAL FIX: The API caps at ~30 items and returns many garbage "song" type items.
+        // We fetch 2 pages concurrently to get ~60 candidates.
+        const [p1, p2] = await Promise.all([
+            fetchApi(`__call=content.getAlbums&api_version=4&_format=json&ctx=wap6dot0&n=50&p=1&languages=${lang}`, true),
+            fetchApi(`__call=content.getAlbums&api_version=4&_format=json&ctx=wap6dot0&n=50&p=2&languages=${lang}`, true)
+        ]);
 
-        // Returns object with 'data' array
-        const list = data?.data || data || [];
-        if (!Array.isArray(list)) return [];
+        const list1 = p1?.data || p1 || [];
+        const list2 = p2?.data || p2 || [];
+        const list = [...(Array.isArray(list1) ? list1 : []), ...(Array.isArray(list2) ? list2 : [])];
 
-        return list.map(mapToSong).map(s => ({
+        if (list.length === 0) return [];
+
+        // Filter out known bad data patterns
+        const validList = list.filter((item: any) => {
+            const name = (item.name || item.title || '').toLowerCase();
+            const isSongType = item.type === 'song';
+            return !isSongType && !name.includes('trailer') && !name.includes('teaser');
+        });
+
+        // Dedup by ID just in case
+        const unique = Array.from(new Map(validList.map((item: any) => [item.id, item])).values());
+
+        return unique.slice(0, limit).map(mapToSong).map(s => ({
             ...s,
             type: 'album'
         }));
@@ -604,21 +632,36 @@ export async function getNewReleases(limit: number = 10, language?: string): Pro
 export async function getFeaturedPlaylists(limit: number = 10, language?: string): Promise<any[]> {
     try {
         const lang = normalizeLanguage(language);
-        // Using search.getPlaylistResults with empty query sometimes works for "top", but featured playlists 
-        // usually come from modules. Let's try content.getFeaturedPlaylists if available or fallback to a broad search 
-        // tailored to the language.
-
         // Better endpoint: content.getFeaturedPlaylists
         const data = await fetchApi(`__call=content.getFeaturedPlaylists&fetch_from_serialized_id=true&p=1&n=${limit}&_format=json&ctx=wap6dot0&languages=${lang}`, true); // CACHED
 
         const list = data?.data || data || [];
         if (!Array.isArray(list)) return [];
 
-        return list.map(mapToSong).map(s => ({
-            ...s,
-            id: s.id || (s as any).listid, // Ensure ID mapping
-            type: 'playlist'
-        }));
+        return list.map((item: any) => {
+            return {
+                id: item.listid || item.id,
+                name: item.listname || item.title || item.name || "[Unknown Playlist]",
+                type: 'playlist',
+                album: { id: '', name: '', url: '' },
+                year: '',
+                releaseDate: '',
+                duration: 0,
+                label: '',
+                primaryArtists: item.firstname || '',
+                primaryArtistsId: '',
+                featuredArtists: '',
+                explicitContent: 0,
+                playCount: parseInt(item.play_count || item.count || '0'),
+                language: item.language || '',
+                hasLyrics: 'false',
+                url: item.perma_url,
+                copyright: '',
+                image: formatImage(item.image),
+                downloadUrl: [],
+                encryptedMediaUrl: ''
+            };
+        });
     } catch (e) {
         console.error("Error fetching featured playlists", e);
         return [];
@@ -656,7 +699,13 @@ export async function getAlbumDetails(id: string): Promise<JioSaavnSong[]> {
     const list = data?.list || data?.songs || [];
     if (!Array.isArray(list)) return [];
 
-    return list.map(mapToSong);
+    // FIX: Filter out "trailer" or "testing" placeholder tracks that clutter production albums
+    return list
+        .filter((item: any) => {
+            const name = (item.title || item.name || '').toLowerCase();
+            return !name.includes('trailer') && !name.includes('testing') && !name.includes('teaser');
+        })
+        .map(mapToSong);
 }
 
 export async function getArtistDetails(artistId: string): Promise<any> {

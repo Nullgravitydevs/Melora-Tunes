@@ -1,15 +1,39 @@
 import { searchSongs, JioSaavnSong } from './jiosaavn';
 import { getArt } from '../components/discovery/DiscoveryShared';
 import { searchHiFi, HiFiSearchResult } from './hifi-client';
-import { PlayableTrack, PlayableSource, AudioQuality } from './types';
+import { PlayableTrack, PlayableSource, AudioQuality, QualityFilterType } from './types';
+
+// ... (Normalization Helpers remain same, importing from types changed)
 
 // --- Normalization Helpers ---
 
+/**
+ * Normalize a string for fuzzy matching.
+ * Strips punctuation, common version keywords, etc.
+ */
 function normalizeStr(str: string): string {
     if (!str) return '';
     return str.toLowerCase()
         .replace(/[^a-z0-9]/g, '')
         .replace(/(original|mix|remaster|remastered|stereo|mono|version|edit|radio)/g, '');
+}
+
+/**
+ * Aggressively normalize artist name for better merging.
+ * Strips feat/ft/featuring, extra collaborators, and keeps only primary artist.
+ */
+function normalizeArtist(artist: string): string {
+    if (!artist) return '';
+    return artist
+        .toLowerCase()
+        // Remove everything after feat/ft/featuring/with/&/x
+        .split(/\s*(?:feat\.?|ft\.?|featuring|with|\&|\sx\s)/i)[0]
+        // Remove everything after comma (extra collaborators)
+        .split(',')[0]
+        // Remove punctuation and extra whitespace
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim()
+        .replace(/\s+/g, '');
 }
 
 /**
@@ -66,61 +90,77 @@ export type SearchType = 'song' | 'album' | 'artist' | 'all';
 
 const QUALITY_ORDER: AudioQuality[] = ['hires', 'flac', '320', '160', '96'];
 
-export async function searchUnified(query: string, language?: string, type: SearchType = 'song'): Promise<PlayableTrack[]> {
+export async function searchUnified(
+    query: string,
+    language?: string,
+    type: SearchType = 'song',
+    qualityPreference: QualityFilterType = 'auto'
+): Promise<PlayableTrack[]> {
     // 1. Clean Query
-    // [FIX] Don't strip "flac" or "hi-res" as they might be part of the user's intent to find specific versions
-    // const cleanQuery = query.replace(/\b(flac|lossless|hi-res|high quality|320kbps|320|128kbps|128)\b/gi, '').trim();
     const cleanQuery = query.trim();
-    console.log(`[UnifiedSearch] Query: "${query}" -> Clean: "${cleanQuery}" (Lang: ${language})`);
+    console.log(`[UnifiedSearch] Query: "${cleanQuery}" | Pref: ${qualityPreference} (Lang: ${language})`);
 
-    // 2. Parallel Fetch (Strictly Concurrent)
-    console.log(`[UnifiedSearch] Starting parallel search for: ${cleanQuery}`);
-    const [saavnResults, hifiResult] = await Promise.all([
-        searchSongs(cleanQuery, 1, 10, language).catch(err => {
+    // 2. Determine Search Strategy (Optimization)
+    const shouldSearchHiFi = qualityPreference !== '320'; // SKIP HiFi if HQ explicit
+    const shouldSearchSaavn = true; // Always search Saavn as base/backup
+
+    const promises: Promise<any>[] = [];
+
+    // Saavn Request
+    if (shouldSearchSaavn) {
+        promises.push(searchSongs(cleanQuery, 1, 10, language).catch(err => {
             console.error('[UnifiedSearch] Saavn Error:', err);
             return [];
-        }),
-        searchHiFi(cleanQuery).catch(err => {
-            console.error('[UnifiedSearch] HiFi Error:', err);
+        }));
+    } else {
+        promises.push(Promise.resolve([]));
+    }
+
+    // HiFi Request
+    if (shouldSearchHiFi) {
+        promises.push(searchHiFi(cleanQuery).catch(err => {
+            // console.error('[UnifiedSearch] HiFi Error:', err); // Silent fail allowed
             return null;
-        })
-    ]);
+        }));
+    } else {
+        promises.push(Promise.resolve(null));
+    }
+
+    // 3. Parallel Fetch
+    const [saavnResults, hifiResult] = await Promise.all(promises);
 
     const rawSaavn: JioSaavnSong[] = Array.isArray(saavnResults) ? saavnResults : [];
     const rawHiFi: HiFiSearchResult | null = hifiResult;
 
-    // 3. Deduplication Logic (Strict Merging)
+    // 4. Deduplication Logic (Strict Merging)
     const uniqueTracks: PlayableTrack[] = [];
 
     // Helper: Find existing track using Fuzzy Match
     const findMatch = (title: string, artist: string, duration: number): PlayableTrack | undefined => {
         const normTitle = normalizeStr(title);
-        const normArtist = normalizeStr(artist);
+        const normArtist = normalizeArtist(artist);
 
         return uniqueTracks.find(t => {
             if (!t.song) return false;
             const tTitle = normalizeStr(t.song.name);
-            const tArtist = normalizeStr(t.song.primaryArtists);
+            const tArtist = normalizeArtist(t.song.primaryArtists);
 
-            // 1. Text Match
-            if (tTitle !== normTitle || tArtist !== normArtist) return false;
+            // 1. Title Match
+            if (tTitle !== normTitle) return false;
 
-            // 2. Anti-Merge Guard (Keyword Check)
-            // If one has { "Live", "Remix", "Demo", "Acoustic" } and the other doesn't, DO NOT MERGE.
+            // 2. Artist Match
+            if (tArtist !== normArtist) return false;
+
+            // 3. Anti-Merge Guard
             const keywords = ['live', 'remix', 'demo', 'acoustic', 'cover', 'reprised', 'edited'];
             const tHasKeyword = keywords.some(k => tTitle.includes(k));
             const newHasKeyword = keywords.some(k => normTitle.includes(k));
 
-            if (tHasKeyword !== newHasKeyword) {
-                console.log(`[UnifiedSearch] Anti-Merge Triggered: "${t.song.name}" vs "${title}" (Keyword Mismatch)`);
-                return false;
-            }
+            if (tHasKeyword !== newHasKeyword) return false;
 
-            // 3. Duration Match (Diff < 5s)
-            // If either duration is 0, skip check (or require exact text match only?)
-            // Assumption: Valid songs have duration.
-            const diff = Math.abs(t.song.duration - duration);
-            return diff < 5; // Strictly less than 5s
+            // 4. Duration Match (10s)
+            const diff = Math.abs((parseInt(String(t.song.duration)) || 0) - duration);
+            return diff <= 10;
         });
     };
 
@@ -137,42 +177,49 @@ export async function searchUnified(query: string, language?: string, type: Sear
             const hasSource = existing.sources.some(s => s.provider === source.provider && s.quality === source.quality);
             if (!hasSource) {
                 existing.sources.push(source);
+                if (source.quality === 'flac' || source.quality === 'hires') {
+                    console.log(`[UnifiedSearch] 🔀 MERGED: "${metadata.name}" got ${source.quality}`);
+                }
             }
 
-            // UPGRADE PREFERENCE (Conservative)
-            // If new source is higher quality than current preferred, should we upgrade?
-            // User Rule: "Results are merged into ONE logical song... A single song card with real quality badges only"
-            // The UI determines badges from sources.
-            // But we need to ensure the `preferredQuality` defaults to the best available?
-            // Or just '320' default?
-            // Let's keep '320' default unless HI-RES is found.
-            if (QUALITY_ORDER.indexOf(source.quality) < QUALITY_ORDER.indexOf(existing.preferredQuality)) {
-                existing.preferredQuality = source.quality;
-                if (source.provider !== 'jiosaavn') {
-                    // Upgrade metadata only if it's a significant visual upgrade? 
-                    // Actually, keep Saavn metadata as base usually better for Indian context.
-                    // But for English, Qobuz might be better.
-                    // Current: Keep existing metadata to be stable.
+            // UPGRADE PREFERENCE (Only if Auto)
+            if (qualityPreference === 'auto') {
+                if (QUALITY_ORDER.indexOf(source.quality) < QUALITY_ORDER.indexOf(existing.preferredQuality)) {
+                    // console.log(`[UnifiedSearch] ⬆️ UPGRADE: "${metadata.name}" ${existing.preferredQuality} → ${source.quality}`);
+                    existing.preferredQuality = source.quality;
+                    existing.isExplicitPreference = true;
                 }
             }
         } else {
             // CREATE NEW
+            // Determine Preference: Explicit > Source Quality > Default
+            let prefQ: AudioQuality = '320';
+            let explicit = false;
+
+            if (qualityPreference !== 'auto') {
+                prefQ = qualityPreference as AudioQuality;
+                explicit = true;
+            } else {
+                prefQ = source.quality === 'hires' || source.quality === 'flac' ? source.quality : '320';
+                explicit = source.quality === 'hires' || source.quality === 'flac';
+            }
+
             uniqueTracks.push({
-                id: metadata.id, // Use Provider ID as base ID
+                id: metadata.id,
                 title: metadata.name,
                 artist: metadata.primaryArtists,
                 duration: metadata.duration,
                 art: getArt(metadata),
                 song: metadata,
                 sources: [source],
-                preferredQuality: source.quality === 'hires' || source.quality === 'flac' ? source.quality : '320'
+                preferredQuality: prefQ,
+                isExplicitPreference: explicit
             });
         }
     };
 
     // A. Process JioSaavn (Base)
     rawSaavn.forEach(song => {
-        // Capability: 320/160/96
         ['320', '160', '96'].forEach(q => {
             processResult({ provider: 'jiosaavn', songId: song.id, quality: q as AudioQuality }, song);
         });
@@ -192,6 +239,15 @@ export async function searchUnified(query: string, language?: string, type: Sear
         });
     }
 
-    console.log(`[UnifiedSearch] Merged ${uniqueTracks.length} unique tracks from ${rawSaavn.length} Saavn + ${rawHiFi?.tracks?.length || 0} HiFi results.`);
+    // Force Explicit Preference on Merged Items 
+    // (If existing item was created with '320' but then merged with HiFi in strict mode, we need to ensure pref is strict)
+    if (qualityPreference !== 'auto') {
+        uniqueTracks.forEach(t => {
+            t.preferredQuality = qualityPreference as AudioQuality;
+            t.isExplicitPreference = true;
+        });
+    }
+
+    console.log(`[UnifiedSearch] Merged ${uniqueTracks.length} from Saavn:${rawSaavn.length} HiFi:${rawHiFi?.tracks?.length || 0}`);
     return uniqueTracks;
 }
