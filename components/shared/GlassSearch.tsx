@@ -211,33 +211,35 @@ export function GlassSearch({ onClose, initialQuery = "", variant = 'overlay' }:
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-24">
 
                         {/* HERO RESULT (First Item) */}
-                        <div className="md:col-span-2 row-span-2 group relative rounded-[2rem] overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl hover:border-white/20 transition-all cursor-pointer" onClick={() => handlePlay(results[0])}>
+                        <div className="md:col-span-2 row-span-2 group relative rounded-[2.5rem] overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl hover:border-white/20 transition-all duration-500 cursor-pointer" onClick={() => handlePlay(results[0])}>
                             {/* Background Blur */}
-                            <div className="absolute inset-0 z-0">
-                                <img src={getArt(results[0])} className="w-full h-full object-cover opacity-60 blur-3xl scale-125" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                            <div className="absolute inset-0 z-0 overflow-hidden">
+                                <img src={getArt(results[0])} className="w-full h-full object-cover opacity-60 blur-3xl scale-150 group-hover:scale-125 transition-transform duration-[2s]" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                             </div>
 
                             {/* Content */}
-                            <div className="relative z-10 h-full p-8 flex flex-col justify-end items-start text-left">
+                            <div className="relative z-10 h-full p-10 flex flex-col justify-end items-start text-left">
                                 <div className="mb-auto">
-                                    <span className="px-3 py-1 rounded-lg bg-black/40 backdrop-blur text-[10px] font-bold uppercase tracking-widest text-emerald-400 border border-emerald-500/20 shadow-lg">Top Result</span>
+                                    <span className="px-4 py-1.5 rounded-xl bg-emerald-500/20 backdrop-blur-md text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400 border border-emerald-500/20 shadow-lg">Top Result</span>
                                 </div>
 
-                                <motion.img
-                                    layoutId={`img-${results[0].id}`}
-                                    src={getArt(results[0])}
-                                    className="w-32 h-32 rounded-2xl shadow-2xl mb-6 object-cover border border-white/10"
-                                />
+                                <div className="relative mb-8">
+                                    <motion.img
+                                        layoutId={`img-${results[0].id}`}
+                                        src={getArt(results[0])}
+                                        className="w-40 h-40 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] object-cover border border-white/20 group-hover:scale-105 transition-transform duration-500"
+                                    />
+                                    <div className="absolute -bottom-4 -right-4 w-12 h-12 rounded-2xl bg-white text-black flex items-center justify-center shadow-2xl opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+                                        <Play size={20} fill="currentColor" />
+                                    </div>
+                                </div>
 
-                                <h2 className="text-4xl font-bold leading-tight mb-2 line-clamp-2">{decodeHtml(results[0].title)}</h2>
-                                <p className="text-xl text-white/70 font-medium mb-6">{decodeHtml(results[0].artist)}</p>
+                                <h2 className="text-5xl font-black leading-tight mb-3 line-clamp-2 tracking-tight">{decodeHtml(results[0].title)}</h2>
+                                <p className="text-2xl text-white/50 font-semibold mb-8 tracking-tight">{decodeHtml(results[0].artist)}</p>
 
-                                {/* Play Button Interaction */}
-                                <div className="absolute bottom-8 right-8 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-                                    <button className="w-16 h-16 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform">
-                                        <Play size={28} fill="currentColor" className="ml-1" />
-                                    </button>
+                                <div className="flex items-center gap-4">
+                                    <QualityBadge quality={results[0]._quality as any || (results[0].sources?.some(s => s.quality === 'hires') ? 'hires' : results[0].sources?.some(s => s.quality === 'flac') ? 'flac' : undefined)} variant="full" />
                                 </div>
                             </div>
                         </div>
@@ -247,20 +249,20 @@ export function GlassSearch({ onClose, initialQuery = "", variant = 'overlay' }:
                             <div
                                 key={track.id}
                                 onClick={() => handlePlay(track)}
-                                className="group relative bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-3xl p-4 flex items-center gap-4 transition-all cursor-pointer active:scale-[0.98]"
+                                className="group relative bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/10 rounded-[1.5rem] p-4 flex items-center gap-4 transition-all duration-300 cursor-pointer active:scale-[0.98] backdrop-blur-md"
                             >
-                                <div className="w-16 h-16 rounded-2xl bg-neutral-800 overflow-hidden shadow-lg relative shrink-0">
-                                    <img src={getArt(track)} className="w-full h-full object-cover brightness-90 group-hover:brightness-100 transition-all" />
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Play size={20} fill="white" />
+                                <div className="w-16 h-16 rounded-2xl bg-neutral-800 overflow-hidden shadow-xl relative shrink-0 border border-white/5">
+                                    <img src={getArt(track)} className="w-full h-full object-cover brightness-90 group-hover:brightness-105 group-hover:scale-105 transition-all duration-500" />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-[2px]">
+                                        <Play size={20} fill="white" className="scale-75 group-hover:scale-100 transition-transform duration-300" />
                                     </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-lg truncate leading-tight mb-1">{decodeHtml(track.title)}</h4>
-                                    <p className="text-sm text-white/50 truncate">{decodeHtml(track.artist)}</p>
+                                    <h4 className="font-bold text-lg truncate leading-tight mb-1 text-white/90 group-hover:text-white transition-colors">{decodeHtml(track.title)}</h4>
+                                    <p className="text-sm text-white/40 truncate font-medium">{decodeHtml(track.artist)}</p>
 
                                     {/* BADGES (Unified) */}
-                                    <div className="mt-2 text-left">
+                                    <div className="mt-2 text-left flex items-center gap-2">
                                         <QualityBadge quality={track._quality as any || (track.sources?.some(s => s.quality === 'hires') ? 'hires' : track.sources?.some(s => s.quality === 'flac') ? 'flac' : undefined)} variant="mini" />
                                     </div>
                                 </div>
@@ -268,9 +270,16 @@ export function GlassSearch({ onClose, initialQuery = "", variant = 'overlay' }:
                                 {/* ADD BUTTON */}
                                 <button
                                     onClick={(e) => handleAddAction(e, track)}
-                                    className={`p-3 rounded-2xl transition-all border ${addingToTrackId === track.id ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/5 hover:border-white/20 hover:bg-white/10 text-white/40 hover:text-white'}`}
+                                    className={`w-12 h-12 rounded-2xl transition-all duration-300 border flex items-center justify-center relative overflow-hidden group/btn ${addingToTrackId === track.id
+                                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                                        : 'bg-white/[0.02] border-white/5 hover:border-white/20 hover:bg-white/10 text-white/20 hover:text-white shadow-lg'
+                                        }`}
                                 >
-                                    {addingToTrackId === track.id ? <Check size={20} /> : <Plus size={20} />}
+                                    {addingToTrackId === track.id ? (
+                                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><Check size={18} /></motion.div>
+                                    ) : (
+                                        <Plus size={18} className="group-hover/btn:rotate-90 transition-transform duration-300" />
+                                    )}
                                 </button>
                             </div>
                         ))}
@@ -290,39 +299,49 @@ export function GlassSearch({ onClose, initialQuery = "", variant = 'overlay' }:
                         <>
                             <div className="fixed inset-0 z-[110]" onClick={() => setShowPlaylistSelector(null)} />
                             <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                initial={{ opacity: 0, scale: 0.9, y: 10 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                className="fixed z-[120] w-64 max-h-80 overflow-y-auto bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl p-2 flex flex-col gap-1 backdrop-blur-2xl"
+                                exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                className="fixed z-[120] w-72 max-h-96 overflow-y-auto bg-neutral-900 border border-white/10 rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] p-3 flex flex-col gap-1 backdrop-blur-3xl"
                                 style={{
-                                    left: Math.min(showPlaylistSelector.x, typeof window !== 'undefined' ? window.innerWidth - 270 : 0),
-                                    top: Math.min(showPlaylistSelector.y, typeof window !== 'undefined' ? window.innerHeight - 340 : 0)
+                                    left: Math.min(showPlaylistSelector.x, typeof window !== 'undefined' ? window.innerWidth - 300 : 0),
+                                    top: Math.min(showPlaylistSelector.y, typeof window !== 'undefined' ? window.innerHeight - 400 : 0)
                                 }}
                             >
-                                <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/30 border-b border-white/5 mb-1">
-                                    Add to Playlist
+                                <div className="px-4 py-3 flex items-center justify-between border-b border-white/5 mb-2">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Add to Playlist</span>
+                                    <X size={14} className="text-white/20 cursor-pointer hover:text-white transition-colors" onClick={() => setShowPlaylistSelector(null)} />
                                 </div>
-                                {playlists.length === 0 ? (
-                                    <div className="p-4 text-center text-xs text-white/40 italic">
-                                        No playlists found.
-                                    </div>
-                                ) : (
-                                    playlists.map(pl => (
-                                        <button
-                                            key={pl.id}
-                                            onClick={() => addToPlaylist(pl.id, showPlaylistSelector.track)}
-                                            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-white/10 transition-colors text-left group"
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                                                <ListMusic size={14} className="text-white/60" />
+
+                                <div className="flex flex-col gap-1 overflow-y-auto pr-1 custom-scrollbar">
+                                    {playlists.length === 0 ? (
+                                        <div className="p-8 text-center flex flex-col items-center gap-3">
+                                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center">
+                                                <ListMusic size={20} className="text-white/20" />
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-medium text-white truncate">{pl.name}</div>
-                                                <div className="text-[10px] text-white/30">{pl.tracks.length} tracks</div>
-                                            </div>
-                                        </button>
-                                    ))
-                                )}
+                                            <p className="text-xs text-white/40 font-medium">No playlists found</p>
+                                        </div>
+                                    ) : (
+                                        playlists.map(pl => (
+                                            <button
+                                                key={pl.id}
+                                                onClick={() => addToPlaylist(pl.id, showPlaylistSelector.track)}
+                                                className="flex items-center gap-4 w-full px-3 py-3 rounded-2xl hover:bg-white/[0.05] active:scale-[0.97] transition-all text-left group border border-transparent hover:border-white/5"
+                                            >
+                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center group-hover:from-emerald-500/20 group-hover:to-emerald-500/10 transition-colors shrink-0">
+                                                    <ListMusic size={16} className="text-white/40 group-hover:text-emerald-400 transition-colors" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-bold text-white/90 group-hover:text-white truncate transition-colors">{pl.name}</div>
+                                                    <div className="text-[10px] text-white/30 font-medium tracking-tight">{pl.tracks.length} {pl.tracks.length === 1 ? 'track' : 'tracks'}</div>
+                                                </div>
+                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <ChevronRight size={14} className="text-white/20" />
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
                             </motion.div>
                         </>
                     )}

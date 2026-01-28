@@ -9,17 +9,22 @@ export interface AppSettings {
     userName?: string;
     userDOB?: string;
     languages?: string[];
+    crossfadeDuration?: number;
+    stopAtEndOfSong?: boolean;
+    notificationsEnabled?: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     volume: 0.7,
     clickSounds: true,
     theme: 'classic', // White/Classic iPod
-    theme: 'classic', // White/Classic iPod
     qualityPreference: '320', // Default to High Quality
     lastPlayedSongId: null,
     version: '2.0.0',
-    languages: ['english', 'hindi']
+    languages: ['english', 'hindi'],
+    crossfadeDuration: 3,
+    stopAtEndOfSong: false,
+    notificationsEnabled: true
 };
 
 const STORAGE_KEY = 'melora-settings';

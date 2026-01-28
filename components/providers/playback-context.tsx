@@ -515,7 +515,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                                 .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality)) // [FIX Bug 9] Normalize immediately
                                 .filter(sTrack => {
                                     // [FIX Bug 19] Strict deduplication using PlayableTrack IDs
-                                    if (sTrack.id === seed.id || sTrack.song.id === seed.song.id) return false;
+                                    if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
 
                                     return !currentMix.songs.some(existing => {
                                         const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
@@ -882,7 +882,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // 2. Search Fallback
         if (allowSearch) {
             try {
-                const query = `${track.song.name} ${track.song.primaryArtists}`;
+                const query = `${track.title} ${track.artist}`;
                 const searchResult = await searchHiFi(query);
                 if (searchResult && searchResult.tracks && searchResult.tracks.length > 0) {
                     const match = searchResult.tracks[0];
@@ -900,7 +900,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // --- MASTER RESOLVER (Melora Explicit Truth) ---
     const resolvePlayableUrl = useCallback(async (track: PlayableTrack): Promise<{ url: string, quality: AudioQuality, keyName?: string } | null> => {
-        const songName = track.song.name;
+        const songName = track.title;
         // 1. Strict Request: Use explicit preference if set, otherwise default to context qualityPreference
         // The track.preferredQuality is populated by the Caller (e.g. Search Click or PlaybackEngine defaults)
         const targetQ = track.preferredQuality || '320';
@@ -972,7 +972,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             } else {
                 // Try JioSaavn
                 // [FIX Bug 4] Do NOT downgrade to Saavn if we already found HiFi (shouldn't happen due to break, but safety)
-                if (!hiFiResolved) {
+                if (!hiFiResolved && track.song) {
                     result = await tryJioSaavn(track.song, q);
                 }
             }
@@ -983,7 +983,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 // --- TRUTH TOAST ---
                 if (result.quality !== targetQ && !toastOnceRef.current) {
                     // [FIX Bug 20] Throttle duplicate downgrade toasts
-                    const songName = track.song.name;
+                    const songName = track.title;
                     const key = `${songName}:${targetQ}:${result.quality}`;
 
                     if (downgradeToastRef.current !== key) {
@@ -1084,19 +1084,19 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             track = { ...track, preferredQuality: targetQualityPreference };
         }
 
-        const songSource = `${track.song.name} (${track.id}) [${track.preferredQuality}]`;
+        const songSource = `${track.title} (${track.id}) [${track.preferredQuality}]`;
 
         // 3. FETCH URL (Unified via Resolver now)
         try {
             // 4. Fallback to Stream API for non-standard tracks (e.g. video types)
-            const isVideo = track.song.type === 'video';
+            const isVideo = track.song?.type === 'video';
 
             if (isVideo) {
                 // Video logic placeholder
             }
 
             // CRITICAL FIX: Always resolve URL just-in-time
-            console.log(`[Playback] Resolving JIT URL for: ${track.song.name} (Preferred: ${track.preferredQuality})`);
+            console.log(`[Playback] Resolving JIT URL for: ${track.title} (Preferred: ${track.preferredQuality})`);
 
             // Using UNSPLIT Resolver (Handles both Offline and Online phases internally)
             const result = await resolvePlayableUrl(track);
@@ -1276,9 +1276,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         const nextItem = activeMix.songs[nextIndex];
-        const nextSong = isPlayableTrack(nextItem) ? nextItem.song : nextItem;
+        const nextTitle = isPlayableTrack(nextItem) ? nextItem.title : nextItem.name;
 
-        console.log("[Next] Advancing to:", nextSong.name);
+        console.log("[Next] Advancing to:", nextTitle);
 
         // Optimistic update
         updateMix(activeMix.id, { currentSongIndex: nextIndex });
@@ -1561,7 +1561,6 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         eq,
         downloadSong, removeDownload, isDownloaded,
         playInstantMix,
-        activeQuality: currentTrack ? currentTrack.preferredQuality : null,
         showToast,
     };
 
