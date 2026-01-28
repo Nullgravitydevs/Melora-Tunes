@@ -262,7 +262,8 @@ export function PlaylistScreen({
                                         ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, "0")}`
                                         : "--:--",
                                     art: getArt(song),
-                                    original: song
+                                    original: song,
+                                    quality: playableTracks[i]?.preferredQuality // Pass quality
                                 }}
                                 colors={colors}
                                 isPlaying={currentSong?.id === song.id && isPlaying}

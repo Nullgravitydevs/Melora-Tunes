@@ -176,15 +176,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
     const isMobile = useIsMobile();
 
-    const handleSwitchToDesktop = (mode?: string) => { // Updated to accept string for 'GLASS'
-        if (isMobile && mode !== 'GLASS') {
-            showToast("Desktop Only Feature");
-            return;
-        }
-        // Small delay to hear sound before unmount
-        setTimeout(() => {
-            if (onSwitchToDesktop) onSwitchToDesktop(mode);
-        }, 300);
+    // Mode switching handler
+    const handleSwitchMode = (mode: string) => {
+        window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: mode }));
     };
 
     const toggleLock = () => {
@@ -682,7 +676,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 { label: "Themes", type: 'navigation', target: 'theme-settings' },
                 { label: "Sticker Collection", type: 'action', data: { id: 'sticker-collection' } },
                 { label: "Clean All Stickers (Cheat)", type: 'action', action: handleClearStickers },
-                { label: "Switch to Discovery Mode", type: 'action', action: () => onSwitchToDesktop && onSwitchToDesktop('GLASS') }, // Update to 'GLASS' for consistency if 'zen' was old logic, but sticking to existing pattern is safer. Actually, let's keep it simply as removing the previous line.
+                { label: "Switch to Discovery Mobile", type: 'action', action: () => handleSwitchMode('DISCOVERY') },
             ];
             case 'games': return GAMES_MENU;
 
@@ -1554,6 +1548,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             // Find index of current song's album
             const index = currentSong?.album?.id ? albums.findIndex(a => a.id === currentSong.album.id) : 0;
             setViewStack(prev => [...prev, { id: 'cover-flow', title: 'Cover Flow', viewType: 'cover-flow', selectedIndex: index >= 0 ? index : 0 }]);
+        } else if (item.data?.id === 'sticker-collection') {
+            setViewStack(prev => [...prev, { id: 'stickers', title: 'Stickers', viewType: 'stickers', selectedIndex: 0 }]);
         } else if (item.data?.id === 'now-playing') {
             goToNowPlaying();
         } else if (item.data?.id === 'lyrics') {
@@ -1728,7 +1724,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     };
 
     return (
-        <div className={`flex flex-col items-center justify-center select-none w-full h-full min-h-screen ${ipodTheme === 'blue' ? 'font-jakarta' : 'font-vietnam'}`}>
+        <div className={`flex flex-col items-center justify-center select-none w-full h-[100dvh] overflow-hidden bg-black p-3 md:p-0 ${ipodTheme === 'blue' ? 'font-jakarta' : 'font-vietnam'}`}>
             {/* MAIN CONTAINER: Layout Wrapper */}
             <motion.div
                 ref={iPodBodyRef}
@@ -1740,7 +1736,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             >
                 {/* 2. INNER MASK: The iPod Body (Clipped) */}
                 <div
-                    className={`absolute inset-0 md:rounded-[3rem] overflow-hidden z-0 pointer-events-none ${getThemeClasses()}`}
+                    className={`absolute inset-0 rounded-[2.5rem] md:rounded-[3rem] overflow-hidden z-0 pointer-events-none ${getThemeClasses()}`}
                     style={{
                         WebkitTapHighlightColor: 'transparent',
                         WebkitTouchCallout: 'none',
@@ -1925,6 +1921,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                                     item.action();
                                 } else if (item.type === 'navigation' && item.target) {
                                     handleNavigation(item.target, item.data, item.label);
+                                } else if (item.data?.id === 'sticker-collection') {
+                                    setViewStack(prev => [...prev, { id: 'stickers', title: 'Stickers', viewType: 'stickers', selectedIndex: 0 }]);
                                 }
                             }}
                             isFlipped={currentView.isFlipped}

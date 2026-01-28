@@ -48,6 +48,7 @@ export interface Mix {
     color: "orange" | "purple" | "white" | "green" | "red" | "blue" | "cyan" | "pink" | "teal" | "yellow" | "black";
     songs: (JioSaavnSong | PlayableTrack)[];
     currentSongIndex: number;
+    pinned?: boolean; // New: Sync with Deck
 }
 
 
@@ -98,8 +99,13 @@ interface PlaybackContextType {
     setCrossfadeDuration: (duration: number) => void;
 
     // Audio Quality
-    bitrate: AudioQuality;
-    setBitrate: (bitrate: AudioQuality) => void;
+    qualityPreference: AudioQuality;
+    setQualityPreference: (q: AudioQuality) => void;
+
+    // Sync
+    togglePin: (mixId: string) => void;
+    // bitrate: AudioQuality; // REMOVED
+    // setBitrate: (bitrate: AudioQuality) => void; // REMOVED
 
     // Hi-Res Override - REMOVED (Use bitrate: 'flac' instead)
 
@@ -136,6 +142,9 @@ interface PlaybackContextType {
 
     // Active Streaming Quality
     activeQuality: AudioQuality | null;
+
+    // Toasts
+    showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -153,8 +162,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [shuffle, setShuffle] = useState(false);
     const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
-    const [bitrate, setSelectBitrate] = useState<AudioQuality>('320'); // Default 320 for init
-    // forceLossless REMOVED - use bitrate: 'flac' instead
+    const [qualityPreference, setQualityPreferenceState] = useState<AudioQuality>('320'); // Default 320 for init
+    // forceLossless REMOVED - use qualityPreference: 'flac' instead
     const [sleepTimer, setSleepTimer] = useState<{ endTime: number; duration: number } | null>(null);
     const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
     const [stopAtEndOfSong, setStopAtEndOfSong] = useState(false);
@@ -214,8 +223,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const currentTrack = useMemo(() => {
         if (!rawCurrentItem) return undefined;
         if (isPlayableTrack(rawCurrentItem)) return rawCurrentItem;
-        return ensurePlayableTrack(rawCurrentItem, bitrate as AudioQuality);
-    }, [rawCurrentItem, bitrate]);
+        return ensurePlayableTrack(rawCurrentItem, qualityPreference as AudioQuality);
+    }, [rawCurrentItem, qualityPreference]);
 
     // --- Persistence ---
     const DISCOVERY_MIX_ID = 'discovery-mix';
@@ -283,9 +292,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 title: "Discovery Mix",
                 color: "blue",
                 songs: [],
-                currentSongIndex: 0
-            },
-            { id: "1", title: "My Tape", color: "orange", songs: [], currentSongIndex: 0 }
+                currentSongIndex: 0,
+                pinned: false
+            }
         ]);
     };
 
@@ -443,14 +452,25 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // --- Persistence Effects ---
     // Load settings
     useEffect(() => {
-        const s = loadSettings() as any; // Cast to allow new settings like crossfade
-        if (s.bitrate) setSelectBitrate(s.bitrate);
+        const s = loadSettings();
+        if (s.qualityPreference) setQualityPreferenceState(s.qualityPreference as AudioQuality);
         if (s.crossfadeDuration !== undefined) setCrossfadeDuration(s.crossfadeDuration);
     }, []);
 
+    // Toggle Pin Logic
+    const togglePin = (mixId: string) => {
+        setMixes(prev => prev.map(m => {
+            if (m.id === mixId) {
+                const newPinned = !m.pinned;
+                showToast(newPinned ? `Pinned "${m.title}" to Deck` : `Unpinned "${m.title}"`, 'success');
+                return { ...m, pinned: newPinned };
+            }
+            return m;
+        }));
+    };
+
     // Sync active mix song to currentSong - REMOVED (Computed state)
 
-    // --- Autoplay & Pre-fetch Logic ---(Moved after Actions) ---
     // --- Autoplay & Pre-fetch Logic ---
     const autoplayFetchedRef = useRef<string | null>(null);
 
@@ -492,7 +512,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             // Merge Strategy: Append new songs (excluding duplication)
                             // Merge Strategy: Append new songs (excluding duplication)
                             const newSongs = newMix.songs
-                                .map(s => ensurePlayableTrack(s, bitrate as AudioQuality)) // [FIX Bug 9] Normalize immediately
+                                .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality)) // [FIX Bug 9] Normalize immediately
                                 .filter(sTrack => {
                                     // [FIX Bug 19] Strict deduplication using PlayableTrack IDs
                                     if (sTrack.id === seed.id || sTrack.song.id === seed.song.id) return false;
@@ -518,7 +538,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     });
             }
         }
-    }, [progress, duration, activeMixId, isPlaying, currentSong, updateMix]);
+    }, [progress, duration, activeMixId, isPlaying, currentSong, updateMix, qualityPreference]);
 
     const loadMix = useCallback((mixId: string) => {
         console.log("[loadMix] Called with:", mixId, "current:", activeMixId);
@@ -566,7 +586,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         // 1. Normalize songs FIRST
         const normalizedSongs = mix.songs.map(s =>
-            isPlayableTrack(s) ? s : ensurePlayableTrack(s, bitrate as AudioQuality)
+            isPlayableTrack(s) ? s : ensurePlayableTrack(s, qualityPreference as AudioQuality)
         );
 
         const safeMix: Mix = {
@@ -575,14 +595,41 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             currentSongIndex: 0
         };
 
-        // 2. Replace mixes atomically
+        // 2. Refactor to Single "Discovery Mix" Logic
         setMixes(prev => {
-            const filtered = prev.filter(m => m.id === DISCOVERY_MIX_ID);
-            return [...filtered, safeMix];
+            // Keep pinned playlist tapes
+            const pinned = prev.filter(m => m.pinned);
+
+            // Find existing Discovery Mix or create fresh
+            const existingDiscovery = prev.find(m => m.id === DISCOVERY_MIX_ID);
+
+            // Merge Songs: New Mix songs + Existing Discovery songs
+            // Deduplicate: If song exists, remove old instance (MRU behavior)
+            const newSongIds = new Set(safeMix.songs.map(s => isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id));
+
+            const oldSongs = existingDiscovery ? existingDiscovery.songs.filter(s => {
+                const id = isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id;
+                return !newSongIds.has(id);
+            }) : [];
+
+            // Combine: New Songs at TOP, followed by history
+            const mergedSongs = [...safeMix.songs, ...oldSongs].slice(0, 100); // Limit queue history?
+
+            const updatedDiscoveryMix: Mix = {
+                id: DISCOVERY_MIX_ID,
+                title: "Discovery Mix", // Always keep this name
+                color: "blue",
+                songs: mergedSongs,
+                currentSongIndex: 0,
+                pinned: false
+            };
+
+            // Result: Pinned Tapes + Single Discovery Tape
+            return [...pinned, updatedDiscoveryMix];
         });
 
         // 3. Set active mix
-        setActiveMixId(safeMix.id);
+        setActiveMixId(DISCOVERY_MIX_ID);
 
         // 4. HARD RESET PLAYER
         setIsPlaying(false);
@@ -595,16 +642,68 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             setShuffle(false);
             setIsPlaying(true);
         }, 200);
-    }, [bitrate]);
+    }, [qualityPreference]);
 
 
 
-    const play = useCallback(() => {
+    const play = useCallback(async () => {
         console.log("[play] Called, activeMixId:", activeMixId);
         if (!activeMixId) return;
+
+        // Ensure we have a playable track with sources
+        const trackToPlay = currentTrack || await ensurePlayableTrack(currentSong, qualityPreference);
+
+        // Quality Fallback Check
+        if (trackToPlay && trackToPlay.preferredQuality !== qualityPreference) {
+            // Logic: If user wants HI-RES/FLAC but we got 320/160
+            if ((qualityPreference === 'hires' || qualityPreference === 'flac') &&
+                (trackToPlay.preferredQuality === '320' || trackToPlay.preferredQuality === '160')) {
+                showToast(`Playing ${trackToPlay.preferredQuality}kbps (${qualityPreference.toUpperCase()} unavailable)`, 'info');
+            }
+        }
+
+        // [New Feature] Sync Play to Discovery Mix (Recents)
+        // If we are playing from a non-Discovery mix context, should we add it?
+        // User wants "Discovery Mix" to show "Recents".
+        if (trackToPlay) {
+            // Logic: Update Discovery Mix with this track
+            setMixes(prev => {
+                const pinned = prev.filter(m => m.pinned);
+                // Discovery Mix Handling
+                const existing = prev.find(m => m.id === DISCOVERY_MIX_ID) || {
+                    id: DISCOVERY_MIX_ID,
+                    title: "Discovery Mix",
+                    color: "blue",
+                    songs: [],
+                    currentSongIndex: 0,
+                    pinned: false
+                };
+
+                const trackId = trackToPlay.id;
+                // Remove existing instance of this song to move it to top
+                const cleanSongs = existing.songs.filter(s => {
+                    const id = isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id;
+                    return id !== trackId;
+                });
+
+                // Add to TOP
+                const normalizeTrack = isPlayableTrack(trackToPlay) ? trackToPlay : ensurePlayableTrack(trackToPlay);
+                const newSongs = [normalizeTrack, ...cleanSongs].slice(0, 50);
+
+                const updatedDiscovery: Mix = { ...existing, songs: newSongs };
+
+                // Return Logic:
+                // If the current active mix IS Discovery Mix, we just updated it.
+                // If active mix is Playlists, we still update Discovery Mix in background.
+                const otherMixes = prev.filter(m => m.id !== DISCOVERY_MIX_ID && !m.pinned);
+
+                return [...pinned, updatedDiscovery, ...otherMixes.filter(m => m.id !== existing.id)];
+            });
+        }
+
         setIsPlaying(true);
         audioPlayerRef.current?.play();
-    }, [activeMixId]);
+    }, [activeMixId, currentSong, currentTrack, qualityPreference, showToast]);
 
     const pause = useCallback(() => {
         console.log("[pause] Called");
@@ -640,8 +739,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // Always derive "track" first to resolve the proper preferences
         // Note: For pure JioSaavnSong input, ensurePlayableTrack creates a wrapper but ID might be provider ID.
         // Unified Search results passed here are PlayableTracks with STABLE IDs.
-        const currentBitrate = bitrate as AudioQuality;
-        const track = ensurePlayableTrack(songOrTrack, currentBitrate);
+        const currentQualityPreference = qualityPreference as AudioQuality;
+        const track = ensurePlayableTrack(songOrTrack, currentQualityPreference);
 
         const songMetadata = track.song;
         if (!songMetadata) {
@@ -656,7 +755,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             // Strict Rule 2: Downloads must NEVER silently downgrade.
             const result = await resolvePlayableUrl(track); // Use resolver to find BEST url (Online check phase essentially)
 
-            // We specifically want the TARGET quality. resolvePlayableUrl falls back. 
+            // We specifically want the TARGET quality. resolvePlayableUrl falls back.
             // We must verify the result quality matches strictly.
             if (!result || result.quality !== targetQuality) {
                 if (result && result.quality !== targetQuality) {
@@ -802,7 +901,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // --- MASTER RESOLVER (Melora Explicit Truth) ---
     const resolvePlayableUrl = useCallback(async (track: PlayableTrack): Promise<{ url: string, quality: AudioQuality, keyName?: string } | null> => {
         const songName = track.song.name;
-        // 1. Strict Request: Use explicit preference if set, otherwise default to context bitrate
+        // 1. Strict Request: Use explicit preference if set, otherwise default to context qualityPreference
         // The track.preferredQuality is populated by the Caller (e.g. Search Click or PlaybackEngine defaults)
         const targetQ = track.preferredQuality || '320';
 
@@ -901,7 +1000,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         // --- PHASE 3: LAST RESORT (Hail Mary) ---
-        // If specific ID/Quality lookup failed, the ID might be dead. 
+        // If specific ID/Quality lookup failed, the ID might be dead.
         // Try to find ANY version of this song that works.
         try {
             console.log(`[Resolver] Phase 3: Hail Mary for "${songName}"...`);
@@ -956,15 +1055,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         const requestId = ++loadRequestId.current;
-        const targetBitrate = (overrideQuality as AudioQuality) || (bitrate as AudioQuality);
+        const targetQualityPreference = (overrideQuality as AudioQuality) || (qualityPreference as AudioQuality);
 
         // Ensure we have a PlayableTrack
-        let track = ensurePlayableTrack(songOrTrack, targetBitrate);
+        let track = ensurePlayableTrack(songOrTrack, targetQualityPreference);
 
         // --- PREFERENCE LOGIC ---
         // 1. If overrideQuality is passed (e.g. user toggled setting while playing), force it.
         if (overrideQuality) {
-            track = { ...track, preferredQuality: targetBitrate, isExplicitPreference: true };
+            track = { ...track, preferredQuality: targetQualityPreference, isExplicitPreference: true };
         }
         // 2. If it's a PlayableTrack (from Unified Search or Queue) and we DID NOT just convert it from a raw song
         //    AND it has a specific preference that differs from global default...
@@ -978,11 +1077,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             if (songOrTrack.isExplicitPreference) {
                 track = songOrTrack; // Respect manual choice
             } else {
-                track = { ...songOrTrack, preferredQuality: targetBitrate }; // Apply global default
+                track = { ...songOrTrack, preferredQuality: targetQualityPreference }; // Apply global default
             }
         } else {
-            // Raw song: Apply global targetBitrate
-            track = { ...track, preferredQuality: targetBitrate };
+            // Raw song: Apply global targetQualityPreference
+            track = { ...track, preferredQuality: targetQualityPreference };
         }
 
         const songSource = `${track.song.name} (${track.id}) [${track.preferredQuality}]`;
@@ -1037,22 +1136,19 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             setCurrentSongUrl(''); // Empty string triggers error in AudioPlayer
         }
 
-    }, [bitrate, resolvePlayableUrl]);
+    }, [qualityPreference, resolvePlayableUrl, showToast]);
 
 
+    const setQualityPreference = useCallback((newQualityPreference: AudioQuality) => {
+        setQualityPreferenceState(newQualityPreference);
+        saveSettings({ qualityPreference: newQualityPreference });
+        showToast(`Audio Quality set to ${newQualityPreference.toUpperCase()}`, 'info');
 
-
-
-
-
-    const setBitrate = useCallback((newBitrate: AudioQuality) => {
-        setSelectBitrate(newBitrate);
-        saveSettings({ bitrate: newBitrate });
         // [FIX Bug 16] Reload using currentTrack to preserve source metadata
         if (currentTrack) {
-            loadSongUrl(currentTrack, newBitrate);
+            loadSongUrl(currentTrack, newQualityPreference);
         }
-    }, [currentTrack, loadSongUrl]);
+    }, [currentTrack, loadSongUrl, showToast]);
 
     // Effect to load URL when song changes
     // MOVED: To line 1390+ to respect currentTrack scope
@@ -1100,7 +1196,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [progress, duration, crossfadeDuration, volume, isPlaying]);
 
     const next = useCallback(() => {
-        // forceLossless removed - quality is now controlled by bitrate setting only
+        // forceLossless removed - quality is now controlled by qualityPreference setting only
 
         // Use Refs for latest state to prevent closure staleness on rapid clicks
         const currentActiveMixId = activeMixIdRef.current;
@@ -1196,7 +1292,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         // Use timeout to allow state to settle? Not strictly needed if `updateMix` triggers effect.
         if (!isPlaying) setIsPlaying(true);
-    }, [repeat, shuffle, isPlaying, updateMix, stopAtEndOfSong, pause]);
+    }, [repeat, shuffle, isPlaying, updateMix, stopAtEndOfSong, pause, currentTrack]);
 
     const prev = useCallback(() => {
         // Use Refs for latest state
@@ -1353,7 +1449,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             try {
                 // [FIX Bug 6] Inherit quality from current track if possible
                 // If I am listening to FLAC, preload next song in FLAC too.
-                const targetQ = currentTrack?.preferredQuality || (bitrate as AudioQuality);
+                const targetQ = currentTrack?.preferredQuality || (qualityPreference as AudioQuality);
                 const track = ensurePlayableTrack(nextItem, targetQ);
 
                 // Use Resolver
@@ -1373,7 +1469,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         loadNext();
 
         return () => { cancelled = true; };
-    }, [activeMixId, mixes, bitrate, resolvePlayableUrl, currentSong?.id, currentSongUrl, currentTrack]); // Added currentTrack dep
+    }, [activeMixId, mixes, qualityPreference, resolvePlayableUrl, currentSong?.id, currentSongUrl, currentTrack]); // Added currentTrack dep
 
 
 
@@ -1449,12 +1545,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         isLoaded: true,
         activeMix,
 
-        queue: normalizedQueue,
+        queue: normalizedQueue.filter((s): s is JioSaavnSong => !!s),
         currentIndex: activeMix?.currentSongIndex || 0,
 
         sleepTimer, setSleepTimer,
         crossfadeDuration, setCrossfadeDuration,
-        bitrate, setBitrate,
+        qualityPreference, setQualityPreference, // This will reference the function we define
+        togglePin,
+        activeQuality: currentTrack ? currentTrack.preferredQuality : null,
         stopAtEndOfSong, setStopAtEndOfSong,
         notificationsEnabled, setNotificationsEnabled,
         likedSongs, toggleLike, isLiked,
@@ -1463,7 +1561,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         eq,
         downloadSong, removeDownload, isDownloaded,
         playInstantMix,
-        activeQuality
+        activeQuality: currentTrack ? currentTrack.preferredQuality : null,
+        showToast,
     };
 
     return (

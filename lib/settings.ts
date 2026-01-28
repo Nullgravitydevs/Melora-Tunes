@@ -2,7 +2,8 @@ export interface AppSettings {
     volume: number;
     clickSounds: boolean;
     theme: 'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush';
-    bitrate: 'flac' | '320' | '160' | '96' | '48' | '12';
+    qualityPreference: 'hires' | 'flac' | '320' | '160' | '96' | '48' | '12';
+    // Legacy mapping support could be done in loadSettings if needed, but for now we'll just add the new field.
     lastPlayedSongId: string | null;
     version: string;
     userName?: string;
@@ -14,7 +15,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     volume: 0.7,
     clickSounds: true,
     theme: 'classic', // White/Classic iPod
-    bitrate: '320', // Default to High Quality
+    theme: 'classic', // White/Classic iPod
+    qualityPreference: '320', // Default to High Quality
     lastPlayedSongId: null,
     version: '2.0.0',
     languages: ['english', 'hindi']

@@ -6,6 +6,8 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Shuffle, Repeat, R
 import { Visualizer } from "./visualizer";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
+import { PlayableTrack, AudioQuality, isPlayableTrack } from "@/lib/types";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 import { useAudio } from "@/hooks/use-audio";
 
 export interface PlayerProps {
@@ -14,6 +16,7 @@ export interface PlayerProps {
     cassetteTitle?: string;
     cassetteColor?: string;
     currentSong?: JioSaavnSong;
+    currentTrack?: PlayableTrack | null; // Added for Quality Badges
     onPlayToggle: () => void;
     onNext?: () => void;
     onPrev?: () => void;
@@ -160,7 +163,7 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
         isPlaying, hasCassette, cassetteTitle, cassetteColor = "orange", currentSong,
         onPlayToggle, onNext, onPrev, volume, onVolumeChange,
         progress = 0, onSeek, shuffle, onShuffleToggle, repeat = 'off', onRepeatToggle,
-        onOpenQueue, className, dragConstraints, drag = true, onEject
+        onOpenQueue, className, dragConstraints, drag = true, onEject, currentTrack
     } = props;
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -306,12 +309,17 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
                     {/* LCD Display */}
                     <div className="bg-[#9da8a3] rounded p-2 shadow-[inset_0_2px_6px_rgba(0,0,0,0.4)] text-left overflow-hidden border border-black/20 relative">
                         <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-transparent pointer-events-none"></div>
-                        <div className="flex items-center gap-2 relative z-10">
-                            <p className="text-black font-bold font-mono text-sm leading-normal whitespace-nowrap opacity-80 tracking-tight">
+                        <div className="flex items-center gap-2 relative z-10 w-full">
+                            <p className="text-black font-bold font-mono text-sm leading-normal whitespace-nowrap opacity-80 tracking-tight flex-1 min-w-0 truncate">
                                 {currentSong ? (
                                     <span className="animate-pulse">▶ {decodeHtml(currentSong.name).substring(0, 20)}</span>
                                 ) : "READY"}
                             </p>
+                            {/* LCD Quality Badge */}
+                            {/* [MODIFIED] Use Unified QualityBadge (Full Variant) */}
+                            <div className="absolute top-6 right-6 transform scale-75 origin-right">
+                                <QualityBadge quality={currentTrack?.preferredQuality} variant="full" />
+                            </div>
                         </div>
                     </div>
 
@@ -482,7 +490,7 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
     const {
         isPlaying, hasCassette, currentSong,
         onPlayToggle, onNext, onPrev, volume, onVolumeChange,
-        progress = 0, onSeek, onEject
+        progress = 0, onSeek, onEject, currentTrack
     } = props;
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -549,10 +557,20 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
                 </div>
 
                 {/* Status Strip */}
-                <div className="bg-gray-400/50 dark:bg-gray-500/50 h-10 w-full rounded-md shadow-inner mb-4 flex items-center px-4 border border-gray-400/30 overflow-hidden">
-                    <span className="font-mono text-gray-800 dark:text-black font-bold tracking-widest text-base truncate">
+                <div className="bg-gray-400/50 dark:bg-gray-500/50 h-10 w-full rounded-md shadow-inner mb-4 flex items-center px-4 border border-gray-400/30 overflow-hidden text-gray-800 dark:text-black">
+                    <span className="font-mono font-bold tracking-widest text-base truncate flex-1">
                         {currentSong ? decodeHtml(currentSong.name) : "READY"}
                     </span>
+
+                    {/* Studio Quality Indicator */}
+                    {currentTrack && (
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                            {/* [MODIFIED] Use Unified QualityBadge (Full Variant) */}
+                            <div className="absolute top-2 right-4 transform scale-90 origin-right">
+                                <QualityBadge quality={currentTrack?.preferredQuality} variant="full" />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Visualizer (Simulated LED) */}
@@ -657,7 +675,7 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
 }
 
 export function DesktopPlayer(props: PlayerProps) {
-    const { currentTheme = 'ZEN' } = props;
+    const { currentTheme = 'ZEN', currentTrack } = props;
     const theme = THEMES[currentTheme];
 
     if (theme.layout === 'studio') {

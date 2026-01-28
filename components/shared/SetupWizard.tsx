@@ -18,6 +18,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     const [isMuted, setIsMuted] = useState(true);
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    // Dynamic Video Source
+    // NOTE: 'intro-mobile.mp4' appears to be silent/compressed (3MB). Using full quality 'intro.mp4' (66MB) to ensure audio works.
+    const videoSrc = "/assets/intro.mp4";
+
     // Initial Load Settings if revisiting? Usually fresh.
     useEffect(() => {
         // Ensure video plays
@@ -42,7 +46,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 {/* 1. Video Layer */}
                 <video
                     ref={videoRef}
-                    src="/assets/intro.mp4"
+                    src={videoSrc}
                     className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-1000"
                     loop
                     muted={isMuted}
@@ -77,8 +81,19 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
                     {/* Volume Toggle */}
                     <button
-                        onClick={() => setIsMuted(!isMuted)}
-                        className="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors"
+                        onClick={() => {
+                            const nextState = !isMuted;
+                            setIsMuted(nextState);
+                            if (videoRef.current) {
+                                videoRef.current.muted = nextState;
+                                // Mobile browsers often require explicit play() after interaction
+                                if (!nextState) {
+                                    videoRef.current.play().catch(e => console.error("Play failed", e));
+                                }
+                            }
+                        }}
+                        className="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors z-50"
+                        aria-label={isMuted ? "Unmute" : "Mute"}
                     >
                         {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                     </button>
@@ -159,6 +174,7 @@ function StepIdentity({ profile, setProfile, onNext }: { profile: any, setProfil
                         type="text"
                         value={profile.name}
                         onChange={e => setProfile({ ...profile, name: e.target.value })}
+                        maxLength={15}
                         className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-lg focus:outline-none focus:border-white transition-colors"
                         placeholder="Enter your name"
                         autoFocus
@@ -229,34 +245,49 @@ function StepMode({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m: any
         >
             <h2 className="text-3xl font-bold text-center mb-10">Choose your Interface</h2>
 
-            <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
-                {/* 1. DISCOVERY */}
-                <ModeCard
-                    title="Discovery"
-                    desc="Modern dashboard for exploration."
-                    icon={<Disc size={32} />}
-                    onClick={() => onSelect('DISCOVERY')}
-                    color="from-blue-500 to-indigo-600"
-                />
+            <div className={`grid gap-6 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 max-w-4xl mx-auto'}`}>
+                {/* === MOBILE MODES === */}
+                {isMobile && (
+                    <>
+                        {/* 1. Mobile Discovery */}
+                        <ModeCard
+                            title="Discovery Mobile"
+                            desc="Modern, touch-first player."
+                            icon={<Disc size={32} />}
+                            onClick={() => onSelect('DISCOVERY')}
+                            color="from-blue-500 to-indigo-600"
+                        />
+                        {/* 2. iPod Classic */}
+                        <ModeCard
+                            title="iPod Classic"
+                            desc="Zen mode. Pure music."
+                            icon={<Smartphone size={32} />}
+                            onClick={() => onSelect('CLASSIC')}
+                            color="from-gray-700 to-black"
+                        />
+                    </>
+                )}
 
-                {/* 2. CLASSIC */}
-                <ModeCard
-                    title="Classic"
-                    desc="Tactile Click Wheel experience."
-                    icon={<Smartphone size={32} />}
-                    onClick={() => onSelect('CLASSIC')}
-                    color="from-gray-700 to-black"
-                />
-
-                {/* 3. DECK (Desktop Only) */}
+                {/* === DESKTOP MODES === */}
                 {!isMobile && (
-                    <ModeCard
-                        title="Deck Studio"
-                        desc="Professional analog simulation."
-                        icon={<CassetteTape size={32} />}
-                        onClick={() => onSelect('DECK')}
-                        color="from-orange-500 to-amber-600"
-                    />
+                    <>
+                        {/* 1. Desktop Discovery */}
+                        <ModeCard
+                            title="Discovery Desktop"
+                            desc="The ultimate dashboard."
+                            icon={<Disc size={32} />}
+                            onClick={() => onSelect('DISCOVERY')}
+                            color="from-blue-500 to-indigo-600"
+                        />
+                        {/* 2. Deck Studio */}
+                        <ModeCard
+                            title="Deck Studio"
+                            desc="Pro analog workspace."
+                            icon={<CassetteTape size={32} />}
+                            onClick={() => onSelect('DECK')}
+                            color="from-orange-500 to-amber-600"
+                        />
+                    </>
                 )}
             </div>
         </motion.div>

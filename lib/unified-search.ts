@@ -1,5 +1,5 @@
 import { searchSongs, JioSaavnSong } from './jiosaavn';
-import { getArt } from '../components/discovery/DiscoveryShared';
+import { getArt } from '../components/desktop/discovery/DiscoveryShared';
 import { searchHiFi, HiFiSearchResult } from './hifi-client';
 import { PlayableTrack, PlayableSource, AudioQuality, QualityFilterType } from './types';
 

@@ -3,22 +3,22 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cassette } from "@/components/ui/cassette";
-import { SearchModal } from "@/components/ui/search-modal";
+import { GlassSearch } from "@/components/shared/GlassSearch";
 import { Button } from "@/components/ui/button";
 import { Plus, Maximize2, Pencil, Camera, Download, Upload, MoreHorizontal, Settings, Smartphone, Palette } from "lucide-react";
 import { useAudio } from "@/hooks/use-audio";
 import { JioSaavnSong, getSongDetails } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import dynamic from 'next/dynamic';
-const DeckStage = dynamic(() => import("./deck-stage").then(mod => mod.DeckStage), { ssr: false });
-import { ZenStage } from "./zen-stage";
-import { BauhausStage } from "./bauhaus-stage";
-import { NordicStage } from "./nordic-stage";
-import { OpenDeckStage } from "./opendeck-stage";
-import { BoomboxStage } from "./boombox-stage";
-import { SilverFrostStage } from "./silverfrost-stage";
-// import { GlassStage } from "./glass-stage"; // REMOVED
-import { DiscoveryLayout } from "@/components/discovery/DiscoveryLayout";
+const DeckStage = dynamic(() => import("./themes/deck-stage").then(mod => mod.DeckStage), { ssr: false });
+import { ZenStage } from "./themes/zen-stage";
+import { BauhausStage } from "./themes/bauhaus-stage";
+import { NordicStage } from "./themes/nordic-stage";
+import { OpenDeckStage } from "./themes/opendeck-stage";
+import { BoomboxStage } from "./themes/boombox-stage";
+import { SilverFrostStage } from "./themes/silverfrost-stage";
+// import { GlassStage } from "./themes/glass-stage"; // REMOVED
+import { DiscoveryLayout } from "@/components/desktop/discovery/DiscoveryLayout";
 
 import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -33,7 +33,7 @@ import { QueueModal } from "@/components/ui/queue-modal";
 import { ShareMixModal } from "@/components/ui/share-mix-modal";
 import { DesktopThemeSelector } from "@/components/ui/desktop-theme-selector";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { WelcomeScreen } from "@/components/windows/scenes/welcome-screen";
+
 
 interface StageProps {
     onSwitchToMobile?: () => void;
@@ -80,36 +80,28 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
     const [editingMix, setEditingMix] = useState<Mix | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isQueueOpen, setIsQueueOpen] = useState(false);
-    const [isShareOpen, setIsShareOpen] = useState(false);
-    const [shareMix, setShareMix] = useState<Mix | null>(null);
     const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'error' }[]>([]);
-    const [isWelcome, setIsWelcome] = useState(true);
 
     const playerRef = useRef<HTMLDivElement>(null);
     const { playClick, playClunk, playInsert } = useAudio();
 
-    // Init Theme from LocalStorage
     const [isMounted, setIsMounted] = useState(false);
+    // const [isWelcome, setIsWelcome] = useState(false); // DISABLED & REMOVED
 
     useEffect(() => {
         setIsMounted(true);
         if (initialTheme && THEMES[initialTheme as ThemeKey]) {
             setCurrentTheme(initialTheme as ThemeKey);
-            setIsWelcome(false);
             return;
         }
-        const savedTheme = localStorage.getItem('melora-theme') as ThemeKey;
-        if (savedTheme && THEMES[savedTheme]) {
-            setCurrentTheme(savedTheme);
-            // Sync deck theme preference on load if applicable
-            if (THEMES[savedTheme].layout !== 'glass') {
-                localStorage.setItem('melora-deck-theme', savedTheme);
-            }
+
+        // Auto-load last used deck or default to BOOMBOX
+        const savedDeckTheme = localStorage.getItem('melora-deck-theme') as ThemeKey;
+        if (savedDeckTheme && THEMES[savedDeckTheme] && THEMES[savedDeckTheme].layout !== 'glass') {
+            setCurrentTheme(savedDeckTheme);
         } else {
-            // If no saved theme, ensure default (Boombox) is recorded as deck theme
-            if (THEMES['BOOMBOX']) {
-                localStorage.setItem('melora-deck-theme', 'BOOMBOX');
-            }
+            setCurrentTheme('BOOMBOX');
+            localStorage.setItem('melora-deck-theme', 'BOOMBOX');
         }
     }, [initialTheme]);
 
@@ -140,6 +132,8 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
     };
 
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
+    const [isShareOpen, setIsShareOpen] = useState(false);
+    const [shareMix, setShareMix] = useState<Mix | null>(null);
 
     const handleSeek = (amount: number) => {
         seek(amount);
@@ -210,7 +204,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                 });
 
                 if (isDuplicate) {
-                    const name = 'song' in song ? song.song.name : song.name;
+                    const name = isPlayableTrack(song) ? (song.title || song.song?.name || "Unknown Track") : song.name;
                     // Show WHICH quality is duplicate
                     addToast(`"${decodeHtml(name)}" (${newQuality}) is already in this mix`, "error");
                     return;
@@ -218,7 +212,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
 
                 updateMix(targetMixId, { songs: [...current.songs, song] });
                 playClick();
-                const songName = isPlayableTrack(song) ? song.song.name : song.name;
+                const songName = isPlayableTrack(song) ? (song.title || song.song?.name || "Unknown Track") : song.name;
                 addToast(`Added "${decodeHtml(songName)}" (${newQuality})`);
             }
         }
@@ -302,6 +296,8 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                         const hasBasicProps = m.id && typeof m.title === 'string' && Array.isArray(m.songs);
                         if (!hasBasicProps) return false;
                         return m.songs.every((s: any) => {
+                            // Handle both PlayableTrack (flat) and JioSaavnSong (nested)
+                            const title = (s as any).title || s.song?.name || (s as any).name || "Unknown Track";
                             if (isPlayableTrack(s)) {
                                 return s.id && s.song && s.song.name;
                             }
@@ -371,31 +367,12 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
 
 
     const handleSelectMode = (mode: ThemeKey) => {
-        setIsWelcome(false);
         setCurrentTheme(mode);
     };
 
     if (!isMounted) return null; // Prevent hydration mismatch/flash
 
-    if (isWelcome) {
-        return (
-            <WelcomeScreen
-                onSelectMode={handleSelectMode}
-                onSelectIpod={() => onSwitchToMobile?.()}
-                onSelectDeck={() => {
-                    // Logic to load PREVIOUS deck theme
-                    const savedDeckTheme = localStorage.getItem('melora-deck-theme') as ThemeKey;
-                    const targetTheme = (savedDeckTheme && THEMES[savedDeckTheme] && THEMES[savedDeckTheme].layout !== 'glass')
-                        ? savedDeckTheme
-                        : 'ZEN'; // Default backup
-
-                    setIsWelcome(false);
-                    setCurrentTheme(targetTheme);
-                    localStorage.setItem('melora-theme', targetTheme);
-                }}
-            />
-        );
-    }
+    // Welcome Screen Removed (Redundant)
 
     return (
         <>
@@ -568,25 +545,8 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                     THEMES[currentTheme]?.layout === 'glass' ? 'discovery' : 'deck'
                 }
                 onSwitchLayout={(mode) => {
-                    if (mode === 'ipod') {
-                        onSwitchToMobile?.();
-                        setIsSettingsOpen(false);
-                    } else if (mode === 'discovery') {
-                        // Switch to Glass Theme
-                        setCurrentTheme('GLASS');
-                        localStorage.setItem('melora-theme', 'GLASS');
-                        setIsSettingsOpen(false);
-                    } else if (mode === 'deck') {
-                        // Restore preferred deck theme
-                        const savedDeckTheme = localStorage.getItem('melora-deck-theme') as ThemeKey;
-                        const targetTheme = (savedDeckTheme && THEMES[savedDeckTheme] && THEMES[savedDeckTheme].layout !== 'glass')
-                            ? savedDeckTheme
-                            : 'ZEN';
-
-                        setCurrentTheme(targetTheme);
-                        localStorage.setItem('melora-theme', targetTheme);
-                        setIsSettingsOpen(false);
-                    }
+                    // Modal handles dispatch. We just close.
+                    setIsSettingsOpen(false);
                 }}
             />
 
@@ -614,32 +574,17 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                 mix={shareMix}
             />
 
-            {/* Search Modal */}
-            {
-                isSearchOpen && (
-                    <SearchModal
-                        isOpen={isSearchOpen}
-                        onClose={() => { setIsSearchOpen(false); setSearchTargetMixId(null); }}
-                        onAddSong={handleAddSong}
-                        favorites={new Set(likedSongs.map(s => s.id))}
-                        onToggleFavorite={toggleLike}
-                        existingAssets={(() => {
-                            const targetId = searchTargetMixId || activeMixId;
-                            const mix = mixes.find(m => m.id === targetId);
-                            if (!mix) return undefined;
-
-                            // Create set of "id_quality" assets
-                            return new Set(mix.songs.map(s => {
-                                const id = 'id' in s ? s.id : (s as any).id;
-                                // For JioSaavnSong (legacy), default to 320 if wrapper not present, but usually we care about PlayableTrack here
-                                // If it's a PlayableTrack, it has preferredQuality
-                                const quality = isPlayableTrack(s) ? s.preferredQuality : '320';
-                                return `${id}_${quality}`;
-                            }));
-                        })()}
-                    />
-                )
-            }
+            {/* Premium Glass Search Modal */}
+            <AnimatePresence>
+                {isSearchOpen && (
+                    <div className="fixed inset-0 z-[100]">
+                        <GlassSearch
+                            onClose={() => { setIsSearchOpen(false); setSearchTargetMixId(null); }}
+                            variant="overlay"
+                        />
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Edit Mix Modal */}
             {

@@ -86,34 +86,49 @@ function ModeSelector({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m:
         >
             <h2 className="text-3xl font-bold text-center mb-10">Choose your Interface</h2>
 
-            <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
-                {/* 1. DISCOVERY */}
-                <ModeCard
-                    title="Discovery"
-                    desc="Modern dashboard for exploration."
-                    icon={<Disc size={32} />}
-                    onClick={() => onSelect('DISCOVERY')}
-                    color="from-blue-500 to-indigo-600"
-                />
+            <div className={`grid gap-6 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 max-w-4xl mx-auto'}`}>
+                {/* === MOBILE MODES === */}
+                {isMobile && (
+                    <>
+                        {/* 1. Mobile Discovery */}
+                        <ModeCard
+                            title="Discovery Mobile"
+                            desc="Modern, touch-first player."
+                            icon={<Disc size={32} />}
+                            onClick={() => onSelect('DISCOVERY')}
+                            color="from-blue-500 to-indigo-600"
+                        />
+                        {/* 2. iPod Classic */}
+                        <ModeCard
+                            title="iPod Classic"
+                            desc="Zen mode. Pure music."
+                            icon={<Smartphone size={32} />}
+                            onClick={() => onSelect('CLASSIC')}
+                            color="from-gray-700 to-black"
+                        />
+                    </>
+                )}
 
-                {/* 2. CLASSIC */}
-                <ModeCard
-                    title="Classic"
-                    desc="Tactile Click Wheel experience."
-                    icon={<Smartphone size={32} />}
-                    onClick={() => onSelect('CLASSIC')}
-                    color="from-gray-700 to-black"
-                />
-
-                {/* 3. DECK (Desktop Only) */}
+                {/* === DESKTOP MODES === */}
                 {!isMobile && (
-                    <ModeCard
-                        title="Deck Studio"
-                        desc="Professional analog simulation."
-                        icon={<CassetteTape size={32} />}
-                        onClick={() => onSelect('DECK')}
-                        color="from-orange-500 to-amber-600"
-                    />
+                    <>
+                        {/* 1. Desktop Discovery */}
+                        <ModeCard
+                            title="Discovery Desktop"
+                            desc="The ultimate dashboard."
+                            icon={<Disc size={32} />}
+                            onClick={() => onSelect('DISCOVERY')}
+                            color="from-blue-500 to-indigo-600"
+                        />
+                        {/* 2. Deck Studio */}
+                        <ModeCard
+                            title="Deck Studio"
+                            desc="Pro analog workspace."
+                            icon={<CassetteTape size={32} />}
+                            onClick={() => onSelect('DECK')}
+                            color="from-orange-500 to-amber-600"
+                        />
+                    </>
                 )}
             </div>
         </motion.div>

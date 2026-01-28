@@ -1,19 +1,26 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Play, Disc } from 'lucide-react';
+import { PlayableTrack, AudioQuality } from '@/lib/types';
+import { JioSaavnSong } from '@/lib/jiosaavn';
+import { QualityBadge } from '@/components/shared/QualityBadge';
 
 /* =========================
    TYPES
 ========================= */
 
+// Wrapper for UI-safe track representation
 export interface TrackData {
     id: string;
     title: string;
     artist: string;
-    duration: string | number;
+    duration: number; // Normalized to seconds
     art?: string;
-    quality?: 'hires' | 'flac' | 'hq';
-    original?: any;
+    // Align with global enum (lowercase 'flac', '320' etc)
+    quality?: AudioQuality;
+
+    // Original payload for playback context
+    original: PlayableTrack | JioSaavnSong; // Explicit Typing
 }
 
 export interface DiscoveryThemeColors {
@@ -32,28 +39,33 @@ export interface DiscoveryThemeColors {
    HELPERS
 ========================= */
 
+// Deterministic Art Fetcher
 export function getArt(item: any): string {
     if (!item) return '';
 
-    const images =
-        item.image ||
-        item.images ||
-        item.art ||
-        [];
+    // 1. PlayableTrack / HistoryItem wrapper
+    if (item.track && item.track.art) return item.track.art; // HistoryItem
+    if (item.art) return item.art; // already defined
+
+    // 2. JioSaavn Song Structure
+    const images = item.image || item.images || [];
 
     if (Array.isArray(images)) {
+        // Priority: 500x500 > 150x150 > Last (High) > First (Low)
         const best =
             images.find((i: any) => i?.quality === '500x500') ||
             images.find((i: any) => i?.quality === '150x150') ||
-            images[images.length - 1];
+            images[images.length - 1]; // Usually highest res in Saavn array
 
         return best?.link || '';
     }
 
+    // 3. Single Object
     if (typeof images === 'object' && images?.link) {
         return images.link;
     }
 
+    // 4. Direct String
     if (typeof images === 'string') {
         return images;
     }
@@ -61,9 +73,35 @@ export function getArt(item: any): string {
     return '';
 }
 
-/* =========================
-   SHARED UI
-========================= */
+// SSR-Safe Decoder
+export function decodeHtml(html: string) {
+    if (!html) return "";
+    if (typeof window === 'undefined') return html;
+
+    const txt = document.createElement("textarea");
+    txt.innerHTML = html;
+    return txt.value;
+}
+
+// Identity Normalizer
+export function normalizeTrackIdentity(title: string, artist: string): string {
+    const t = (title || '').toLowerCase()
+        .split('(')[0]
+        .split('[')[0]
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+    const a = (artist || '').toLowerCase().split(',')[0].replace(/[^a-z0-9]/g, '').trim();
+    return `${t}|${a}`;
+}
+
+// Duration Formatter (Seconds -> MM:SS)
+export function formatDuration(seconds: number): string {
+    if (!seconds || isNaN(seconds)) return "--:--";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 
 /* =========================
    SHARED UI
@@ -142,7 +180,7 @@ export function FeatureCard({
 }
 
 /* =========================
-   TRACK ROW
+   TRACK ROW (Pure Component)
 ========================= */
 
 export function TrackRow({
@@ -153,7 +191,7 @@ export function TrackRow({
     onPlay
 }: {
     index: number;
-    track: TrackData;
+    track: TrackData; // Accepts normalized wrapper
     colors: DiscoveryThemeColors;
     isPlaying: boolean;
     onPlay: () => void;
@@ -207,7 +245,7 @@ export function TrackRow({
 
             <div className="w-10 h-10 rounded-md mr-4 overflow-hidden bg-neutral-900 border border-white/5">
                 {track.art ? (
-                    <img src={track.art} className="w-full h-full object-cover" />
+                    <img src={track.art} className="w-full h-full object-cover" loading="lazy" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center">
                         <Disc size={16} className="text-white/20" />
@@ -217,24 +255,18 @@ export function TrackRow({
 
             <div className="flex-1 min-w-0">
                 <p className={`text-sm truncate ${isPlaying ? 'text-green-400' : 'text-white'}`}>
-                    {track.title}
+                    {decodeHtml(track.title)}
                 </p>
-                <p className="text-xs text-white/40 truncate">{track.artist}</p>
+                <p className="text-xs text-white/40 truncate">{decodeHtml(track.artist)}</p>
             </div>
 
-            {track.quality && (
-                <span className="hidden md:inline-flex px-1.5 py-0.5 ml-2 text-[9px] font-bold rounded border
-                    bg-white/10 text-white/70 border-white/20">
-                    {track.quality === 'hires'
-                        ? 'HI-RES'
-                        : track.quality === 'flac'
-                            ? 'LOSSLESS'
-                            : 'HQ'}
-                </span>
-            )}
+            {/* Quality Badge (Unified) */}
+            <div className="hidden md:block ml-3">
+                <QualityBadge quality={track.quality} variant="mini" />
+            </div>
 
             <span className="w-14 text-xs text-right text-white/30 font-mono">
-                {track.duration}
+                {formatDuration(track.duration)}
             </span>
         </motion.div>
     );
@@ -322,18 +354,19 @@ export function PlaylistItem({
     return (
         <div
             className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all group
-                \${active ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                ${active ? 'bg-white/10' : 'hover:bg-white/5'}`} // Fixed Template Literal
             onClick={onClick}
+            title={title}
         >
             <div
                 className={`w-8 h-8 rounded flex items-center justify-center transition-colors min-w-[32px]
-                    \${active ? 'bg-white text-black' : 'bg-white/5 text-white/40 group-hover:text-white group-hover:bg-white/10'}`}
+                    ${active ? 'bg-white text-black' : 'bg-white/5 text-white/40 group-hover:text-white group-hover:bg-white/10'}`} // Fixed Template Literal
             >
                 {icon}
             </div>
             <div className="min-w-0 flex-1 overflow-hidden">
                 <p
-                    className={`text-sm truncate font-medium \${active ? 'text-white' : 'text-white/80'}`}
+                    className={`text-sm truncate font-medium ${active ? 'text-white' : 'text-white/80'}`} // Fixed Template Literal
                     style={{ color: active ? colors.text : colors.textMuted }}
                 >
                     {title}
@@ -349,9 +382,3 @@ export function PlaylistItem({
     );
 }
 
-export function decodeHtml(html: string) {
-    if (!html) return "";
-    const txt = document.createElement("textarea");
-    txt.innerHTML = html;
-    return txt.value;
-}

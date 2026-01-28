@@ -22,7 +22,7 @@ interface NowPlayingProps {
     quality: string | null | undefined;
     onClose: () => void;
     playback: any;
-    onAddToOTG: (s: any) => void;
+    onAddToOTG?: (s: any) => void;
 }
 
 export function NowPlayingOverlay({

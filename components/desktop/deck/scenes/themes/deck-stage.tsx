@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import { usePlayback } from "@/components/providers/playback-context";
 import { useAudio } from "@/hooks/use-audio";
 import { ThemeConfig, ThemeKey, THEMES } from "@/components/ui/desktop-player";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 import { useState, useRef, useEffect } from "react";
 import { decodeHtml } from "@/lib/utils";
 import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc, Share2, Sun, Moon } from "lucide-react";
@@ -664,7 +665,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
 
                             {/* LCD Display */}
                             <div className="bg-[#9ca3af] h-10 w-full rounded-md shadow-inner mb-3 flex items-center px-3 border border-gray-400/30 overflow-hidden whitespace-nowrap">
-                                <span className="font-mono text-black font-bold tracking-widest text-sm flex items-center gap-2">
+                                <span className="font-mono text-black font-bold tracking-widest text-sm flex items-center gap-2 flex-1 min-w-0">
                                     {currentSong ? (
                                         <>
                                             {isDownloaded(currentTrack?.id || currentSong.id) && <span className="bg-black/10 px-1 rounded text-[10px]">OFFLINE</span>}
@@ -674,6 +675,10 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                         "READY"
                                     )}
                                 </span>
+                                {/* LCD Quality Badge */}
+                                <div className="ml-2 scale-90 origin-right">
+                                    <QualityBadge quality={currentTrack?.preferredQuality} variant="full" />
+                                </div>
                             </div>
 
                             {/* Visualizer */}

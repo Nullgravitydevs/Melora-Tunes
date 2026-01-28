@@ -323,7 +323,7 @@ export async function searchQobuz(query: string): Promise<HiFiSearchResult | nul
         if (error.name === 'AbortError') {
             console.log('[Qobuz] Search timed out');
         } else {
-            console.error('[Qobuz] Search error:', error.message);
+            console.warn('[Qobuz] Search warning:', error.message); // Warn instead of Error for network glitches
         }
         return null;
     }

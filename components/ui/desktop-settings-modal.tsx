@@ -1,8 +1,8 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles } from "lucide-react";
-import { useState, useEffect } from "react";
+import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 
 interface DesktopSettingsModalProps {
@@ -12,29 +12,43 @@ interface DesktopSettingsModalProps {
     currentLayout?: 'deck' | 'ipod' | 'discovery';
 }
 
-type SettingsTab = 'layout' | 'audio' | 'data' | 'about';
+type SettingsTab = 'experience' | 'audio' | 'library' | 'stats' | 'support' | 'about';
 
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const {
-        bitrate, setBitrate,
+        qualityPreference, setQualityPreference,
         crossfadeDuration, setCrossfadeDuration,
-        playbackSpeed, setPlaybackSpeed,
-        sleepTimer, setSleepTimer,
         mixes, setMixes
     } = usePlayback();
 
-    // UI State for things not yet in context
-    const [normalize, setNormalize] = useState(false);
-    const [activeTab, setActiveTab] = useState<SettingsTab>('layout');
+    // Local State for Performance (Detached from Context)
+    const [localCrossfade, setLocalCrossfade] = useState(crossfadeDuration);
+    const [activeTab, setActiveTab] = useState<SettingsTab>('experience');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+    // Sync local state when open
+    useEffect(() => {
+        if (isOpen) {
+            setLocalCrossfade(crossfadeDuration);
+        }
+    }, [isOpen, crossfadeDuration]);
+
+    // Commit changes on unmount or specific actions
+    const handleCrossfadeCommit = useCallback(() => {
+        if (localCrossfade !== crossfadeDuration) {
+            setCrossfadeDuration(localCrossfade);
+        }
+    }, [localCrossfade, crossfadeDuration, setCrossfadeDuration]);
 
     if (!isOpen) return null;
 
     const tabs = [
-        { id: 'layout', label: 'Experience', sub: 'Visuals & UI', icon: Monitor },
-        { id: 'audio', label: 'Acoustics', sub: 'Audio Quality', icon: Volume2 },
-        { id: 'data', label: 'Library', sub: 'Data & Backup', icon: Database },
-        { id: 'about', label: 'System', sub: 'About Melora', icon: Zap },
+        { id: 'experience', label: 'Experience', icon: Monitor },
+        { id: 'audio', label: 'Audio', icon: Volume2 },
+        { id: 'library', label: 'Library', icon: Database },
+        { id: 'stats', label: 'Stats', icon: Server },
+        { id: 'support', label: 'Support', icon: Heart },
+        { id: 'about', label: 'About', icon: Info },
     ] as const;
 
     return (
@@ -43,317 +57,320 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4"
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6"
                 onClick={onClose}
             >
                 <motion.div
-                    initial={{ scale: 0.95, y: 20 }}
-                    animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.95, y: 20 }}
-                    className="w-full max-w-5xl h-[650px] bg-black border border-white/10 rounded-3xl shadow-[0_0_120px_-30px_rgba(255,255,255,0.1)] flex overflow-hidden backdrop-blur-3xl"
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    className="w-full max-w-5xl h-[700px] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-2xl flex overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {/* Sidebar - Premium Minimalist */}
-                    <div className="w-72 bg-zinc-950 border-r border-white/5 p-6 flex flex-col gap-8 relative z-10">
-                        <div className="pl-2">
-                            <h2 className="text-3xl font-bold tracking-tighter text-white mb-1 flex items-center gap-2">
-                                Settings <span className="text-zinc-600 text-lg">⚙️</span>
-                            </h2>
-                            <p className="text-zinc-500 text-[10px] uppercase tracking-[0.3em] font-bold">Control Center</p>
-                        </div>
+                    {/* Sidebar */}
+                    <div className="w-64 bg-black/40 border-r border-white/5 p-6 flex flex-col gap-2">
+                        <h2 className="text-xl font-bold text-white px-2 mb-6 flex items-center gap-2">
+                            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-black">
+                                <Zap size={18} fill="currentColor" />
+                            </div>
+                            Control
+                        </h2>
 
-                        <nav className="flex flex-col gap-2">
-                            {tabs.map((tab) => {
-                                const Icon = tab.icon;
-                                const isActive = activeTab === tab.id;
-                                return (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id as SettingsTab)}
-                                        className={`group flex items-center gap-4 px-4 py-4 rounded-2xl transition-all duration-300 relative overflow-hidden ${isActive
-                                            ? 'bg-white text-black shadow-xl shadow-white/5'
-                                            : 'text-zinc-500 hover:bg-zinc-900 hover:text-white'
-                                            }`}
-                                    >
-                                        <div className={`p-2 rounded-xl transition-colors ${isActive ? 'bg-black text-white' : 'bg-zinc-900 text-zinc-500 group-hover:text-white'}`}>
-                                            <Icon size={18} strokeWidth={2.5} />
-                                        </div>
-                                        <div className="text-left">
-                                            <div className={`text-sm font-bold ${isActive ? 'text-black' : 'text-zinc-300 group-hover:text-white'}`}>{tab.label}</div>
-                                            <div className={`text-[10px] font-medium tracking-wide ${isActive ? 'text-zinc-500' : 'text-zinc-600'}`}>{tab.sub}</div>
-                                        </div>
-                                        {isActive && (
-                                            <motion.div layoutId="active-indicator" className="absolute right-4 w-1.5 h-1.5 rounded-full bg-black" />
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </nav>
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as SettingsTab)}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive
+                                        ? 'bg-white text-black font-bold shadow-lg'
+                                        : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    <Icon size={18} />
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
 
-                        <div className="mt-auto pl-2">
-                            <div className="flex items-center gap-3 opacity-40 hover:opacity-100 transition-opacity">
-                                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
-                                    <Music size={14} className="text-black fill-current" />
-                                </div>
-                                <div>
-                                    <p className="text-xs text-white font-bold">Melora OS</p>
-                                    <p className="text-[10px] text-zinc-500">v1.2.4 • Beta</p>
-                                </div>
+                        <div className="mt-auto px-2">
+                            <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                                Melora OS Beta
                             </div>
                         </div>
                     </div>
 
-                    {/* Content Area */}
-                    <div className="flex-1 bg-black p-10 overflow-y-auto relative [&::-webkit-scrollbar]:hidden">
-                        {/* Background Gradients */}
-                        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-b from-zinc-900/40 to-transparent rounded-full blur-[120px] pointer-events-none" />
-
+                    {/* Content */}
+                    <div className="flex-1 bg-black/20 p-8 overflow-y-auto relative">
                         <button
                             onClick={onClose}
-                            className="absolute top-8 right-8 p-3 bg-zinc-900/50 hover:bg-white text-zinc-500 hover:text-black rounded-full transition-all duration-300 z-20 group"
+                            className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors"
                         >
-                            <X size={20} className="group-hover:rotate-90 transition-transform" />
+                            <X size={20} />
                         </button>
 
-                        <div className="max-w-2xl mx-auto relative z-10 pb-20">
-                            {/* LAYOUT TAB */}
-                            {activeTab === 'layout' && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="space-y-10"
-                                >
-                                    <div>
-                                        <h3 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                                            Interface Mode <span className="text-2xl">🖥️</span>
-                                        </h3>
-                                        <p className="text-zinc-500 font-medium">Choose your operating frequency.</p>
-                                    </div>
+                        <div className="max-w-2xl mx-auto py-4">
+                            {/* EXPERIENCE TAB */}
+                            {activeTab === 'experience' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <header>
+                                        <h1 className="text-3xl font-bold text-white mb-2">Experience</h1>
+                                        <p className="text-zinc-500">Customize your visual interface.</p>
+                                    </header>
 
                                     <div className="grid gap-4">
                                         {[
-                                            { id: 'deck', title: 'Deck Studio', desc: 'Analog cassette experience with tactile physics.', icon: Radio, color: 'purple' },
-                                            { id: 'discovery', title: 'Discovery Glass', desc: 'Modern formatting for visual exploration.', icon: Disc, color: 'pink' },
-                                            { id: 'ipod', title: 'iPod Classic', desc: 'Retro pocket simulator. Distraction free.', icon: Smartphone, color: 'blue' }
+                                            { id: 'deck', title: 'Deck Studio', desc: 'Analog cassette physics.', icon: Radio },
+                                            { id: 'discovery', title: 'Discovery Glass', desc: 'Modern digital library.', icon: Disc },
                                         ].map((mode) => (
                                             <button
                                                 key={mode.id}
-                                                onClick={() => onSwitchLayout?.(mode.id as any)}
-                                                className={`group relative flex items-center gap-6 p-6 rounded-3xl border transition-all duration-500 text-left overflow-hidden ${currentLayout === mode.id
-                                                    ? 'bg-white border-white'
-                                                    : 'bg-zinc-900/30 border-white/5 hover:bg-zinc-900/80 hover:border-white/20'
+                                                onClick={() => {
+                                                    if (typeof window !== 'undefined') {
+                                                        // page.tsx expects 'CLASSIC' uppercased
+                                                        window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: mode.id.toUpperCase() }));
+                                                    }
+                                                    onSwitchLayout?.(mode.id as any);
+                                                }}
+                                                className={`flex items-center gap-5 p-5 rounded-2xl border transition-all text-left group ${currentLayout === mode.id
+                                                    ? 'bg-white/10 border-white/20 ring-1 ring-white/10'
+                                                    : 'bg-zinc-900/40 border-white/5 hover:border-white/10 hover:bg-zinc-900/60'
                                                     }`}
                                             >
-                                                {/* Active Glow */}
-                                                {currentLayout === mode.id && <div className="absolute inset-0 bg-gradient-to-r from-zinc-200 via-white to-zinc-200 opacity-20 blur-xl" />}
-
-                                                <div className={`relative w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${currentLayout === mode.id ? 'bg-black text-white shadow-2xl scale-110' : 'bg-black/40 text-zinc-500 group-hover:text-white group-hover:scale-105'}`}>
-                                                    <mode.icon size={28} strokeWidth={1.5} />
+                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${currentLayout === mode.id ? 'bg-white text-black' : 'bg-black text-zinc-500 group-hover:text-white'
+                                                    }`}>
+                                                    <mode.icon size={24} />
                                                 </div>
-
-                                                <div className="flex-1 relative">
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <span className={`text-lg font-bold ${currentLayout === mode.id ? 'text-black' : 'text-white'}`}>{mode.title}</span>
+                                                <div>
+                                                    <div className="font-bold text-white text-lg flex items-center gap-2">
+                                                        {mode.title}
                                                         {currentLayout === mode.id && (
-                                                            <span className="bg-black text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-widest shadow-lg">Active</span>
+                                                            <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full uppercase tracking-wide">Active</span>
                                                         )}
                                                     </div>
-                                                    <p className={`text-sm font-medium ${currentLayout === mode.id ? 'text-zinc-600' : 'text-zinc-500'}`}>
-                                                        {mode.desc}
-                                                    </p>
+                                                    <div className="text-sm text-zinc-500">{mode.desc}</div>
                                                 </div>
                                             </button>
                                         ))}
                                     </div>
-                                </motion.div>
+                                </div>
                             )}
 
                             {/* AUDIO TAB */}
                             {activeTab === 'audio' && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="space-y-10"
-                                >
-                                    <div>
-                                        <h3 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                                            Acoustics <span className="text-2xl">🎧</span>
+                                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <header>
+                                        <h1 className="text-3xl font-bold text-white mb-2">Audio</h1>
+                                        <p className="text-zinc-500">Master your sonic output.</p>
+                                    </header>
+
+                                    {/* Quality */}
+                                    <section>
+                                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                                            <Volume2 size={18} /> Streaming Quality
                                         </h3>
-                                        <p className="text-zinc-500 font-medium">Fine-tune your sonic experience.</p>
-                                    </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {[
+                                                { id: 'auto', label: 'Auto', sub: 'Adaptive' },
+                                                { id: 'hires', label: 'Hi-Res', sub: '24-bit / 96kHz' },
+                                                { id: 'flac', label: 'Lossless', sub: '16-bit / 44.1kHz' },
+                                                { id: '320', label: 'High', sub: '320 kbps' },
+                                                { id: '160', label: 'Standard', sub: '160 kbps' },
+                                                { id: '96', label: 'Saver', sub: '96 kbps' },
+                                            ].map((q) => (
+                                                <button
+                                                    key={q.id}
+                                                    onClick={() => setQualityPreference(q.id as any)}
+                                                    className={`p-4 rounded-xl border text-left transition-all ${qualityPreference === q.id
+                                                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20'
+                                                        : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:bg-zinc-800'
+                                                        }`}
+                                                >
+                                                    <div className="font-bold">{q.label}</div>
+                                                    <div className={`text-xs ${qualityPreference === q.id ? 'text-blue-200' : 'text-zinc-600'}`}>{q.sub}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </section>
 
-                                    <div className="space-y-6">
-                                        {/* Quality - REMOVED per user request */}
-                                        {/* <div className="bg-zinc-900/30 border border-white/5 rounded-3xl p-8 backdrop-blur-sm">...</div> */}
-
-                                        {/* Toggles */}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-zinc-900/30 border border-white/5 rounded-3xl p-6 flex flex-col justify-between h-32 hover:bg-zinc-900/50 transition-colors group">
-                                                <div className="flex justify-between items-start">
-                                                    <div className="p-2 bg-black rounded-xl text-white group-hover:scale-110 transition-transform"><Sparkles size={18} /></div>
-                                                    <button
-                                                        onClick={() => setNormalize(prev => !prev)}
-                                                        className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ${normalize ? 'bg-white' : 'bg-black border border-zinc-800'}`}
-                                                    >
-                                                        <div className={`w-5 h-5 rounded-full shadow-md transition-transform duration-300 ${normalize ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-600'}`} />
-                                                    </button>
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-white">Normalization</div>
-                                                    <div className="text-[10px] text-zinc-500 font-medium mt-1">Consistent Volume</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-zinc-900/30 border border-white/5 rounded-3xl p-6 flex flex-col justify-between h-32 hover:bg-zinc-900/50 transition-colors group">
-                                                <div className="flex justify-between items-start">
-                                                    <div className="p-2 bg-black rounded-xl text-white group-hover:scale-110 transition-transform"><Zap size={18} /></div>
-                                                    <button
-                                                        onClick={() => setCrossfadeDuration(crossfadeDuration > 0 ? 0 : 3)}
-                                                        className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ${crossfadeDuration > 0 ? 'bg-white' : 'bg-black border border-zinc-800'}`}
-                                                    >
-                                                        <div className={`w-5 h-5 rounded-full shadow-md transition-transform duration-300 ${crossfadeDuration > 0 ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-600'}`} />
-                                                    </button>
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-white">Crossfade</div>
-                                                    <div className="text-[10px] text-zinc-500 font-medium mt-1">3s Overlap</div>
-                                                </div>
+                                    {/* Crossfade */}
+                                    <section>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-white font-bold flex items-center gap-2">
+                                                <Sparkles size={18} /> Crossfade
+                                            </h3>
+                                            <span className="text-zinc-400 font-mono text-sm">{localCrossfade}s</span>
+                                        </div>
+                                        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
+                                            <input
+                                                type="range"
+                                                min="0" max="12" step="1"
+                                                value={localCrossfade}
+                                                onChange={(e) => setLocalCrossfade(Number(e.target.value))}
+                                                onMouseUp={handleCrossfadeCommit}
+                                                onTouchEnd={handleCrossfadeCommit}
+                                                className="w-full appearance-none bg-zinc-700 h-1.5 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white cursor-pointer"
+                                            />
+                                            <div className="flex justify-between text-[10px] text-zinc-600 mt-2 font-mono uppercase">
+                                                <span>Off</span>
+                                                <span>12s</span>
                                             </div>
                                         </div>
-                                    </div>
-                                </motion.div>
+                                    </section>
+                                </div>
                             )}
 
-                            {/* DATA TAB */}
-                            {activeTab === 'data' && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="space-y-10"
-                                >
-                                    <div>
-                                        <h3 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                                            Library Data <span className="text-2xl">💾</span>
-                                        </h3>
-                                        <p className="text-zinc-500 font-medium">Manage and backup your collection.</p>
-                                    </div>
+                            {/* LIBRARY TAB */}
+                            {activeTab === 'library' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <header>
+                                        <h1 className="text-3xl font-bold text-white mb-2">Library</h1>
+                                        <p className="text-zinc-500">Manage your data.</p>
+                                    </header>
 
-                                    <div className="space-y-6">
-                                        <div className="bg-zinc-900/30 border border-white/5 rounded-3xl p-8">
-                                            <h4 className="font-bold text-white mb-6 flex items-center gap-2">JSON Backup <span className="text-xs px-2 py-1 bg-white/10 rounded-md text-zinc-400">Portable</span></h4>
-                                            <div className="flex gap-4">
-                                                <button
-                                                    onClick={() => {
-                                                        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mixes));
-                                                        const downloadAnchorNode = document.createElement('a');
-                                                        downloadAnchorNode.setAttribute("href", dataStr);
-                                                        downloadAnchorNode.setAttribute("download", "melora-backup.json");
-                                                        document.body.appendChild(downloadAnchorNode);
-                                                        downloadAnchorNode.click();
-                                                        downloadAnchorNode.remove();
-                                                    }}
-                                                    className="flex-1 py-4 bg-white text-black hover:bg-zinc-200 rounded-2xl font-bold text-sm transition-all hover:scale-[1.02] shadow-lg shadow-white/5"
-                                                >
-                                                    Export Data 📤
-                                                </button>
-                                                <label className="flex-1 py-4 bg-black border border-zinc-800 hover:border-white/20 hover:bg-zinc-900/50 rounded-2xl text-white font-bold text-sm transition-all cursor-pointer text-center flex items-center justify-center gap-2">
-                                                    Import Data 📥
-                                                    <input
-                                                        type="file"
-                                                        accept=".json"
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (!file) return;
-                                                            const reader = new FileReader();
-                                                            reader.onload = (event) => {
-                                                                try {
-                                                                    const importedMixes = JSON.parse(event.target?.result as string);
-                                                                    if (Array.isArray(importedMixes)) {
-                                                                        setMixes(importedMixes);
-                                                                        window.location.reload();
-                                                                    }
-                                                                } catch (err) {
-                                                                    console.error(err);
-                                                                }
-                                                            };
-                                                            reader.readAsText(file);
-                                                        }}
-                                                    />
-                                                </label>
+                                    <div className="grid gap-4">
+                                        <div className="p-6 bg-zinc-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-white font-bold">Export Data</div>
+                                                <div className="text-zinc-500 text-sm">Save your mixes as JSON.</div>
                                             </div>
+                                            <button
+                                                onClick={() => {
+                                                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mixes));
+                                                    const downloadAnchorNode = document.createElement('a');
+                                                    downloadAnchorNode.setAttribute("href", dataStr);
+                                                    downloadAnchorNode.setAttribute("download", "melora-backup.json");
+                                                    document.body.appendChild(downloadAnchorNode);
+                                                    downloadAnchorNode.click();
+                                                    downloadAnchorNode.remove();
+                                                }}
+                                                className="px-4 py-2 bg-white text-black rounded-lg font-bold text-sm hover:bg-zinc-200"
+                                            >
+                                                Export
+                                            </button>
                                         </div>
 
-                                        <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8">
-                                            <h4 className="font-bold text-red-500 mb-2 flex items-center gap-2">Danger Zone ⚠️</h4>
-                                            <p className="text-zinc-500 text-xs mb-6 font-medium">Irreversible actions. Proceed with caution.</p>
+                                        <div className="p-6 bg-zinc-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-white font-bold">Import Data</div>
+                                                <div className="text-zinc-500 text-sm">Restore mixes from backup.</div>
+                                            </div>
+                                            <label className="px-4 py-2 bg-zinc-800 text-white rounded-lg font-bold text-sm hover:bg-zinc-700 cursor-pointer">
+                                                Import
+                                                <input
+                                                    type="file"
+                                                    accept=".json"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        const reader = new FileReader();
+                                                        reader.onload = (event) => {
+                                                            try {
+                                                                const importedMixes = JSON.parse(event.target?.result as string);
+                                                                if (Array.isArray(importedMixes)) {
+                                                                    setMixes(importedMixes);
+                                                                    window.location.reload();
+                                                                }
+                                                            } catch (err) { console.error(err); }
+                                                        };
+                                                        reader.readAsText(file);
+                                                    }}
+                                                />
+                                            </label>
+                                        </div>
+
+                                        <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10">
+                                            <div className="text-red-500 font-bold mb-4">Danger Zone</div>
                                             {!showResetConfirm ? (
                                                 <button
                                                     onClick={() => setShowResetConfirm(true)}
-                                                    className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl font-bold text-sm transition-colors border border-red-500/20"
+                                                    className="w-full py-3 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 font-bold text-sm"
                                                 >
-                                                    Factory Reset Melora ☢️
+                                                    Factory Reset App
                                                 </button>
                                             ) : (
-                                                <div className="flex gap-3">
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => setShowResetConfirm(false)} className="flex-1 py-3 bg-zinc-800 text-white rounded-lg font-bold text-sm">Cancel</button>
                                                     <button
-                                                        onClick={() => setShowResetConfirm(false)}
-                                                        className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl font-bold text-sm transition-colors"
+                                                        onClick={() => { localStorage.clear(); window.location.reload(); }}
+                                                        className="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-500"
                                                     >
-                                                        Cancel
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            localStorage.clear();
-                                                            window.location.reload();
-                                                        }}
-                                                        className="flex-1 py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-bold text-sm transition-colors"
-                                                    >
-                                                        Yes, Reset ☢️
+                                                        Confirm Reset
                                                     </button>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
-                                </motion.div>
+                                </div>
+                            )}
+
+                            {/* STATS TAB */}
+                            {activeTab === 'stats' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <header>
+                                        <h1 className="text-3xl font-bold text-white mb-2">Statistics</h1>
+                                        <p className="text-zinc-500">Your listening DNA.</p>
+                                    </header>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {[
+                                            { label: 'Total Mixes', value: mixes.length },
+                                            { label: 'Total Songs', value: mixes.reduce((acc, m) => acc + m.songs.length, 0) },
+                                        ].map(s => (
+                                            <div key={s.label} className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5">
+                                                <div className="text-4xl font-extrabold text-white mb-1">{s.value}</div>
+                                                <div className="text-xs uppercase tracking-widest text-zinc-500">{s.label}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="p-10 text-center border border-dashed border-zinc-800 rounded-2xl text-zinc-600">
+                                        More insights coming soon.
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SUPPORT TAB */}
+                            {activeTab === 'support' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 text-center py-10">
+                                    <div className="w-20 h-20 bg-pink-500 rounded-full mx-auto flex items-center justify-center text-white shadow-xl shadow-pink-500/20 mb-6">
+                                        <Heart size={32} fill="currentColor" />
+                                    </div>
+                                    <h1 className="text-4xl font-bold text-white">Support Melora</h1>
+                                    <p className="text-zinc-400 max-w-md mx-auto leading-relaxed">
+                                        Melora is an open-source passion project. If you love the music, consider supporting the development.
+                                    </p>
+                                    <div className="flex gap-4 justify-center pt-4">
+                                        <a href="#" className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors">
+                                            <Coffee size={18} /> Buy us a Coffee
+                                        </a>
+                                        <a href="#" className="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-full font-bold hover:bg-zinc-700 transition-colors">
+                                            <Github size={18} /> Star on GitHub
+                                        </a>
+                                    </div>
+                                </div>
                             )}
 
                             {/* ABOUT TAB */}
                             {activeTab === 'about' && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="pt-10 flex flex-col items-center"
-                                >
-                                    <div className="relative mb-8 group">
-                                        <div className="absolute inset-0 bg-white/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                                        <div className="w-32 h-32 bg-white rounded-[2rem] mx-auto shadow-2xl flex items-center justify-center relative z-10 rotate-3 group-hover:rotate-6 transition-transform duration-500">
-                                            <Music size={56} className="text-black fill-current" />
-                                        </div>
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 text-center py-20">
+                                    <div>
+                                        <h1 className="text-5xl font-black text-white tracking-tighter mb-2">MELORA</h1>
+                                        <div className="px-3 py-1 bg-white/10 text-white rounded-full text-xs font-mono inline-block">v1.2.4-beta</div>
                                     </div>
-
-                                    <h2 className="text-5xl font-black tracking-tighter text-white mb-4">Melora <span className="text-zinc-700">OS</span></h2>
-                                    <p className="text-zinc-500 tracking-[0.5em] text-xs font-bold uppercase mb-12">The Audiophile Workstation</p>
-
-                                    {/* Stats Grid */}
-                                    <div className="grid grid-cols-3 gap-6 w-full mb-12">
-                                        {[
-                                            { label: 'Songs', value: mixes.reduce((acc, m) => acc + m.songs.length, 0), color: 'text-white' },
-                                            { label: 'Mixes', value: mixes.length, color: 'text-white' },
-                                            { label: 'Liked', value: (JSON.parse(localStorage.getItem('melora-liked-songs') || '[]') as any[]).length, color: 'text-white' }
-                                        ].map((stat) => (
-                                            <div key={stat.label} className="p-6 bg-zinc-900/30 border border-white/5 rounded-3xl text-center group hover:bg-white/5 transition-colors">
-                                                <div className={`text-3xl font-black ${stat.color} mb-1 group-hover:scale-110 transition-transform`}>{stat.value}</div>
-                                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{stat.label}</div>
-                                            </div>
-                                        ))}
+                                    <p className="text-zinc-500 max-w-sm mx-auto">
+                                        Designed for audiophiles who miss the tangible feel of music.
+                                    </p>
+                                    <div className="pt-8">
+                                        <a href="#" className="text-zinc-400 hover:text-white flex items-center justify-center gap-2 text-sm font-bold transition-colors">
+                                            <MessageCircle size={16} /> Join our Discord
+                                        </a>
                                     </div>
-
-                                    <div className="text-center opacity-40 hover:opacity-100 transition-opacity">
-                                        <p className="text-xs text-zinc-400 font-mono">Build v1.2.4-beta</p>
-                                        <p className="text-[10px] text-zinc-600 mt-2">© 2024 Melora Tunes • Made with 🖤</p>
+                                    <div className="text-[10px] text-zinc-700 pt-20">
+                                        © 2024 Melora Tunes Project
                                     </div>
-                                </motion.div>
+                                </div>
                             )}
                         </div>
                     </div>

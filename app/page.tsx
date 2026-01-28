@@ -7,23 +7,24 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { usePlayback } from "@/components/providers/playback-context";
 
 // --- THE TRINITY: 3 MODES ---
-const ClassicMode = dynamic(() => import("@/components/android/AndroidEntry").then(mod => mod.AndroidEntry), {
+// --- THE TRINITY: 3 MODES ---
+const ClassicMode = dynamic(() => import("@/components/mobile/classic/AndroidEntry").then(mod => mod.AndroidEntry), {
   ssr: false,
   loading: () => <SplashScreen text="LOADING CLASSIC..." />
 });
 
-const DiscoveryMode = dynamic(() => import("@/components/discovery/DiscoveryLayout").then(mod => mod.DiscoveryLayout), {
+const DiscoveryMode = dynamic(() => import("@/components/desktop/discovery/DiscoveryLayout").then(mod => mod.DiscoveryLayout), {
   ssr: false,
   loading: () => <SplashScreen text="LOADING DISCOVERY..." />
 });
 
-const DeckMode = dynamic(() => import("@/components/windows/scenes/stage").then(mod => mod.WindowsStage), {
+const DeckMode = dynamic(() => import("@/components/desktop/deck/scenes/stage").then(mod => mod.WindowsStage), {
   ssr: false,
   loading: () => <SplashScreen text="LOADING DECK..." />
 });
 
-import { SetupWizard } from "@/components/windows/scenes/setup-wizard";
-import { Launcher } from "@/components/windows/scenes/launcher";
+import { SetupWizard } from "@/components/shared/SetupWizard";
+import { Launcher } from "@/components/desktop/deck/scenes/launcher";
 
 export type UIMode = 'CLASSIC' | 'DISCOVERY' | 'DECK' | 'WELCOME' | 'LAUNCHER';
 
@@ -31,7 +32,7 @@ export default function Home() {
   const isMobileSystem = useIsMobile();
   const [mode, setMode] = useState<UIMode | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { pause, setQueue, updateMix } = usePlayback();
+  const { pause } = usePlayback();
 
   useEffect(() => {
     setMounted(true);
@@ -46,21 +47,11 @@ export default function Home() {
     }
   }, [isMobileSystem]);
 
-  // Function to Switch Modes (Passed down via Context or Props if needed, 
-  // but usually components will just set localStorage and reload or we pass a callback)
-  // For now, components can use:
-  // window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: 'DECK' }));
-  // We listen for it here.
-
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
       const newMode = e.detail as UIMode;
-      if (['CLASSIC', 'DISCOVERY', 'DECK', 'WELCOME', 'LAUNCHER'].includes(newMode)) { // Updated valid modes
-        // STOP LOOPHOLE: Switching modes resets the experience.
+      if (['CLASSIC', 'DISCOVERY', 'DECK', 'WELCOME', 'LAUNCHER'].includes(newMode)) {
         pause();
-        // Optional: Clear queue to force "Insert Tape" or "Select Song"
-        // setQueue([]); 
-
         setMode(newMode);
         localStorage.setItem('melora-ui-mode', newMode);
       }
@@ -109,9 +100,6 @@ export default function Home() {
 
           {mode === 'DISCOVERY' && (
             <DiscoveryMode />
-            // Note: DiscoveryLayout handles internal Theme state.
-            // We need a way to Switch to Deck/Classic from inside Discovery.
-            // We will add a "Mode Switcher" UI later.
           )}
 
           {mode === 'DECK' && (
@@ -120,7 +108,6 @@ export default function Home() {
                 setMode('CLASSIC');
                 localStorage.setItem('melora-ui-mode', 'CLASSIC');
               }}
-            // Deck -> Discovery handled via Settings often
             />
           )}
         </Suspense>

@@ -7,6 +7,7 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, 
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { Visualizer } from "@/components/ui/visualizer";
 import { toPng } from 'html-to-image';
@@ -34,9 +35,9 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const {
-        mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
+        mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration,
         loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq
+        isLoaded, eq, isDownloaded
     } = usePlayback();
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -354,12 +355,26 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                             </div>
 
                             {/* Digital Display */}
-                            <div className={clsx("h-8 w-full rounded border flex items-center px-3 mb-4 shadow-inner transition-colors",
+                            <div className={clsx("h-8 w-full rounded border flex items-center px-3 mb-4 shadow-inner transition-colors overflow-hidden whitespace-nowrap",
                                 isDark ? "bg-[#111] border-white/10" : "bg-zinc-100 border-black/10"
                             )}>
-                                <span className={clsx("font-mono text-xs tracking-wider truncate", isDark ? "text-white/80" : "text-black/80")}>
-                                    {currentSong ? `▶ ${decodeHtml(currentSong.name)}` : "READY"}
+                                <span className={clsx("font-mono text-xs tracking-wider truncate flex-1 min-w-0 flex items-center gap-2", isDark ? "text-white/80" : "text-black/80")}>
+                                    {currentSong ? (
+                                        <>
+                                            {isDownloaded(currentTrack?.id || currentSong.id) && <span className={clsx("px-1 rounded text-[9px]", isDark ? "bg-white/10" : "bg-black/10")}>OFFLINE</span>}
+                                            <span className="truncate">▶ {decodeHtml(currentSong.name)}</span>
+                                        </>
+                                    ) : "READY"}
                                 </span>
+                                {/* LCD Quality Badge */}
+                                {currentTrack && (currentTrack.preferredQuality === 'flac' || currentTrack.preferredQuality === 'hires' || currentTrack.sources?.some(s => s.quality === 'hires')) && (
+                                    <span className={clsx("text-[9px] font-black border px-1 rounded-sm tracking-tighter shrink-0 opacity-70 ml-2", isDark ? "text-white border-white/40" : "text-black border-black/40")}>
+                                        {currentTrack.sources?.some(s => s.quality === 'hires') ? 'HI-RES' : 'FLAC'}
+                                    </span>
+                                )}
+                                {currentTrack && currentTrack.preferredQuality === '320' && (
+                                    <span className={clsx("text-[9px] font-black border px-1 rounded-sm tracking-tighter shrink-0 opacity-70 ml-2", isDark ? "text-white border-white/40" : "text-black border-black/40")}>HQ</span>
+                                )}
                             </div>
 
                             {/* Visualizer */}
