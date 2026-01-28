@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
+import { factoryReset } from "@/lib/cleanup";
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -294,7 +295,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                 <div className="flex gap-2">
                                                     <button onClick={() => setShowResetConfirm(false)} className="flex-1 py-3 bg-zinc-800 text-white rounded-lg font-bold text-sm">Cancel</button>
                                                     <button
-                                                        onClick={() => { localStorage.clear(); window.location.reload(); }}
+                                                        onClick={() => factoryReset()}
                                                         className="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-500"
                                                     >
                                                         Confirm Reset
