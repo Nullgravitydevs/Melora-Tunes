@@ -159,9 +159,9 @@ export function DecadeDetailScreen({ decade, colors, onBack, onOpenPlaylist, lan
                                         id: song.id,
                                         title: song.name,
                                         artist: song.primaryArtists,
-                                        duration: song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : '--:--',
+                                        duration: Number(song.duration || 0),
                                         art: getArt(song),
-                                        original: { song, sources: [] }
+                                        original: song
                                     }}
                                     index={i}
                                     onPlay={() => {

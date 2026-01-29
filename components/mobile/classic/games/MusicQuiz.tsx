@@ -41,7 +41,12 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
         // Debounce mix changes/ensure stable generation
         const generateQuestions = () => {
             const allSongs: JioSaavnSong[] = [];
-            mixes.forEach(mix => allSongs.push(...mix.songs));
+            mixes.forEach(mix => {
+                mix.songs.forEach(track => {
+                    const song = 'song' in track ? track.song : track;
+                    if (song) allSongs.push(song as JioSaavnSong);
+                });
+            });
 
             // Use Map for efficient deduplication by ID
             const uniqueSongsMap = new Map<string, JioSaavnSong>();

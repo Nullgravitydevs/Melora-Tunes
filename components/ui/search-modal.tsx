@@ -287,23 +287,13 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
 
                         {!isLoading && results.length > 0 && (
                             <div className="space-y-1">
-                                {results.map((track, idx) => {
-                                    const imageUrl = track.song.image?.[0]?.link || '';
+                                {results.filter(t => t.song).map((track, idx) => {
+                                    const song = track.song;
+                                    if (!song) return null; // Safe Guard
+
+                                    const imageUrl = typeof song.image === 'string' ? song.image : (song.image?.[0]?.link || '');
                                     const qualities = getAvailableQualities(track);
-                                    // isAdded check now depends on specific quality buttons, but we can check if preferred is added for row highlighting if needed
-                                    // or just allow the specific buttons to handle it.
-                                    // The variable 'isAdded' needs to be removed or replaced.
-                                    // Let's remove the variable declaration if it creates reference error.
-                                    // But wait, look down at line 357 (in previous view), I saw: const isBestAdded = addedAssets.has(...)
-                                    // So 'isAdded' variable at line 293 might be just vestigial?
-                                    // Ah, I need to see where 'isAdded' is used.
-                                    // I see in previous diffs I replaced usages of 'isAdded' with 'isBestAdded' or similar.
-                                    // So this declaration is likely unused or I missed a usage.
-                                    // Safest is to remove it, but I must check if it's used in the returned JSX.
-                                    // The error is ReferenceError at 293. I will replace it with a dummy false or the correct check.
-                                    // Better yet, I'll delete the line if I can verify it's not used. 
-                                    // But I can't see lines 300+.
-                                    // I'll assume it might be used. I'll define it as checking the preferred quality.
+
                                     const isAdded = addedAssets.has(`${track.id}_${track.preferredQuality}`);
 
                                     return (
@@ -319,7 +309,7 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
                                                 {imageUrl && (
                                                     <Image
                                                         src={imageUrl}
-                                                        alt={track.song.name}
+                                                        alt={song.name}
                                                         width={56}
                                                         height={56}
                                                         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
@@ -333,8 +323,8 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
 
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-bold text-zinc-200 group-hover:text-white truncate transition-colors text-[15px]">{decodeHtml(track.song.name)}</h3>
-                                                <p className="text-xs text-zinc-500 group-hover:text-zinc-400 truncate mt-0.5 font-medium">{decodeHtml(track.song.primaryArtists)}</p>
+                                                <h3 className="font-bold text-zinc-200 group-hover:text-white truncate transition-colors text-[15px]">{decodeHtml(song.name)}</h3>
+                                                <p className="text-xs text-zinc-500 group-hover:text-zinc-400 truncate mt-0.5 font-medium">{decodeHtml(song.primaryArtists)}</p>
                                             </div>
 
                                             {/* Quality Badges */}
@@ -358,13 +348,13 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
                                             {/* Actions */}
                                             <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                                 <button
-                                                    onClick={() => onToggleFavorite(track.song)}
-                                                    className={`p-2 rounded-full transition-all hover:bg-white/10 ${favorites.has(track.song.id)
+                                                    onClick={() => onToggleFavorite(song)}
+                                                    className={`p-2 rounded-full transition-all hover:bg-white/10 ${favorites.has(song.id)
                                                         ? 'text-red-500 scale-110'
                                                         : 'text-zinc-500 hover:text-white'
                                                         }`}
                                                 >
-                                                    <span className="text-sm">{favorites.has(track.song.id) ? '❤️' : '♡'}</span>
+                                                    <span className="text-sm">{favorites.has(song.id) ? '❤️' : '♡'}</span>
                                                 </button>
 
                                                 {/* Add Best Quality Button */}

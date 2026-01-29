@@ -286,11 +286,9 @@ export function ArtistView({
                                             id: song.id,
                                             title: decodeHtml(song.name),
                                             artist: decodeHtml(song.primaryArtists),
-                                            duration: song.duration
-                                                ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, '0')}`
-                                                : '--:--',
+                                            duration: Number(song.duration || 0),
                                             art: getHighResArt(song.image),
-                                            quality: 'hq', // Assume HQ for discovery
+
                                             original: song
                                         }}
                                         colors={colors}

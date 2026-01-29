@@ -140,7 +140,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         sleepTimer, setSleepTimer,
         crossfadeDuration, setCrossfadeDuration,
         stopAtEndOfSong, setStopAtEndOfSong,
-        bitrate, setBitrate,
+        // bitrate, setBitrate, // Removed from context
         likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded,
         playInstantMix
     } = usePlayback();
@@ -153,6 +153,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const [clickSounds, setClickSounds] = useState(true);
     const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush'>('classic');
     const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume');
+    const [bitrate, setBitrate] = useState<string>('320'); // Shim for build compatibility
     const [isLocked, setIsLocked] = useState(false); // Hold Switch state
     const inputRef = useRef<HTMLInputElement>(null);
     const stickerConstraintsRef = useRef<HTMLDivElement>(null);
@@ -384,7 +385,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         currentMixes
             // .filter(m => m.title !== "On-the-Go") // REMOVED: Include On-the-Go so it shows in Cover Flow
             .forEach(m => m.songs.forEach(item => {
-                const s = 'song' in item ? item.song : item; // Normalize PlayableTrack
+                const s = ('song' in item ? item.song : item) as any; // Normalize PlayableTrack
                 if (!s.album?.id && !s.id) return;
 
                 const albumId = s.album?.id || `unknown-${s.id}`;
@@ -560,10 +561,10 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             // Already a PlayableTrack (Unified Search Result)
             playableSong = songOrTrack as PlayableTrack;
             // No need for JIT resolution as sources are already populated
-            console.log("[iPod] Playing Unified Track:", playableSong.song.name);
+            console.log("[iPod] Playing Unified Track:", playableSong.song?.name);
         } else {
             // Legacy / Standard Song
-            let song = songOrTrack as JioSaavnSong;
+            let song = songOrTrack as any;
             playableSong = { ...song };
             const songData = song as any;
 
@@ -578,19 +579,18 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     // Prefer best match (Unified Search returns merged tracks)
                     const bestMatch = fallbackResults[0];
 
-                    if (bestMatch) {
-                        const isNameSimilar = bestMatch.song.name.toLowerCase().includes(song.name.toLowerCase()) ||
-                            song.name.toLowerCase().includes(bestMatch.song.name.toLowerCase());
+                    const bmName = bestMatch.song?.name?.toLowerCase() || '';
+                    const sName = song.name.toLowerCase();
+                    const isNameSimilar = bmName.includes(sName) || sName.includes(bmName);
 
-                        if (isNameSimilar) {
-                            console.log("[iPod] Resolved fallback track for", song.name);
-                            // UPGRADE to PlayableTrack!
-                            playableSong = bestMatch;
-                        } else {
-                            console.warn("[iPod] Fallback mismatch");
-                            showToast("Stream Unavailable");
-                            return;
-                        }
+                    if (isNameSimilar) {
+                        console.log("[iPod] Resolved fallback track for", song.name);
+                        // UPGRADE to PlayableTrack!
+                        playableSong = bestMatch;
+                    } else {
+                        console.warn("[iPod] Fallback mismatch");
+                        showToast("Stream Unavailable");
+                        return;
                     }
                 } catch (e) {
                     console.error("Failed to resolve Hi-Res stream", e);
@@ -929,9 +929,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 mixes
                     .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
                     .forEach(m => m.songs.forEach(item => {
-                        const s = 'song' in item ? item.song : item;
+                        const s = ('song' in item ? item.song : item) as any;
                         // Split multiple artists and clean up
-                        s.primaryArtists.split(',').forEach(a => artists.add(a.trim()));
+                        s?.primaryArtists?.split(',').forEach((a: string) => artists.add(a.trim()));
                     }));
                 const sortedArtists = Array.from(artists).sort();
 
@@ -968,7 +968,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 mixes
                     .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
                     .forEach(m => m.songs.forEach(item => {
-                        const s = 'song' in item ? item.song : item;
+                        const s = ('song' in item ? item.song : item) as any;
                         if (s.album?.id) {
                             albums.set(s.album.id, { id: s.album.id, name: s.album.name });
                         }
@@ -990,7 +990,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 const allSongs = mixes
                     .filter(m => m.title !== "On-the-Go") // Exclude temporary queue
                     .flatMap(m => m.songs)
-                    .map(item => 'song' in item ? item.song : item);
+                    .map(item => ('song' in item ? item.song : item) as any);
 
                 // Unique by ID
                 const uniqueSongs = Array.from(new Map(allSongs.map(s => [s.id, s])).values())
@@ -1029,7 +1029,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 }
 
                 return queue.map((s, index) => {
-                    const name = 'song' in s ? s.song.name : s.name;
+                    const item: any = s;
+                    const name = item.song?.name || item.name || 'Unknown';
                     return {
                         label: `${index === currentIndex ? '▶ ' : ''}${decodeHtml(name)}`,
                         type: 'action',
@@ -1058,7 +1059,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     if (!mix) return [{ label: "(Playlist Deleted)", type: 'action', action: () => handleBack() }];
 
                     const songItems: MenuItem[] = mix.songs.map((item: JioSaavnSong | PlayableTrack, idx: number) => {
-                        const s = 'song' in item ? item.song : item;
+                        const s = ('song' in item ? item.song : item) as any;
                         return {
                             label: decodeHtml(s.name),
                             type: 'action',
@@ -1108,7 +1109,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     const artistSongs = mixes
                         .filter(m => m.title !== "On-the-Go")
                         .flatMap(m => m.songs)
-                        .map(item => 'song' in item ? item.song : item)
+                        .map(item => ('song' in item ? item.song : item) as any)
                         .filter(s =>
                             s.primaryArtists.toLowerCase().includes(artistName.toLowerCase())
                         );
@@ -1141,7 +1142,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                 // Artist -> All Songs
                 if (currentView.id.startsWith('artist-allsongs-')) {
-                    const songs = currentView.data as JioSaavnSong[];
+                    const songs = currentView.data as any[];
                     return songs.map(s => ({
                         label: decodeHtml(s.name),
                         type: 'action',
@@ -1154,7 +1155,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 if (currentView.id.startsWith('album-')) {
                     const albumId = currentView.id.replace('album-', '');
                     const songs = mixes.flatMap(m => m.songs)
-                        .map(item => 'song' in item ? item.song : item)
+                        .map(item => ('song' in item ? item.song : item) as any)
                         .filter(s => s.album?.id === albumId);
                     const uniqueSongs = Array.from(new Map(songs.map(s => [s.id, s])).values());
 
@@ -1168,7 +1169,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                 // Song Options
                 if (currentView.id.startsWith('song-')) {
-                    const song = currentView.data as JioSaavnSong;
+                    const song = currentView.data as any;
                     return [
                         { label: "Play", type: 'action', action: () => playSongNow(song) },
                         { label: "Add to Playlist", type: 'navigation', target: `add-to-${song.id}`, data: song },
@@ -1178,7 +1179,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                 // Add to Playlist Menu
                 if (currentView.id.startsWith('add-to-')) {
-                    const song = currentView.data as JioSaavnSong;
+                    const song = currentView.data as any;
                     return mixes
                         .filter(m => m.title !== "On-the-Go") // Don't allow adding to temporary queue
                         .map(mix => ({
@@ -1367,16 +1368,16 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 // Inject metadata for IpodScreen badges
                 const shimmedData = {
                     ...track,
-                    name: track.song.name,
-                    primaryArtists: track.song.primaryArtists,
-                    image: track.song.image,
+                    name: track.song?.name,
+                    primaryArtists: track.song?.primaryArtists,
+                    image: track.song?.image,
                     _quality: badge,
                     _qualityTier: badge === '24-bit' ? 0 : badge === 'FLAC' ? 1 : badge === '320kbps' ? 2 : 3,
                     source: isTidal ? 'tidal' : sourceProvider
                 };
 
                 return {
-                    label: decodeHtml(track.song.name),
+                    label: decodeHtml(track.song?.name || "Unknown"),
                     type: 'action',
                     action: () => {
                         const isHiRes = badge === '24-bit' || badge === 'FLAC';

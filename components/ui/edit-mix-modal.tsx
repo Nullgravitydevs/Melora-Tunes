@@ -190,17 +190,17 @@ export function EditMixModal({ isOpen, onClose, mix, onUpdateMix, onShareMix, on
                                     const song = isPlayableTrack(item) ? item.song : item;
                                     return (
                                         <div
-                                            key={`${song.id}-${index}`}
+                                            key={`${song?.id || 'unknown'}-${index}`}
                                             className="group flex items-center justify-between p-3 rounded-lg hover:bg-zinc-900 transition-colors border border-transparent hover:border-zinc-800/50"
                                         >
                                             <div className="flex items-center flex-1 min-w-0 mr-4">
                                                 <span className="text-xs font-mono text-zinc-600 w-6 text-right mr-4 opacity-50">{index + 1}</span>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center">
-                                                        <p className="font-medium text-sm truncate text-zinc-200">{decodeHtml(song.name)}</p>
+                                                        <p className="font-medium text-sm truncate text-zinc-200">{decodeHtml(song?.name || "")}</p>
                                                         {getQualityBadge(item)}
                                                     </div>
-                                                    <p className="text-[11px] text-zinc-500 truncate mt-0.5">{decodeHtml(song.primaryArtists)}</p>
+                                                    <p className="text-[11px] text-zinc-500 truncate mt-0.5">{decodeHtml(song?.primaryArtists || "")}</p>
                                                 </div>
                                             </div>
 

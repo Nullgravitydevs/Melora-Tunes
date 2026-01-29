@@ -258,9 +258,7 @@ export function PlaylistScreen({
                                     id: song.id,
                                     title: decodeHtml(song.name),
                                     artist: decodeHtml(song.primaryArtists),
-                                    duration: song.duration
-                                        ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, "0")}`
-                                        : "--:--",
+                                    duration: Number(song.duration || 0),
                                     art: getArt(song),
                                     original: song,
                                     quality: playableTracks[i]?.preferredQuality // Pass quality

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
@@ -20,7 +20,6 @@ interface OpenDeckStageProps {
     currentTheme: ThemeKey;
     onThemeChange: () => void;
     onSelectTheme?: (theme: ThemeKey) => void;
-    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -36,7 +35,6 @@ export function OpenDeckStage({
     currentTheme,
     onThemeChange,
     onSelectTheme,
-    // onSwitchToMobile removed
     onOpenSettings,
     onEditMix,
     onOpenSearch,
@@ -49,9 +47,16 @@ export function OpenDeckStage({
 }: OpenDeckStageProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<HTMLDivElement>(null);
-    const [isOverPlayer, setIsOverPlayer] = useState(false);
-    const [dragPosition, setDragPosition] = useState<{ x: number, y: number } | null>(null);
+    const ghostRef = useRef<HTMLDivElement>(null);
+
+    // Drag State (Refs for High Perf)
+    const dragPositionRef = useRef<{ x: number, y: number } | null>(null);
     const [draggingMix, setDraggingMix] = useState<{ mix: Mix, index: number } | null>(null);
+    const [isOverPlayer, setIsOverPlayer] = useState(false);
+
+    // Cache rect to avoid thrashing
+    const playerRectRef = useRef<DOMRect | null>(null);
+
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
 
@@ -61,9 +66,14 @@ export function OpenDeckStage({
     } = usePlayback();
 
     const { playClick, playEject, playClunk, playInsert } = useAudio();
-    const activeMix = mixes.find(m => m.id === activeMixId) || null;
+    const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId) || null, [mixes, activeMixId]);
+
+    // Validate song duration for progress calc
+    const safeDuration = duration > 0 ? duration : (currentSong && currentSong.duration ? parseInt(currentSong.duration.toString()) : 0);
+    const safeProgress = Number.isFinite(progress) ? progress : 0;
 
     const formatTime = (seconds: number) => {
+        if (!Number.isFinite(seconds) || isNaN(seconds)) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -77,32 +87,50 @@ export function OpenDeckStage({
 
     const getStyleForMix = (index: number) => cassetteStyles[index % cassetteStyles.length];
 
-    const handleDragStart = (mix: Mix, index: number, e: React.PointerEvent) => {
+    const handleDragStart = useCallback((mix: Mix, index: number, e: React.PointerEvent) => {
         setDraggingMix({ mix, index });
-        setDragPosition({ x: e.clientX, y: e.clientY });
-    };
+        dragPositionRef.current = { x: e.clientX, y: e.clientY };
 
-    const handleDragMove = (e: React.PointerEvent) => {
-        if (draggingMix) {
-            setDragPosition({ x: e.clientX, y: e.clientY });
-            if (playerRef.current) {
-                const rect = playerRef.current.getBoundingClientRect();
-                const isOver = e.clientX >= rect.left && e.clientX <= rect.right &&
-                    e.clientY >= rect.top && e.clientY <= rect.bottom;
-                setIsOverPlayer(isOver);
-            }
+        // Capture pointer to ensure we receive move events even if cursor leaves
+        e.currentTarget.setPointerCapture(e.pointerId);
+
+        // Cache player rect
+        if (playerRef.current) {
+            playerRectRef.current = playerRef.current.getBoundingClientRect();
         }
-    };
+    }, []);
 
-    const handleDragEnd = () => {
-        if (draggingMix && isOverPlayer) {
+    const handleDragMove = useCallback((e: React.PointerEvent) => {
+        if (!draggingMix) return;
+
+        // Update Ghost Position directly via DOM
+        if (ghostRef.current) {
+            ghostRef.current.style.transform = `translate(${e.clientX - 72}px, ${e.clientY - 48}px) rotate(5deg) scale(1.1)`;
+        }
+
+        // Check intersection with Player
+        if (playerRectRef.current) {
+            const rect = playerRectRef.current;
+            const isOver = e.clientX >= rect.left && e.clientX <= rect.right &&
+                e.clientY >= rect.top && e.clientY <= rect.bottom;
+
+            // Only update state if changed (avoids re-renders)
+            setIsOverPlayer(prev => prev !== isOver ? isOver : prev);
+        }
+    }, [draggingMix]);
+
+    const handleDragEnd = useCallback((e: React.PointerEvent) => {
+        if (!draggingMix) return;
+
+        if (isOverPlayer) {
             playInsert();
             loadMix(draggingMix.mix.id);
         }
+
         setDraggingMix(null);
-        setDragPosition(null);
+        dragPositionRef.current = null;
         setIsOverPlayer(false);
-    };
+    }, [draggingMix, isOverPlayer, playInsert, loadMix]);
 
     return (
         <div
@@ -113,11 +141,6 @@ export function OpenDeckStage({
             onPointerUp={handleDragEnd}
             onPointerLeave={handleDragEnd}
         >
-            {/* Hide all scrollbars globally - Handled by utility now */}
-
-            {/* Grainy Texture */}
-            <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E")` }} />
-
             {/* Header - Fixed height */}
             <header className="flex items-center justify-between px-6 py-4 shrink-0">
                 <div className="flex items-center gap-3">
@@ -129,11 +152,10 @@ export function OpenDeckStage({
                         <button onClick={onCreateMix} className="text-[#101814] text-[10px] font-semibold tracking-widest uppercase hover:text-[#2d8652]">+ Create Mix</button>
                     </nav>
                     <div className="flex gap-2">
-                        {/* Switch Mobile Removed */}
                         <button onClick={onOpenThemeSelector} className="flex size-8 items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-[#2d8652]/10"><Palette size={14} className="text-neutral-600" /></button>
                         <button onClick={onOpenSettings} className="flex size-8 items-center justify-center rounded-full bg-white border border-neutral-200 hover:bg-[#2d8652]/10"><Settings size={14} className="text-neutral-600" /></button>
-                        <button onClick={() => setShowLyrics(prev => !prev)} className={`flex size-8 items-center justify-center rounded-full border border-neutral-200 transition-colors ${showLyrics ? 'bg-[#2d8652] text-white border-[#2d8652]' : 'bg-white text-neutral-600 hover:bg-[#2d8652]/10'}`}><Mic2 size={14} /></button>
-                        <button onClick={() => setShowEq(prev => !prev)} className={`flex size-8 items-center justify-center rounded-full border border-neutral-200 transition-colors ${showEq ? 'bg-[#2d8652] text-white border-[#2d8652]' : 'bg-white text-neutral-600 hover:bg-[#2d8652]/10'}`}><SlidersHorizontal size={14} /></button>
+                        <button onClick={() => { if (!showLyrics) setShowEq(false); setShowLyrics(prev => !prev); }} className={`flex size-8 items-center justify-center rounded-full border border-neutral-200 transition-colors ${showLyrics ? 'bg-[#2d8652] text-white border-[#2d8652]' : 'bg-white text-neutral-600 hover:bg-[#2d8652]/10'}`}><Mic2 size={14} /></button>
+                        <button onClick={() => { if (!showEq) setShowLyrics(false); setShowEq(prev => !prev); }} className={`flex size-8 items-center justify-center rounded-full border border-neutral-200 transition-colors ${showEq ? 'bg-[#2d8652] text-white border-[#2d8652]' : 'bg-white text-neutral-600 hover:bg-[#2d8652]/10'}`}><SlidersHorizontal size={14} /></button>
                     </div>
                 </div>
             </header>
@@ -184,10 +206,10 @@ export function OpenDeckStage({
                                             {/* Hover Actions Overlay */}
                                             {!isInsidePlayer && !isDragging && (
                                                 <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
-                                                    <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Settings"><Pencil size={10} className="text-slate-800" /></button>
-                                                    <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Snapshot"><Camera size={10} className="text-slate-800" /></button>
-                                                    <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Share"><Share2 size={10} className="text-slate-800" /></button>
-                                                    <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Add Songs"><Plus size={10} className="text-slate-800" /></button>
+                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Settings"><Pencil size={10} className="text-slate-800" /></button>
+                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Snapshot"><Camera size={10} className="text-slate-800" /></button>
+                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Share"><Share2 size={10} className="text-slate-800" /></button>
+                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Add Songs"><Plus size={10} className="text-slate-800" /></button>
                                                 </div>
                                             )}
                                         </div>
@@ -266,23 +288,25 @@ export function OpenDeckStage({
                             {/* Progress Bar */}
                             <div
                                 className="h-6 px-4 flex items-center cursor-pointer"
+                                onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
+                                    if (!isLoaded) return;
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     const p = (e.clientX - rect.left) / rect.width;
                                     seek(Math.min(Math.max(p, 0), 1));
                                 }}
                             >
                                 <div className="relative h-1 w-full bg-neutral-200 rounded-full">
-                                    <div className="absolute inset-y-0 left-0 bg-[#2d8652] rounded-full" style={{ width: `${progress * 100}%` }} />
+                                    <div className="absolute inset-y-0 left-0 bg-[#2d8652] rounded-full" style={{ width: `${Math.min(safeProgress * 100, 100)}%` }} />
                                 </div>
                             </div>
 
                             {/* Controls */}
                             <div className="h-12 border-t border-neutral-200 flex items-center justify-center gap-6 px-4">
-                                <button onClick={() => { playClick(); prev(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipBack size={18} className="fill-current" /></button>
-                                <button onClick={() => { playClick(); togglePlay(); }} className="size-10 rounded-full bg-[#2d8652] flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-transform">{isPlaying ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current pl-0.5" />}</button>
-                                <button onClick={() => { playClick(); next(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipForward size={18} className="fill-current" /></button>
-                                <div className="relative h-1 w-16 bg-neutral-200 rounded-full ml-3">
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); prev(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipBack size={18} className="fill-current" /></button>
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); togglePlay(); }} className="size-10 rounded-full bg-[#2d8652] flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-transform">{isPlaying ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current pl-0.5" />}</button>
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); next(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipForward size={18} className="fill-current" /></button>
+                                <div className="relative h-1 w-16 bg-neutral-200 rounded-full ml-3" onPointerDown={(e) => e.stopPropagation()}>
                                     <div className="absolute inset-y-0 left-0 bg-[#2d8652]/50 rounded-full" style={{ width: `${volume * 100}%` }} />
                                     <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
                                 </div>
@@ -291,12 +315,12 @@ export function OpenDeckStage({
                     </motion.div>
 
                     {isLoaded && (
-                        <button onClick={() => { playEject(); loadMix(null as any); }} className="mt-4 flex items-center gap-1.5 text-[9px] font-bold tracking-widest text-neutral-400 hover:text-[#2d8652] uppercase"><LogOut size={12} /> Eject</button>
+                        <button onClick={() => { playEject(); loadMix(""); }} className="mt-4 flex items-center gap-1.5 text-[9px] font-bold tracking-widest text-neutral-400 hover:text-[#2d8652] uppercase"><LogOut size={12} /> Eject</button>
                     )}
                     <p className="mt-4 text-[8px] tracking-widest text-neutral-300 uppercase">Drag cassette to insert</p>
                 </div>
 
-                {/* Right: Status - Positioned to fit within viewport */}
+                {/* Right: Status */}
                 <div className="col-span-3 flex flex-col justify-center items-end min-h-0">
                     <div className="text-right">
                         <p className="text-xs font-bold tracking-widest text-[#2d8652] uppercase mb-2">Status</p>
@@ -306,7 +330,7 @@ export function OpenDeckStage({
                         <div className="space-y-3 text-neutral-600">
                             <div className="flex items-center justify-end gap-3">
                                 <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Time</span>
-                                <span className="text-sm font-mono font-bold">{formatTime(progress * duration)}/{formatTime(duration || 0)}</span>
+                                <span className="text-sm font-mono font-bold">{formatTime(safeProgress * safeDuration)}/{formatTime(safeDuration || 0)}</span>
                             </div>
                             <div className="flex items-center justify-end gap-3">
                                 <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Vol</span>
@@ -318,53 +342,58 @@ export function OpenDeckStage({
             </main >
 
             {/* FLOATING DRAG GHOST - Always on top */}
-            {
-                draggingMix && dragPosition && (
-                    <div
-                        className="fixed pointer-events-none"
-                        style={{ left: dragPosition.x - 72, top: dragPosition.y - 48, zIndex: 99999, transform: 'rotate(5deg) scale(1.1)' }}
-                    >
-                        {(() => {
-                            const style = getStyleForMix(draggingMix.index);
-                            return (
-                                <div className={`w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-2xl relative overflow-hidden`}>
-                                    <div className="absolute inset-1 flex items-center justify-center">
-                                        <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
-                                            <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
-                                            <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
-                                        </div>
-                                    </div>
-                                    <div className="absolute bottom-1.5 left-2 right-2">
-                                        <p className={`text-[8px] font-bold tracking-tight ${style.text} truncate`}>{draggingMix.mix.title.toUpperCase()}</p>
+            {draggingMix && (
+                <div
+                    ref={ghostRef}
+                    className="fixed pointer-events-none top-0 left-0 z-[99999]"
+                    style={{
+                        transform: dragPositionRef.current
+                            ? `translate(${dragPositionRef.current.x - 72}px, ${dragPositionRef.current.y - 48}px) rotate(5deg) scale(1.1)`
+                            : 'none'
+                    }}
+                >
+                    {(() => {
+                        const style = getStyleForMix(draggingMix.index);
+                        return (
+                            <div className={`w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-2xl relative overflow-hidden`}>
+                                <div className="absolute inset-1 flex items-center justify-center">
+                                    <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
+                                        <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
+                                        <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
                                     </div>
                                 </div>
-                            );
-                        })()}
-                    </div>
-                )
-            }
+                                <div className="absolute bottom-1.5 left-2 right-2">
+                                    <p className={`text-[8px] font-bold tracking-tight ${style.text} truncate`}>{draggingMix.mix.title.toUpperCase()}</p>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
             {/* Overlays */}
-            <AnimatePresence>
-                {showLyrics && (
-                    <LyricsView
-                        currentSong={currentSong}
-                        currentTime={progress * duration}
-                        onClose={() => setShowLyrics(false)}
-                    />
-                )}
-                {showEq && (
-                    <EqualizerView
-                        onClose={() => setShowEq(false)}
-                        bands={eq.bands}
-                        setBand={eq.setBand}
-                        isEnabled={eq.isEnabled}
-                        setIsEnabled={eq.setIsEnabled}
-                        currentPreset={eq.currentPreset}
-                        setPreset={eq.setPreset}
-                        presets={eq.presets}
-                    />
-                )}
-            </AnimatePresence>
+            <div className="relative z-[10000]">
+                <AnimatePresence>
+                    {showLyrics && (
+                        <LyricsView
+                            currentSong={currentSong}
+                            currentTime={progress * duration}
+                            onClose={() => setShowLyrics(false)}
+                        />
+                    )}
+                    {showEq && (
+                        <EqualizerView
+                            onClose={() => setShowEq(false)}
+                            bands={eq.bands}
+                            setBand={eq.setBand}
+                            isEnabled={eq.isEnabled}
+                            setIsEnabled={eq.setIsEnabled}
+                            currentPreset={eq.currentPreset}
+                            setPreset={eq.setPreset}
+                            presets={eq.presets}
+                        />
+                    )}
+                </AnimatePresence>
+            </div>
         </div >
     );
 }

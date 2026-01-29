@@ -152,10 +152,10 @@ export function UnifiedSearch({
                     >
                         {/* Album Art */}
                         <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-800">
-                            {track.song.image?.[0]?.link && (
+                            {track.song?.image?.[0]?.link && (
                                 <Image
-                                    src={track.song.image[0].link}
-                                    alt={track.song.name}
+                                    src={track.song!.image[0].link}
+                                    alt={track.song!.name}
                                     width={48}
                                     height={48}
                                     className="w-full h-full object-cover"
@@ -165,8 +165,8 @@ export function UnifiedSearch({
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                            <p className="text-white font-medium truncate">{decodeHtml(track.song.name)}</p>
-                            <p className="text-gray-400 text-sm truncate">{decodeHtml(track.song.primaryArtists)}</p>
+                            <p className="text-white font-medium truncate">{decodeHtml(track.song?.name || "")}</p>
+                            <p className="text-gray-400 text-sm truncate">{decodeHtml(track.song?.primaryArtists || "")}</p>
                         </div>
 
                         {/* Quality Badges */}

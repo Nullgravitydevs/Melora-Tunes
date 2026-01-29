@@ -123,7 +123,7 @@ export function ExploreView({
                 {moodCategories.map((mood) => (
                     <motion.div
                         key={mood.id}
-                        className="aspect-[3/2] rounded-2xl flex flex-col items-start justify-end p-5 cursor-pointer relative overflow-hidden group"
+                        className="aspect-[3/2] rounded-2xl flex flex-col items-start justify-end p-5 cursor-pointer relative overflow-hidden group transform-gpu"
                         style={{
                             background: moodGradients[mood.id] || `linear-gradient(135deg, ${c.accent}, ${c.accent}99)`,
                             boxShadow: `0 8px 32px ${moodGradients[mood.id]?.includes('#FF6B9D') ? '#FF6B9D33' : c.accent + '33'}`

@@ -1,25 +1,21 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Download, Share2, Palette, X, Settings, Plus, Maximize2, Share as ShareIcon, Volume1, Moon, Sun, Camera, Pencil, Disc, Mic2 } from "lucide-react";
-import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Camera, Pencil, Mic2, SlidersHorizontal, Sun, Moon } from "lucide-react";
+import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
-import { QualityBadge } from "@/components/shared/QualityBadge";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { Visualizer } from "@/components/ui/visualizer";
-import { toPng } from 'html-to-image';
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { SlidersHorizontal } from "lucide-react";
 
 interface ZenStageProps {
-    currentTheme: ThemeKey;
-    onThemeChange: () => void;
+    currentTheme?: ThemeKey; // Made optional as unused
+    onThemeChange?: () => void; // Made optional
     onSelectTheme?: (theme: ThemeKey) => void;
-    // onSwitchToMobile prop removed
     onOpenSettings?: () => void;
     onEditMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
@@ -31,57 +27,95 @@ interface ZenStageProps {
     onShareMix?: (mix: Mix) => void;
 }
 
-export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowQueue, onShareMix, onSnapshotMix }: ZenStageProps) {
+export function ZenStage({
+    // currentTheme, // Unused
+    // onThemeChange, // Unused
+    // onSelectTheme, // Unused
+    onOpenSettings,
+    onEditMix,
+    onOpenSearch,
+    onCreateMix,
+    onCinemaMode,
+    onOpenThemeSelector,
+    // onShowQueue, // Unused
+    onShareMix,
+    onSnapshotMix
+}: ZenStageProps) {
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Cache player rect for drag target detection
+    const playerRectRef = useRef<DOMRect | null>(null);
+
     const {
         mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration,
-        loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
+        loadMix, togglePlay, next, prev, seek, setVolume,
         isLoaded, eq, isDownloaded
     } = usePlayback();
 
     const { playClick, playClunk, playEject } = useAudio();
-    // const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
-    // Zen Mode Persistence
+    // Zen Mode Persistence - Run once
     const [isDark, setIsDark] = useState(true);
-
     useEffect(() => {
         const savedMode = localStorage.getItem('melora-zen-mode');
         if (savedMode) {
             setIsDark(savedMode === 'dark');
         }
-    }, [currentTheme]);
+    }, []);
 
-    const toggleZenMode = () => {
+    const toggleZenMode = useCallback(() => {
         const newMode = !isDark;
         setIsDark(newMode);
         localStorage.setItem('melora-zen-mode', newMode ? 'dark' : 'light');
         playClick();
-    };
+    }, [isDark, playClick]);
+
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
 
     // Drag Logic Helpers
     const isDraggingRef = useRef(false);
-    const handleDragStart = () => { isDraggingRef.current = true; };
-    const handleDragEndAction = () => { setTimeout(() => { isDraggingRef.current = false; }, 50); };
-    const handleClick = (callback: () => void) => { if (!isDraggingRef.current) callback(); };
 
-    const activeMix = mixes.find(m => m.id === activeMixId) || null;
-    const hasCassette = isLoaded && !!activeMix;
+    const handleDragStart = useCallback((e: PointerEvent | MouseEvent | TouchEvent | React.PointerEvent) => {
+        isDraggingRef.current = true;
+        // Capture player rect for hit testing once at start
+        if (playerRef.current) {
+            playerRectRef.current = playerRef.current.getBoundingClientRect();
+        }
+    }, []);
 
-    // Derived state for display
-    const currentMixTitle = activeMix?.title || "No Cassette Loaded";
-    // const songName = currentSong ? decodeHtml(currentSong.name) : (activeMix ? "Ready to Play" : "NO CASSETTE"); // Unused
-    // const artistName = currentSong ? decodeHtml(currentSong.primaryArtists || "") : (activeMix ? "Melora High Bias" : ""); // Unused
+    const handleDragEnd = useCallback((e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo, mixId: string) => {
+        // Use standard timeout for click-prevention, but safer
+        setTimeout(() => { isDraggingRef.current = false; }, 50);
 
-    // Format time
+        // Check drop on player using CACHED rect
+        if (playerRectRef.current) {
+            const rect = playerRectRef.current;
+            const pt = info.point;
+            if (pt.x >= rect.left && pt.x <= rect.right && pt.y >= rect.top && pt.y <= rect.bottom) {
+                playClunk();
+                loadMix(mixId);
+            }
+        }
+    }, [playClunk, loadMix]);
+
+    const handleClick = useCallback((callback: () => void) => {
+        if (!isDraggingRef.current) callback();
+    }, []);
+
+    const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId) || null, [mixes, activeMixId]);
+
+    // Format time with Guards
     const formatTime = (seconds: number) => {
+        if (!Number.isFinite(seconds) || isNaN(seconds)) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    const safeDuration = duration > 0 ? duration : 0;
+    const safeProgress = Number.isFinite(progress) ? progress : 0;
 
     return (
         <div ref={containerRef} className={clsx(
@@ -93,7 +127,6 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                 ::-webkit-scrollbar { display: none; }
                 * { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
-
             {/* Subtle gradient overlay for depth */}
             <div className={clsx("fixed inset-0 pointer-events-none z-0 bg-gradient-to-br transition-colors duration-500",
                 isDark ? "from-white/[0.02] via-transparent to-transparent" : "from-black/[0.02] via-transparent to-transparent"
@@ -106,8 +139,8 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         drag
                         dragConstraints={containerRef}
                         className="flex items-center gap-3 pointer-events-auto cursor-grab active:cursor-grabbing"
+                        onPointerDown={(e) => e.stopPropagation()}
                     >
-                        {/* Logo Icon Removed */}
                         <h1 className={clsx("text-3xl tracking-normal select-none transition-colors",
                             "font-['Pacifico']",
                             isDark ? "text-white" : "text-black"
@@ -118,13 +151,14 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         drag
                         dragConstraints={containerRef}
                         className="flex items-center gap-6 pointer-events-auto cursor-grab active:cursor-grabbing"
+                        onPointerDown={(e) => e.stopPropagation()}
                     >
-                        <button onClick={onCinemaMode} className={clsx("hidden md:block font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1",
+                        <button onPointerDown={(e) => e.stopPropagation()} onClick={onCinemaMode} className={clsx("hidden md:block font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1",
                             isDark ? "text-white/50 hover:text-white hover:border-white/30" : "text-black/50 hover:text-black hover:border-black/30"
                         )}>
                             Cinema Mode
                         </button>
-                        <button onClick={onCreateMix} className={clsx("font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1",
+                        <button onPointerDown={(e) => e.stopPropagation()} onClick={onCreateMix} className={clsx("font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1",
                             isDark ? "text-white/50 hover:text-white hover:border-white/30" : "text-black/50 hover:text-black hover:border-black/30"
                         )}>
                             + Create Mix
@@ -134,6 +168,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                             {/* Theme Dropdown */}
                             <div className="relative">
                                 <button
+                                    onPointerDown={(e) => e.stopPropagation()}
                                     onClick={() => onOpenThemeSelector?.()}
                                     className={clsx("p-2 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}
                                     title="Change Theme"
@@ -144,6 +179,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
 
                             {/* Dark/Light Toggle */}
                             <button
+                                onPointerDown={(e) => e.stopPropagation()}
                                 onClick={toggleZenMode}
                                 className={clsx("p-2 transition-colors", isDark ? "text-white/40 hover:text-yellow-300" : "text-black/40 hover:text-purple-600")}
                                 title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
@@ -151,7 +187,11 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                 {isDark ? <Sun size={20} /> : <Moon size={20} />}
                             </button>
 
-                            <button onClick={onOpenSettings} className={clsx("p-2 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
+                            <button
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={onOpenSettings}
+                                className={clsx("p-2 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}
+                            >
                                 <Settings size={20} />
                             </button>
                         </div>
@@ -177,19 +217,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                         dragElastic={0.2}
                                         dragMomentum
                                         onDragStart={handleDragStart}
-                                        onDragEnd={(e, info) => {
-                                            handleDragEndAction();
-                                            // Check drop on player
-                                            if (playerRef.current) {
-                                                const rect = playerRef.current.getBoundingClientRect();
-                                                const x = info.point.x;
-                                                const y = info.point.y;
-                                                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-                                                    playClunk();
-                                                    loadMix(mix.id);
-                                                }
-                                            }
-                                        }}
+                                        onDragEnd={(e, info) => handleDragEnd(e, info, mix.id)}
                                         initial={{ opacity: 0, scale: 0.9 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         whileHover={{ scale: 1.05, zIndex: 50, transition: { duration: 0.2 } }}
@@ -252,11 +280,11 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                         </div>
 
                                         {/* Action Buttons (Edit/Snapshot/Share/Add) */}
-                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20" onClick={(e) => e.stopPropagation()}>
-                                            <button onClick={() => onEditMix?.(mix)} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Edit"><Pencil size={10} className="text-black" /></button>
-                                            <button onClick={() => onSnapshotMix?.(mix)} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Snapshot"><Camera size={10} className="text-black" /></button>
-                                            <button onClick={() => onShareMix?.(mix)} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Share"><Share2 size={10} className="text-black" /></button>
-                                            <button onClick={() => onOpenSearch?.(mix.id)} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Add Songs"><Plus size={10} className="text-black" /></button>
+                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Edit"><Pencil size={10} className="text-black" /></button>
+                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Snapshot"><Camera size={10} className="text-black" /></button>
+                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Share"><Share2 size={10} className="text-black" /></button>
+                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Add Songs"><Plus size={10} className="text-black" /></button>
                                         </div>
                                     </motion.div>
                                 );
@@ -275,7 +303,6 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         </div>
                     </section>
 
-                    {/* Right Column: Player - Sticky & Compact like Metal Theme */}
                     {/* Right Column: Player - Sticky & Draggable */}
                     <motion.section
                         ref={playerRef}
@@ -283,7 +310,6 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         dragConstraints={containerRef}
                         dragMomentum={false}
                         onDragStart={handleDragStart}
-                        onDragEnd={handleDragEndAction}
                         dragElastic={0.1}
                         className="lg:col-span-5 w-full flex justify-center sticky top-8 h-fit z-40 cursor-grab active:cursor-grabbing"
                         initial={{ opacity: 0, x: 20 }}
@@ -377,38 +403,41 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                 )}
                             </div>
 
-                            {/* Visualizer */}
-                            <Visualizer isPlaying={isPlaying} accentColor={isDark ? "#ffffff" : "#000000"} className="w-full h-8 rounded mb-4 opacity-50" />
+                            {/* Visualizer - Render only if loaded for perf, or opacity handled */}
+                            {isLoaded && <Visualizer isPlaying={isPlaying} accentColor={isDark ? "#ffffff" : "#000000"} className="w-full h-8 rounded mb-4 opacity-50" />}
+                            {!isLoaded && <div className="w-full h-8 rounded mb-4 opacity-10 bg-current"></div>}
 
                             {/* Time & Progress */}
                             <div className="mb-6 px-1">
                                 <div className={clsx("flex justify-between text-[10px] font-mono mb-1", isDark ? "text-white/40" : "text-black/40")}>
-                                    <span>{formatTime(progress * duration)}</span>
-                                    <span>{formatTime(duration || 0)}</span>
+                                    <span>{formatTime(safeProgress * safeDuration)}</span>
+                                    <span>{formatTime(safeDuration || 0)}</span>
                                 </div>
                                 <div
                                     className={clsx("h-1 rounded-full overflow-hidden cursor-pointer group", isDark ? "bg-white/10" : "bg-black/10")}
+                                    onPointerDown={(e) => e.stopPropagation()}
                                     onClick={(e) => {
-                                        if (duration && isLoaded) {
+                                        if (safeDuration && isLoaded) {
                                             const rect = e.currentTarget.getBoundingClientRect();
                                             const percent = (e.clientX - rect.left) / rect.width;
-                                            seek(percent);
+                                            seek(Math.min(Math.max(percent, 0), 1));
                                         }
                                     }}
                                 >
                                     <motion.div
                                         className={clsx("h-full transition-colors", isDark ? "bg-white group-hover:bg-white/80" : "bg-black group-hover:bg-black/80")}
-                                        style={{ width: `${progress * 100}%` }}
+                                        style={{ width: `${Math.min(safeProgress * 100, 100)}%` }}
                                     ></motion.div>
                                 </div>
                             </div>
 
                             {/* Main Controls */}
                             <div className="flex items-center justify-center gap-6 mb-8">
-                                <button onClick={() => handleClick(() => { playClick(); prev(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => handleClick(() => { playClick(); prev(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
                                     <SkipBack size={20} className="fill-current" />
                                 </button>
                                 <button
+                                    onPointerDown={(e) => e.stopPropagation()}
                                     onClick={() => handleClick(() => { playClick(); togglePlay(); })}
                                     className={clsx("w-14 h-14 flex items-center justify-center rounded-full hover:scale-105 active:scale-95 transition-all shadow-lg",
                                         isDark ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]" : "bg-black text-white shadow-[0_0_20px_rgba(0,0,0,0.1)]"
@@ -416,7 +445,7 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                 >
                                     {isPlaying ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current pl-1" />}
                                 </button>
-                                <button onClick={() => handleClick(() => { playClick(); next(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => handleClick(() => { playClick(); next(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
                                     <SkipForward size={20} className="fill-current" />
                                 </button>
                             </div>
@@ -424,7 +453,8 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                             <div className={clsx("flex justify-between items-center pt-4 border-t", isDark ? "border-white/5" : "border-black/5")}>
                                 <div className="flex items-center gap-4">
                                     <button
-                                        onClick={() => handleClick(() => { playEject(); loadMix(null as any); })}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={() => handleClick(() => { playEject(); loadMix(""); })}
                                         className={clsx("flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest",
                                             isDark ? "text-white/30 hover:text-white" : "text-black/30 hover:text-black"
                                         )}
@@ -433,7 +463,11 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                     </button>
 
                                     <button
-                                        onClick={() => setShowLyrics(prev => !prev)}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={() => {
+                                            if (!showLyrics) setShowEq(false);
+                                            setShowLyrics(prev => !prev);
+                                        }}
                                         className={clsx("flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest",
                                             showLyrics ? (isDark ? "text-white" : "text-black") : (isDark ? "text-white/30 hover:text-white" : "text-black/30 hover:text-black")
                                         )}
@@ -442,7 +476,11 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                                     </button>
 
                                     <button
-                                        onClick={() => setShowEq(prev => !prev)}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={() => {
+                                            if (!showEq) setShowLyrics(false);
+                                            setShowEq(prev => !prev);
+                                        }}
                                         className={clsx("flex items-center gap-2 text-[10px] font-mono font-bold transition-colors uppercase tracking-widest",
                                             showEq ? (isDark ? "text-white" : "text-black") : (isDark ? "text-white/30 hover:text-white" : "text-black/30 hover:text-black")
                                         )}
@@ -469,31 +507,40 @@ export function ZenStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSet
                         </div>
                     </motion.section>
 
+                    {/* Overlays - High Z-Index */}
                     <AnimatePresence>
                         {showLyrics && (
-                            <LyricsView
-                                currentSong={currentSong}
-                                currentTime={progress * duration}
-                                onClose={() => setShowLyrics(false)}
-                            />
+                            <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                                <div className="pointer-events-auto w-full h-full max-w-2xl max-h-[80vh]">
+                                    <LyricsView
+                                        currentSong={currentSong}
+                                        currentTime={progress * duration}
+                                        onClose={() => setShowLyrics(false)}
+                                    />
+                                </div>
+                            </div>
                         )}
                         {showEq && (
-                            <EqualizerView
-                                onClose={() => setShowEq(false)}
-                                bands={eq.bands}
-                                setBand={eq.setBand}
-                                isEnabled={eq.isEnabled}
-                                setIsEnabled={eq.setIsEnabled}
-                                currentPreset={eq.currentPreset}
-                                setPreset={eq.setPreset}
-                                presets={eq.presets}
-                            />
+                            <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                                <div className="pointer-events-auto">
+                                    <EqualizerView
+                                        onClose={() => setShowEq(false)}
+                                        bands={eq.bands}
+                                        setBand={eq.setBand}
+                                        isEnabled={eq.isEnabled}
+                                        setIsEnabled={eq.setIsEnabled}
+                                        currentPreset={eq.currentPreset}
+                                        setPreset={eq.setPreset}
+                                        presets={eq.presets}
+                                    />
+                                </div>
+                            </div>
                         )}
                     </AnimatePresence>
                 </main>
 
                 <footer className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                    {/* Removed N button based on user request */}
+                    {/* Footer Content */}
                 </footer>
             </div>
         </div>

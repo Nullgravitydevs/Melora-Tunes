@@ -198,9 +198,7 @@ export function ChartDetailScreen({
                                     id: song.id,
                                     title: song.name,
                                     artist: song.primaryArtists,
-                                    duration: song.duration
-                                        ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, "0")}`
-                                        : "--:--",
+                                    duration: Number(song.duration || 0),
                                     art: getArt(song),
                                     original: song
                                 }}

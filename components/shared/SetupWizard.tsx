@@ -298,7 +298,7 @@ function ModeCard({ title, desc, icon, onClick, color }: any) {
     return (
         <button
             onClick={onClick}
-            className="relative group h-64 rounded-3xl overflow-hidden border border-white/10 hover:border-white transition-all text-left p-6 flex flex-col justify-end"
+            className="relative group h-64 rounded-3xl overflow-hidden border border-white/10 hover:border-white transition-all text-left p-6 flex flex-col justify-end transform-gpu will-change-transform"
         >
             <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-20 group-hover:opacity-40 transition-opacity`} />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />

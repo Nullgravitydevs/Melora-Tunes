@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
-    Play, Pause, SkipBack, SkipForward, Volume2, LogOut,
-    Palette, Settings, Plus, Camera, Share2
+    SkipBack, SkipForward, Volume2, LogOut,
+    Palette, Settings, Plus, Camera, Share2, Play, Pause
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -51,16 +51,17 @@ export function NordicStage({
     const containerRef = useRef<HTMLDivElement>(null);
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
+        loadMix, togglePlay, next, prev, seek, setVolume,
         isLoaded, eq
     } = usePlayback();
 
     const { playClick, playEject } = useAudio();
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
-    const activeMix = mixes.find(m => m.id === activeMixId) || null;
+    const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId) || null, [mixes, activeMixId]);
 
     const formatTime = (seconds: number) => {
+        if (!Number.isFinite(seconds) || isNaN(seconds)) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -112,7 +113,11 @@ export function NordicStage({
                             {mixes.map((mix) => (
                                 <div
                                     key={mix.id}
-                                    onClick={() => { playClick(); loadMix(mix.id); }}
+                                    onClick={() => {
+                                        if (activeMixId === mix.id) return; // Prevent reload
+                                        playClick();
+                                        loadMix(mix.id);
+                                    }}
                                     className={clsx(
                                         "group flex items-center justify-between p-4 rounded-lg cursor-pointer transition-all duration-300 border",
                                         mix.id === activeMixId
@@ -240,13 +245,13 @@ export function NordicStage({
                                         if (duration && isLoaded) {
                                             const rect = e.currentTarget.getBoundingClientRect();
                                             const percent = (e.clientX - rect.left) / rect.width;
-                                            seek(percent);
+                                            seek(Math.max(0, Math.min(1, percent)));
                                         }
                                     }}
                                 >
                                     <div
                                         className="absolute top-0 left-0 h-full bg-blue-500 rounded-full group-hover:bg-blue-400 transition-colors"
-                                        style={{ width: `${(progress / (duration || 1)) * 100}%` }}
+                                        style={{ width: `${Math.min(progress * 100, 100)}%` }}
                                     ></div>
                                 </div>
                             </div>
@@ -256,18 +261,21 @@ export function NordicStage({
                                 <button
                                     onClick={() => { playClick(); prev(); }}
                                     className="p-4 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                                    onPointerDown={(e) => e.stopPropagation()}
                                 >
                                     <SkipBack className="fill-current" size={24} />
                                 </button>
                                 <button
                                     onClick={() => { playClick(); togglePlay(); }}
                                     className="p-5 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-500 hover:shadow-xl transition-all transform hover:scale-105 active:scale-95"
+                                    onPointerDown={(e) => e.stopPropagation()}
                                 >
                                     {isPlaying ? <Pause className="fill-current" size={28} /> : <Play className="fill-current pl-1" size={28} />}
                                 </button>
                                 <button
                                     onClick={() => { playClick(); next(); }}
                                     className="p-4 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                                    onPointerDown={(e) => e.stopPropagation()}
                                 >
                                     <SkipForward className="fill-current" size={24} />
                                 </button>
@@ -276,7 +284,7 @@ export function NordicStage({
                             {/* Footer Controls */}
                             <div className="flex justify-between items-center pt-4 border-t border-slate-800">
                                 <button
-                                    onClick={() => { playEject(); loadMix(null as any); }}
+                                    onClick={() => { playEject(); loadMix(""); }}
                                     className="flex items-center gap-2 text-xs font-mono font-bold text-slate-400 hover:text-blue-400 transition-colors uppercase tracking-widest"
                                 >
                                     <LogOut size={16} />
@@ -285,14 +293,22 @@ export function NordicStage({
 
                                 <div className="flex gap-4">
                                     <button
-                                        onClick={() => setShowLyrics(prev => !prev)}
+                                        onClick={() => {
+                                            if (!showLyrics) setShowEq(false);
+                                            setShowLyrics(prev => !prev);
+                                        }}
                                         className={`flex items-center gap-2 text-xs font-mono font-bold transition-colors uppercase tracking-widest ${showLyrics ? 'text-blue-400' : 'text-slate-400 hover:text-blue-400'}`}
+                                        onPointerDown={(e) => e.stopPropagation()}
                                     >
                                         <Mic2 size={16} />
                                     </button>
                                     <button
-                                        onClick={() => setShowEq(prev => !prev)}
+                                        onClick={() => {
+                                            if (!showEq) setShowLyrics(false);
+                                            setShowEq(prev => !prev);
+                                        }}
                                         className={`flex items-center gap-2 text-xs font-mono font-bold transition-colors uppercase tracking-widest ${showEq ? 'text-blue-400' : 'text-slate-400 hover:text-blue-400'}`}
+                                        onPointerDown={(e) => e.stopPropagation()}
                                     >
                                         <SlidersHorizontal size={16} />
                                     </button>
@@ -318,27 +334,29 @@ export function NordicStage({
                 </main>
             </div>
             {/* Overlays */}
-            <AnimatePresence>
-                {showLyrics && (
-                    <LyricsView
-                        currentSong={currentSong}
-                        currentTime={progress * duration}
-                        onClose={() => setShowLyrics(false)}
-                    />
-                )}
-                {showEq && (
-                    <EqualizerView
-                        onClose={() => setShowEq(false)}
-                        bands={eq.bands}
-                        setBand={eq.setBand}
-                        isEnabled={eq.isEnabled}
-                        setIsEnabled={eq.setIsEnabled}
-                        currentPreset={eq.currentPreset}
-                        setPreset={eq.setPreset}
-                        presets={eq.presets}
-                    />
-                )}
-            </AnimatePresence>
+            <div className="relative z-[10000]">
+                <AnimatePresence>
+                    {showLyrics && (
+                        <LyricsView
+                            currentSong={currentSong}
+                            currentTime={progress * duration}
+                            onClose={() => setShowLyrics(false)}
+                        />
+                    )}
+                    {showEq && (
+                        <EqualizerView
+                            onClose={() => setShowEq(false)}
+                            bands={eq.bands}
+                            setBand={eq.setBand}
+                            isEnabled={eq.isEnabled}
+                            setIsEnabled={eq.setIsEnabled}
+                            currentPreset={eq.currentPreset}
+                            setPreset={eq.setPreset}
+                            presets={eq.presets}
+                        />
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     );
 }

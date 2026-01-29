@@ -226,9 +226,7 @@ export function AlbumView({
                                         id: song.id,
                                         title: decodeHtml(song.name || song.title),
                                         artist: decodeHtml(song.primaryArtists || song.artist),
-                                        duration: song.duration
-                                            ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, "0")}`
-                                            : "--:--",
+                                        duration: Number(song.duration || 0),
                                         art: getArt(song),
                                         original: song
                                     }}

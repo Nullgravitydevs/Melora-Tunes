@@ -56,7 +56,7 @@ export function SilverFrostStage({
     };
 
     const getMixImage = (mix: Mix): string | null => {
-        if (mix.songs.length > 0) return getThumbnailUrl(mix.songs[0]);
+        if (mix.songs.length > 0) return getThumbnailUrl(mix.songs[0] as any);
         return null;
     };
 
@@ -211,7 +211,7 @@ export function SilverFrostStage({
                                         <p className="text-xs text-white font-mono">320kbps</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xl font-black text-slate-600 leading-none">{formatTime(duration - progress)}</p>
+                                        <p className="text-xl font-black text-slate-600 leading-none">{formatTime(Math.max(0, duration - (progress * duration)))}</p>
                                         <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide">Remaining</p>
                                     </div>
                                 </div>
@@ -262,16 +262,16 @@ export function SilverFrostStage({
                         {/* Progress Bar */}
                         <div className="mt-6 pt-4 border-t border-slate-200/50">
                             <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-bold text-slate-400 w-10">{formatTime(progress * duration)}</span>
+                                <span className="text-[10px] font-bold text-slate-400 w-10">{formatTime(Math.min(progress * duration, duration))}</span>
                                 <div
-                                    className="flex-1 h-1 bg-slate-200 rounded-full relative cursor-pointer"
+                                    className="flex-1 h-1 bg-slate-200 rounded-full relative cursor-pointer overflow-hidden"
                                     onClick={(e) => {
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         const p = (e.clientX - rect.left) / rect.width;
                                         seek(Math.min(Math.max(p, 0), 1));
                                     }}
                                 >
-                                    <div className="h-full bg-[#00aaff] rounded-full" style={{ width: `${progress * 100}%` }} />
+                                    <div className="h-full bg-[#00aaff] rounded-full" style={{ width: `${Math.min(progress * 100, 100)}%` }} />
                                 </div>
                                 <span className="text-[10px] font-bold text-slate-400 w-10 text-right">{formatTime(duration)}</span>
                             </div>
@@ -340,6 +340,6 @@ export function SilverFrostStage({
                     />
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 }

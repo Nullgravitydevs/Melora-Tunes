@@ -8,7 +8,7 @@ import { getHiFiAlbum } from '@/lib/hifi-client';
 import { searchUnified, SearchType } from '@/lib/unified-search';
 import { PlayableTrack, isPlayableTrack } from '@/lib/types';
 import { SearchFilters } from "@/components/ui/search-filters";
-import { ArtistView } from "./artist-view";
+import { ArtistView } from "../artist-view";
 import { TrackContextMenu } from '@/components/ui/track-context-menu';
 import { decodeHtml, parseLrc, cleanTrackTitle } from "@/lib/utils";
 import {
@@ -23,7 +23,7 @@ import {
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { ThemeKey } from "@/components/ui/desktop-player";
-import { QualityBadge } from "@/components/discovery/desktop/QualityBadge";
+import { QualityBadge } from "@/components/desktop/discovery/desktop/QualityBadge";
 import Image from "next/image";
 
 // --- Custom Styles (Crystal Clear Onyx) ---
@@ -305,7 +305,7 @@ export function GlassStage({
     useEffect(() => {
         if (currentSong) {
             setLyricsData({ synced: false, text: "Loading lyrics...", lines: [] });
-            getSyncedLyrics(currentSong.name, currentSong.primaryArtists?.split(',')[0] || '', currentSong.album?.name || '', currentSong.duration)
+            getSyncedLyrics(currentSong as any)
                 .then(data => {
                     const lines = data.synced ? parseLrc(data.text) : [];
                     setLyricsData({ ...data, lines });
@@ -509,7 +509,7 @@ export function GlassStage({
     // --- Global Handlers ---
 
     const handleSongClick = (song: JioSaavnSong | PlayableTrack) => {
-        const songId = 'song' in song ? song.song.id : song.id;
+        const songId = 'song' in song ? (song as any).song?.id : song.id;
         // If clicked song is already playing, just toggle play/pause
         if (currentSong?.id === songId) {
             togglePlay();
@@ -523,9 +523,9 @@ export function GlassStage({
         // BUT if we are separately clicking a song in search, we might want to just play it + recommendations
         // For now, simple logic: Play song, and ensure mix exists
         const existingMix = mixes.find(m => m.id === activeMixId);
-        if (existingMix && existingMix.songs.some(s => ('song' in s ? s.song.id : s.id) === songId)) {
+        if (existingMix && existingMix.songs.some(s => ('song' in s ? (s as any).song.id : s.id) === songId)) {
             // Song is in current mix, just jump to it
-            updateMix(activeMixId!, { currentSongIndex: existingMix.songs.findIndex(s => ('song' in s ? s.song.id : s.id) === songId) });
+            updateMix(activeMixId!, { currentSongIndex: existingMix.songs.findIndex(s => ('song' in s ? (s as any).song.id : s.id) === songId) });
             play();
         } else {
             // New Session Mix
@@ -766,7 +766,7 @@ export function GlassStage({
                 // Map PlayableTrack back to basic metadata for searchResults if strictly needed
                 // But generally we should use groupedResults (PlayableTrack[]) for display.
                 // If searchResults is used elsewhere, we shim it:
-                const flatResults = results.map(t => t.song);
+                const flatResults = results.map(t => t.song).filter((s): s is JioSaavnSong => !!s);
                 setSearchResults(flatResults);
 
                 setShowAllResults(false);
@@ -929,18 +929,22 @@ export function GlassStage({
                         />
 
                         {/* User Mixes/Tapes */}
-                        {mixes.filter(m => m.id.startsWith('playlist-')).map(mix => (
-                            <LibraryCard
-                                key={mix.id}
-                                image={mix.songs[0] ? ('song' in mix.songs[0] ? mix.songs[0].song.image : mix.songs[0].image) : undefined}
-                                title={mix.title}
-                                subtitle={`Playlist • ${mix.songs.length} songs`}
-                                onClick={() => {
-                                    loadMix(mix.id);
-                                    navigateTo({ type: 'queue' });
-                                }}
-                            />
-                        ))}
+                        {mixes.filter(m => m.id.startsWith('playlist-')).map(mix => {
+                            const firstItem = mix.songs[0];
+                            const imageUrl = firstItem ? ('song' in firstItem ? firstItem.song?.image : (firstItem as any)?.image) : undefined;
+                            return (
+                                <LibraryCard
+                                    key={mix.id}
+                                    image={imageUrl}
+                                    title={mix.title}
+                                    subtitle={`Playlist • ${mix.songs.length} songs`}
+                                    onClick={() => {
+                                        loadMix(mix.id);
+                                        navigateTo({ type: 'queue' });
+                                    }}
+                                />
+                            )
+                        })}
                     </div>
                 </div>
 
@@ -1124,8 +1128,8 @@ export function GlassStage({
                                                     isPlaying={currentSong?.id === track.id && isPlaying}
                                                     isLiked={isLiked(track.id)}
                                                     onPlay={() => handleSongClick(track)}
-                                                    onLike={() => toggleLike(track.song)}
-                                                    onContextMenu={(e) => handleContextMenu(e, track.song)}
+                                                    onLike={() => toggleLike(track.song as any)}
+                                                    onContextMenu={(e) => handleContextMenu(e, track.song as any)}
                                                     isOffline={isDownloaded(track.id)}
                                                 />
                                             );
@@ -1615,7 +1619,7 @@ export function GlassStage({
                 visible={contextMenu.visible}
                 x={contextMenu.x}
                 y={contextMenu.y}
-                song={contextMenu.song ? ('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song) : null}
+                song={contextMenu.song ? ('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song) as any : null}
                 onClose={() => setContextMenu(prev => ({ ...prev, visible: false }))}
                 onPlay={(songArg) => {
                     // Use scope song which might be PlayableTrack
@@ -1627,19 +1631,19 @@ export function GlassStage({
                     const song = contextMenu.song!;
                     if (activeMixId) {
                         updateMix(activeMixId, { songs: [...mixes.find(m => m.id === activeMixId)!.songs, song] });
-                        const name = 'song' in song ? song.song.name : song.name;
+                        const name = 'song' in song ? song.song?.name : (song as any).name;
                         showToast(`Added "${decodeHtml(name)}" to queue`);
                     }
                 }}
                 onGoToArtist={(artistId) => { navigateTo({ type: 'artist', data: { id: artistId } }); }}
                 onGoToAlbum={(albumId) => {
-                    const s = contextMenu.song ? ('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song) : null;
+                    const s = contextMenu.song ? ('song' in contextMenu.song ? (contextMenu.song as any).song : contextMenu.song) : null;
                     if (s?.album) navigateTo({ type: 'playlist', data: { ...s.album, type: 'album', image: s.image } });
                 }}
-                onStartRadio={(songArg) => contextMenu.song && handleStartRadio('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song)}
-                isDownloaded={contextMenu.song ? isDownloaded(('song' in contextMenu.song ? contextMenu.song.song.id : contextMenu.song.id)) : false}
-                onDownload={() => contextMenu.song && downloadSong(contextMenu.song)}
-                onRemoveDownload={() => contextMenu.song && removeDownload('song' in contextMenu.song ? contextMenu.song.song.id : contextMenu.song.id)}
+                onStartRadio={(songArg) => contextMenu.song && handleStartRadio('song' in contextMenu.song ? contextMenu.song.song : contextMenu.song as any)}
+                isDownloaded={contextMenu.song ? isDownloaded(('song' in contextMenu.song ? (contextMenu.song as any).song.id : (contextMenu.song as any).id)) : false}
+                onDownload={() => contextMenu.song && downloadSong(contextMenu.song as any)}
+                onRemoveDownload={() => contextMenu.song && removeDownload('song' in contextMenu.song ? (contextMenu.song as any).song.id : (contextMenu.song as any).id)}
             />
 
             {/* Create Playlist Modal */}
@@ -1730,7 +1734,7 @@ function SongRow({ song, index, isPlaying, isLiked, quality, onPlay, onLike, onC
     onContextMenu: (e: React.MouseEvent) => void;
     isOffline?: boolean;
 }) {
-    const displaySong = 'song' in song ? song.song : song;
+    const displaySong = ('song' in song ? song.song : song) as JioSaavnSong;
 
     // Auto-derive quality if not explicitly provided
     let displayQuality = quality;

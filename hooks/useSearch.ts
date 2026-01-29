@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { searchUnified, GroupedSong, SearchType } from '@/lib/unified-search';
+import { searchUnified, SearchType } from '@/lib/unified-search';
+import { PlayableTrack } from '@/lib/types';
 
 interface UseSearchOptions {
     debounceMs?: number;
@@ -11,7 +12,7 @@ interface UseSearchOptions {
 interface UseSearchReturn {
     query: string;
     setQuery: (q: string) => void;
-    results: GroupedSong[];
+    results: PlayableTrack[];
     isSearching: boolean;
     filter: SearchType;
     setFilter: (f: SearchType) => void;
@@ -26,7 +27,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
     const { debounceMs = 400, initialFilter = 'all' } = options;
 
     const [query, setQuery] = useState("");
-    const [results, setResults] = useState<GroupedSong[]>([]);
+    const [results, setResults] = useState<PlayableTrack[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [filter, setFilter] = useState<SearchType>(initialFilter);
     const searchTimeout = useRef<NodeJS.Timeout | null>(null);

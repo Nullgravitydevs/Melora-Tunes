@@ -1586,7 +1586,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     next();
                 }}
                 onProgress={({ played, playedSeconds }) => {
-                    setProgress(playedSeconds);
+                    setProgress(played);
 
                     // SponsorBlock Check
                     if (skipSegments.length > 0 && duration > 0) {

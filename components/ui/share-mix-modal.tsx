@@ -22,10 +22,10 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
     const shareData = {
         id: mix.id,
         title: mix.title,
-        songs: mix.songs.map(s => ({
-            id: s.id,
-            name: s.name,
-            artists: s.primaryArtists
+        songs: mix.songs.map((s: any) => ({
+            id: s.song?.id || s.id,
+            name: s.song?.name || s.name,
+            artists: s.song?.primaryArtists || s.primaryArtists
         }))
     };
 
@@ -95,13 +95,13 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                             {/* Mix Preview */}
                             <div className="bg-zinc-800/50 rounded-xl p-4">
                                 <div className="flex items-center gap-3 mb-3">
-                                    {mix.songs[0]?.image && (
+                                    {(mix.songs[0] as any).song?.image || (mix.songs[0] as any).image ? (
                                         <img
-                                            src={mix.songs[0].image[2]?.link || mix.songs[0].image[0]?.link}
+                                            src={((mix.songs[0] as any).song?.image?.[2]?.link || (mix.songs[0] as any).song?.image?.[0]?.link) || ((mix.songs[0] as any).image?.[2]?.link || (mix.songs[0] as any).image?.[0]?.link)}
                                             alt={mix.title}
                                             className="w-12 h-12 rounded-lg object-cover"
                                         />
-                                    )}
+                                    ) : null}
                                     <div>
                                         <p className="font-medium text-white">{decodeHtml(mix.title)}</p>
                                         <p className="text-xs text-zinc-400">{mix.songs.length} songs</p>
@@ -110,7 +110,7 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                                 <div className="flex flex-wrap gap-1">
                                     {mix.songs.slice(0, 5).map((s, i) => (
                                         <span key={`${s.id}-${i}`} className="text-[10px] px-2 py-0.5 bg-zinc-700 rounded text-zinc-300">
-                                            {decodeHtml(s.name).substring(0, 20)}...
+                                            {decodeHtml((s as any).song?.name || (s as any).name || "").substring(0, 20)}...
                                         </span>
                                     ))}
                                     {mix.songs.length > 5 && (

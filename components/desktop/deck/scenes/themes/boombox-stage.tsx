@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
+import { isPlayableTrack } from "@/lib/types";
 import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
@@ -33,11 +34,12 @@ interface BoomboxStageProps {
 }
 
 // Draggable Polaroid component that manages its own position
+export interface Position { x: number; y: number; rotation: number; }
+
+// Draggable Polaroid component that manages its own position
 function DraggablePolaroid({
     mix,
-    initialX,
-    initialY,
-    initialRotation,
+    position,
     isInsidePlayer,
     albumArt,
     playerRef,
@@ -46,12 +48,11 @@ function DraggablePolaroid({
     onEditMix,
     onSnapshotMix,
     onOpenSearch,
-    onShareMix
+    onShareMix,
+    onPositionChange
 }: {
     mix: Mix;
-    initialX: number;
-    initialY: number;
-    initialRotation: number;
+    position: Position;
     isInsidePlayer: boolean;
     albumArt: string | null;
     playerRef: React.RefObject<HTMLDivElement | null>;
@@ -61,47 +62,68 @@ function DraggablePolaroid({
     onSnapshotMix?: (mix: Mix) => void;
     onOpenSearch?: (mixId: string) => void;
     onShareMix?: (mix: Mix) => void;
+    onPositionChange: (id: string, newPos: { x: number, y: number }) => void;
 }) {
-    const x = useMotionValue(initialX);
-    const y = useMotionValue(initialY);
+    const x = useMotionValue(position.x);
+    const y = useMotionValue(position.y);
     const [showButtons, setShowButtons] = useState(false);
 
-    const handleDrag = (e: any, info: any) => {
+    // Cache rect to avoid thrashing
+    const playerRectRef = useRef<DOMRect | null>(null);
+
+    // Sync MotionValues if parent updates (e.g. reload)
+    useEffect(() => {
+        x.set(position.x);
+        y.set(position.y);
+    }, [position.x, position.y, x, y]);
+
+    const handleDragStart = () => {
         if (playerRef.current) {
-            const rect = playerRef.current.getBoundingClientRect();
+            playerRectRef.current = playerRef.current.getBoundingClientRect();
+        }
+    };
+
+    const handleDrag = (_: any, info: any) => {
+        if (playerRectRef.current) {
+            const rect = playerRectRef.current;
             const isOver = info.point.x >= rect.left && info.point.x <= rect.right &&
                 info.point.y >= rect.top && info.point.y <= rect.bottom;
             onHoverPlayer(isOver);
         }
     };
 
-    const handleDragEnd = (e: any, info: any) => {
-        if (playerRef.current) {
-            const rect = playerRef.current.getBoundingClientRect();
+    const handleDragEnd = (_: any, info: any) => {
+        if (playerRectRef.current) {
+            const rect = playerRectRef.current;
             if (info.point.x >= rect.left && info.point.x <= rect.right &&
                 info.point.y >= rect.top && info.point.y <= rect.bottom) {
                 onDropOnPlayer(mix);
             }
         }
         onHoverPlayer(false);
+        playerRectRef.current = null; // Clear cache
+
+        // Persist new position
+        onPositionChange(mix.id, { x: x.get(), y: y.get() });
     };
 
     return (
         <motion.div
             drag={!isInsidePlayer}
-            dragMomentum={true}
-            dragElastic={0.2}
+            dragMomentum={false} // Disable momentum for precise drops
+            dragElastic={0.1}
+            onDragStart={handleDragStart}
             onDrag={handleDrag}
             onDragEnd={handleDragEnd}
             onMouseEnter={() => setShowButtons(true)}
             onMouseLeave={() => setShowButtons(false)}
-            style={{ x, y, rotate: initialRotation }}
+            style={{ x, y, rotate: position.rotation }}
             className={clsx(
                 "absolute top-0 left-0 cursor-grab active:cursor-grabbing select-none z-20",
-                isInsidePlayer && "opacity-50 cursor-default"
+                isInsidePlayer && "opacity-50 cursor-default" // Stuck in player
             )}
             whileDrag={{ scale: 1.1, zIndex: 100, rotate: 0 }}
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.05, zIndex: 50 }}
         >
             {!isInsidePlayer && (
                 <div className="bg-white p-2 pb-6 shadow-lg transition-all duration-300">
@@ -123,10 +145,11 @@ function DraggablePolaroid({
                         )}
                         {showButtons && (
                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Edit Mix"><Pencil size={12} className="text-gray-700" /></button>
-                                <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
-                                <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Share"><Share2 size={12} className="text-gray-700" /></button>
-                                <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
+                                {/* Stop Propagation on pointer events to prevent drag start */}
+                                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Edit Mix"><Pencil size={12} className="text-gray-700" /></button>
+                                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
+                                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Share"><Share2 size={12} className="text-gray-700" /></button>
+                                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
                             </div>
                         )}
                     </div>
@@ -139,28 +162,27 @@ function DraggablePolaroid({
     );
 }
 
-// Generate random positions
-const getInitialPositions = (count: number): { x: number, y: number, rotation: number }[] => {
-    const positions: { x: number, y: number, rotation: number }[] = [];
-    for (let i = 0; i < count; i++) {
-        const side = i % 4;
-        let x, y;
-        if (side === 0) { x = 40 + Math.random() * 150; y = 120 + Math.random() * 200; }
-        else if (side === 1) { x = 40 + Math.random() * 180; y = 400 + Math.random() * 120; }
-        else if (side === 2) { x = 680 + Math.random() * 200; y = 100 + Math.random() * 180; }
-        else { x = 650 + Math.random() * 250; y = 400 + Math.random() * 120; }
-        positions.push({ x, y, rotation: -12 + Math.random() * 24 });
-    }
-    return positions;
+// Generate single random position
+const generatePosition = (index: number): Position => {
+    const side = index % 4;
+    let x, y;
+    if (side === 0) { x = 40 + Math.random() * 150; y = 120 + Math.random() * 200; }
+    else if (side === 1) { x = 40 + Math.random() * 180; y = 400 + Math.random() * 120; }
+    else if (side === 2) { x = 680 + Math.random() * 200; y = 100 + Math.random() * 180; }
+    else { x = 650 + Math.random() * 250; y = 400 + Math.random() * 120; }
+    return { x, y, rotation: -12 + Math.random() * 24 };
 };
 
 export function BoomboxStage({
     currentTheme, onThemeChange, onSelectTheme, onOpenSettings,
     onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onSnapshotMix, onShowQueue, onShareMix
 }: BoomboxStageProps) {
-    const playerRef = useRef<HTMLDivElement>(null);
+    const playerRef = useRef<HTMLDivElement>(null!); // Corrected type safety
     const [isOverPlayer, setIsOverPlayer] = useState(false);
-    const [positions, setPositions] = useState<{ x: number, y: number, rotation: number }[]>([]);
+
+    // State Refactor: Record<mixId, Position>
+    const [positions, setPositions] = useState<Record<string, Position>>({});
+
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
 
@@ -170,17 +192,37 @@ export function BoomboxStage({
         shuffle, setShuffle, repeat, setRepeat, eq
     } = usePlayback();
 
-    const { playClick, playClunk, playInsert } = useAudio();
-    const activeMix = mixes.find(m => m.id === activeMixId) || null;
+    const { playClick, playInsert } = useAudio();
 
-    // Initialize positions once
+    // Memoized active mix check
+    const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId) || null, [mixes, activeMixId]);
+
+    // Robust Initialization & Sync
     useEffect(() => {
-        if (mixes.length > 0 && positions.length === 0) {
-            setPositions(getInitialPositions(mixes.length));
-        }
-    }, [mixes, positions.length]);
+        setPositions(prev => {
+            const nextState = { ...prev };
+            let hasChanges = false;
+
+            mixes.forEach((mix, index) => {
+                if (!nextState[mix.id]) {
+                    nextState[mix.id] = generatePosition(index);
+                    hasChanges = true;
+                }
+            });
+
+            return hasChanges ? nextState : prev;
+        });
+    }, [mixes]); // Runs when mixes change (add/remove)
+
+    const updatePosition = (id: string, newPos: { x: number, y: number }) => {
+        setPositions(prev => ({
+            ...prev,
+            [id]: { ...prev[id], ...newPos }
+        }));
+    };
 
     const formatTime = (seconds: number) => {
+        if (!seconds || isNaN(seconds)) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -189,8 +231,8 @@ export function BoomboxStage({
     const getMixImage = (mix: Mix): string | null => {
         if (mix.songs.length > 0) {
             const item = mix.songs[0];
-            const song = 'song' in item ? item.song : item;
-            return getThumbnailUrl(song);
+            const song = isPlayableTrack(item) ? item.song : item;
+            if (song) return getThumbnailUrl(song);
         }
         return null;
     };
@@ -198,7 +240,23 @@ export function BoomboxStage({
     const handleDropOnPlayer = (mix: Mix) => {
         playInsert();
         loadMix(mix.id);
+        setIsOverPlayer(false); // Reset hover
     };
+
+    // Exclusive Overlay Toggles
+    const toggleLyrics = () => {
+        if (!showLyrics) setShowEq(false); // Close others
+        setShowLyrics(!showLyrics);
+    };
+
+    const toggleEq = () => {
+        if (!showEq) setShowLyrics(false); // Close others
+        setShowEq(!showEq);
+    };
+
+    // Safe Progress
+    const safeProgress = Math.min(Math.max(progress || 0, 0), 1);
+    const displayedTime = formatTime(Math.min(safeProgress * duration, duration));
 
     return (
         <div
@@ -231,7 +289,6 @@ export function BoomboxStage({
                     </button>
                 </nav>
                 <div className="flex gap-2">
-                    {/* Switch Mobile Removed */}
                     <button onClick={onOpenThemeSelector} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Palette size={18} className="text-white" /></button>
                     <button onClick={onOpenSettings} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Settings size={18} className="text-white" /></button>
                 </div>
@@ -264,7 +321,7 @@ export function BoomboxStage({
                                     <div className="absolute inset-0 flex justify-between items-end p-2 text-neutral-800">
                                         <div className="flex flex-col"><span className="text-[8px] font-bold opacity-60 uppercase">Track</span><span className="text-lg font-bold font-mono leading-none">{isLoaded ? String(mixes.findIndex(m => m.id === activeMixId) + 1).padStart(2, '0') : '--'}</span></div>
                                         <div className="flex flex-col items-center flex-1 mx-2"><span className="text-[10px] font-mono font-bold uppercase truncate max-w-[150px]">{isLoaded ? (currentSong ? decodeHtml(currentSong.name) : activeMix?.title) : 'Insert Tape'}</span></div>
-                                        <div className="flex flex-col items-end"><span className="text-[8px] font-bold opacity-60 uppercase">Time</span><span className="text-base font-bold font-mono leading-none">{formatTime(progress * duration)}</span></div>
+                                        <div className="flex flex-col items-end"><span className="text-[8px] font-bold opacity-60 uppercase">Time</span><span className="text-base font-bold font-mono leading-none">{displayedTime}</span></div>
                                     </div>
                                 </div>
                                 <div className="bg-neutral-900 rounded border border-zinc-700 h-16 relative flex items-center justify-center overflow-hidden">
@@ -284,7 +341,7 @@ export function BoomboxStage({
 
                         <div className="bg-neutral-800 rounded-lg p-2 border-t-2 border-white/10 flex flex-col gap-2">
                             <div
-                                className="relative w-full h-4 flex items-center px-1 cursor-pointer"
+                                className="relative w-full h-4 flex items-center px-1 cursor-pointer overflow-hidden rounded-full"
                                 onClick={(e) => {
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     const p = (e.clientX - rect.left) / rect.width;
@@ -292,7 +349,7 @@ export function BoomboxStage({
                                 }}
                             >
                                 <div className="absolute w-full h-1.5 bg-black rounded-full shadow-inner" />
-                                <div className="absolute h-1.5 bg-blue-500 rounded-l-full" style={{ width: `${progress * 100}%` }} />
+                                <div className="absolute h-1.5 bg-blue-500 rounded-l-full" style={{ width: `${safeProgress * 100}%` }} />
                             </div>
                             <div className="flex justify-between items-center px-1">
                                 <div className="flex gap-1.5">
@@ -307,12 +364,12 @@ export function BoomboxStage({
                                         title={`Repeat: ${repeat.toUpperCase()}`}
                                     ><Repeat size={14} />{repeat === 'one' && <span className="absolute text-[8px] font-bold">1</span>}</button>
                                     <button
-                                        onClick={() => { playClick(); setShowLyrics(!showLyrics); }}
+                                        onClick={() => { playClick(); toggleLyrics(); }}
                                         className={`w-8 h-8 rounded-full border-b-2 border-black flex items-center justify-center shadow active:translate-y-0.5 ${showLyrics ? 'bg-blue-500 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
                                         title="Lyrics"
                                     ><Mic2 size={14} /></button>
                                     <button
-                                        onClick={() => { playClick(); setShowEq(!showEq); }}
+                                        onClick={() => { playClick(); toggleEq(); }}
                                         className={`w-8 h-8 rounded-full border-b-2 border-black flex items-center justify-center shadow active:translate-y-0.5 ${showEq ? 'bg-blue-500 text-white' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
                                         title="Equalizer"
                                     ><SlidersHorizontal size={14} /></button>
@@ -329,7 +386,7 @@ export function BoomboxStage({
                                 </div>
                                 {isLoaded && (
                                     <button
-                                        onClick={() => { playClick(); loadMix(null as any); }}
+                                        onClick={() => { playClick(); loadMix(""); }} // Safe Call
                                         className="w-8 h-8 rounded bg-red-900/80 border-b-4 border-black text-white/70 flex items-center justify-center shadow active:translate-y-1 hover:bg-red-800 hover:text-white ml-2"
                                         title="Eject Tape"
                                     ><LogOut size={14} /></button>
@@ -341,18 +398,16 @@ export function BoomboxStage({
                 </div>
             </div>
 
-            {/* DRAGGABLE POLAROIDS - Each manages its own position */}
-            {mixes.map((mix, index) => {
-                const pos = positions[index];
-                if (!pos) return null;
+            {/* DRAGGABLE POLAROIDS - Each manages its own position from persisted state */}
+            {mixes.map((mix) => {
+                const pos = positions[mix.id];
+                if (!pos) return null; // Wait for init
 
                 return (
                     <DraggablePolaroid
                         key={mix.id}
                         mix={mix}
-                        initialX={pos.x}
-                        initialY={pos.y}
-                        initialRotation={pos.rotation}
+                        position={pos}
                         isInsidePlayer={isLoaded && activeMixId === mix.id}
                         albumArt={getMixImage(mix)}
                         playerRef={playerRef}
@@ -362,9 +417,11 @@ export function BoomboxStage({
                         onSnapshotMix={onSnapshotMix}
                         onOpenSearch={onOpenSearch}
                         onShareMix={onShareMix}
+                        onPositionChange={updatePosition}
                     />
                 );
             })}
+
             {/* Overlays */}
             <AnimatePresence>
                 {showLyrics && (
