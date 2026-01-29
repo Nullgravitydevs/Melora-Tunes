@@ -50,6 +50,7 @@ export function SilverFrostStage({
     const [showEq, setShowEq] = useState(false);
 
     const formatTime = (seconds: number) => {
+        if (!Number.isFinite(seconds) || isNaN(seconds)) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
@@ -319,25 +320,34 @@ export function SilverFrostStage({
                 </div>
             </footer>
             {/* Overlays */}
+            {/* Overlays */}
             <AnimatePresence>
                 {showLyrics && (
-                    <LyricsView
-                        currentSong={currentSong}
-                        currentTime={progress * duration}
-                        onClose={() => setShowLyrics(false)}
-                    />
+                    <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                        <div className="pointer-events-auto">
+                            <LyricsView
+                                currentSong={currentSong}
+                                currentTime={progress * duration}
+                                onClose={() => setShowLyrics(false)}
+                            />
+                        </div>
+                    </div>
                 )}
                 {showEq && (
-                    <EqualizerView
-                        onClose={() => setShowEq(false)}
-                        bands={eq.bands}
-                        setBand={eq.setBand}
-                        isEnabled={eq.isEnabled}
-                        setIsEnabled={eq.setIsEnabled}
-                        currentPreset={eq.currentPreset}
-                        setPreset={eq.setPreset}
-                        presets={eq.presets}
-                    />
+                    <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                        <div className="pointer-events-auto">
+                            <EqualizerView
+                                onClose={() => setShowEq(false)}
+                                bands={eq.bands}
+                                setBand={eq.setBand}
+                                isEnabled={eq.isEnabled}
+                                setIsEnabled={eq.setIsEnabled}
+                                currentPreset={eq.currentPreset}
+                                setPreset={eq.setPreset}
+                                presets={eq.presets}
+                            />
+                        </div>
+                    </div>
                 )}
             </AnimatePresence>
         </div >

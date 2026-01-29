@@ -65,7 +65,7 @@ function DraggableMixCard({
     mix: Mix;
     position: Position;
     isActive: boolean;
-    containerRef: React.RefObject<HTMLDivElement>;
+    containerRef: React.RefObject<HTMLDivElement | null>;
     playerRef: React.RefObject<HTMLDivElement>;
     onDragEnd: (id: string, pos: Position) => void;
     onEditMix?: (mix: Mix) => void;
@@ -422,10 +422,18 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
 
                 <AnimatePresence>
                     {showLyrics && (
-                        <LyricsView currentSong={currentSong} currentTime={progress * duration} onClose={() => setShowLyrics(false)} />
+                        <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                            <div className="pointer-events-auto w-full h-full max-w-2xl max-h-[80vh]">
+                                <LyricsView currentSong={currentSong} currentTime={progress * duration} onClose={() => setShowLyrics(false)} />
+                            </div>
+                        </div>
                     )}
                     {showEq && (
-                        <EqualizerView onClose={() => setShowEq(false)} bands={eq.bands} setBand={eq.setBand} isEnabled={eq.isEnabled} setIsEnabled={eq.setIsEnabled} currentPreset={eq.currentPreset} setPreset={eq.setPreset} presets={eq.presets} />
+                        <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                            <div className="pointer-events-auto">
+                                <EqualizerView onClose={() => setShowEq(false)} bands={eq.bands} setBand={eq.setBand} isEnabled={eq.isEnabled} setIsEnabled={eq.setIsEnabled} currentPreset={eq.currentPreset} setPreset={eq.setPreset} presets={eq.presets} />
+                            </div>
+                        </div>
                     )}
                 </AnimatePresence>
             </div>

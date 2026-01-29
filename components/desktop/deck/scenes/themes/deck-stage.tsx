@@ -857,26 +857,35 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                 )}
             </main>
             {/* Overlays */}
+            {/* Overlays */}
             <div className="relative z-[10000]">
                 <AnimatePresence>
                     {showLyrics && (
-                        <LyricsView
-                            currentSong={currentSong}
-                            currentTime={progress * songDuration} // DeckStage uses progress ratio * derived duration
-                            onClose={() => setShowLyrics(false)}
-                        />
+                        <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                            <div className="pointer-events-auto w-full h-full max-w-2xl max-h-[80vh]">
+                                <LyricsView
+                                    currentSong={currentSong}
+                                    currentTime={progress * songDuration}
+                                    onClose={() => setShowLyrics(false)}
+                                />
+                            </div>
+                        </div>
                     )}
                     {showEq && (
-                        <EqualizerView
-                            onClose={() => setShowEq(false)}
-                            bands={eq.bands}
-                            setBand={eq.setBand}
-                            isEnabled={eq.isEnabled}
-                            setIsEnabled={eq.setIsEnabled}
-                            currentPreset={eq.currentPreset}
-                            setPreset={eq.setPreset}
-                            presets={eq.presets}
-                        />
+                        <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                            <div className="pointer-events-auto">
+                                <EqualizerView
+                                    onClose={() => setShowEq(false)}
+                                    bands={eq.bands}
+                                    setBand={eq.setBand}
+                                    isEnabled={eq.isEnabled}
+                                    setIsEnabled={eq.setIsEnabled}
+                                    currentPreset={eq.currentPreset}
+                                    setPreset={eq.setPreset}
+                                    presets={eq.presets}
+                                />
+                            </div>
+                        </div>
                     )}
                 </AnimatePresence>
             </div>

@@ -423,25 +423,34 @@ export function BoomboxStage({
             })}
 
             {/* Overlays */}
+            {/* Overlays */}
             <AnimatePresence>
                 {showLyrics && (
-                    <LyricsView
-                        currentSong={currentSong}
-                        currentTime={progress * duration}
-                        onClose={() => setShowLyrics(false)}
-                    />
+                    <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                        <div className="pointer-events-auto">
+                            <LyricsView
+                                currentSong={currentSong}
+                                currentTime={progress * duration}
+                                onClose={() => setShowLyrics(false)}
+                            />
+                        </div>
+                    </div>
                 )}
                 {showEq && (
-                    <EqualizerView
-                        onClose={() => setShowEq(false)}
-                        bands={eq.bands}
-                        setBand={eq.setBand}
-                        isEnabled={eq.isEnabled}
-                        setIsEnabled={eq.setIsEnabled}
-                        currentPreset={eq.currentPreset}
-                        setPreset={eq.setPreset}
-                        presets={eq.presets}
-                    />
+                    <div className="fixed inset-0 z-[99999] pointer-events-none flex items-center justify-center">
+                        <div className="pointer-events-auto">
+                            <EqualizerView
+                                onClose={() => setShowEq(false)}
+                                bands={eq.bands}
+                                setBand={eq.setBand}
+                                isEnabled={eq.isEnabled}
+                                setIsEnabled={eq.setIsEnabled}
+                                currentPreset={eq.currentPreset}
+                                setPreset={eq.setPreset}
+                                presets={eq.presets}
+                            />
+                        </div>
+                    </div>
                 )}
             </AnimatePresence>
         </div>

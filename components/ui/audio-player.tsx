@@ -57,8 +57,6 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const secondaryRef = useRef<HTMLAudioElement>(null);
     const [activeId, setActiveId] = useState<'primary' | 'secondary'>('primary');
     const progressIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
-    const crossfadeIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
-    const isCrossfadingRef = useRef(false);
 
     // Audio Graph Refs
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -277,39 +275,15 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                         : 0
                 });
 
-                // Crossfade Logic: Start fading when within crossfadeDuration of end
-                if (crossfadeDuration > 0 && remainingSeconds <= crossfadeDuration && nextUrl && inactive && !isCrossfadingRef.current) {
-                    isCrossfadingRef.current = true;
-                    console.log("🎵 Starting crossfade...");
-
-                    // Start playing next track at volume 0
-                    inactive.volume = 0;
-                    inactive.play().catch(() => { });
-
-                    // Ramp volumes over crossfadeDuration
-                    const fadeSteps = 20;
-                    const stepDuration = (crossfadeDuration * 1000) / fadeSteps;
-                    let step = 0;
-
-                    crossfadeIntervalRef.current = setInterval(() => {
-                        step++;
-                        const fadeRatio = step / fadeSteps;
-                        if (active) active.volume = Math.max(0, volume * (1 - fadeRatio));
-                        if (inactive) inactive.volume = volume * fadeRatio;
-
-                        if (step >= fadeSteps) {
-                            clearInterval(crossfadeIntervalRef.current);
-                            isCrossfadingRef.current = false;
-                        }
-                    }, stepDuration);
-                }
+                // Crossfade Removed - Simple progress tracking
+                // (Gapless preloading logic maintained via useEffect handling URL changes)
             }
         }, 200);
 
         return () => {
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    }, [playing, onProgress, activeId, crossfadeDuration, nextUrl, volume]);
+    }, [playing, onProgress, activeId, nextUrl]);
 
     // Event Handlers helper
     const handleEvent = (e: React.SyntheticEvent<HTMLAudioElement>, type: 'ended' | 'duration' | 'error') => {

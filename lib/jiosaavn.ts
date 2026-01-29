@@ -559,13 +559,47 @@ async function fetchApi(params: string, useCache: boolean = false): Promise<any>
 
 export async function getTopCharts(language?: string): Promise<any[]> {
     const lang = normalizeLanguage(language);
-    // Charts are often specific to a region/language. If multiple are passed, 
-    // the API might default to Global. We enforce the primary (first) language 
-    // to ensure the "Language Based" requirement is met.
-    const primaryLang = lang.split(',')[0];
-    const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${primaryLang}`, true); // CACHED
-    // Ensure it's an array, otherwise return empty
-    return Array.isArray(data) ? data : [];
+    // FIX: The API often defaults to the first language or Global if multiple are passed improperly.
+    // To ensure we get charts for ALL requested languages, we fetch them in parallel and merge.
+    const langs = lang.split(',').map(s => s.trim()).filter(Boolean);
+
+    // If only one language, strict fetch
+    if (langs.length <= 1) {
+        const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${lang}`, true);
+        return Array.isArray(data) ? data : [];
+    }
+
+    // Multiple languages: Fetch all concurrently
+    try {
+        const promises = langs.map(l =>
+            fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${l}`, true)
+        );
+
+        const results = await Promise.all(promises);
+
+        // Merge and Deduplicate
+        const allCharts: any[] = [];
+        const seenIds = new Set();
+
+        results.forEach(res => {
+            if (Array.isArray(res)) {
+                res.forEach(chart => {
+                    const id = chart.id || chart.listid;
+                    if (!seenIds.has(id)) {
+                        seenIds.add(id);
+                        allCharts.push(chart);
+                    }
+                });
+            }
+        });
+
+        // Optional: Interleave them? Or just return merged.
+        // For now, merged is fine, the UI sorts/displays them.
+        return allCharts;
+    } catch (e) {
+        console.error("Multi-language chart fetch failed", e);
+        return [];
+    }
 }
 
 export async function getTrending(language?: string): Promise<JioSaavnSong[]> {
@@ -796,11 +830,34 @@ export async function getArtistStation(artistId: string): Promise<JioSaavnSong[]
 
 // Helper for language normalization
 function normalizeLanguage(language: string | undefined): string {
-    return (language || 'english,hindi')
-        .toLowerCase()
-        .split(',')
-        .filter(Boolean)
-        .join(',');
+    if (language) return language.toLowerCase();
+
+    // Client-side fallback to storage
+    if (typeof window !== 'undefined') {
+        try {
+            // Try common keys used in Melora
+            const keys = ['melora-settings', 'settings', 'language', 'melora-language'];
+
+            for (const key of keys) {
+                const stored = localStorage.getItem(key);
+                if (stored) {
+                    // Handle JSON settings object
+                    if (stored.trim().startsWith('{')) {
+                        try {
+                            const parsed = JSON.parse(stored);
+                            const langs = parsed.language || parsed.languages;
+                            if (Array.isArray(langs)) return langs.join(',').toLowerCase();
+                            if (typeof langs === 'string') return langs.toLowerCase();
+                        } catch (e) { /* Ignore parse error */ }
+                    } else {
+                        // Plain string value
+                        return stored.toLowerCase();
+                    }
+                }
+            }
+        } catch (e) { console.error("Error reading language settings", e); }
+    }
+    return 'english,hindi';
 }
 
 // Helper to standardize image handling (handles string vs array API ambiguity)

@@ -5,6 +5,7 @@ import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monit
 import { useState, useEffect, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { factoryReset } from "@/lib/cleanup";
+import { loadSettings, saveSettings } from "@/lib/settings";
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -18,28 +19,12 @@ type SettingsTab = 'experience' | 'audio' | 'library' | 'stats' | 'support' | 'a
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const {
         qualityPreference, setQualityPreference,
-        crossfadeDuration, setCrossfadeDuration,
         mixes, setMixes
     } = usePlayback();
 
     // Local State for Performance (Detached from Context)
-    const [localCrossfade, setLocalCrossfade] = useState(crossfadeDuration);
     const [activeTab, setActiveTab] = useState<SettingsTab>('experience');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
-
-    // Sync local state when open
-    useEffect(() => {
-        if (isOpen) {
-            setLocalCrossfade(crossfadeDuration);
-        }
-    }, [isOpen, crossfadeDuration]);
-
-    // Commit changes on unmount or specific actions
-    const handleCrossfadeCommit = useCallback(() => {
-        if (localCrossfade !== crossfadeDuration) {
-            setCrossfadeDuration(localCrossfade);
-        }
-    }, [localCrossfade, crossfadeDuration, setCrossfadeDuration]);
 
     if (!isOpen) return null;
 
@@ -162,9 +147,46 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                             {activeTab === 'audio' && (
                                 <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <header>
-                                        <h1 className="text-3xl font-bold text-white mb-2">Audio</h1>
+                                        <h1 className="text-3xl font-bold text-white mb-2">Audio & Language</h1>
                                         <p className="text-zinc-500">Master your sonic output.</p>
                                     </header>
+
+                                    {/* Language Preference */}
+                                    <section>
+                                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                                            <MessageCircle size={18} /> Music Languages
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {['English', 'Hindi', 'Telugu', 'Tamil', 'Punjabi', 'Marathi', 'Gujarati', 'Bengali', 'Kannada', 'Malayalam', 'Bhojpuri'].map(lang => {
+                                                const currentLangs = loadSettings().languages || ['english', 'hindi'];
+                                                const isActive = currentLangs.includes(lang.toLowerCase());
+                                                return (
+                                                    <button
+                                                        key={lang}
+                                                        onClick={() => {
+                                                            const lower = lang.toLowerCase();
+                                                            let newLangs;
+                                                            if (isActive) {
+                                                                newLangs = currentLangs.filter(l => l !== lower);
+                                                                if (newLangs.length === 0) newLangs = ['english']; // Prevent empty
+                                                            } else {
+                                                                newLangs = [...currentLangs, lower];
+                                                            }
+                                                            saveSettings({ languages: newLangs });
+                                                            // Force Reload to apply changes immediately (simplest fix for now)
+                                                            window.location.reload();
+                                                        }}
+                                                        className={`px-4 py-2 rounded-full font-bold text-sm border transition-all ${isActive
+                                                            ? 'bg-white text-black border-white'
+                                                            : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-white'}`}
+                                                    >
+                                                        {lang}
+                                                        {isActive && <Check size={14} className="inline-block ml-2 -mt-0.5" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
 
                                     {/* Quality */}
                                     <section>
@@ -195,30 +217,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         </div>
                                     </section>
 
-                                    {/* Crossfade */}
-                                    <section>
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-white font-bold flex items-center gap-2">
-                                                <Sparkles size={18} /> Crossfade
-                                            </h3>
-                                            <span className="text-zinc-400 font-mono text-sm">{localCrossfade}s</span>
-                                        </div>
-                                        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
-                                            <input
-                                                type="range"
-                                                min="0" max="12" step="1"
-                                                value={localCrossfade}
-                                                onChange={(e) => setLocalCrossfade(Number(e.target.value))}
-                                                onMouseUp={handleCrossfadeCommit}
-                                                onTouchEnd={handleCrossfadeCommit}
-                                                className="w-full appearance-none bg-zinc-700 h-1.5 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white cursor-pointer"
-                                            />
-                                            <div className="flex justify-between text-[10px] text-zinc-600 mt-2 font-mono uppercase">
-                                                <span>Off</span>
-                                                <span>12s</span>
-                                            </div>
-                                        </div>
-                                    </section>
+
                                 </div>
                             )}
 

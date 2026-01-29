@@ -95,8 +95,8 @@ interface PlaybackContextType {
     setSleepTimer: (timer: { endTime: number; duration: number } | null) => void;
 
     // Crossfade (Fade out/in duration in seconds)
-    crossfadeDuration: number;
-    setCrossfadeDuration: (duration: number) => void;
+    // crossfadeDuration: number;
+    // setCrossfadeDuration: (duration: number) => void;
 
     // Audio Quality
     qualityPreference: AudioQuality;
@@ -165,7 +165,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [qualityPreference, setQualityPreferenceState] = useState<AudioQuality>('320'); // Default 320 for init
     // forceLossless REMOVED - use qualityPreference: 'flac' instead
     const [sleepTimer, setSleepTimer] = useState<{ endTime: number; duration: number } | null>(null);
-    const [crossfadeDuration, setCrossfadeDuration] = useState(0); // 0 = off
+    // const [crossfadeDuration, setCrossfadeDuration] = useState(0); // REMOVED
     const [stopAtEndOfSong, setStopAtEndOfSong] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [likedSongs, setLikedSongs] = useState<JioSaavnSong[]>([]);
@@ -454,10 +454,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const s = loadSettings();
         if (s.qualityPreference) setQualityPreferenceState(s.qualityPreference as AudioQuality);
-        if (s.crossfadeDuration !== undefined) setCrossfadeDuration(s.crossfadeDuration);
+        // Crossfade removed
     }, []);
-
-    // Toggle Pin Logic
     const togglePin = (mixId: string) => {
         setMixes(prev => prev.map(m => {
             if (m.id === mixId) {
@@ -1170,30 +1168,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         return () => clearInterval(interval);
     }, [sleepTimer, pause]);
 
-    // Crossfade Logic
-    useEffect(() => {
-        if (!audioPlayerRef.current || crossfadeDuration === 0 || !isPlaying) return;
 
-        // Ensure we have valid numbers
-        if (!duration || !progress) return;
-
-        const remaining = duration - progress;
-
-        // Fade Out at end
-        if (remaining <= crossfadeDuration) {
-            const fadeVol = volume * (remaining / crossfadeDuration);
-            audioPlayerRef.current.setVolume(Math.max(0, fadeVol));
-        }
-        // Fade In at start
-        else if (progress <= crossfadeDuration) {
-            const fadeVol = volume * (progress / crossfadeDuration);
-            audioPlayerRef.current.setVolume(Math.min(volume, fadeVol));
-        }
-        else {
-            // Normal volume check (simple throttle could be added but this is OK for 5Hz)
-            audioPlayerRef.current.setVolume(volume);
-        }
-    }, [progress, duration, crossfadeDuration, volume, isPlaying]);
 
     const next = useCallback(() => {
         // forceLossless removed - quality is now controlled by qualityPreference setting only
@@ -1549,7 +1524,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         currentIndex: activeMix?.currentSongIndex || 0,
 
         sleepTimer, setSleepTimer,
-        crossfadeDuration, setCrossfadeDuration,
+        // crossfadeDuration, setCrossfadeDuration,
         qualityPreference, setQualityPreference, // This will reference the function we define
         togglePin,
         activeQuality: currentTrack ? currentTrack.preferredQuality : null,
@@ -1576,7 +1551,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 playing={isPlaying}
                 volume={volume}
                 speed={playbackSpeed}
-                crossfadeDuration={crossfadeDuration}
+                // crossfadeDuration={crossfadeDuration}
                 eqBands={eq.isEnabled ? eq.bands : undefined} // Only pass bands if enabled
                 onEnded={() => {
                     // [SignalStore] Full Listen

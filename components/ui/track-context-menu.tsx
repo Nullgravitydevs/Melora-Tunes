@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { JioSaavnSong, getArtistStation } from "@/lib/jiosaavn";
-import { Play, ListPlus, Radio, User, Disc, X, HardDrive, Trash2 } from "lucide-react";
+import { Play, ListPlus, Radio, User, Disc, X, HardDrive, Trash2, ListMusic } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface TrackContextMenuProps {
@@ -19,6 +19,7 @@ interface TrackContextMenuProps {
     isDownloaded: boolean;
     onDownload: (song: JioSaavnSong) => void;
     onRemoveDownload: (songId: string) => void;
+    onAddToPlaylist: (song: JioSaavnSong) => void;
 }
 
 export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
@@ -34,7 +35,8 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
     onStartRadio,
     isDownloaded,
     onDownload,
-    onRemoveDownload
+    onRemoveDownload,
+    onAddToPlaylist
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -89,6 +91,7 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 
                     <MenuItem icon={<Play size={14} />} label="Play Now" onClick={() => { onPlay(song); onClose(); }} />
                     <MenuItem icon={<ListPlus size={14} />} label="Add to Queue" onClick={() => { onAddToQueue(song); onClose(); }} />
+                    <MenuItem icon={<ListMusic size={14} />} label="Add to Playlist" onClick={() => { onAddToPlaylist(song); onClose(); }} />
                     <MenuItem icon={<Radio size={14} />} label="Start Radio" onClick={() => { onStartRadio(song); onClose(); }} highlight />
 
                     {isDownloaded ? (

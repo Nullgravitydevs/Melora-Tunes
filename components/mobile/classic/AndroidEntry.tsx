@@ -138,7 +138,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         shuffle, setShuffle, repeat, setRepeat,
         queue, currentIndex,
         sleepTimer, setSleepTimer,
-        crossfadeDuration, setCrossfadeDuration,
+        // crossfadeDuration, setCrossfadeDuration, // Not in context - using local shim
         stopAtEndOfSong, setStopAtEndOfSong,
         // bitrate, setBitrate, // Removed from context
         likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded,
@@ -154,6 +154,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush'>('classic');
     const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume');
     const [bitrate, setBitrate] = useState<string>('320'); // Shim for build compatibility
+    const [crossfadeDuration, setCrossfadeDuration] = useState<number>(0); // Shim for build compatibility
     const [isLocked, setIsLocked] = useState(false); // Hold Switch state
     const inputRef = useRef<HTMLInputElement>(null);
     const stickerConstraintsRef = useRef<HTMLDivElement>(null);

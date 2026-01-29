@@ -9,7 +9,6 @@ export interface AppSettings {
     userName?: string;
     userDOB?: string;
     languages?: string[];
-    crossfadeDuration?: number;
     stopAtEndOfSong?: boolean;
     notificationsEnabled?: boolean;
 }
@@ -22,7 +21,6 @@ const DEFAULT_SETTINGS: AppSettings = {
     lastPlayedSongId: null,
     version: '2.0.0',
     languages: ['english', 'hindi'],
-    crossfadeDuration: 3,
     stopAtEndOfSong: false,
     notificationsEnabled: true
 };

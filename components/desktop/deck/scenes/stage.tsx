@@ -580,7 +580,6 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                     <div className="fixed inset-0 z-[100]">
                         <GlassSearch
                             onClose={() => { setIsSearchOpen(false); setSearchTargetMixId(null); }}
-                            variant="overlay"
                         />
                     </div>
                 )}
