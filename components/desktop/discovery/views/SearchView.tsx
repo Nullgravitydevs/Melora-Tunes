@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Play, Pause, Clock, TrendingUp, Loader2, Disc, Sparkles, Headphones, Settings, Music } from "lucide-react";
+import { Search, X, Play, Pause, Clock, TrendingUp, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
-import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
-import { loadSettings } from "@/lib/settings";
+import { loadSettings, saveSettings } from "@/lib/settings";
 
 /* ============================================================================
    SEARCH VIEW - Premium Glass Design with Unified Search
@@ -88,7 +87,7 @@ export function SearchView({ onNavigate }: SearchViewProps) {
     const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
     // Get user's preferred quality from settings
-    const [qualityPreference, setQualityPreference] = useState<'auto' | 'hires' | 'flac' | '320'>('auto');
+    const [qualityPreference, setQualityPreference] = useState<'hires' | 'flac' | '320' | '160'>('320');
     const [language, setLanguage] = useState<string>('');
 
     useEffect(() => {
@@ -98,7 +97,8 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                 const q = settings.qualityPreference;
                 if (q === 'flac' || q === 'hires') setQualityPreference(q);
                 else if (q === '320') setQualityPreference('320');
-                else setQualityPreference('auto');
+                else if (q === '160') setQualityPreference('160');
+                else setQualityPreference('320'); // Default to high quality
             }
             if (settings.languages && settings.languages.length > 0) {
                 setLanguage(settings.languages[0]);
@@ -125,7 +125,8 @@ export function SearchView({ onNavigate }: SearchViewProps) {
         setIsSearching(true);
         try {
             // Use the UNIFIED search that merges FLAC sources!
-            const tracks = await searchUnified(q, language || undefined, 'song', qualityPreference);
+            const qFilter = qualityPreference === 'hires' ? 'hires' : qualityPreference === 'flac' ? 'flac' : qualityPreference === '320' ? '320' : undefined;
+            const tracks = await searchUnified(q, language || undefined, 'song', qFilter);
             setResults(tracks);
 
             const updated = [q, ...recentSearches.filter(s => s !== q)].slice(0, 8);
@@ -199,12 +200,71 @@ export function SearchView({ onNavigate }: SearchViewProps) {
         <>
             <style dangerouslySetInnerHTML={{ __html: SEARCH_STYLES }} />
 
-            {/* Settings Modal */}
-            <DesktopSettingsModal
-                isOpen={showSettings}
-                onClose={() => setShowSettings(false)}
-                currentLayout="discovery"
-            />
+            {/* Audio Quality Dropdown */}
+            <AnimatePresence>
+                {showSettings && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50"
+                        onClick={() => setShowSettings(false)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            className="absolute top-24 left-1/2 -translate-x-1/2 w-72 p-4 rounded-2xl"
+                            style={{
+                                background: 'rgba(30, 30, 30, 0.95)',
+                                backdropFilter: 'blur(40px)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                boxShadow: '0 20px 60px -20px rgba(0, 0, 0, 0.6)'
+                            }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-2 mb-4">
+                                <Headphones size={16} className="text-white/40" />
+                                <p className="text-sm font-semibold">Streaming Quality</p>
+                            </div>
+                            <div className="space-y-1">
+                                {[
+                                    { value: 'hires' as const, label: 'Hi-Res Lossless', desc: '24-bit/192kHz' },
+                                    { value: 'flac' as const, label: 'Lossless', desc: 'FLAC 16-bit' },
+                                    { value: '320' as const, label: 'High', desc: '320kbps' },
+                                    { value: '160' as const, label: 'Normal', desc: '160kbps' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => {
+                                            setQualityPreference(opt.value);
+                                            saveSettings({ qualityPreference: opt.value });
+                                            setShowSettings(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${qualityPreference === opt.value
+                                            ? 'bg-white/10'
+                                            : 'hover:bg-white/5'
+                                            }`}
+                                    >
+                                        <div className="text-left">
+                                            <p className="text-sm font-medium">{opt.label}</p>
+                                            <p className="text-xs text-white/40">{opt.desc}</p>
+                                        </div>
+                                        {qualityPreference === opt.value && (
+                                            <Check size={16} className="text-white/60" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-white/20 mt-4 text-center">
+                                {qualityPreference === 'hires' || qualityPreference === 'flac'
+                                    ? 'HiFi search enabled'
+                                    : 'Saavn search only'}
+                            </p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <div className="min-h-full p-8">
                 {/* Premium Glassy Search Bar + Settings */}
@@ -278,9 +338,9 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                     >
                         <Headphones size={12} />
                         <span>
-                            {qualityPreference === 'auto' ? 'Auto Quality' :
-                                qualityPreference === 'flac' ? 'Lossless (FLAC)' :
-                                    qualityPreference === 'hires' ? 'Hi-Res Lossless' :
+                            {qualityPreference === 'flac' ? 'Lossless (FLAC)' :
+                                qualityPreference === 'hires' ? 'Hi-Res Lossless' :
+                                    qualityPreference === '160' ? '160kbps' :
                                         '320kbps'}
                         </span>
                         {qualityPreference !== '320' && (
