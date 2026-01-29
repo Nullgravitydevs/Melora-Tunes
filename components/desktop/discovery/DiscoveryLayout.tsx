@@ -215,7 +215,7 @@ export function DiscoveryLayout() {
     const [currentView, setCurrentView] = useState<ViewState>({ id: 'home' });
     const [mounted, setMounted] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const { mixes, currentSong, isPlaying } = usePlayback();
+    const { mixes, currentSong, isPlaying, likedSongs, recentlyPlayed } = usePlayback();
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -277,8 +277,18 @@ export function DiscoveryLayout() {
 
                     {/* Quick Links */}
                     <div className="px-2.5 mt-5 space-y-0.5">
-                        <QuickLink icon={<Heart size={14} />} label="Liked Songs" count={42} />
-                        <QuickLink icon={<Clock size={14} />} label="Recently Played" />
+                        <QuickLink
+                            icon={<Heart size={14} />}
+                            label="Liked Songs"
+                            count={likedSongs.length}
+                            onClick={() => setCurrentView({ id: 'library', data: { tab: 'liked' } })}
+                        />
+                        <QuickLink
+                            icon={<Clock size={14} />}
+                            label="Recently Played"
+                            count={recentlyPlayed.length}
+                            onClick={() => setCurrentView({ id: 'library', data: { tab: 'recent' } })}
+                        />
                     </div>
 
                     <div className="mx-4 my-5 h-px bg-white/[0.04]" />
@@ -287,17 +297,19 @@ export function DiscoveryLayout() {
                     <div className="flex-1 overflow-y-auto scroll px-2.5">
                         <div className="flex items-center justify-between px-2.5 py-1.5 mb-1">
                             <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20">Playlists</span>
-                            <motion.button className="p-1 rounded text-white/20 hover:text-white/50 hover:bg-white/5" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <motion.button
+                                onClick={() => setCurrentView({ id: 'library', data: { tab: 'playlists' } })}
+                                className="p-1 rounded text-white/20 hover:text-white/50 hover:bg-white/5"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                            >
                                 <Plus size={12} strokeWidth={2.5} />
                             </motion.button>
                         </div>
                         {mixes.length > 0 ? mixes.map((m, i) => <PlaylistItem key={m.id} mix={m} index={i} />) : <EmptyState />}
                     </div>
 
-                    {/* Settings */}
-                    <div className="p-2.5 border-t border-white/[0.02]">
-                        <NavItem icon={<Settings size={16} />} label="Settings" active={currentView.id === 'settings'} onClick={() => setCurrentView({ id: 'settings' })} subtle />
-                    </div>
+
                 </aside>
 
                 {/* MAIN */}
@@ -336,7 +348,10 @@ export function DiscoveryLayout() {
                             )}
 
                             {currentView.id === 'library' && (
-                                <LibraryView onNavigate={(view) => setCurrentView(view as ViewState)} />
+                                <LibraryView
+                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    initialTab={currentView.data?.tab}
+                                />
                             )}
 
                             {currentView.id === 'explore' && (
@@ -368,12 +383,15 @@ function NavItem({ icon, label, active, onClick, subtle }: { icon: React.ReactNo
     );
 }
 
-function QuickLink({ icon, label, count }: { icon: React.ReactNode; label: string; count?: number }) {
+function QuickLink({ icon, label, count, onClick }: { icon: React.ReactNode; label: string; count?: number; onClick?: () => void }) {
     return (
-        <button className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-white/35 hover:text-white/60 hover:bg-white/[0.02] transition-all text-left">
+        <button
+            onClick={onClick}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-white/35 hover:text-white/60 hover:bg-white/[0.02] transition-all text-left"
+        >
             <span className="text-white/20">{icon}</span>
             <span className="text-[12px] flex-1">{label}</span>
-            {count && <span className="text-[10px] text-white/15">{count}</span>}
+            {count !== undefined && <span className="text-[10px] text-white/15">{count}</span>}
         </button>
     );
 }

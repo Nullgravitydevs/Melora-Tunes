@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Heart, Clock, ListMusic, Plus, Play, Pause, MoreHorizontal,
@@ -57,9 +57,10 @@ type TabType = 'liked' | 'recent' | 'playlists';
 
 interface LibraryViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
+    initialTab?: TabType;
 }
 
-export function LibraryView({ onNavigate }: LibraryViewProps) {
+export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
     const {
         likedSongs, recentlyPlayed, mixes,
         currentSong, isPlaying, togglePlay,
@@ -67,8 +68,13 @@ export function LibraryView({ onNavigate }: LibraryViewProps) {
         qualityPreference, showToast
     } = usePlayback();
 
-    const [activeTab, setActiveTab] = useState<TabType>('liked');
+    const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'liked');
     const [showCreateModal, setShowCreateModal] = useState(false);
+
+    // Sync active tab when prop changes (e.g. from sidebar navigation)
+    useEffect(() => {
+        if (initialTab) setActiveTab(initialTab);
+    }, [initialTab]);
 
     // Filter out system mixes, show only user playlists
     const userPlaylists = useMemo(() =>
