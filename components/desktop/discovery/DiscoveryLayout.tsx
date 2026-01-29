@@ -11,7 +11,7 @@ import { AlbumView } from "./views/AlbumView";
 import { FullPlayer } from "./views/FullPlayer";
 import { LibraryView } from "./views/LibraryView";
 import { ExploreView } from "./views/ExploreView";
-import { SettingsView } from "./views/SettingsView";
+import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 
 
 /* ============================================================================
@@ -214,6 +214,7 @@ const MONO_STYLES = `
 export function DiscoveryLayout() {
     const [currentView, setCurrentView] = useState<ViewState>({ id: 'home' });
     const [mounted, setMounted] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const { mixes, currentSong, isPlaying } = usePlayback();
 
     useEffect(() => { setMounted(true); }, []);
@@ -233,6 +234,13 @@ export function DiscoveryLayout() {
         <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
             <style>{MONO_STYLES}</style>
             <div className="noise" />
+
+            {/* Settings Modal (Existing Control Panel) */}
+            <DesktopSettingsModal
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+                currentLayout="discovery"
+            />
 
             {/* Album BG - Grayscale */}
             {getAlbumArt() && <div className="album-blur" style={{ backgroundImage: `url(${getAlbumArt()})` }} />}
@@ -261,6 +269,11 @@ export function DiscoveryLayout() {
                         <NavItem icon={<Library size={18} />} label="Your Library" active={currentView.id === 'library'} onClick={() => setCurrentView({ id: 'library' })} />
                         <NavItem icon={<Compass size={18} />} label="Explore" active={currentView.id === 'explore'} onClick={() => setCurrentView({ id: 'explore' })} />
                     </nav>
+
+                    {/* Settings at bottom */}
+                    <div className="px-2.5 mt-auto pb-2">
+                        <NavItem icon={<Settings size={18} />} label="Settings" onClick={() => setShowSettings(true)} subtle />
+                    </div>
 
                     {/* Quick Links */}
                     <div className="px-2.5 mt-5 space-y-0.5">
@@ -328,10 +341,6 @@ export function DiscoveryLayout() {
 
                             {currentView.id === 'explore' && (
                                 <ExploreView onNavigate={(view) => setCurrentView(view as ViewState)} />
-                            )}
-
-                            {currentView.id === 'settings' && (
-                                <SettingsView onNavigate={(view) => setCurrentView(view as ViewState)} />
                             )}
                         </motion.div>
                     </AnimatePresence>
