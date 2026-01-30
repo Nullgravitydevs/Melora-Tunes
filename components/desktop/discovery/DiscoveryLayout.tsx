@@ -13,6 +13,7 @@ import { PlaylistView } from "./views/PlaylistView";
 import { FullPlayer } from "./views/FullPlayer";
 import { LibraryView } from "./views/LibraryView";
 import { ExploreView } from "./views/ExploreView";
+import { RadioView } from "./views/RadioView";
 import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { SectionView } from "./views/SectionView";
 import { PeelRevealView } from "./views/PeelRevealView";
@@ -423,9 +424,8 @@ export function DiscoveryLayout() {
                                 <ExploreView onNavigate={(view) => setCurrentView(view as ViewState)} />
                             )}
 
-                            {/* Render ExploreView for Radio temporarily until specific RadioView is built */}
                             {currentView.id === 'radio' && (
-                                <ExploreView onNavigate={(view) => setCurrentView(view as ViewState)} initialMode="radio" />
+                                <RadioView onNavigate={(view) => setCurrentView(view as ViewState)} />
                             )}
 
                             {currentView.id === 'category-hub' && currentView.data && (

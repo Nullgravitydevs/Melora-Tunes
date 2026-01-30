@@ -282,6 +282,48 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
     }
 }
 
+export async function searchArtists(query: string, page: number = 1, limit: number = 10, language?: string): Promise<any[]> {
+    try {
+        const lang = normalizeLanguage(language);
+        console.log(`[Search Artists] Query: "${query}"`);
+        let data: any;
+        const params = `__call=search.getArtistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&languages=${lang}`;
+
+        if (Capacitor.isNativePlatform()) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?${params}`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?${params}`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        } else {
+            // Use our existing retry/proxy wrapper
+            data = await fetchApi(params, true);
+        }
+
+        let list = [];
+        if (data.results) {
+            list = Array.isArray(data.results) ? data.results : [];
+        }
+
+        if (list.length > 0) {
+            return list.map((item: any) => ({
+                id: item.id || item.artistId,
+                name: decodeHtml(item.name || item.title),
+                type: 'artist',
+                image: formatImage(item.image),
+                url: item.perma_url,
+                role: item.role
+            }));
+        }
+        return [];
+    } catch (e) {
+        console.error("Error searching artists", e);
+        return [];
+    }
+}
+
 export function decryptUrl(encryptedUrl: string): string {
     const key = CryptoJS.enc.Utf8.parse(DES_KEY);
     const encrypted = CryptoJS.enc.Base64.parse(encryptedUrl);

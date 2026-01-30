@@ -1,51 +1,53 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, TrendingUp, Radio, Music, Play, Zap, Grid, Globe, Headphones } from "lucide-react";
-import { usePlayback } from "@/components/providers/playback-context";
-import { getTopCharts } from "@/lib/jiosaavn";
-import { FeatureCard, SectionHeader, HorizontalScroll } from "../home/HomeComponents";
+import { Headphones, Disc, Activity, TrendingUp, Play, Mic2, Globe, Grid } from "lucide-react";
+import { searchPlaylists, searchAlbums, searchSongs, getTopCharts } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
+import { usePlayback } from "@/components/providers/playback-context";
+import { StandardCard, FeatureCard, HorizontalScroll } from "../home/HomeComponents";
+import { decodeHtml } from "@/lib/utils";
 
 interface ExploreViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
     initialMode?: 'explore' | 'radio';
 }
 
-// === CONSTANTS ===
-const MOODS = [
-    { id: 'party', label: 'Party', query: 'party hits', color: '#db2777', image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=2070&auto=format&fit=crop', colSpan: 2, rowSpan: 2 }, // Big
-    { id: 'romance', label: 'Romance', query: 'romantic songs', color: '#e11d48', image: 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1986&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
-    { id: 'workout', label: 'Workout', query: 'workout motivation', color: '#ea580c', image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
-    { id: 'chill', label: 'Chill', query: 'lofi chill', color: '#0d9488', image: 'https://images.unsplash.com/photo-1516280440614-6697288d5d38?q=80&w=2070&auto=format&fit=crop', colSpan: 1, rowSpan: 2 }, // Tall
-    { id: 'focus', label: 'Focus', query: 'focus music', color: '#4f46e5', image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=2070&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
-    { id: 'sad', label: 'Sad', query: 'sad songs', color: '#2563eb', image: 'https://images.unsplash.com/photo-1499482125586-91609c0b5fd4?q=80&w=1976&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
-    { id: 'happy', label: 'Happy', query: 'happy hits', color: '#ca8a04', image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=2070&auto=format&fit=crop', colSpan: 2, rowSpan: 1 }, // Wide
-];
-
-const GENRES = [
-    { id: 'pop', label: 'Pop', query: 'pop hits', color: '#d946ef', image: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?q=80&w=1974&auto=format&fit=crop' },
-    { id: 'rock', label: 'Rock', query: 'rock classics', color: '#dc2626', image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?q=80&w=2070&auto=format&fit=crop' },
-    { id: 'hiphop', label: 'Hip Hop', query: 'hip hop', color: '#eab308', image: 'https://images.unsplash.com/photo-1536849460588-696219a9e9b8?q=80&w=2042&auto=format&fit=crop' },
-    { id: 'indie', label: 'Indie', query: 'indie', color: '#10b981', image: 'https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?q=80&w=2070&auto=format&fit=crop' },
-    { id: 'electronic', label: 'Electronic', query: 'edm hits', color: '#3b82f6', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop' },
-    { id: 'classical', label: 'Classical', query: 'classical essentials', color: '#8b5cf6', image: 'https://images.unsplash.com/photo-1507838153414-b4b713384ebd?q=80&w=2070&auto=format&fit=crop' },
-    { id: 'kpop', label: 'K-Pop', query: 'k-pop hits', color: '#ec4899', image: 'https://images.unsplash.com/photo-1621255152062-094396ca8954?q=80&w=1974&auto=format&fit=crop' },
-    { id: 'jazz', label: 'Jazz', query: 'jazz classics', color: '#f97316', image: 'https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?q=80&w=2070&auto=format&fit=crop' },
-];
-
-const RADIO_STATIONS = [
-    { id: 'artist-radio', label: 'Artist Radio', query: 'best of', color: '#6366f1', icon: Mic2 },
-    { id: 'discover', label: 'Discover Weekly', query: 'weekly mix', color: '#14b8a6', icon: Globe },
-    { id: 'on-repeat', label: 'On Repeat', query: 'on repeat', color: '#f43f5e', icon: Grid },
-];
-import { Mic2 } from "lucide-react";
-
+// Helper to get best image
+const getHighQualityImage = (image: any) => {
+    if (!image) return '';
+    if (typeof image === 'string') return image;
+    if (Array.isArray(image)) {
+        return image.find((i: any) => i.quality === '500x500')?.link || image[0]?.link || '';
+    }
+    return '';
+};
 
 export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
     const { playInstantMix, showToast } = usePlayback();
-    const [charts, setCharts] = useState<any[]>([]);
+
+    // State for all sections
+    const [content, setContent] = useState<{
+        globalCharts: any[];
+        topPlaylists: any[];
+        newReleases: any[];
+        livePerformances: any[];
+        globalTrending: any[];
+        bollywood: any[];
+        tollywood: any[];
+        hollywood: any[];
+    }>({
+        globalCharts: [],
+        topPlaylists: [],
+        newReleases: [],
+        livePerformances: [],
+        globalTrending: [],
+        bollywood: [],
+        tollywood: [],
+        hollywood: []
+    });
+
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -53,132 +55,233 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
     }, []);
 
     const loadData = async () => {
+        setLoading(true);
         try {
             const settings = loadSettings();
             const langString = settings?.languages?.join(',') || 'english';
-            const data = await getTopCharts(langString);
-            setCharts(data.slice(0, 10)); // Top 10 Charts
-        } catch (e) { console.error(e) } finally { setLoading(false) }
+
+            // Parallel Fetching for "No Placeholders" Speed
+            const [
+                charts,
+                playlists,
+                newAlbums,
+                live,
+                trending,
+                bolly,
+                tolly,
+                holly
+            ] = await Promise.all([
+                searchPlaylists("Global Top 50", 1, 10),
+                searchPlaylists("Top Hits", 1, 10),
+                searchAlbums("New Releases 2025", 1, 10),
+                searchAlbums("Live Concert", 1, 10), // "Live Performance" often returns albums
+                searchSongs("Global Viral", 1, 10),
+                searchPlaylists("Bollywood Top Hits", 1, 10),
+                searchPlaylists("Tollywood Top Hits", 1, 10),
+                searchPlaylists("Hollywood Top Hits", 1, 10)
+            ]);
+
+            setContent({
+                globalCharts: charts,
+                topPlaylists: playlists,
+                newReleases: newAlbums,
+                livePerformances: live,
+                globalTrending: trending,
+                bollywood: bolly,
+                tollywood: tolly,
+                hollywood: holly
+            });
+
+        } catch (e) { console.error("Explore Data Load Failed", e) }
+        finally { setLoading(false) }
     };
 
-    const handleCategoryClick = (item: any) => {
-        onNavigate({
-            id: 'category-hub',
-            data: {
-                query: item.query,
-                label: item.label,
-                color: item.color,
-                image: item.image
-            }
-        });
-    };
+    // Helper for Section Headers
+    const Header = ({ title, subtitle }: { title: string, subtitle?: string }) => (
+        <div className="flex items-end justify-between mb-6 px-4">
+            <div>
+                <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
+                {subtitle && <p className="text-sm text-white/40 font-medium mt-1">{subtitle}</p>}
+            </div>
+        </div>
+    );
+
+    if (loading) {
+        return (
+            <div className="min-h-full p-8 space-y-12 animate-pulse">
+                {[1, 2, 3].map(i => <div key={i} className="h-64 bg-white/5 rounded-3xl" />)}
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-full p-8 pb-32 space-y-12">
+        <div className="min-h-full pb-32 space-y-12">
 
-            {/* HERO TITLE */}
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                <h1 className="text-4xl md:text-5xl font-black text-white mb-2 flex items-center gap-3">
-                    <Headphones size={40} className="text-pink-500" />
-                    Explore
-                </h1>
-                <p className="text-white/40 font-medium text-lg">Find your vibe, genre, or next obsession.</p>
-            </motion.div>
+            {/* HERO TITLE (Sticky/Floating effect usually, but static here for simplicity) */}
+            <div className="px-8 pt-8">
+                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                    <h1 className="text-4xl md:text-5xl font-black text-white mb-2 flex items-center gap-3">
+                        <TrendingUp size={40} className="text-pink-500" />
+                        Explore
+                    </h1>
+                    <p className="text-white/40 font-medium text-lg">What's happening in the world of music.</p>
+                </motion.div>
+            </div>
 
-            {/* 1. MOODS (BENTO GRID) */}
-            <section>
-                <SectionHeader title="Moods & Moments" subtitle="Vibe check your day" />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 auto-rows-[160px]">
-                    {MOODS.map((mood, i) => (
-                        <motion.div
-                            key={mood.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: i * 0.05 }}
-                            onClick={() => handleCategoryClick(mood)}
-                            className={`group relative rounded-3xl overflow-hidden cursor-pointer ${mood.colSpan === 2 ? 'col-span-2' : 'col-span-1'
-                                } ${mood.rowSpan === 2 ? 'row-span-2' : 'row-span-1'}`}
-                        >
-                            <img
-                                src={mood.image}
-                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                            />
-                            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
-                            <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                                <h3 className="text-2xl font-bold text-white drop-shadow-lg group-hover:translate-x-2 transition-transform">{mood.label}</h3>
-                            </div>
-                        </motion.div>
+            {/* 1. GLOBAL CHART TOPPERS (Square Cards, Apple Style) */}
+            <section className="px-4">
+                <Header title="Global Chart Toppers" subtitle="The biggest hits right now" />
+                <HorizontalScroll>
+                    {content.globalCharts.map((item, i) => (
+                        <FeatureCard
+                            key={item.id}
+                            item={item}
+                            index={i}
+                            description="Top 50"
+                            onClick={() => onNavigate({ id: 'playlist', data: item })}
+                        />
                     ))}
-                </div>
+                </HorizontalScroll>
             </section>
 
-            {/* 2. GENRES (PILL GRID) */}
-            <section>
-                <SectionHeader title="Browse Genres" subtitle="Dive deep into sound" />
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4">
-                    {GENRES.map((genre, i) => (
-                        <motion.div
-                            key={genre.id}
-                            whileHover={{ y: -5 }}
-                            onClick={() => handleCategoryClick(genre)}
-                            className="aspect-square relative rounded-2xl overflow-hidden cursor-pointer group"
-                        >
-                            <img src={genre.image} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <span className="font-bold text-white text-sm md:text-base">{genre.label}</span>
-                            </div>
-                            <div
-                                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ boxShadow: `inset 0 0 20px ${genre.color}` }}
-                            />
-                        </motion.div>
-                    ))}
-                </div>
-            </section>
-
-            {/* 3. FEATURED RADIO */}
-            <section>
-                <SectionHeader title="Featured Radio" subtitle="Non-stop stations" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                    {RADIO_STATIONS.map((station, i) => (
+            {/* 2. GLOBAL TRENDING (Wide Rows) */}
+            <section className="px-4">
+                <Header title="Global Trending" subtitle="Viral everywhere" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {content.globalTrending.slice(0, 9).map((song, i) => (
                         <div
-                            key={station.id}
-                            onClick={() => {
-                                // Default search for now, could be smarter
-                                handleCategoryClick({ ...station, image: 'https://images.unsplash.com/photo-1594434533760-02e0f3faaa68?q=80&w=2128&auto=format&fit=crop' })
-                            }}
-                            className="h-32 rounded-2xl bg-white/5 border border-white/5 flex items-center px-6 gap-6 cursor-pointer hover:bg-white/10 transition-colors group"
+                            key={song.id}
+                            onClick={() => onNavigate({ id: 'song', data: song })} // Or play directly?
+                            className="group flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer border border-white/5 hover:border-white/10"
                         >
-                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-110 transition-transform">
-                                <station.icon size={32} className="text-white" />
+                            <div className="w-16 h-16 rounded-lg overflow-hidden relative flex-shrink-0">
+                                <img src={getHighQualityImage(song.image)} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Play size={20} fill="white" />
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white">{station.label}</h3>
-                                <p className="text-white/40 text-sm">Infinite Mix</p>
+                            <div className="min-w-0">
+                                <h4 className="font-bold text-sm truncate text-white">{decodeHtml(song.name)}</h4>
+                                <p className="text-xs text-white/50 truncate">{decodeHtml(song.primaryArtists)}</p>
                             </div>
                         </div>
                     ))}
                 </div>
             </section>
 
-            {/* 4. GLOBAL CHARTS */}
-            {charts.length > 0 && (
+            {/* 3. NEW RELEASES (Standard Cards) */}
+            <section className="px-4">
+                <Header title="New Releases" subtitle="Fresh from the studio" />
+                <HorizontalScroll>
+                    {content.newReleases.map((album, i) => (
+                        <StandardCard
+                            key={album.id}
+                            item={album}
+                            index={i}
+                            subtitle={album.year || "2025"}
+                            onClick={() => onNavigate({ id: 'peel-reveal', data: album })} // Use PeelReveal for albums
+                        />
+                    ))}
+                </HorizontalScroll>
+            </section>
+
+            {/* 4. LIVE PERFORMANCES (Wide Cards) */}
+            <section className="px-4">
+                <Header title="Live Performances" subtitle="Experience the energy" />
+                <HorizontalScroll>
+                    {content.livePerformances.map((album, i) => (
+                        <div
+                            key={album.id}
+                            onClick={() => onNavigate({ id: 'peel-reveal', data: album })}
+                            className="min-w-[280px] h-64 relative rounded-2xl overflow-hidden cursor-pointer group snap-start"
+                        >
+                            <img src={getHighQualityImage(album.image)} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-70" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                            <div className="absolute bottom-0 left-0 p-6">
+                                <span className="px-2 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded mb-2 inline-block">Live Audio</span>
+                                <h3 className="text-xl font-bold text-white leading-tight mb-1 line-clamp-2">{decodeHtml(album.name)}</h3>
+                                <p className="text-white/60 text-sm">{decodeHtml(album.primaryArtists)}</p>
+                            </div>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                                    <Play fill="white" size={24} />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </HorizontalScroll>
+            </section>
+
+            {/* 5. TOP PLAYLISTS (Square) */}
+            <section className="px-4">
+                <Header title="Top Playlists" subtitle="Curated for you" />
+                <HorizontalScroll>
+                    {content.topPlaylists.map((playlist, i) => (
+                        <StandardCard
+                            key={playlist.id}
+                            item={playlist}
+                            index={i}
+                            subtitle="Playlist"
+                            onClick={() => onNavigate({ id: 'playlist', data: playlist })}
+                        />
+                    ))}
+                </HorizontalScroll>
+            </section>
+
+            {/* 6. REGIONAL BLOCK (Bollywood, Tollywood, Hollywood) */}
+            <div className="bg-gradient-to-b from-white/5 to-transparent rounded-3xl p-6 mx-4 space-y-12 border border-white/5">
+                <div className="flex items-center gap-3 mb-8">
+                    <Headphones className="text-purple-400" size={32} />
+                    <h2 className="text-3xl font-bold">Global Sounds</h2>
+                </div>
+
+                {/* Bollywood */}
                 <section>
-                    <SectionHeader title="Global Charts" subtitle="Top 50s everywhere" />
+                    <Header title="Bollywood Hits" />
                     <HorizontalScroll>
-                        {charts.map((chart, i) => (
-                            <FeatureCard
-                                key={chart.id}
-                                item={chart}
-                                index={i}
-                                description="Top Chart"
-                                onClick={() => onNavigate({ id: 'playlist', data: chart })}
-                            />
+                        {content.bollywood.map((item, i) => (
+                            <CompactCard key={item.id} item={item} subtitle="Hindi" onClick={() => onNavigate({ id: 'playlist', data: item })} />
                         ))}
                     </HorizontalScroll>
                 </section>
-            )}
+
+                {/* Tollywood */}
+                <section>
+                    <Header title="Tollywood Beats" />
+                    <HorizontalScroll>
+                        {content.tollywood.map((item, i) => (
+                            <CompactCard key={item.id} item={item} subtitle="Telugu" onClick={() => onNavigate({ id: 'playlist', data: item })} />
+                        ))}
+                    </HorizontalScroll>
+                </section>
+
+                {/* Hollywood */}
+                <section>
+                    <Header title="Hollywood & Western" />
+                    <HorizontalScroll>
+                        {content.hollywood.map((item, i) => (
+                            <CompactCard key={item.id} item={item} subtitle="English" onClick={() => onNavigate({ id: 'playlist', data: item })} />
+                        ))}
+                    </HorizontalScroll>
+                </section>
+            </div>
 
         </div>
     );
+}
+
+// Compact Card for dense lists
+function CompactCard({ item, subtitle, onClick }: any) {
+    return (
+        <div onClick={onClick} className="min-w-[160px] w-[160px] cursor-pointer group snap-start">
+            <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 relative shadow-lg">
+                <img src={getHighQualityImage(item.image)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Play fill="white" size={24} />
+                </div>
+            </div>
+            <h3 className="font-semibold text-sm text-white truncate">{decodeHtml(item.name)}</h3>
+            <p className="text-xs text-white/40 truncate">{subtitle}</p>
+        </div>
+    )
 }
