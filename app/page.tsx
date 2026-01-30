@@ -18,6 +18,11 @@ const DiscoveryMode = dynamic(() => import("@/components/desktop/discovery/Disco
   loading: () => <SplashScreen text="LOADING DISCOVERY..." />
 });
 
+const MobileDiscoveryMode = dynamic(() => import("@/components/mobile/discovery/DiscoveryEntry").then(mod => mod.DiscoveryEntry), {
+  ssr: false,
+  loading: () => <SplashScreen text="LOADING DISCOVERY..." />
+});
+
 const DeckMode = dynamic(() => import("@/components/desktop/deck/scenes/stage").then(mod => mod.WindowsStage), {
   ssr: false,
   loading: () => <SplashScreen text="LOADING DECK..." />
@@ -99,7 +104,7 @@ export default function Home() {
           )}
 
           {mode === 'DISCOVERY' && (
-            <DiscoveryMode />
+            isMobileSystem ? <MobileDiscoveryMode /> : <DiscoveryMode />
           )}
 
           {mode === 'DECK' && (

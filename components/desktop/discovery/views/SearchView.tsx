@@ -76,7 +76,10 @@ interface SearchViewProps {
 }
 
 export function SearchView({ onNavigate }: SearchViewProps) {
-    const { addMix, loadMix, currentSong, isPlaying, togglePlay } = usePlayback();
+    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality } = usePlayback();
+
+    // FIX 1: Stable search mix ID to prevent memory leak
+    const SEARCH_MIX_ID = 'search-results';
 
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<PlayableTrack[]>([]);
@@ -149,20 +152,27 @@ export function SearchView({ onNavigate }: SearchViewProps) {
     const playTrack = (track: PlayableTrack, allTracks?: PlayableTrack[]) => {
         const tracks = allTracks || [track];
         const idx = tracks.findIndex(t => t.id === track.id);
-        const mixId = `search-${Date.now()}`;
 
         // Convert PlayableTracks back to songs for the mix
         const songs = tracks.map(t => t.song).filter(Boolean);
 
         const newMix: Mix = {
-            id: mixId,
+            id: SEARCH_MIX_ID,
             title: 'Search Results',
             color: 'white',
             songs: songs as any[],
             currentSongIndex: idx >= 0 ? idx : 0
         };
-        addMix(newMix);
-        setTimeout(() => loadMix(mixId), 50);
+
+        const added = addMix(newMix);
+        if (!added) {
+            updateMix(SEARCH_MIX_ID, {
+                songs: songs as any[],
+                currentSongIndex: idx >= 0 ? idx : 0
+            });
+        }
+
+        loadMix(SEARCH_MIX_ID);
     };
 
     // Get quality badge styling
@@ -368,7 +378,8 @@ export function SearchView({ onNavigate }: SearchViewProps) {
 
                             <div className="space-y-2">
                                 {results.map((track, i) => {
-                                    const isCurrentPlaying = currentSong?.id === track.id;
+                                    // FIX 2: Check activeMixId for correct icon
+                                    const isCurrentPlaying = currentSong?.id === track.id && activeMixId === SEARCH_MIX_ID;
                                     const hasFLAC = track.sources.some(s => s.quality === 'flac' || s.quality === 'hires');
 
                                     return (
@@ -377,7 +388,14 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                                             initial={{ opacity: 0, x: -20 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             transition={{ delay: i * 0.025 }}
-                                            onClick={() => playTrack(track, results)}
+                                            /* FIX 3: Smart toggle - same song = pause/play, different song = switch */
+                                            onClick={() => {
+                                                if (currentSong?.id === track.id && activeMixId === SEARCH_MIX_ID) {
+                                                    togglePlay();
+                                                } else {
+                                                    playTrack(track, results);
+                                                }
+                                            }}
                                             className="glass-result flex items-center gap-4 p-4 rounded-xl cursor-pointer group"
                                         >
                                             {/* CD Art with Vinyl Effect */}
@@ -433,9 +451,11 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                                                         {track.title}
                                                     </p>
 
-                                                    {/* Quality Badge - Preferred */}
-                                                    <span className={`quality-badge ${getQualityClass(track.preferredQuality)} flex-shrink-0`}>
-                                                        {getQualityLabel(track.preferredQuality)}
+                                                    {/* Quality Badge - FIX 4: Use activeQuality when current */}
+                                                    <span className={`quality-badge ${getQualityClass(isCurrentPlaying && activeQuality ? activeQuality : track.preferredQuality)} flex-shrink-0`}>
+                                                        {isCurrentPlaying && activeQuality
+                                                            ? activeQuality.toUpperCase()
+                                                            : getQualityLabel(track.preferredQuality)}
                                                     </span>
 
                                                     {/* Merged FLAC indicator - show if FLAC available but not preferred */}

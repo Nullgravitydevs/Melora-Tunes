@@ -152,7 +152,8 @@ export class DiscoveryEngine {
                 const results = await searchUnified(query);
                 return results.map(r => ensurePlayableTrack(r, quality));
             } else {
-                const trending = await getTrending();
+                // Pass region even for 'global' to respect language settings
+                const trending = await getTrending(region || 'english');
                 return trending.map(s => ensurePlayableTrack(s, quality));
             }
         } catch (e) { return []; }

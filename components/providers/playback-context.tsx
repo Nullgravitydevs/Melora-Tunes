@@ -83,6 +83,7 @@ interface PlaybackContextType {
     addMix: (mix: Mix) => boolean;
     updateMix: (mixId: string, updates: Partial<Mix>) => void;
     deleteMix: (mixId: string) => void;
+    addSongToMix: (mixId: string, song: JioSaavnSong | PlayableTrack) => void;
     isLoaded: boolean;
     activeMix: Mix | undefined;
 
@@ -193,6 +194,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const toastOnceRef = useRef(false); // [FIX Bug 10] Prevent toast spam
     const currentSongUrlRef = useRef<string | null>(null); // Track latest URL for sync comparison
     const nextPreloadRequestId = useRef(0); // [FIX Bug 15] Preload race condition guard
+    const loadMixRequestId = useRef(0); // [FIX 2] loadMix race condition guard
     const downgradeToastRef = useRef<string | null>(null); // [FIX Bug 20] Throttle downgrade toasts
     useEffect(() => { currentSongUrlRef.current = currentSongUrl; }, [currentSongUrl]);
 
@@ -298,6 +300,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         ]);
     };
 
+
+
+    const addSongToMix = (mixId: string, song: JioSaavnSong | PlayableTrack) => {
+        setMixes(prev => prev.map(mix => {
+            if (mix.id === mixId) {
+                return { ...mix, songs: [...mix.songs, song] };
+            }
+            return mix;
+        }));
+    };
+
     // Load liked songs and recently played from localStorage
     useEffect(() => {
         const savedLiked = localStorage.getItem('melora-liked-songs');
@@ -385,20 +398,37 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // Helpers defined first (hoisted manually) to be available for next/prev
     const addMix = useCallback((mix: Mix) => {
-        console.log("Adding mix. Current count:", mixesRef.current.length);
+        // Atomic Upsert to prevent race conditions (duplicates)
+        let limitReached = false;
 
-        // Count only USER tapes (exclude Discovery Mix)
-        const userTapeCount = mixesRef.current.filter(m => m.id !== DISCOVERY_MIX_ID).length;
+        setMixes(prev => {
+            // 1. Check if exists - Update in place
+            const existingIdx = prev.findIndex(m => m.id === mix.id);
+            if (existingIdx >= 0) {
+                console.log("[addMix] Atomic update:", mix.id);
+                const newMixes = [...prev];
+                newMixes[existingIdx] = mix;
+                return newMixes;
+            }
 
-        // Allow "Discovery Mix" to bypass limit
-        const isSystem = mix.id === DISCOVERY_MIX_ID;
+            // 2. Check Limit (if not system)
+            const isSystem = mix.id === DISCOVERY_MIX_ID || mix.id === 'quick-play' || mix.id === 'search-results';
+            const userTapeCount = prev.filter(m => m.id !== DISCOVERY_MIX_ID).length;
 
-        if (!isSystem && userTapeCount >= 8) {
-            console.log("Limit blocked.");
+            if (!isSystem && userTapeCount >= 8) {
+                console.log("Limit blocked (atomic check).");
+                limitReached = true;
+                return prev;
+            }
+
+            // 3. Add new
+            return [...prev, mix];
+        });
+
+        if (limitReached) {
             showToast("Mix limit reached (8)", 'error');
             return false;
         }
-        setMixes(prev => [...prev, mix]);
         return true;
     }, [showToast]);
 
@@ -539,7 +569,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [progress, duration, activeMixId, isPlaying, currentSong, updateMix, qualityPreference]);
 
     const loadMix = useCallback((mixId: string) => {
-        console.log("[loadMix] Called with:", mixId, "current:", activeMixId);
+        // FIX 2: Request ID to prevent race condition on rapid taps
+        const requestId = ++loadMixRequestId.current;
+        console.log("[loadMix] Called with:", mixId, "current:", activeMixId, "requestId:", requestId);
 
         // Eject: If loading empty mixId, pause and clear
         if (!mixId || mixId === "") {
@@ -574,8 +606,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         setActiveMixId(mixId);
 
-        // Delay to let state update and audio engine clear
-        setTimeout(() => setIsPlaying(true), 150);
+        // FIX 2: Guard setTimeout with requestId to prevent ghost playback
+        setTimeout(() => {
+            if (loadMixRequestId.current === requestId) {
+                setIsPlaying(true);
+            }
+        }, 150);
     }, [activeMixId]);
 
     const playInstantMix = useCallback((mix: Mix) => {
@@ -1487,6 +1523,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // We also need to ensure currentSong matches what's actually playing if we are in a mix
 
+    // FIX 3: Use constant ID to prevent memory leak from infinite mixes
+    const QUEUE_MIX_ID = 'queue-mix';
     const setQueue = useCallback((newQueue: (JioSaavnSong | PlayableTrack)[]) => {
         if (!newQueue || newQueue.length === 0) {
             setIsPlaying(false);
@@ -1497,7 +1535,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         const mix: Mix = {
-            id: `queue-${Date.now()}`,
+            id: QUEUE_MIX_ID,
             title: 'Queue',
             color: 'blue',
             songs: newQueue.map(s => ensurePlayableTrack(s)),
@@ -1517,7 +1555,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         addMix,
         updateMix,
         deleteMix,
-        isLoaded: true,
+        addSongToMix,
+        isLoaded,
         activeMix,
 
         queue: normalizedQueue.filter((s): s is JioSaavnSong => !!s),

@@ -10,6 +10,7 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { isPlayableTrack, PlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
+import { AddToPlaylistModal } from "@/components/desktop/discovery/modals/AddToPlaylistModal";
 
 /* ============================================================================
    LIBRARY VIEW - Liked Songs, Recently Played, Playlists
@@ -60,6 +61,11 @@ interface LibraryViewProps {
     initialTab?: TabType;
 }
 
+/* ============================================================================
+   LIBRARY VIEW - Liked Songs, Recently Played, Playlists
+   Muzza-inspired "Best Search" & Sort Features
+   ============================================================================ */
+
 export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
     const {
         likedSongs, recentlyPlayed, mixes,
@@ -70,17 +76,74 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
 
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'liked');
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [songToAdd, setSongToAdd] = useState<JioSaavnSong | PlayableTrack | null>(null);
 
-    // Sync active tab when prop changes (e.g. from sidebar navigation)
+    // SEARCH & FILTER STATE
+    const [searchQuery, setSearchQuery] = useState("");
+    const [sortType, setSortType] = useState<'date' | 'name'>('date');
+    const [sortDescending, setSortDescending] = useState(true);
+
+    // Sync active tab when prop changes
     useEffect(() => {
         if (initialTab) setActiveTab(initialTab);
     }, [initialTab]);
 
-    // Filter out system mixes, show only user playlists
-    const userPlaylists = useMemo(() =>
-        mixes.filter(m => m.id !== 'discovery-mix' && !m.id.startsWith('search-') && !m.id.startsWith('artist-') && !m.id.startsWith('album-')),
-        [mixes]
-    );
+    // Reset search when switching tabs
+    useEffect(() => {
+        setSearchQuery("");
+    }, [activeTab]);
+
+    // --- FILTERING LOGIC ---
+
+    // 1. Playlists
+    const userPlaylists = useMemo(() => {
+        let raw = mixes.filter(m => m.id !== 'discovery-mix' && !m.id.startsWith('search-') && !m.id.startsWith('artist-') && !m.id.startsWith('album-'));
+
+        // Search Filter
+        if (searchQuery.trim()) {
+            const lowerQ = searchQuery.toLowerCase();
+            raw = raw.filter(p => p.title.toLowerCase().includes(lowerQ));
+        }
+
+        // Sort
+        return raw.sort((a, b) => {
+            if (sortType === 'name') {
+                return sortDescending
+                    ? b.title.localeCompare(a.title)
+                    : a.title.localeCompare(b.title);
+            }
+            // Date (ID timestamp based fallback for now since we lack 'createdAt' in Mix type)
+            // We assume ID has timestamp component or is chronological
+            const aTime = extractTimestamp(a.id);
+            const bTime = extractTimestamp(b.id);
+            return sortDescending ? bTime - aTime : aTime - bTime;
+        });
+    }, [mixes, searchQuery, sortType, sortDescending]);
+
+    // 2. Liked Songs
+    const filteredLikedSongs = useMemo(() => {
+        let list = [...likedSongs];
+        if (searchQuery.trim()) {
+            const lowerQ = searchQuery.toLowerCase();
+            list = list.filter(song =>
+                (song.name || '').toLowerCase().includes(lowerQ) ||
+                (song.primaryArtists || '').toLowerCase().includes(lowerQ) ||
+                (song.album?.name || '').toLowerCase().includes(lowerQ)
+            );
+        }
+        // TODO: Add Sort for songs if requested. For now, Liked is usually "Recently Added" (FIFO/LIFO)
+        return list;
+    }, [likedSongs, searchQuery]);
+
+    // Helper: Extract timestamp from ID if possible
+    function extractTimestamp(id: string): number {
+        if (id.includes('-')) {
+            const parts = id.split('-');
+            const ts = parseInt(parts[parts.length - 1]);
+            if (!isNaN(ts)) return ts;
+        }
+        return 0;
+    }
 
     // Get quality badge
     const getQualityBadge = (item: JioSaavnSong | PlayableTrack) => {
@@ -243,10 +306,27 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                 {/* Album */}
                 <p className="text-sm text-white/20 truncate max-w-32 hidden lg:block">{song.album?.name}</p>
 
-                {/* Duration */}
-                <span className="text-sm text-white/30 tabular-nums">
-                    {formatDuration(song.duration)}
-                </span>
+                {/* Duration & Actions */}
+                <div className="flex items-center gap-4">
+                    <span className="text-sm text-white/30 tabular-nums group-hover:hidden">
+                        {formatDuration(song.duration)}
+                    </span>
+
+                    <div className="hidden group-hover:flex items-center gap-2">
+                        <motion.button
+                            onClick={(e) => { e.stopPropagation(); playSong(item, allItems); }}
+                            className="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
+                        >
+                            <Heart size={16} />
+                        </motion.button>
+                        <motion.button
+                            onClick={(e) => { e.stopPropagation(); setSongToAdd(item); }}
+                            className="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
+                        >
+                            <MoreHorizontal size={16} />
+                        </motion.button>
+                    </div>
+                </div>
             </motion.div>
         );
     };
@@ -341,6 +421,59 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                     ))}
                 </div>
 
+                {/* SEARCH BAR & FILTERS (Applied to Liked & Playlists) */}
+                {activeTab !== 'recent' && (
+                    <div className="flex flex-col md:flex-row gap-4 mb-6">
+                        {/* Search Input */}
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={`Search ${activeTab === 'playlists' ? 'playlists...' : 'liked songs...'}`}
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-white/20 text-sm text-white placeholder-white/30 transition-all font-medium"
+                            />
+                            {/* Search Icon */}
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/30">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* Sort Options (Only for Playlists for now) */}
+                        {activeTab === 'playlists' && (
+                            <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs font-semibold text-white/30 uppercase tracking-wider hidden md:block">Sort By:</span>
+                                <button
+                                    onClick={() => setSortType('date')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 transition-colors ${sortType === 'date' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
+                                >
+                                    Date
+                                </button>
+                                <button
+                                    onClick={() => setSortType('name')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 transition-colors ${sortType === 'name' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
+                                >
+                                    Name
+                                </button>
+                                <button
+                                    onClick={() => setSortDescending(!sortDescending)}
+                                    className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                                    title={sortDescending ? "Newest First" : "Oldest First"}
+                                >
+                                    {sortDescending ? (
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7 7 7-7" /></svg>
+                                    ) : (
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7-7-7 7" /></svg>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Content */}
                 <AnimatePresence mode="wait">
                     {/* Liked Songs */}
@@ -351,12 +484,12 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
                         >
-                            {likedSongs.length > 0 ? (
+                            {filteredLikedSongs.length > 0 ? (
                                 <>
                                     {/* Play controls */}
                                     <div className="flex items-center gap-3 mb-6">
                                         <motion.button
-                                            onClick={() => playAll(likedSongs)}
+                                            onClick={() => playAll(filteredLikedSongs)}
                                             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-black font-medium"
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
@@ -365,7 +498,7 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                             Play All
                                         </motion.button>
                                         <motion.button
-                                            onClick={() => playAll(likedSongs, true)}
+                                            onClick={() => playAll(filteredLikedSongs, true)}
                                             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 font-medium"
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
@@ -376,14 +509,16 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                     </div>
 
                                     <div className="space-y-2">
-                                        {likedSongs.map((song, i) => renderSongRow(song, i, likedSongs))}
+                                        {filteredLikedSongs.map((song, i) => renderSongRow(song, i, filteredLikedSongs))}
                                     </div>
                                 </>
                             ) : (
                                 <div className="text-center py-20">
                                     <Heart size={48} className="mx-auto text-white/10 mb-4" />
-                                    <p className="text-white/40">No liked songs yet</p>
-                                    <p className="text-sm text-white/20 mt-1">Tap the heart icon to save songs</p>
+                                    <p className="text-white/40">
+                                        {searchQuery ? `No liked songs matching "${searchQuery}"` : "No liked songs yet"}
+                                    </p>
+                                    {!searchQuery && <p className="text-sm text-white/20 mt-1">Tap the heart icon to save songs</p>}
                                 </div>
                             )}
                         </motion.div>
@@ -461,8 +596,10 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                             ) : (
                                 <div className="text-center py-16">
                                     <ListMusic size={48} className="mx-auto text-white/10 mb-4" />
-                                    <p className="text-white/40">No playlists yet</p>
-                                    <p className="text-sm text-white/20 mt-1">Create one to get started</p>
+                                    <p className="text-white/40">
+                                        {searchQuery ? `No playlists matching "${searchQuery}"` : "No playlists yet"}
+                                    </p>
+                                    {!searchQuery && <p className="text-sm text-white/20 mt-1">Create one to get started</p>}
                                 </div>
                             )}
                         </motion.div>
@@ -476,6 +613,12 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                     <CreatePlaylistModal
                         onClose={() => setShowCreateModal(false)}
                         onCreate={createPlaylist}
+                    />
+                )}
+                {songToAdd && (
+                    <AddToPlaylistModal
+                        song={songToAdd}
+                        onClose={() => setSongToAdd(null)}
                     />
                 )}
             </AnimatePresence>

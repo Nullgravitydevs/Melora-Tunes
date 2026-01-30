@@ -49,6 +49,10 @@ export function saveSettings(settings: Partial<AppSettings>): void {
         const current = loadSettings();
         const updated = { ...current, ...settings };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+        // Dispatch custom event for cross-component reactivity
+        console.log('[Settings] 📤 Dispatching melora-settings-changed event with:', updated);
+        window.dispatchEvent(new CustomEvent('melora-settings-changed', { detail: updated }));
     } catch (error) {
         console.error('Failed to save settings:', error);
     }

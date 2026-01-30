@@ -1,6 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import CryptoJS from 'crypto-js';
 import { musixmatch } from '@/lib/musixmatch';
+import { decodeHtml } from './utils';
 // REMOVED: internal loadSettings() - strictly passed via args now
 
 export interface JioSaavnSong {
@@ -34,6 +35,26 @@ export interface JioSaavnSong {
         link: string;
     }[];
     encryptedMediaUrl: string;
+}
+
+export interface LaunchData {
+    new_trending: JioSaavnSong[];
+    top_playlists: JioSaavnSong[];
+    new_albums: JioSaavnSong[];
+    browse_discover: JioSaavnSong[];
+    charts: JioSaavnSong[];
+    radio: JioSaavnSong[];
+    artist_recos: JioSaavnSong[];
+    quick_picks: JioSaavnSong[]; // NEW: Quick Picks
+    // NEW SECTIONS
+    moods: {
+        love: JioSaavnSong[];
+        party: JioSaavnSong[];
+        workout: JioSaavnSong[];
+        chill: JioSaavnSong[];
+    };
+    retro: JioSaavnSong[];
+    top_charts: JioSaavnSong[];
 }
 
 export interface SearchResponse {
@@ -217,13 +238,6 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
             data = await response.json();
         } else {
             const response = await fetch(`/api/search?type=playlist&query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${lang}`);
-            // Note: server API might not support type=playlist yet, but let's assume direct call if not.
-            // Actually, if we use the proxy (fetchApi logic), better.
-            // Let's manually reconstruct the proxy call if needed or assume /api/search handles it.
-            // Safest: Use fetchApi wrapper logic directly here if we want consistency?
-            // Actually, for simplicity, I'll assume the /api/search is smart enough OR i'll just use fetchApi wrapped call logic if I were refactoring.
-            // But since I am editing the file, I'll stick to the pattern used in searchSongs/Albums.
-            // To be safe, I'll fallback to a direct proxied call using fetchApi pattern if /api/search isn't guaranteed.
             data = await fetchApi(`__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&languages=${lang}`, true);
         }
 
@@ -236,10 +250,10 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
 
         if (list.length > 0) {
             return list.map((item: any) => {
-                const title = item.title || item.name || `[Unknown Playlist]`;
+                const title = item.title || item.name || item.listname || item.more_info?.firstname || `[Unknown Playlist]`;
                 return {
                     id: item.id || item.listid,
-                    name: title,
+                    name: decodeHtml(title),
                     type: 'playlist',
                     album: { id: '', name: '', url: '' },
                     year: '',
@@ -292,18 +306,11 @@ export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' 
 
     try {
         const decryptedUrl = decryptUrl(song.encryptedMediaUrl);
-        // If FLAC is requested, try to generate the FLAC URL (usually ends in _flac. or _lossless. depending on provider quirks)
-        // For JioSaavn, standard encrypted URLs are usually MP4/AAC.
-        // However, if we are in "Native Mode", we might want to try forcing the bitrate.
-        // Fix: Use 'flac' as target if requested.
         const targetBitrate = bitrate;
 
         if (targetBitrate === 'flac') {
-            // For FLAC, we usually need to change the extension from .mp4 to .flac as well
             return decryptedUrl.replace(/_(320|160|96|48|12)\.(mp4|m4a)/g, '_flac.flac');
         }
-
-        // Standard bitrate change (keeps extension)
         return decryptedUrl.replace(/_(320|160|96|48|12)\./g, `_${targetBitrate}.`);
     } catch (e) {
         console.warn('Failed to decrypt URL for song:', song.name, e);
@@ -313,22 +320,14 @@ export function getAudioUrl(song: JioSaavnSong, bitrate: 'flac' | '320' | '160' 
 
 export function getThumbnailUrl(song: JioSaavnSong): string {
     if (!song || !song.image) return '';
-
-    // Handle legacy/raw string format
     if (typeof song.image === 'string') return song.image;
-
-    // Safety check for array
     if (!Array.isArray(song.image)) return '';
 
     const qualities = ['500x500', '150x150', '50x50'];
-
     for (const quality of qualities) {
-        // Safe access
         const match = song.image.find(i => i && i.quality === quality);
         if (match && match.link) return match.link;
     }
-
-    // Fallback to first available
     return song.image[0]?.link || '';
 }
 
@@ -349,7 +348,6 @@ export async function getLyrics(songId: string): Promise<string | null> {
         }
 
         if (data.lyrics) {
-            // JioSaavn returns lyrics with <br> tags, replace them with newlines
             return data.lyrics.replace(/<br\s*\/?>/gi, '\n');
         }
         return null;
@@ -360,20 +358,17 @@ export async function getLyrics(songId: string): Promise<string | null> {
 }
 
 export async function getLyricsWithFallback(song: JioSaavnSong): Promise<string | null> {
-    // Try JioSaavn first
     const jiosaavnLyrics = await getLyrics(song.id);
     if (jiosaavnLyrics && jiosaavnLyrics.trim().length > 0) {
         return jiosaavnLyrics;
     }
 
-    // Fallback to LRCLib
     try {
         console.log('JioSaavn failed, trying LRCLib fallback...');
         const response = await fetch(
             `/api/lyrics-fallback?track=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.primaryArtists)}`
         );
         const data = await response.json();
-
         if (data.lyrics && data.lyrics.trim().length > 0) {
             console.log('Found lyrics from LRCLib!');
             return data.lyrics;
@@ -381,34 +376,26 @@ export async function getLyricsWithFallback(song: JioSaavnSong): Promise<string 
     } catch (error) {
         console.error('LRCLib fallback failed:', error);
     }
-
     return null;
 }
 
 export async function getSongDetails(songId: string): Promise<JioSaavnSong | null> {
     try {
         let data: any;
-
         if (Capacitor.isNativePlatform()) {
-            // 🚀 NATIVE MODE: Direct fetch to JioSaavn (Bypasses Proxy)
             const apiUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            // 🚀 ELECTRON MODE: Direct fetch
             const apiUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
-            // 🐢 WEB MODE: Use Next.js Proxy
             const response = await fetch(`/api/song?id=${songId}`);
             data = await response.json();
         }
 
-        // JioSaavn returns an object where keys are IDs, or sometimes a list
-        // We need to handle the specific format for song.getDetails
         const songData = data[songId] || (data.songs && data.songs[0]) || data;
-
         if (songData && (songData.id || songData.song)) {
             return {
                 id: songData.id,
@@ -444,82 +431,112 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
     }
 }
 
+export async function getAlbumDetails(albumId: string): Promise<JioSaavnSong[]> {
+    try {
+        let data: any;
+        if (Capacitor.isNativePlatform()) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=${albumId}&ctx=wap6dot0`;
+            const response = await CapacitorHttp.get({ url: apiUrl });
+            data = response.data;
+        } else if (isElectron) {
+            // Electron can fetch directly
+            const apiUrl = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=${albumId}&ctx=wap6dot0`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        } else {
+            // Browser: Use Next.js proxy rewrite to bypass CORS
+            const apiUrl = `/api/proxy?__call=content.getAlbumDetails&_format=json&albumid=${albumId}&ctx=wap6dot0`;
+            const response = await fetch(apiUrl);
+            data = await response.json();
+        }
+
+        if (data && data.songs) {
+            return data.songs.map(mapToSong);
+        }
+        if (Array.isArray(data)) return data.map(mapToSong);
+        return [];
+    } catch (e) {
+        console.error("Error fetching album details", e);
+        return [];
+    }
+}
+
+export async function getPlaylistDetails(listId: string): Promise<JioSaavnSong[]> {
+    try {
+        // Direct API call for robustness
+        // Note: search results give us 'id' which is 'listid'
+        const params = `__call=playlist.getDetails&_format=json&listid=${listId}&ctx=wap6dot0`;
+        const data = await fetchApi(params, true);
+
+        if (data && data.songs) {
+            return data.songs.map(mapToSong);
+        }
+        if (data && data.list) return data.list.map(mapToSong);
+
+        return [];
+    } catch (e) {
+        console.error("Error fetching playlist details", e);
+        return [];
+    }
+}
+
+export async function getRadioSongs(stationId: string): Promise<JioSaavnSong[]> {
+    // Simplifying radio fetch
+    const params = `__call=webradio.getSong&_format=json&stationid=${stationId}&k=20&p=1&ctx=wap6dot0`;
+    const data = await fetchApi(params, false); // Don't cache radio
+    if (data && data[stationId]) {
+        return data[stationId].map(mapToSong);
+    }
+    return [];
+}
+
 // --- CACHE IMPLEMENTATION ---
 const CACHE_DURATION = 1000 * 60 * 15; // 15 Minutes
 const CACHE_KEY_PREFIX = 'melora_cache_';
-
-interface CacheEntry {
-    timestamp: number;
-    data: any;
-}
-
+interface CacheEntry { timestamp: number; data: any; }
 class ApiCache {
     private memoryCache = new Map<string, CacheEntry>();
-
     get(key: string): any | null {
-        // 1. Try Memory
         if (this.memoryCache.has(key)) {
             const entry = this.memoryCache.get(key)!;
-            if (Date.now() - entry.timestamp < CACHE_DURATION) {
-                console.log(`[Cache] Hit (Memory): ${key}`);
-                return entry.data;
-            } else {
-                this.memoryCache.delete(key);
-            }
+            if (Date.now() - entry.timestamp < CACHE_DURATION) return entry.data;
+            this.memoryCache.delete(key);
         }
-
-        // 2. Try LocalStorage (Client Side Only)
         if (typeof window !== 'undefined') {
             try {
                 const stored = localStorage.getItem(CACHE_KEY_PREFIX + key);
                 if (stored) {
                     const entry: CacheEntry = JSON.parse(stored);
                     if (Date.now() - entry.timestamp < CACHE_DURATION) {
-                        console.log(`[Cache] Hit (Disk): ${key}`);
-                        // Hydrate memory
                         this.memoryCache.set(key, entry);
-                        if (entry.data?.length === 0) return null; // Don't return empty cached arrays
+                        if (entry.data?.length === 0) return null;
                         return entry.data;
-                    } else {
-                        localStorage.removeItem(CACHE_KEY_PREFIX + key);
                     }
+                    localStorage.removeItem(CACHE_KEY_PREFIX + key);
                 }
-            } catch (e) { console.warn("[Cache] Read Failed", e); }
+            } catch (e) { }
         }
         return null;
     }
-
     set(key: string, data: any) {
-        if (!data || (Array.isArray(data) && data.length === 0)) return; // Don't cache empty
-
+        if (!data || (Array.isArray(data) && data.length === 0)) return;
         const entry: CacheEntry = { timestamp: Date.now(), data };
         this.memoryCache.set(key, entry);
-
         if (typeof window !== 'undefined') {
-            try {
-                localStorage.setItem(CACHE_KEY_PREFIX + key, JSON.stringify(entry));
-            } catch (e) {
-                console.warn("[Cache] Write Failed (Quota?)", e);
-                // Clear old cache if full?
-                try { localStorage.clear(); } catch { }
-            }
+            try { localStorage.setItem(CACHE_KEY_PREFIX + key, JSON.stringify(entry)); } catch (e) { }
         }
     }
 }
-
 export const apiCache = new ApiCache();
 
-// --- HELPER FUNCTION FOR ALL PLATFORMS ---
 async function fetchApi(params: string, useCache: boolean = false): Promise<any> {
     try {
         if (useCache) {
             const cached = apiCache.get(params);
             if (cached) return cached;
         }
-
         const urlStr = params.startsWith('?') ? params.slice(1) : params;
         let resData: any = null;
-
         if (Capacitor.isNativePlatform()) {
             const url = `https://www.jiosaavn.com/api.php?${urlStr}`;
             const res = await CapacitorHttp.get({ url });
@@ -529,12 +546,9 @@ async function fetchApi(params: string, useCache: boolean = false): Promise<any>
             const res = await fetch(url);
             resData = await res.json();
         } else {
-            // Web Proxy
             const url = `/api/proxy?${urlStr}`;
             const res = await fetch(url);
             if (res.status === 429) {
-                console.error("API Rate Limit (429) - Returning cached stale if available");
-                // Aggressive fallback: try to find ANYTHING in cache for this key even if expired
                 if (typeof window !== 'undefined') {
                     const stored = localStorage.getItem(CACHE_KEY_PREFIX + params);
                     if (stored) return JSON.parse(stored).data;
@@ -544,472 +558,266 @@ async function fetchApi(params: string, useCache: boolean = false): Promise<any>
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             resData = await res.json();
         }
-
-        if (useCache && resData) {
-            apiCache.set(params, resData);
-        }
-
+        if (useCache && resData) apiCache.set(params, resData);
         return resData;
-
     } catch (e) {
         console.error("API Fetch Error:", e);
         return null;
     }
 }
 
-export async function getTopCharts(language?: string): Promise<any[]> {
-    const lang = normalizeLanguage(language);
-    // FIX: The API often defaults to the first language or Global if multiple are passed improperly.
-    // To ensure we get charts for ALL requested languages, we fetch them in parallel and merge.
-    const langs = lang.split(',').map(s => s.trim()).filter(Boolean);
+// Deprecated: Legacy getLaunchData, mapped to strict for compatibility but we prefer explicit usage
+export async function getLaunchData(language?: string): Promise<LaunchData> {
+    return getStrictLaunchData(language);
+}
 
-    // If only one language, strict fetch
-    if (langs.length <= 1) {
-        const data = await fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${lang}`, true);
-        return Array.isArray(data) ? data : [];
-    }
-
-    // Multiple languages: Fetch all concurrently
+// Mobile Compatibility Wrappers
+export async function getTopCharts(language?: string): Promise<JioSaavnSong[]> {
     try {
-        const promises = langs.map(l =>
-            fetchApi(`__call=content.getCharts&api_version=4&_format=json&ctx=wap6dot0&languages=${l}`, true)
-        );
-
-        const results = await Promise.all(promises);
-
-        // Merge and Deduplicate
-        const allCharts: any[] = [];
-        const seenIds = new Set();
-
-        results.forEach(res => {
-            if (Array.isArray(res)) {
-                res.forEach(chart => {
-                    const id = chart.id || chart.listid;
-                    if (!seenIds.has(id)) {
-                        seenIds.add(id);
-                        allCharts.push(chart);
-                    }
-                });
-            }
-        });
-
-        // Optional: Interleave them? Or just return merged.
-        // For now, merged is fine, the UI sorts/displays them.
-        return allCharts;
+        const lang = normalizeLanguage(language);
+        const primaryLang = lang.split(',')[0].trim().toLowerCase();
+        return await searchPlaylists(`${primaryLang} Top 50`, 1, 10, lang);
     } catch (e) {
-        console.error("Multi-language chart fetch failed", e);
         return [];
     }
 }
 
 export async function getTrending(language?: string): Promise<JioSaavnSong[]> {
+    return getStrictLanguageTrending(language || 'english');
+}
+
+export async function getNewReleases(limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
+    const data = await getStrictLanguageAlbums(language || 'english');
+    return data.slice(0, limit);
+}
+
+export async function getSyncedLyrics(song: JioSaavnSong): Promise<{ synced: boolean; text: string | null }> {
     try {
-        const lang = normalizeLanguage(language);
-        const data = await fetchApi(`__call=webapi.get&token=&type=trending&p=1&n=20&_format=json&ctx=wap6dot0&api_version=4&languages=${lang}`, true); // CACHED
-        if (!data || !Array.isArray(data)) {
-            console.log('[getTrending] No data or not array:', typeof data);
-            return [];
-        }
-        console.log('[getTrending] Raw data count:', data.length, 'Types:', data.slice(0, 3).map((i: any) => i.type));
-        // Trending API returns mixed content - filter for songs (case-insensitive) or items that look like songs
-        const songs = data.filter((item: any) => {
-            const itemType = (item.type || '').toLowerCase();
-            // Include songs, or items with downloadUrl/duration (song indicators)
-            return itemType === 'song' || itemType === '' || item.downloadUrl || item.duration;
-        });
-        console.log('[getTrending] Filtered songs count:', songs.length);
-        return songs.map(mapToSong);
+        const text = await getLyricsWithFallback(song);
+        if (!text) return { synced: false, text: null };
+
+        // Check if it looks like LRC
+        const isSynced = /\[\d{2}:\d{2}\.\d{2,3}\]/.test(text);
+        return { synced: isSynced, text };
     } catch (e) {
-        console.error("Error fetching trending:", e);
+        return { synced: false, text: null };
+    }
+}
+
+// Fallback logic helpers... (Kept implicitly if needed but cleaning up exports)
+
+// --- STRICT SEARCH-BASED IMPLEMENTATION ---
+
+async function getStrictLanguageTrending(lang: string): Promise<JioSaavnSong[]> {
+    try {
+        const primaryLang = lang.split(',')[0].trim().toLowerCase();
+        const queries: Record<string, string> = {
+            telugu: "telugu hits",
+            tamil: "tamil hits",
+            hindi: "bollywood hits",
+            malayalam: "malayalam hits",
+            kannada: "kannada hits",
+            english: "global top hits",
+            punjabi: "punjabi hits",
+            marathi: "marathi hits",
+            bhojpuri: "bhojpuri hits",
+            gujarati: "gujarati hits",
+            bengali: "bengali hits",
+            rajasthani: "rajasthani hits",
+        };
+        const q = queries[primaryLang] || `${primaryLang} hits`;
+        const results = await searchSongs(q, 1, 26, primaryLang);
+        if (primaryLang === 'english') return results;
+        return results.filter(s => {
+            const l = (s.language || '').toLowerCase();
+            return l.includes(primaryLang);
+        });
+    } catch (e) {
         return [];
     }
 }
 
-export async function getNewReleases(limit: number = 10, language?: string): Promise<any[]> {
+async function getStrictLanguageAlbums(lang: string): Promise<JioSaavnSong[]> {
     try {
-        const lang = normalizeLanguage(language);
-        // Note: content.getAlbums is often used for new releases
-        // Note: content.getAlbums is often used for new releases
-        // CRITICAL FIX: The API caps at ~30 items and returns many garbage "song" type items.
-        // We fetch 2 pages concurrently to get ~60 candidates.
-        const [p1, p2] = await Promise.all([
-            fetchApi(`__call=content.getAlbums&api_version=4&_format=json&ctx=wap6dot0&n=50&p=1&languages=${lang}`, true),
-            fetchApi(`__call=content.getAlbums&api_version=4&_format=json&ctx=wap6dot0&n=50&p=2&languages=${lang}`, true)
-        ]);
+        const primaryLang = lang.split(',')[0].trim().toLowerCase();
+        const currentYear = new Date().getFullYear();
 
-        const list1 = p1?.data || p1 || [];
-        const list2 = p2?.data || p2 || [];
-        const list = [...(Array.isArray(list1) ? list1 : []), ...(Array.isArray(list2) ? list2 : [])];
+        // Strategy: Search for "Year" specifically first
+        let q = `${primaryLang} ${currentYear} albums`;
+        // Fetch a larger pool to filter
+        let results = await searchAlbums(q, 1, 50, primaryLang);
 
-        if (list.length === 0) return [];
-
-        // Filter out known bad data patterns
-        const validList = list.filter((item: any) => {
-            const name = (item.name || item.title || '').toLowerCase();
-            const isSongType = item.type === 'song';
-            return !isSongType && !name.includes('trailer') && !name.includes('teaser');
-        });
-
-        // Dedup by ID just in case
-        const unique = Array.from(new Map(validList.map((item: any) => [item.id, item])).values());
-
-        return unique.slice(0, limit).map(mapToSong).map(s => ({
-            ...s,
-            type: 'album'
-        }));
-    } catch (e) {
-        console.error("Error fetching new releases", e);
-        return [];
-    }
-}
-
-export async function getFeaturedPlaylists(limit: number = 10, language?: string): Promise<any[]> {
-    try {
-        const lang = normalizeLanguage(language);
-        // Better endpoint: content.getFeaturedPlaylists
-        const data = await fetchApi(`__call=content.getFeaturedPlaylists&fetch_from_serialized_id=true&p=1&n=${limit}&_format=json&ctx=wap6dot0&languages=${lang}`, true); // CACHED
-
-        const list = data?.data || data || [];
-        if (!Array.isArray(list)) return [];
-
-        return list.map((item: any) => {
-            return {
-                id: item.listid || item.id,
-                name: item.listname || item.title || item.name || "[Unknown Playlist]",
-                type: 'playlist',
-                album: { id: '', name: '', url: '' },
-                year: '',
-                releaseDate: '',
-                duration: 0,
-                label: '',
-                primaryArtists: item.firstname || '',
-                primaryArtistsId: '',
-                featuredArtists: '',
-                explicitContent: 0,
-                playCount: parseInt(item.play_count || item.count || '0'),
-                language: item.language || '',
-                hasLyrics: 'false',
-                url: item.perma_url,
-                copyright: '',
-                image: formatImage(item.image),
-                downloadUrl: [],
-                encryptedMediaUrl: ''
-            };
-        });
-    } catch (e) {
-        console.error("Error fetching featured playlists", e);
-        return [];
-    }
-}
-
-export async function getRecommendations(songId: string, limit: number = 5): Promise<JioSaavnSong[]> {
-    const data = await fetchApi(`__call=reco.getreco&api_version=4&_format=json&ctx=wap6dot0&pid=${songId}&n=${limit}`);
-
-    if (!data || !Array.isArray(data)) return [];
-
-    return data.map(mapToSong);
-}
-
-export async function getStation(songId: string): Promise<JioSaavnSong[]> {
-    // Station endpoint often requires specific station ID, but recommendations are similar enough for Autoplay
-    // We use getRecommendations as the underlying implementation for "Station"
-    return getRecommendations(songId, 10);
-}
-
-export async function getPlaylistDetails(id: string): Promise<JioSaavnSong[]> {
-    const data = await fetchApi(`__call=playlist.getDetails&api_version=4&_format=json&ctx=wap6dot0&listid=${id}`);
-
-    // Playlist structure can vary
-    const list = data?.list || data?.songs || [];
-    if (!Array.isArray(list)) return [];
-
-    return list.map(mapToSong);
-}
-
-export async function getAlbumDetails(id: string): Promise<JioSaavnSong[]> {
-    const data = await fetchApi(`__call=content.getAlbumDetails&api_version=4&_format=json&ctx=wap6dot0&albumid=${id}`);
-
-    // Album structure can vary
-    const list = data?.list || data?.songs || [];
-    if (!Array.isArray(list)) return [];
-
-    // FIX: Filter out "trailer" or "testing" placeholder tracks that clutter production albums
-    return list
-        .filter((item: any) => {
-            const name = (item.title || item.name || '').toLowerCase();
-            return !name.includes('trailer') && !name.includes('testing') && !name.includes('teaser');
-        })
-        .map(mapToSong);
-}
-
-export async function getArtistDetails(artistId: string): Promise<any> {
-    const data = await fetchApi(`__call=artist.getArtistPageDetails&api_version=4&_format=json&ctx=wap6dot0&artistId=${artistId}`);
-    return data;
-}
-
-export async function getArtistTopSongs(artistId: string, page: number = 1, limit: number = 10): Promise<JioSaavnSong[]> {
-    const data = await fetchApi(`__call=artist.getArtistPageDetails&api_version=4&_format=json&ctx=wap6dot0&artistId=${artistId}&n=${limit}&p=${page}`);
-    const songs = data.topSongs || [];
-    return Array.isArray(songs) ? songs.map(mapToSong) : [];
-}
-
-export async function getArtistStation(artistId: string): Promise<JioSaavnSong[]> {
-    try {
-        console.log(`[ArtistRadio] Generating station for ${artistId}...`);
-
-        // 1. Fetch Artist Details (Parallel: Details + Top Songs + Albums + Similar)
-        const artist = await getArtistDetails(artistId);
-        if (!artist) throw new Error("Artist not found");
-
-        const topSongsRaw = artist.topSongs || [];
-        const albumsRaw = artist.albums || [];
-        const similarArtistsRaw = artist.similarArtists || [];
-
-        // 2. Pool Generation
-
-        // A. Target Artist Pools (High Familiarity)
-        const topSongs = Array.isArray(topSongsRaw) ? topSongsRaw.map(mapToSong) : [];
-        console.log(`[ArtistRadio] Found ${topSongs.length} top songs`);
-
-        // B. Related Artist Pool (High Relevance)
-        const relatedSongs: JioSaavnSong[] = [];
-        if (similarArtistsRaw.length > 0) {
-            // Take top 3 similar artists
-            const targets = similarArtistsRaw.slice(0, 3);
-            console.log(`[ArtistRadio] Fetching hits from: ${targets.map((a: any) => a.name).join(', ')}`);
-
-            const promises = targets.map((a: any) => getArtistTopSongs(a.id, 1, 5)); // Fetch Top 5 from each
-            const results = await Promise.all(promises);
-            results.forEach(list => relatedSongs.push(...list));
-        }
-        console.log(`[ArtistRadio] Found ${relatedSongs.length} related songs`);
-
-        // C. Deep Cuts Pool (Surprise Factor)
-        const deepCuts: JioSaavnSong[] = [];
-        if (albumsRaw.length > 0) {
-            // Pick 2 random albums
-            const randomAlbums = albumsRaw.sort(() => 0.5 - Math.random()).slice(0, 2);
-            console.log(`[ArtistRadio] Digging deep into albums: ${randomAlbums.map((a: any) => a.name).join(', ')}`);
-
-            const promises = randomAlbums.map((a: any) => getAlbumDetails(a.id));
-            const results = await Promise.all(promises);
-            results.forEach(list => {
-                // Pick random 2 songs from each album to avoid spamming one album
-                if (list.length > 0) deepCuts.push(...list.sort(() => 0.5 - Math.random()).slice(0, 2));
+        // If results are sparse, fallback to generic "new albums" but strict filter later
+        if (results.length < 10) {
+            const fallbackQ = `${primaryLang} new albums`;
+            const fallbackResults = await searchAlbums(fallbackQ, 1, 50, primaryLang);
+            results = [...results, ...fallbackResults];
+            // Deduplicate by ID
+            const seen = new Set();
+            results = results.filter(item => {
+                const duplicate = seen.has(item.id);
+                seen.add(item.id);
+                return !duplicate;
             });
         }
-        console.log(`[ArtistRadio] Found ${deepCuts.length} deep cuts`);
 
-        // 3. Mixing Logic (The Golden Ratio)
-        // Target: 20 Songs -> 8 Top (40%), 8 Related (40%), 4 Deep (20%)
+        // Filtering: Must be strictly from currentYear or (currentYear - 1)
+        const filtered = results.filter(s => {
+            const albumYear = parseInt(s.year || "0");
+            const isFresh = albumYear >= (currentYear - 1); // Allow last year essentially (for early new year context)
 
-        const selectedTop = topSongs.slice(0, 8);
-        const selectedRelated = relatedSongs.sort(() => 0.5 - Math.random()).slice(0, 8);
-        const selectedDeep = deepCuts.sort(() => 0.5 - Math.random()).slice(0, 4);
+            if (primaryLang === 'english') return isFresh;
+            const l = (s.language || '').toLowerCase();
+            return l.includes(primaryLang) && isFresh;
+        });
 
-        // Combine
-        let station = [...selectedTop, ...selectedRelated, ...selectedDeep];
-
-        // Ensure we have at least something
-        if (station.length === 0) {
-            console.warn("[ArtistRadio] Station generation failed (no tracks), falling back to simple station");
-            return getStation(topSongs[0]?.id || "");
-        }
-
-        // Shuffle slightly but keep Top song first for instant gratification
-        const firstSong = selectedTop[0] || station[0];
-        const rest = station.filter(s => s.id !== firstSong.id).sort(() => 0.5 - Math.random());
-
-        return [firstSong, ...rest];
-
+        // Sort descending by Year -> then by ID (pseudo-random/time)
+        return filtered.sort((a, b) => parseInt(b.year) - parseInt(a.year));
     } catch (e) {
-        console.error("[ArtistRadio] Algorithm Failed:", e);
+        console.error("Error getting strict albums:", e);
         return [];
     }
 }
 
-// Helper for language normalization
-function normalizeLanguage(language: string | undefined): string {
-    if (language) return language.toLowerCase();
+export async function getStrictLaunchData(language?: string): Promise<LaunchData> {
+    try {
+        const lang = normalizeLanguage(language);
+        const primaryLang = lang.split(',')[0].trim().toLowerCase();
+        const displayLang = primaryLang.charAt(0).toUpperCase() + primaryLang.slice(1);
+        console.log('[getLaunchData] Fetching Ultimate Content for:', lang);
 
-    // Client-side fallback to storage
-    if (typeof window !== 'undefined') {
-        try {
-            // Try common keys used in Melora
-            const keys = ['melora-settings', 'settings', 'language', 'melora-language'];
+        // EXPANDED PARALLEL FETCHING
+        // We use Promise.all to execute refined searches for every section.
+        // This guarantees data presence and language relevance unlike the legacy launch API.
 
-            for (const key of keys) {
-                const stored = localStorage.getItem(key);
-                if (stored) {
-                    // Handle JSON settings object
-                    if (stored.trim().startsWith('{')) {
-                        try {
-                            const parsed = JSON.parse(stored);
-                            const langs = parsed.language || parsed.languages;
-                            if (Array.isArray(langs)) return langs.join(',').toLowerCase();
-                            if (typeof langs === 'string') return langs.toLowerCase();
-                        } catch (e) { /* Ignore parse error */ }
-                    } else {
-                        // Plain string value
-                        return stored.toLowerCase();
-                    }
-                }
-            }
-        } catch (e) { console.error("Error reading language settings", e); }
+        const [
+            // 1. Trending & Albums (Existing)
+            trending,
+            albums,
+            // 2. Moods (Existing)
+            moodLove, moodParty, moodWorkout, moodChill,
+            // 3. Retro (Existing)
+            retro,
+            // 4. Charts (Existing)
+            charts,
+            // 5. NEW: Quick Picks (Radio Proxy replaced with Songs)
+            quickPicks,
+            // 6. NEW: Language Playlists (Best of...)
+            langPlaylists
+        ] = await Promise.all([
+            getStrictLanguageTrending(lang),
+            getStrictLanguageAlbums(lang),
+            // Moods
+            searchPlaylists(`${primaryLang} Love Songs`, 1, 5, lang),
+            searchPlaylists(`${primaryLang} Party`, 1, 5, lang),
+            searchPlaylists(`${primaryLang} Workout`, 1, 5, lang),
+            searchPlaylists(`${primaryLang} Chill`, 1, 5, lang),
+            // Retro
+            searchSongs(`${primaryLang} 90s hits`, 1, 15, lang),
+            // Charts
+            searchPlaylists(`${primaryLang} Top 50`, 1, 10, lang),
+            // Quick Picks: Fetch songs for the "Quick Picks" section
+            searchSongs(`${primaryLang} songs`, 1, 16, lang),
+            // Language Playlists
+            searchPlaylists(`Best of ${primaryLang}`, 1, 10, lang)
+        ]);
+
+        return {
+            new_trending: trending,
+            new_albums: albums,
+            moods: {
+                love: moodLove,
+                party: moodParty,
+                workout: moodWorkout,
+                chill: moodChill,
+            },
+            retro: retro,
+            top_charts: charts,
+
+            // Search-based replacements for reliability
+            top_playlists: langPlaylists.length > 0 ? langPlaylists : [],
+            radio: [], // Deprecated in favor of quick_picks for now
+            quick_picks: quickPicks.length > 0 ? quickPicks : [],
+
+            // Legacy fallbacks (empty)
+            browse_discover: [],
+            charts: [],
+            artist_recos: []
+        };
+    } catch (e) {
+        console.error("Error fetching launch data", e);
+        return {
+            new_trending: [], top_playlists: [], new_albums: [], browse_discover: [], charts: [], radio: [], artist_recos: [], quick_picks: [],
+            moods: { love: [], party: [], workout: [], chill: [] }, retro: [], top_charts: []
+        };
     }
-    return 'english,hindi';
 }
 
-// Helper to standardize image handling (handles string vs array API ambiguity)
-function formatImage(image: any): { quality: string, link: string }[] {
-    const qualities = ['500x500', '150x150', '50x50'];
-    let baseImage = '';
+// --- HELPERS ---
 
+export function normalizeLanguage(lang?: string | string[]): string {
+    if (!lang) return 'english';
+    if (Array.isArray(lang)) return lang.map(l => l.toLowerCase()).join(',');
+    return lang.toLowerCase();
+}
+
+export function fixImageUrl(url: string, quality: string): string {
+    if (!url) return '';
+    if (url.includes('jioimages.cdn.jio.com')) return url; // Don't touch Jio cdn
+    // Generic replacement for saavncdn
+    return url.replace(/150x150|50x50|500x500/g, quality);
+}
+
+export function formatImage(image: any): { quality: string; link: string }[] {
+    if (!image) return [];
+
+    // Find a base URL (prefer highest quality if array)
+    let baseUrl = '';
     if (typeof image === 'string') {
-        baseImage = image;
-    } else if (Array.isArray(image) && image.length > 0) {
-        // Find highest quality or just take the last one (usually highest)
-        const highest = image.find((i: any) => i.quality === '500x500') || image[image.length - 1];
-        baseImage = highest?.link || '';
+        baseUrl = image;
+    } else if (Array.isArray(image)) {
+        // Try to find the best existing one to use as base
+        const best = image.find((i: any) => i.quality === '500x500') || image[0];
+        baseUrl = best?.link || best?.url || '';
     }
 
-    if (!baseImage) return [];
+    if (!baseUrl) return [];
 
-    return qualities.map(q => ({
-        quality: q,
-        link: baseImage.replace(/150x150|50x50|500x500/g, q)
-    }));
+    // Generate strict qualities
+    // This fixes "low quality" by forcing the URL pattern to match the requested size
+    return [
+        { quality: '500x500', link: fixImageUrl(baseUrl, '500x500') },
+        { quality: '150x150', link: fixImageUrl(baseUrl, '150x150') },
+        { quality: '50x50', link: fixImageUrl(baseUrl, '50x50') }
+    ];
 }
 
-// Helper to map API response to JioSaavnSong
-function mapToSong(item: any): JioSaavnSong {
-    const title = item.title || item.name || item.song || `[Unknown]`;
-    const encryptedUrl = item.more_info?.encrypted_media_url || item.encrypted_media_url || "";
-
+export function mapToSong(item: any): JioSaavnSong {
+    const title = item.title || item.name || item.song || '[Unknown]';
     return {
-        id: item.id,
-        name: title,
-        type: item.type || 'song', // Default to song as safeguard
+        id: item.id || item.song_id || item.pid || '',
+        name: decodeHtml(title),
+        type: item.type || 'song',
         album: {
-            id: item.more_info?.album_id || '',
-            name: item.more_info?.album || '',
-            url: item.more_info?.album_url || ''
+            id: item.albumid || item.album_id || '',
+            name: decodeHtml(item.album || item.album_name || ''),
+            url: item.album_url || ''
         },
-        year: item.year || item.more_info?.year || '',
-        releaseDate: item.more_info?.release_date || '',
-        duration: parseInt(item.more_info?.duration || item.duration || '0'),
-        label: item.more_info?.label || '',
-        primaryArtists: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.name).join(', ') || item.subtitle || '',
-        primaryArtistsId: item.more_info?.artistMap?.primary_artists?.map((a: any) => a.id).join(', ') || item.primary_artists_id || '',
-        featuredArtists: '',
-        explicitContent: item.explicit_content,
+        year: item.year || '',
+        releaseDate: item.release_date || '',
+        duration: parseInt(item.duration || '0'),
+        label: item.label || '',
+        primaryArtists: decodeHtml(item.primary_artists || item.more_info?.primary_artists || ''),
+        primaryArtistsId: item.primary_artists_id || '',
+        featuredArtists: decodeHtml(item.featured_artists || ''),
+        explicitContent: item.explicit_content || 0,
         playCount: parseInt(item.play_count || '0'),
-        language: item.language,
-        hasLyrics: item.more_info?.has_lyrics,
-        url: item.perma_url,
-        copyright: item.more_info?.copyright_text || '',
+        language: item.language || '',
+        hasLyrics: item.has_lyrics || 'false',
+        url: item.perma_url || '',
+        copyright: item.copyright_text || '',
         image: formatImage(item.image),
         downloadUrl: [],
-        encryptedMediaUrl: encryptedUrl
+        encryptedMediaUrl: item.encrypted_media_url || item.more_info?.encrypted_media_url || ''
     };
-}
-
-// Enhanced Lyrics Fetcher
-export async function getSyncedLyrics(song: JioSaavnSong): Promise<{ synced: boolean, text: string }> {
-    const trackName = song.name;
-    const artistName = song.primaryArtists;
-    const albumName = song.album?.name || "";
-    const duration = song.duration;
-
-    // CLEANING LOGIC (Inspired by SuvMusic/TheMusicApp)
-    const cleanString = (str: string) => {
-        return str
-            .replace(/\s*\(.*?\)\s*/g, " ")
-            .replace(/\s*\[.*?\]\s*/g, " ")
-            .replace(/\s*-\s*.*$/g, "")
-            .replace(/[^\w\s\u00C0-\u00FF'-]/g, "")
-            .replace(/\s+/g, " ")
-            .trim();
-    };
-
-    const cleanTrackName = cleanString(trackName);
-    const cleanArtistName = artistName.split(',')[0].trim();
-
-    console.log(`[Lyrics] Fetching for: "${cleanTrackName}" by "${cleanArtistName}"`);
-
-    // --- PARALLEL FETCHING STRATEGY ---
-    const searchTerms = [cleanTrackName];
-    // If original is different, try it as fallback (e.g. for Japanese/Complex titles)
-    if (cleanTrackName !== trackName) searchTerms.push(trackName);
-
-    // Define Fetchers (now accepting term argument cleanly)
-    const fetchLrcLib = async (term: string) => {
-        try {
-            const query = `track_name=${encodeURIComponent(term)}&artist_name=${encodeURIComponent(cleanArtistName)}&duration=${duration}`;
-            const res = await fetch(`https://lrclib.net/api/get?${query}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data.syncedLyrics) return { source: 'lrclib', type: 'synced', text: data.syncedLyrics };
-                if (data.plainLyrics) return { source: 'lrclib', type: 'plain', text: data.plainLyrics };
-            }
-            // Search Fallback
-            const searchRes = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(term + " " + cleanArtistName)}`);
-            if (searchRes.ok) {
-                const searchData = await searchRes.json();
-                if (Array.isArray(searchData) && searchData.length > 0) {
-                    const best = searchData.sort((a: any, b: any) => Math.abs(a.duration - duration) - Math.abs(b.duration - duration))[0];
-                    if (Math.abs(best.duration - duration) < 15) {
-                        if (best.syncedLyrics) return { source: 'lrclib', type: 'synced', text: best.syncedLyrics };
-                        if (best.plainLyrics) return { source: 'lrclib', type: 'plain', text: best.plainLyrics };
-                    }
-                }
-            }
-        } catch (e) { /* Quiet fail */ }
-        return null; // Return null if nothing useful found
-    };
-
-    const fetchMusixmatch = async (term: string) => {
-        try {
-            const mxRes = await musixmatch.getSyncedLyrics(term, cleanArtistName, duration);
-            if (mxRes) return { source: 'musixmatch', type: mxRes.synced ? 'synced' : 'plain', text: mxRes.text };
-        } catch (e) { /* Quiet fail */ }
-        return null;
-    };
-
-    // --- "RACE TO SYNCED" LOGIC ---
-    // We launch ALL requests at once. The moment ANY source returns SYNCED lyrics, we abort/return immediately.
-    // If no synced found after all finish, we return the best Plain lyrics.
-
-    const allPromises = searchTerms.flatMap(term => [
-        fetchLrcLib(term),
-        fetchMusixmatch(term)
-    ]);
-
-    let bestPlain: { synced: boolean, text: string } | null = null;
-
-    // We wrap promises to ensure they don't reject (already handled inside, but extra safety)
-    const safePromises = allPromises.map(p => p.catch(() => null));
-
-    // Custom Race Loop
-    const results = await Promise.all(safePromises);
-
-    // Prioritize Synced
-    for (const res of results) {
-        if (res?.type === 'synced') return { synced: true, text: res.text };
-        if (res?.type === 'plain' && !bestPlain) bestPlain = { synced: false, text: res.text };
-    }
-
-    if (bestPlain) return bestPlain;
-
-    // 4. Fallback: JioSaavn Native
-    try {
-        const nativeAmt = await getLyrics(song.id);
-        if (nativeAmt && nativeAmt.trim().length > 0) {
-            return { synced: false, text: nativeAmt };
-        }
-    } catch (e) {
-        // Quiet fail
-    }
-
-    return { synced: false, text: "" };
 }

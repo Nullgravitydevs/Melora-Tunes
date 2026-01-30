@@ -17,7 +17,7 @@ interface ArtistViewProps {
 }
 
 export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
-    const { addMix, loadMix, currentSong, isPlaying, togglePlay } = usePlayback();
+    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId } = usePlayback();
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -48,34 +48,51 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
         load();
     }, [artistName]);
 
+    // FIX 1: Stable artist mix ID to prevent memory leak
+    const ARTIST_MIX_ID = `artist-${artist?.id || artistName}`;
+
     // Play all
     const playAll = (shuffle = false) => {
         if (songs.length === 0) return;
         const list = shuffle ? [...songs].sort(() => Math.random() - 0.5) : songs;
-        const mixId = `artist-${Date.now()}`;
         const newMix: Mix = {
-            id: mixId,
+            id: ARTIST_MIX_ID,
             title: artistName,
             color: 'white',
             songs: list,
             currentSongIndex: 0
         };
-        addMix(newMix);
-        setTimeout(() => loadMix(mixId), 50);
+
+        const added = addMix(newMix);
+        if (!added) {
+            updateMix(ARTIST_MIX_ID, {
+                songs: list,
+                currentSongIndex: 0
+            });
+        }
+
+        loadMix(ARTIST_MIX_ID);
     };
 
     // Play single song
-    const playSong = (song: JioSaavnSong, index: number) => {
-        const mixId = `artist-${Date.now()}`;
+    const playSong = (index: number) => {
         const newMix: Mix = {
-            id: mixId,
+            id: ARTIST_MIX_ID,
             title: artistName,
             color: 'white',
             songs: songs,
             currentSongIndex: index
         };
-        addMix(newMix);
-        setTimeout(() => loadMix(mixId), 50);
+
+        const added = addMix(newMix);
+        if (!added) {
+            updateMix(ARTIST_MIX_ID, {
+                songs,
+                currentSongIndex: index
+            });
+        }
+
+        loadMix(ARTIST_MIX_ID);
     };
 
     const getArt = (song: JioSaavnSong) => {
@@ -169,18 +186,25 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
                 ) : (
                     <div className="space-y-1">
                         {songs.map((song, i) => (
+                            /* FIX 3: Smart toggle - same song = pause/play, different song = switch */
                             <motion.div
                                 key={song.id + i}
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ delay: i * 0.02 }}
-                                onClick={() => playSong(song, i)}
+                                onClick={() => {
+                                    if (currentSong?.id === song.id && activeMixId === ARTIST_MIX_ID) {
+                                        togglePlay();
+                                    } else {
+                                        playSong(i);
+                                    }
+                                }}
                                 className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.04] cursor-pointer group transition-all"
                             >
-                                {/* Number */}
+                                {/* Number - FIX 2: Check activeMixId for correct icon */}
                                 <span className="w-6 text-center text-sm text-white/30 group-hover:hidden">{i + 1}</span>
                                 <span className="w-6 text-center hidden group-hover:block">
-                                    {currentSong?.id === song.id && isPlaying ? (
+                                    {currentSong?.id === song.id && activeMixId === ARTIST_MIX_ID && isPlaying ? (
                                         <Pause size={14} className="text-white mx-auto" />
                                     ) : (
                                         <Play size={14} className="text-white mx-auto" fill="currentColor" />

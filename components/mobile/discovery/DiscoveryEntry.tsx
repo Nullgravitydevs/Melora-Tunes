@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { usePlayback } from "@/components/providers/playback-context";
-import { Home, Search, Library, Settings, Disc, Play, Heart, MoreHorizontal, ChevronRight, X, Plus } from "lucide-react";
+import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { Home, Search, Library, Settings, Disc, Play, Heart, MoreHorizontal, ChevronRight, X, Plus, TrendingUp, Sparkles } from "lucide-react";
 import { searchUnified } from "@/lib/unified-search";
+import { getTrending, getNewReleases, getTopCharts, JioSaavnSong } from "@/lib/jiosaavn";
+import { loadSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
 import { CDRow } from "@/components/shared/CDRow";
 
@@ -92,40 +94,152 @@ function NavIcon({ icon, label, active, onClick }: any) {
 // --- SUB-SCREENS ---
 
 function HomeTab() {
+    const [trending, setTrending] = useState<JioSaavnSong[]>([]);
+    const [newReleases, setNewReleases] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [greeting, setGreeting] = useState('');
+    const { addMix, loadMix, playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
+
+    // Greeting based on time
+    useEffect(() => {
+        const hour = new Date().getHours();
+        if (hour < 12) setGreeting('Good Morning');
+        else if (hour < 18) setGreeting('Good Afternoon');
+        else setGreeting('Good Evening');
+    }, []);
+
+    // Fetch data with language preference
+    useEffect(() => {
+        const load = async () => {
+            setIsLoading(true);
+            try {
+                const settings = loadSettings();
+                const langs = settings.languages || ['english', 'hindi'];
+                const langString = langs.join(',');
+
+                const [t, n] = await Promise.all([
+                    getTrending(langString).catch(() => []),
+                    getNewReleases(8, langString).catch(() => [])
+                ]);
+                setTrending(t.slice(0, 10));
+                setNewReleases(n.slice(0, 6));
+            } catch (e) {
+                console.error('Home load failed:', e);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        load();
+    }, []);
+
+    // Get art helper
+    const getArt = (item: any): string => {
+        if (!item?.image) return '';
+        if (typeof item.image === 'string') return item.image;
+        if (Array.isArray(item.image)) {
+            return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
+        }
+        return '';
+    };
+
+    // Play song
+    const playSong = (song: JioSaavnSong) => {
+        playInstantMix({
+            id: `quick-${Date.now()}`,
+            title: 'Quick Play',
+            color: 'blue',
+            songs: [song],
+            currentSongIndex: 0
+        });
+    };
+
+    const heroSong = trending[0];
+
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-5 pt-12">
             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 mb-6">
-                Good Afternoon
+                {greeting}
             </h1>
 
-            {/* HERO CARD */}
-            <div className="w-full aspect-[16/9] bg-gradient-to-br from-indigo-900 via-purple-900 to-black rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden relative mb-8 group">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40 mix-blend-overlay" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                <div className="absolute bottom-5 left-5 right-5">
-                    <span className="px-2 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-bold uppercase tracking-widest text-white mb-2 inline-block">
-                        Featured Mix
-                    </span>
-                    <h3 className="text-2xl font-bold text-white leading-tight">Late Night <br />Vibes</h3>
-                </div>
-                <button className="absolute bottom-5 right-5 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform text-black">
-                    <Play size={20} fill="black" className="ml-0.5" />
-                </button>
-            </div>
-
-            {/* SECTION */}
-            <h2 className="text-lg font-bold text-white/90 mb-4 px-1">Jump Back In</h2>
-            <div className="grid grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="aspect-square bg-neutral-900/50 border border-white/5 rounded-2xl overflow-hidden active:scale-95 transition-transform">
-                        <div className="w-full h-2/3 bg-neutral-800" />
-                        <div className="p-3">
-                            <div className="h-2 w-16 bg-white/20 rounded mb-2" />
-                            <div className="h-2 w-8 bg-white/10 rounded" />
-                        </div>
+            {/* HERO CARD - Trending Song */}
+            {heroSong && (
+                <div
+                    className="w-full aspect-[16/9] rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden relative mb-8 group"
+                    style={{ background: `linear-gradient(to bottom right, rgba(79, 70, 229, 0.3), rgba(139, 92, 246, 0.3), rgba(0, 0, 0, 0.8))` }}
+                >
+                    {getArt(heroSong) && <div className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay" style={{ backgroundImage: `url(${getArt(heroSong)})` }} />}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <div className="absolute bottom-5 left-5 right-5">
+                        <span className="px-2 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-bold uppercase tracking-widest text-white mb-2 inline-block">
+                            Trending Now
+                        </span>
+                        <h3 className="text-xl font-bold text-white leading-tight truncate">{decodeHtml(heroSong.name)}</h3>
+                        <p className="text-xs text-white/60 truncate">{decodeHtml(heroSong.primaryArtists)}</p>
                     </div>
-                ))}
-            </div>
+                    <button
+                        onClick={() => playSong(heroSong)}
+                        className="absolute bottom-5 right-5 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform text-black"
+                    >
+                        <Play size={20} fill="black" className="ml-0.5" />
+                    </button>
+                </div>
+            )}
+
+            {/* TRENDING SONGS */}
+            {!isLoading && trending.length > 1 && (
+                <>
+                    <h2 className="text-lg font-bold text-white/90 mb-4 px-1 flex items-center gap-2">
+                        <TrendingUp size={16} className="text-white/50" /> Trending Songs
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3 mb-8">
+                        {trending.slice(1, 5).map((song, i) => (
+                            <div
+                                key={song.id + i}
+                                onClick={() => playSong(song)}
+                                className="aspect-square bg-neutral-900/50 border border-white/5 rounded-2xl overflow-hidden active:scale-95 transition-transform cursor-pointer"
+                            >
+                                {getArt(song) ? (
+                                    <img src={getArt(song)} className="w-full h-2/3 object-cover" alt="" />
+                                ) : (
+                                    <div className="w-full h-2/3 bg-neutral-800" />
+                                )}
+                                <div className="p-3">
+                                    <p className="text-sm font-medium text-white truncate">{decodeHtml(song.name)}</p>
+                                    <p className="text-xs text-white/40 truncate">{decodeHtml(song.primaryArtists)}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {/* NEW RELEASES */}
+            {!isLoading && newReleases.length > 0 && (
+                <>
+                    <h2 className="text-lg font-bold text-white/90 mb-4 px-1 flex items-center gap-2">
+                        <Sparkles size={16} className="text-white/50" /> New Releases
+                    </h2>
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4">
+                        {newReleases.map((album, i) => (
+                            <div key={album.id + i} className="flex-shrink-0 w-32">
+                                <div className="w-32 h-32 rounded-xl overflow-hidden mb-2 bg-neutral-800">
+                                    {getArt(album) && <img src={getArt(album)} className="w-full h-full object-cover" alt="" />}
+                                </div>
+                                <p className="text-xs font-medium text-white truncate">{decodeHtml(album.name || album.title)}</p>
+                                <p className="text-[10px] text-white/40 truncate">{album.primaryArtists || 'Album'}</p>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {/* LOADING STATE */}
+            {isLoading && (
+                <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                    <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mb-4" />
+                    <span className="text-xs uppercase tracking-widest">Loading...</span>
+                </div>
+            )}
         </motion.div>
     );
 }

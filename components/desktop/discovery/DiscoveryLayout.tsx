@@ -2,16 +2,20 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Repeat, Shuffle, Maximize2, ListMusic, Disc3 } from "lucide-react";
+import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
 import { ArtistView } from "./views/ArtistView";
 import { AlbumView } from "./views/AlbumView";
+import { CategoryHubView } from "./views/CategoryHubView";
+import { PlaylistView } from "./views/PlaylistView";
 import { FullPlayer } from "./views/FullPlayer";
 import { LibraryView } from "./views/LibraryView";
 import { ExploreView } from "./views/ExploreView";
 import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
+import { SectionView } from "./views/SectionView";
+import { PeelRevealView } from "./views/PeelRevealView";
 
 
 /* ============================================================================
@@ -19,10 +23,10 @@ import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
    Monochrome Elegance
    ============================================================================ */
 
-type ViewId = 'home' | 'search' | 'library' | 'explore' | 'artist' | 'album' | 'playlist' | 'settings';
+type ViewId = 'home' | 'search' | 'library' | 'explore' | 'radio' | 'artist' | 'album' | 'playlist' | 'settings' | 'trending' | 'albums' | 'charts' | 'retro' | 'editors_picks';
 
 interface ViewState {
-    id: ViewId;
+    id: ViewId | string;
     data?: any;
 }
 
@@ -215,7 +219,9 @@ export function DiscoveryLayout() {
     const [currentView, setCurrentView] = useState<ViewState>({ id: 'home' });
     const [mounted, setMounted] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const { mixes, currentSong, isPlaying, likedSongs, recentlyPlayed } = usePlayback();
+    const [showFullPlayer, setShowFullPlayer] = useState(false);
+    const { mixes, currentSong, isPlaying, likedSongs, recentlyPlayed, loadMix, playInstantMix } = usePlayback();
+
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -230,6 +236,20 @@ export function DiscoveryLayout() {
 
     if (!mounted) return <div className="fixed inset-0 bg-black" />;
 
+    const handlePlaySong = (song: any) => {
+        // Wrap single song into a play context
+        // If the song is already in the current mix, maybe just play it?
+        // For Discovery mode simplicity, we treat single clicks as "Play this song now"
+        // We'll create a mini-mix for it.
+        playInstantMix({
+            id: `quick-play-${song.id}`,
+            title: song.name,
+            color: 'blue',
+            songs: [song], // Ideally we'd pass the surrounding list if we had it, but HomeView doesn't pass context yet
+            currentSongIndex: 0
+        });
+    };
+
     return (
         <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
             <style>{MONO_STYLES}</style>
@@ -241,6 +261,12 @@ export function DiscoveryLayout() {
                 onClose={() => setShowSettings(false)}
                 currentLayout="discovery"
             />
+
+            {/* FULL PLAYER */}
+            <AnimatePresence>
+                {showFullPlayer && <FullPlayer isOpen={showFullPlayer} onClose={() => setShowFullPlayer(false)} />}
+            </AnimatePresence>
+
 
             {/* Album BG - Grayscale */}
             {getAlbumArt() && <div className="album-blur" style={{ backgroundImage: `url(${getAlbumArt()})` }} />}
@@ -266,8 +292,9 @@ export function DiscoveryLayout() {
                     <nav className="px-2.5 space-y-0.5">
                         <NavItem icon={<Home size={18} />} label="Home" active={currentView.id === 'home'} onClick={() => setCurrentView({ id: 'home' })} />
                         <NavItem icon={<Search size={18} />} label="Search" active={currentView.id === 'search'} onClick={() => setCurrentView({ id: 'search' })} />
-                        <NavItem icon={<Library size={18} />} label="Your Library" active={currentView.id === 'library'} onClick={() => setCurrentView({ id: 'library' })} />
                         <NavItem icon={<Compass size={18} />} label="Explore" active={currentView.id === 'explore'} onClick={() => setCurrentView({ id: 'explore' })} />
+                        <NavItem icon={<Radio size={18} />} label="Radio" active={currentView.id === 'radio'} onClick={() => setCurrentView({ id: 'radio' })} />
+                        <NavItem icon={<Library size={18} />} label="Your Library" active={currentView.id === 'library'} onClick={() => setCurrentView({ id: 'library' })} />
                     </nav>
 
                     {/* Settings at bottom */}
@@ -306,7 +333,23 @@ export function DiscoveryLayout() {
                                 <Plus size={12} strokeWidth={2.5} />
                             </motion.button>
                         </div>
-                        {mixes.length > 0 ? mixes.map((m, i) => <PlaylistItem key={m.id} mix={m} index={i} />) : <EmptyState />}
+                        {mixes
+                            .filter(m =>
+                                !m.id.startsWith('quick-') &&
+                                !m.id.startsWith('search-') &&
+                                !m.id.startsWith('album-') &&
+                                !m.id.startsWith('artist-')
+                            )
+                            .length > 0 ? (
+                            mixes
+                                .filter(m =>
+                                    !m.id.startsWith('quick-') &&
+                                    !m.id.startsWith('search-') &&
+                                    !m.id.startsWith('album-') &&
+                                    !m.id.startsWith('artist-')
+                                )
+                                .map((m, i) => <PlaylistItem key={m.id} mix={m} index={i} onClick={() => { setCurrentView({ id: 'library', data: { tab: 'playlists', playlistId: m.id } }); loadMix(m.id); }} />)
+                        ) : <EmptyState />}
                     </div>
 
 
@@ -324,7 +367,12 @@ export function DiscoveryLayout() {
                             className="min-h-full"
                         >
                             {currentView.id === 'home' && (
-                                <HomeView onNavigate={(view) => setCurrentView(view as ViewState)} />
+                                <HomeView
+                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onPlaySong={handlePlaySong}
+                                    currentSongId={currentSong?.id}
+                                    isPlaying={isPlaying}
+                                />
                             )}
 
                             {currentView.id === 'search' && (
@@ -347,6 +395,23 @@ export function DiscoveryLayout() {
                                 />
                             )}
 
+                            {currentView.id === 'playlist' && currentView.data && (
+                                <PlaylistView
+                                    playlist={currentView.data}
+                                    onBack={() => setCurrentView({ id: 'home' })}
+                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                />
+                            )}
+
+                            {/* PEEL TO OPEN ALBUM */}
+                            {currentView.id === 'peel-reveal' && currentView.data && (
+                                <PeelRevealView
+                                    album={currentView.data}
+                                    onBack={() => setCurrentView({ id: 'home' })}
+                                    onPlay={handlePlaySong}
+                                />
+                            )}
+
                             {currentView.id === 'library' && (
                                 <LibraryView
                                     onNavigate={(view) => setCurrentView(view as ViewState)}
@@ -357,13 +422,36 @@ export function DiscoveryLayout() {
                             {currentView.id === 'explore' && (
                                 <ExploreView onNavigate={(view) => setCurrentView(view as ViewState)} />
                             )}
+
+                            {/* Render ExploreView for Radio temporarily until specific RadioView is built */}
+                            {currentView.id === 'radio' && (
+                                <ExploreView onNavigate={(view) => setCurrentView(view as ViewState)} initialMode="radio" />
+                            )}
+
+                            {currentView.id === 'category-hub' && currentView.data && (
+                                <CategoryHubView
+                                    data={currentView.data}
+                                    onBack={() => setCurrentView({ id: 'explore' })}
+                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                />
+                            )}
+
+                            {(['trending', 'albums', 'charts', 'retro', 'editors_picks'].includes(String(currentView.id)) || String(currentView.id).startsWith('mood-')) && (
+                                <SectionView
+                                    sectionId={String(currentView.id)}
+                                    sectionTitle={currentView.data?.title}
+                                    initialData={currentView.data?.items}
+                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onBack={() => setCurrentView({ id: 'home' })}
+                                />
+                            )}
                         </motion.div>
                     </AnimatePresence>
                 </main>
             </div>
 
             {/* PLAYER */}
-            <PlayerBar />
+            <PlayerBar onExpand={() => setShowFullPlayer(true)} />
         </div>
     );
 }
@@ -396,9 +484,10 @@ function QuickLink({ icon, label, count, onClick }: { icon: React.ReactNode; lab
     );
 }
 
-function PlaylistItem({ mix, index }: { mix: Mix; index: number }) {
+function PlaylistItem({ mix, index, onClick }: { mix: Mix; index: number; onClick: () => void }) {
     return (
         <motion.button
+            onClick={onClick}
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.02 }}
@@ -428,8 +517,39 @@ function EmptyState() {
 
 /* === PLAYER === */
 
-function PlayerBar() {
-    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume } = usePlayback();
+function PlayerBar({ onExpand }: { onExpand: () => void }) {
+    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality } = usePlayback();
+
+    /* UPGRADE 3: Keyboard Shortcuts */
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in input
+            if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+
+            switch (e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'ArrowRight':
+                    if (e.metaKey || e.ctrlKey) {
+                        e.preventDefault();
+                        next();
+                    }
+                    break;
+                case 'ArrowLeft':
+                    if (e.metaKey || e.ctrlKey) {
+                        e.preventDefault();
+                        prev();
+                    }
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [togglePlay, next, prev]);
+
 
     const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
@@ -440,21 +560,30 @@ function PlayerBar() {
         return '';
     };
 
-    // Get quality badge
+    // Get quality badge - use activeQuality from playback (source of truth)
     const getQuality = () => {
-        if (!currentSong) return null;
-        const q = (currentSong as any).quality || (currentSong as any).downloadUrl?.[0]?.quality;
-        if (!q) return null;
-        if (q.includes('320') || q === '320kbps') return { label: '320', color: 'bg-white/10' };
-        if (q.includes('160') || q === '160kbps') return { label: '160', color: 'bg-white/10' };
-        if (q.includes('lossless') || q.includes('flac')) return { label: 'FLAC', color: 'bg-white/15' };
-        return { label: 'HQ', color: 'bg-white/10' };
+        if (!activeQuality) return null;
+        return {
+            label: activeQuality.toUpperCase(),
+            color: activeQuality === 'flac' || activeQuality === 'hires'
+                ? 'bg-white/15'
+                : 'bg-white/10'
+        };
     };
 
+    // FIX 1: Seek expects seconds, not ratio
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const r = e.currentTarget.getBoundingClientRect();
-        seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
+        const ratio = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+        seek(ratio * duration); // Convert to seconds
     };
+
+    const handleVolume = (e: React.MouseEvent<HTMLDivElement>) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
+    };
+
+
 
     // Hide completely when no song
     if (!currentSong) return null;
@@ -502,8 +631,12 @@ function PlayerBar() {
                 </div>
 
                 {/* Like Button */}
-                <motion.button className="ctrl p-2 text-white/30 hover:text-pink-400" whileTap={{ scale: 0.85 }}>
-                    <Heart size={16} />
+                <motion.button
+                    onClick={() => currentSong && toggleLike(currentSong)}
+                    className={`ctrl p-2 hover:text-pink-400 ${currentSong && isLiked(currentSong.id) ? 'text-pink-500' : 'text-white/30'}`}
+                    whileTap={{ scale: 0.85 }}
+                >
+                    <Heart size={16} fill={currentSong && isLiked(currentSong.id) ? "currentColor" : "none"} />
                 </motion.button>
 
                 {/* Controls */}
@@ -527,23 +660,32 @@ function PlayerBar() {
 
                 {/* Progress */}
                 <div className="flex items-center gap-2 w-36">
-                    <span className="text-[10px] text-white/30 tabular-nums">{fmt(progress * duration)}</span>
+                    {/* UPGRADE 1: Safer Progress Display (Handles both ratio 0-1 and absolute seconds) */}
+                    <span className="text-[10px] text-white/30 tabular-nums">{fmt(progress <= 1 ? progress * duration : progress)}</span>
                     <div className="progress-track flex-1 h-1" onClick={handleSeek}>
-                        <div className="progress-fill h-full" style={{ width: `${progress * 100}%` }} />
+                        <div
+                            className="progress-fill h-full"
+                            style={{ width: `${(progress <= 1 ? progress : progress / duration) * 100}%` }}
+                        />
                     </div>
                     <span className="text-[10px] text-white/30 tabular-nums">{fmt(duration)}</span>
                 </div>
 
                 {/* Volume */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 group">
                     <Volume2 size={14} className="text-white/30" />
-                    <div className="w-14 h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer">
-                        <div className="h-full bg-white/60 rounded-full" style={{ width: `${volume * 100}%` }} />
+                    <div
+                        className="w-14 h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer py-2 -my-2 flex items-center"
+                        onClick={handleVolume}
+                    >
+                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden pointer-events-none">
+                            <div className="h-full bg-white/60 rounded-full" style={{ width: `${volume * 100}%` }} />
+                        </div>
                     </div>
                 </div>
 
                 {/* Expand */}
-                <motion.button className="ctrl p-2 text-white/30" whileTap={{ scale: 0.85 }}>
+                <motion.button onClick={onExpand} className="ctrl p-2 text-white/30" whileTap={{ scale: 0.85 }}>
                     <Maximize2 size={14} />
                 </motion.button>
             </motion.div>

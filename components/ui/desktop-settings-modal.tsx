@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
+import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
 import { loadSettings, saveSettings } from "@/lib/settings";
 
@@ -19,12 +20,25 @@ type SettingsTab = 'experience' | 'audio' | 'library' | 'stats' | 'support' | 'a
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const {
         qualityPreference, setQualityPreference,
-        mixes, setMixes
+        mixes, setMixes, eq, sleepTimer, setSleepTimer
     } = usePlayback();
 
     // Local State for Performance (Detached from Context)
     const [activeTab, setActiveTab] = useState<SettingsTab>('experience');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [languages, setLanguages] = useState<string[]>([]);
+
+    // Load settings once on mount
+    useEffect(() => {
+        const s = loadSettings();
+        setLanguages(s.languages || ['english', 'hindi']);
+    }, []);
+
+    const updateLanguages = (newLangs: string[]) => {
+        setLanguages(newLangs);
+        // saveSettings already dispatches 'melora-settings-changed' event
+        saveSettings({ languages: newLangs });
+    };
 
     if (!isOpen) return null;
 
@@ -158,8 +172,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         </h3>
                                         <div className="flex flex-wrap gap-2">
                                             {['English', 'Hindi', 'Telugu', 'Tamil', 'Punjabi', 'Marathi', 'Gujarati', 'Bengali', 'Kannada', 'Malayalam', 'Bhojpuri'].map(lang => {
-                                                const currentLangs = loadSettings().languages || ['english', 'hindi'];
-                                                const isActive = currentLangs.includes(lang.toLowerCase());
+                                                const isActive = languages.includes(lang.toLowerCase());
                                                 return (
                                                     <button
                                                         key={lang}
@@ -167,14 +180,12 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                             const lower = lang.toLowerCase();
                                                             let newLangs;
                                                             if (isActive) {
-                                                                newLangs = currentLangs.filter(l => l !== lower);
+                                                                newLangs = languages.filter(l => l !== lower);
                                                                 if (newLangs.length === 0) newLangs = ['english']; // Prevent empty
                                                             } else {
-                                                                newLangs = [...currentLangs, lower];
+                                                                newLangs = [...languages, lower];
                                                             }
-                                                            saveSettings({ languages: newLangs });
-                                                            // Force Reload to apply changes immediately (simplest fix for now)
-                                                            window.location.reload();
+                                                            updateLanguages(newLangs);
                                                         }}
                                                         className={`px-4 py-2 rounded-full font-bold text-sm border transition-all ${isActive
                                                             ? 'bg-white text-black border-white'
@@ -215,6 +226,105 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                 </button>
                                             ))}
                                         </div>
+                                    </section>
+
+                                    {/* Equalizer */}
+                                    <section>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-white font-bold flex items-center gap-2">
+                                                <Layout size={18} /> Equalizer
+                                            </h3>
+                                            <div className="flex items-center gap-3">
+                                                <select
+                                                    value={eq.currentPreset}
+                                                    onChange={(e) => eq.setPreset(e.target.value)}
+                                                    className="bg-white/10 text-white text-xs rounded-lg px-2 py-1 outline-none"
+                                                    disabled={!eq.isEnabled}
+                                                >
+                                                    {eq.presets.map(p => (
+                                                        <option key={p} value={p} className="bg-zinc-900">{p}</option>
+                                                    ))}
+                                                    <option value="Custom" className="bg-zinc-900">Custom</option>
+                                                </select>
+                                                <button
+                                                    onClick={() => eq.setIsEnabled(!eq.isEnabled)}
+                                                    className={`w-10 h-5 rounded-full transition-colors relative ${eq.isEnabled ? 'bg-green-500' : 'bg-white/10'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${eq.isEnabled ? 'left-6' : 'left-1'}`} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className={`bg-black/40 rounded-xl p-4 border border-white/5 overflow-x-auto transition-opacity ${eq.isEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                                            <div className="flex items-end justify-between gap-2 h-32 min-w-[300px]">
+                                                {FREQUENCIES.map((freq, i) => (
+                                                    <div key={freq} className="flex flex-col items-center gap-2 flex-1 group">
+                                                        <div className="relative h-24 w-1.5 bg-white/10 rounded-full">
+                                                            <div
+                                                                className="absolute bottom-0 w-full bg-white/40 rounded-full"
+                                                                style={{ height: `${((eq.bands[i] + 12) / 24) * 100}%` }}
+                                                            />
+                                                            <input
+                                                                type="range"
+                                                                min="-12"
+                                                                max="12"
+                                                                step="0.5"
+                                                                value={eq.bands[i]}
+                                                                onChange={(e) => eq.setBand(i, parseFloat(e.target.value))}
+                                                                className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-24 -rotate-90 opacity-0 cursor-pointer"
+                                                                tabIndex={0}
+                                                                aria-label={`${freq} Hz`}
+                                                            />
+                                                            <div
+                                                                className="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-lg pointer-events-none transition-all group-hover:scale-125"
+                                                                style={{ bottom: `${((eq.bands[i] + 12) / 24) * 100}%`, transform: 'translate(-50%, 50%)' }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-[9px] text-white/40 font-mono">
+                                                            {freq >= 1000 ? `${freq / 1000}k` : freq}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    {/* Sleep Timer */}
+                                    <section>
+                                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                                            <Moon size={18} /> Sleep Timer
+                                        </h3>
+                                        {sleepTimer ? (
+                                            <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-xl flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-indigo-400 font-bold mb-1">Timer Active</div>
+                                                    <div className="text-sm text-white/60">
+                                                        Stops in {Math.ceil((sleepTimer.endTime - Date.now()) / 60000)} minutes
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => setSleepTimer(null)}
+                                                    className="px-4 py-2 bg-indigo-500 text-white rounded-lg font-bold text-sm"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {[5, 15, 30, 60].map(mins => (
+                                                    <button
+                                                        key={mins}
+                                                        onClick={() => setSleepTimer({
+                                                            duration: mins * 60 * 1000,
+                                                            endTime: Date.now() + (mins * 60 * 1000)
+                                                        })}
+                                                        className="py-3 bg-zinc-900 border border-zinc-800 rounded-lg text-sm font-bold text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 transition-colors"
+                                                    >
+                                                        {mins}m
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </section>
 
 
@@ -271,7 +381,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                                 const importedMixes = JSON.parse(event.target?.result as string);
                                                                 if (Array.isArray(importedMixes)) {
                                                                     setMixes(importedMixes);
-                                                                    window.location.reload();
+                                                                    window.dispatchEvent(new CustomEvent('melora-library-updated'));
                                                                 }
                                                             } catch (err) { console.error(err); }
                                                         };

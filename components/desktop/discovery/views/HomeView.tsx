@@ -1,548 +1,359 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { Play, ChevronRight, Clock, Disc3, Music, TrendingUp, Sparkles, Timer } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
-import { getTrending, getNewReleases, getTopCharts, JioSaavnSong } from "@/lib/jiosaavn";
-
-/* ============================================================================
-   HOME VIEW - Premium Discovery Home
-   ============================================================================ */
+import React, { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Play, Sparkles, TrendingUp, Music, Heart, Zap, Coffee, Activity, Calendar } from "lucide-react";
+import { getStrictLaunchData, LaunchData, JioSaavnSong, searchPlaylists } from "@/lib/jiosaavn";
+import { decodeHtml } from "@/lib/utils";
+import { StandardCard, FeatureCard, HorizontalScroll, SectionHeader, RadioCard, CompactCard, QuickPickItem, MoodCard, VibeAlbumCard } from "../home/HomeComponents";
 
 interface HomeViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
-}
-
-export function HomeView({ onNavigate }: HomeViewProps) {
-    const { recentlyPlayed, mixes, loadMix, addMix, play, currentSong, isPlaying, togglePlay } = usePlayback();
-
-    const [trending, setTrending] = useState<JioSaavnSong[]>([]);
-    const [newReleases, setNewReleases] = useState<any[]>([]);
-    const [charts, setCharts] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [greeting, setGreeting] = useState('');
-
-    // Greeting based on time
-    useEffect(() => {
-        const hour = new Date().getHours();
-        if (hour < 12) setGreeting('Good morning');
-        else if (hour < 18) setGreeting('Good afternoon');
-        else setGreeting('Good evening');
-    }, []);
-
-    // Fetch data
-    useEffect(() => {
-        const load = async () => {
-            setIsLoading(true);
-            try {
-                const [t, n, c] = await Promise.all([
-                    getTrending().catch(() => []),
-                    getNewReleases(12).catch(() => []),
-                    getTopCharts().catch(() => [])
-                ]);
-                setTrending(t.slice(0, 10));
-                setNewReleases(n.slice(0, 8));
-                setCharts(Array.isArray(c) ? c.slice(0, 6) : []);
-            } catch (e) {
-                console.error('Home load failed:', e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        load();
-    }, []);
-
-    // Get art helper
-    const getArt = (item: any): string => {
-        if (!item?.image) return '';
-        if (typeof item.image === 'string') return item.image;
-        if (Array.isArray(item.image)) {
-            return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
-        }
-        return '';
-    };
-
-    // Play song
-    const playSong = (song: JioSaavnSong) => {
-        const mixId = `quick-${Date.now()}`;
-        const newMix: Mix = {
-            id: mixId,
-            title: 'Quick Play',
-            color: 'white',
-            songs: [song],
-            currentSongIndex: 0
-        };
-        addMix(newMix);
-        setTimeout(() => loadMix(mixId), 50);
-    };
-
-    // Hero song (first trending or recent)
-    const heroSong = trending[0] || recentlyPlayed[0];
-
-    return (
-        <div className="min-h-full">
-            {/* Hero Section */}
-            {heroSong && (
-                <HeroSection
-                    song={heroSong}
-                    greeting={greeting}
-                    onPlay={() => playSong(heroSong)}
-                    isPlaying={isPlaying && currentSong?.id === heroSong.id}
-                    onToggle={togglePlay}
-                />
-            )}
-
-            <div className="px-8 pb-32 space-y-10">
-                {/* Recently Played */}
-                {recentlyPlayed.length > 0 && (
-                    <Section
-                        title="Recently Played"
-                        icon={<Clock size={18} />}
-                        onSeeAll={() => { }}
-                    >
-                        <div className="grid grid-cols-3 gap-3">
-                            {recentlyPlayed.slice(0, 6).map((song, i) => (
-                                <RecentCard
-                                    key={song.id + i}
-                                    song={song}
-                                    onClick={() => playSong(song)}
-                                    isPlaying={isPlaying && currentSong?.id === song.id}
-                                />
-                            ))}
-                        </div>
-                    </Section>
-                )}
-
-                {/* Quick Picks - Compact Grid */}
-                {mixes.length > 0 && (
-                    <Section title="Your Tapes" icon={<Disc3 size={18} />}>
-                        <div className="grid grid-cols-2 gap-3">
-                            {mixes.slice(0, 4).map((mix, i) => (
-                                <TapeCard
-                                    key={mix.id}
-                                    mix={mix}
-                                    index={i}
-                                    onClick={() => loadMix(mix.id)}
-                                />
-                            ))}
-                        </div>
-                    </Section>
-                )}
-
-                {/* Trending */}
-                {!isLoading && trending.length > 0 && (
-                    <Section
-                        title="Trending Now"
-                        icon={<TrendingUp size={18} />}
-                        onSeeAll={() => { }}
-                    >
-                        <ScrollRow>
-                            {trending.map((song, i) => (
-                                <SongCard
-                                    key={song.id + i}
-                                    song={song}
-                                    index={i}
-                                    onClick={() => playSong(song)}
-                                    isPlaying={isPlaying && currentSong?.id === song.id}
-                                />
-                            ))}
-                        </ScrollRow>
-                    </Section>
-                )}
-
-                {/* New Releases */}
-                {!isLoading && newReleases.length > 0 && (
-                    <Section
-                        title="New Releases"
-                        icon={<Sparkles size={18} />}
-                        onSeeAll={() => { }}
-                    >
-                        <ScrollRow>
-                            {newReleases.map((album, i) => (
-                                <AlbumCard
-                                    key={album.id + i}
-                                    album={album}
-                                    index={i}
-                                    onClick={() => onNavigate({ id: 'album', data: album })}
-                                />
-                            ))}
-                        </ScrollRow>
-                    </Section>
-                )}
-
-                {/* Charts */}
-                {!isLoading && charts.length > 0 && (
-                    <Section
-                        title="Top Charts"
-                        icon={<TrendingUp size={18} />}
-                    >
-                        <ScrollRow>
-                            {charts.map((chart, i) => (
-                                <ChartCard
-                                    key={chart.id + i}
-                                    chart={chart}
-                                    index={i}
-                                    onClick={() => onNavigate({ id: 'playlist', data: chart })}
-                                />
-                            ))}
-                        </ScrollRow>
-                    </Section>
-                )}
-
-                {/* Loading State */}
-                {isLoading && (
-                    <div className="space-y-10">
-                        <SkeletonSection />
-                        <SkeletonSection />
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-/* ============================================================================
-   HERO SECTION
-   ============================================================================ */
-
-function HeroSection({ song, greeting, onPlay, isPlaying, onToggle }: {
-    song: JioSaavnSong;
-    greeting: string;
-    onPlay: () => void;
+    onPlaySong: (song: JioSaavnSong) => void;
+    currentSongId?: string;
     isPlaying: boolean;
-    onToggle: () => void;
-}) {
-    const getArt = () => {
-        if (!song?.image) return '';
-        if (typeof song.image === 'string') return song.image;
-        if (Array.isArray(song.image)) {
-            return song.image.find((i: any) => i.quality === '500x500')?.link || song.image[0]?.link || '';
-        }
-        return '';
-    };
-
-    return (
-        <div className="relative h-[320px] overflow-hidden">
-            {/* Background Blur */}
-            <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{
-                    backgroundImage: `url(${getArt()})`,
-                    filter: 'blur(80px) brightness(0.2) saturate(0)',
-                    transform: 'scale(1.5)'
-                }}
-            />
-
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-transparent" />
-
-            {/* Content */}
-            <div className="relative h-full flex items-end p-8 pb-10">
-                <div className="flex items-end gap-8 max-w-4xl">
-                    {/* Album Art */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5 }}
-                        className="relative group"
-                    >
-                        <img
-                            src={getArt()}
-                            alt=""
-                            className="w-44 h-44 rounded-xl object-cover shadow-2xl"
-                        />
-                        <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                            <motion.button
-                                onClick={isPlaying ? onToggle : onPlay}
-                                className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xl"
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.95 }}
-                            >
-                                {isPlaying ? (
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <rect x="6" y="4" width="4" height="16" rx="1" />
-                                        <rect x="14" y="4" width="4" height="16" rx="1" />
-                                    </svg>
-                                ) : (
-                                    <Play size={22} fill="currentColor" className="ml-1" />
-                                )}
-                            </motion.button>
-                        </div>
-                    </motion.div>
-
-                    {/* Info */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.1 }}
-                        className="flex-1 pb-2"
-                    >
-                        <p className="text-white/40 text-sm mb-2 uppercase tracking-wider">{greeting}</p>
-                        <h1 className="text-4xl font-bold mb-3 line-clamp-2">{song.name}</h1>
-                        <p className="text-white/50 text-lg mb-6">{song.primaryArtists}</p>
-
-                        <div className="flex items-center gap-4">
-                            <motion.button
-                                onClick={isPlaying ? onToggle : onPlay}
-                                className="px-8 py-3 bg-white text-black rounded-full font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors"
-                                whileHover={{ scale: 1.03 }}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                {isPlaying ? (
-                                    <>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                            <rect x="6" y="4" width="4" height="16" rx="1" />
-                                            <rect x="14" y="4" width="4" height="16" rx="1" />
-                                        </svg>
-                                        Pause
-                                    </>
-                                ) : (
-                                    <>
-                                        <Play size={18} fill="currentColor" />
-                                        Play Now
-                                    </>
-                                )}
-                            </motion.button>
-                            <span className="text-white/30 text-sm flex items-center gap-1">
-                                <Timer size={14} />
-                                {song.duration ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}` : ''}
-                            </span>
-                        </div>
-                    </motion.div>
-                </div>
-            </div>
-        </div>
-    );
 }
 
-/* ============================================================================
-   SECTION COMPONENTS
-   ============================================================================ */
-
-function Section({ title, icon, children, onSeeAll }: {
-    title: string;
-    icon?: React.ReactNode;
-    children: React.ReactNode;
-    onSeeAll?: () => void;
-}) {
-    return (
-        <section>
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                    {icon && <span className="text-white/30">{icon}</span>}
-                    <h2 className="text-xl font-bold">{title}</h2>
-                </div>
-                {onSeeAll && (
-                    <button
-                        onClick={onSeeAll}
-                        className="text-sm text-white/40 hover:text-white flex items-center gap-1 transition-colors"
-                    >
-                        See all <ChevronRight size={16} />
-                    </button>
-                )}
-            </div>
-            {children}
-        </section>
-    );
+function getGreeting() {
+    const hours = new Date().getHours();
+    if (hours < 12) return "Good Morning";
+    if (hours < 18) return "Good Afternoon";
+    return "Good Evening";
 }
 
-function ScrollRow({ children }: { children: React.ReactNode }) {
-    const ref = useRef<HTMLDivElement>(null);
-
+// === PREMIUM SKELETON LOADER ===
+function HomeSkeleton() {
     return (
-        <div
-            ref={ref}
-            className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
-            style={{
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-            }}
-        >
-            <style>{`.scroll-row::-webkit-scrollbar { display: none; }`}</style>
-            {children}
-        </div>
-    );
-}
-
-/* ============================================================================
-   CARDS
-   ============================================================================ */
-
-function RecentCard({ song, onClick, isPlaying }: { song: JioSaavnSong; onClick: () => void; isPlaying: boolean }) {
-    const getArt = () => {
-        if (!song?.image) return '';
-        if (typeof song.image === 'string') return song.image;
-        if (Array.isArray(song.image)) return song.image.find((i: any) => i.quality === '150x150')?.link || song.image[0]?.link || '';
-        return '';
-    };
-
-    return (
-        <motion.button
-            onClick={onClick}
-            className="flex items-center gap-3 p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-all text-left group"
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-        >
-            <div className="relative">
-                <img src={getArt()} alt="" className="w-12 h-12 rounded object-cover" />
-                {isPlaying && (
-                    <div className="absolute inset-0 rounded bg-black/50 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{song.name}</p>
-                <p className="text-xs text-white/40 truncate">{song.primaryArtists}</p>
-            </div>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <Play size={16} className="text-white" fill="currentColor" />
-            </div>
-        </motion.button>
-    );
-}
-
-function TapeCard({ mix, index, onClick }: { mix: Mix; index: number; onClick: () => void }) {
-    return (
-        <motion.button
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            onClick={onClick}
-            className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.03] transition-all text-left group"
-            whileHover={{ scale: 1.01 }}
-        >
-            <div className="w-12 h-12 rounded-lg bg-white/[0.05] flex items-center justify-center">
-                <Disc3 size={20} className="text-white/40" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{mix.title}</p>
-                <p className="text-xs text-white/35">{mix.songs.length} songs</p>
-            </div>
-        </motion.button>
-    );
-}
-
-function SongCard({ song, index, onClick, isPlaying }: {
-    song: JioSaavnSong;
-    index: number;
-    onClick: () => void;
-    isPlaying: boolean;
-}) {
-    const getArt = () => {
-        if (!song?.image) return '';
-        if (typeof song.image === 'string') return song.image;
-        if (Array.isArray(song.image)) return song.image.find((i: any) => i.quality === '500x500')?.link || song.image[0]?.link || '';
-        return '';
-    };
-
-    return (
-        <motion.button
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.03 }}
-            onClick={onClick}
-            className="flex-shrink-0 w-44 group"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-        >
-            <div className="relative aspect-square rounded-xl overflow-hidden mb-3 bg-white/5">
-                <img src={getArt()} alt="" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                    <div className={`w-11 h-11 rounded-full bg-white text-black flex items-center justify-center shadow-xl transition-all ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'}`}>
-                        {isPlaying ? (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                <rect x="6" y="4" width="4" height="16" rx="1" />
-                                <rect x="14" y="4" width="4" height="16" rx="1" />
-                            </svg>
-                        ) : (
-                            <Play size={18} fill="currentColor" className="ml-0.5" />
-                        )}
-                    </div>
-                </div>
-            </div>
-            <p className="text-sm font-medium truncate mb-0.5">{song.name}</p>
-            <p className="text-xs text-white/40 truncate">{song.primaryArtists}</p>
-        </motion.button>
-    );
-}
-
-function AlbumCard({ album, index, onClick }: { album: any; index: number; onClick: () => void }) {
-    const getArt = () => {
-        if (!album?.image) return '';
-        if (typeof album.image === 'string') return album.image;
-        if (Array.isArray(album.image)) return album.image.find((i: any) => i.quality === '500x500')?.link || album.image[0]?.link || '';
-        return '';
-    };
-
-    return (
-        <motion.button
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.03 }}
-            onClick={onClick}
-            className="flex-shrink-0 w-44 group text-left"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-        >
-            <div className="relative aspect-square rounded-xl overflow-hidden mb-3 bg-white/5">
-                <img src={getArt()} alt="" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
-            </div>
-            <p className="text-sm font-medium truncate mb-0.5">{album.name || album.title}</p>
-            <p className="text-xs text-white/40 truncate">{album.primaryArtists || album.subtitle || 'Album'}</p>
-        </motion.button>
-    );
-}
-
-function ChartCard({ chart, index, onClick }: { chart: any; index: number; onClick: () => void }) {
-    const getArt = () => {
-        if (!chart?.image) return '';
-        if (typeof chart.image === 'string') return chart.image;
-        if (Array.isArray(chart.image)) return chart.image.find((i: any) => i.quality === '500x500')?.link || chart.image[0]?.link || '';
-        return '';
-    };
-
-    return (
-        <motion.button
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.03 }}
-            onClick={onClick}
-            className="flex-shrink-0 w-48 rounded-xl overflow-hidden group text-left"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-        >
-            <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3 bg-white/5">
-                <img src={getArt()} alt="" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute bottom-3 left-3 right-3">
-                    <p className="text-sm font-bold truncate">{chart.listname || chart.title || 'Chart'}</p>
-                </div>
-            </div>
-        </motion.button>
-    );
-}
-
-/* ============================================================================
-   LOADING SKELETON
-   ============================================================================ */
-
-function SkeletonSection() {
-    return (
-        <div className="space-y-4">
-            <div className="h-6 w-40 bg-white/5 rounded animate-pulse" />
-            <div className="flex gap-4">
-                {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="w-44 flex-shrink-0">
-                        <div className="aspect-square rounded-xl bg-white/5 animate-pulse mb-3" />
-                        <div className="h-4 w-3/4 bg-white/5 rounded animate-pulse mb-2" />
-                        <div className="h-3 w-1/2 bg-white/5 rounded animate-pulse" />
-                    </div>
+        <div className="animate-pulse space-y-10 p-8">
+            <div className="h-80 bg-white/5 bg-opacity-10 rounded-3xl relative overflow-hidden" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-24 bg-white/5 rounded-xl" />
                 ))}
             </div>
+            <div className="space-y-4">
+                <div className="h-8 w-48 bg-white/5 rounded-lg" />
+                <div className="flex gap-6 overflow-hidden">
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className="w-48 h-64 bg-white/5 rounded-2xl shrink-0" />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// === SMART HERO COMPONENT ===
+function SmartHero({ song, onPlay }: { song: JioSaavnSong | null; onPlay: (s: JioSaavnSong) => void }) {
+    if (!song) return null;
+
+    const getArt = (quality: string = '500x500') => {
+        if (!song.image) return '';
+        if (typeof song.image === 'string') return song.image;
+        if (Array.isArray(song.image)) return song.image.find(i => i.quality === quality)?.link || song.image[0]?.link || '';
+        return '';
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="relative h-[26rem] mx-8 mb-10 group overflow-hidden rounded-[2rem]"
+        >
+            {/* Dynamic Blurry Background */}
+            <div className="absolute inset-0 z-0">
+                {getArt() && (
+                    <motion.img
+                        initial={{ scale: 1.1 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 10, ease: "linear", repeat: Infinity, repeatType: "mirror" }}
+                        src={getArt()} alt="" className="w-full h-full object-cover blur-3xl opacity-40 scale-125"
+                    />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#090909] via-[#090909]/80 to-transparent" />
+                <div className="absolute inset-0 bg-black/20" />
+            </div>
+
+            <div className="relative z-10 h-full flex items-center px-12 gap-12">
+                {/* Left: Floating Art */}
+                <motion.div
+                    initial={{ opacity: 0, x: -30, rotate: -2 }}
+                    animate={{ opacity: 1, x: 0, rotate: 0 }}
+                    transition={{ delay: 0.2, duration: 0.6 }}
+                    className="shrink-0 w-72 h-72 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/10 hidden md:block"
+                >
+                    <img src={getArt()} alt={song.name} className="w-full h-full object-cover" />
+                </motion.div>
+
+                {/* Right: Info */}
+                <div className="flex flex-col justify-center flex-1 min-w-0 pt-4">
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="flex items-center gap-3 mb-4"
+                    >
+                        <span className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-md text-[10px] font-bold tracking-widest text-white/80 uppercase">
+                            Pick of the Day
+                        </span>
+                        <span className="text-white/40 text-sm font-medium tracking-wide">• {getGreeting()}</span>
+                    </motion.div>
+
+                    <motion.h1
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="text-5xl md:text-6xl lg:text-7xl font-black text-white leading-tight mb-4 tracking-tight drop-shadow-xl line-clamp-2"
+                    >
+                        {decodeHtml(song.name)}
+                    </motion.h1>
+
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5 }}
+                        className="text-xl text-white/60 font-medium mb-8 truncate"
+                    >
+                        {decodeHtml(song.primaryArtists || "")} • {song.year || "2025"}
+                    </motion.p>
+
+                    <motion.button
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.6 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="w-max px-10 py-4 bg-white text-black rounded-full font-bold text-lg flex items-center gap-3 shadow-xl hover:bg-zinc-200 transition-colors"
+                        onClick={() => onPlay(song)}
+                    >
+                        <Play fill="currentColor" size={24} /> Play Now
+                    </motion.button>
+                </div>
+            </div>
+        </motion.div>
+    );
+}
+
+// === MOOD CARD COMPONENT ===
+
+
+
+// === DATA FETCHING LOGIC ===
+export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: HomeViewProps) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [launchData, setLaunchData] = useState<LaunchData | null>(null);
+    const [heroSong, setHeroSong] = useState<JioSaavnSong | null>(null);
+    const [vibePlaylists, setVibePlaylists] = useState<JioSaavnSong[]>([]);
+    const [displayLangs, setDisplayLangs] = useState<string[]>(['English']);
+
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            // 1. Get Settings
+            let storedLangs = ['english'];
+            try {
+                const stored = localStorage.getItem('melora-settings');
+                if (stored && JSON.parse(stored).languages) {
+                    const l = JSON.parse(stored).languages;
+                    storedLangs = Array.isArray(l) ? l : [l];
+                }
+            } catch (e) { }
+
+            const validLangs = storedLangs.map(l => l.toLowerCase().trim()).filter(Boolean);
+            const langString = validLangs.join(',') || 'english';
+            setDisplayLangs(validLangs);
+
+            console.log(`[HomeView] 🌍 Fetching Ultimate Content for: ${langString}`);
+
+            // 2. Call Enhanced API
+            const data = await getStrictLaunchData(langString);
+            if (!data) throw new Error("No data returned");
+            setLaunchData(data);
+
+            // 3. Set Hero (Randomize from top 5 for freshness)
+            const heroPool = [...(data.new_trending || []), ...(data.new_albums || [])];
+            if (heroPool.length > 0) {
+                // Pick random from top 5 or fewer
+                const max = Math.min(heroPool.length, 5);
+                const random = Math.floor(Math.random() * max);
+                setHeroSong(heroPool[random]);
+            }
+
+            // Fetch Vibe Playlists (Parallel) - Specific searches for quality vibes
+            const primaryLang = displayLangs[0] || 'English';
+            const vibeQueries = [`${primaryLang} Love Songs`, `${primaryLang} Party`, `${primaryLang} Sad Songs`, `${primaryLang} Workout`, "Chill Vibes", "Focus Music"];
+            const vibePromises = vibeQueries.map(q => searchPlaylists(q, 1, 1, langString)); // Get top result for each
+            const vibeResults = await Promise.all(vibePromises);
+
+            // Flatten and filter valid results
+            const vibes = vibeResults
+                .map(res => res[0]) // Take first result from each search
+                .filter(item => item && item.type === 'playlist');
+
+            setVibePlaylists(vibes);
+
+        } catch (err) {
+            console.error("[HomeView]", err);
+            setError("Failed to load content.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+        const handleSettingsUpdate = () => fetchData();
+        window.addEventListener('melora-settings-changed', handleSettingsUpdate);
+        return () => window.removeEventListener('melora-settings-changed', handleSettingsUpdate);
+    }, [fetchData]);
+
+    if (loading) return <HomeSkeleton />;
+
+    if (error || !launchData) return null; // Error state handled by parent or toast
+
+    const { new_trending, new_albums, top_playlists, moods, retro, top_charts, radio, quick_picks } = launchData;
+
+    return (
+        <div className="pb-40 w-full overflow-x-hidden">
+            <AnimatePresence mode="wait">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-12"
+                >
+                    {/* 1. SMART HERO */}
+                    <SmartHero song={heroSong} onPlay={onPlaySong} />
+
+                    {/* 2. QUICK PICKS */}
+                    {quick_picks && quick_picks.length > 0 && (
+                        <section className="px-8">
+                            <SectionHeader title="Quick Picks" subtitle="Start Listening" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {quick_picks.slice(0, 12).map((song, i) => (
+                                    <QuickPickItem
+                                        key={song.id}
+                                        item={song}
+                                        index={i}
+                                        onClick={() => onPlaySong(song)}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* 3. TRENDING NOW */}
+                    {new_trending.length > 0 && (
+                        <section className="pl-8">
+                            <SectionHeader title="Trending Now" onSeeAll={() => onNavigate({ id: 'trending', data: { items: new_trending, title: 'Trending Now' } })} />
+                            <HorizontalScroll>
+                                {new_trending.slice(0, 15).map((song, i) => (
+                                    <StandardCard
+                                        key={song.id}
+                                        item={song}
+                                        index={i}
+                                        subtitle={song.primaryArtists}
+                                        onClick={() => onPlaySong(song)}
+                                        rank={i + 1}
+                                    />
+                                ))}
+                            </HorizontalScroll>
+                        </section>
+                    )}
+
+                    {/* 4. NEW ARRIVALS (Albums) */}
+                    {new_albums.length > 0 && (
+                        <section className="pl-8">
+                            <SectionHeader title="New Arrivals" onSeeAll={() => onNavigate({ id: 'albums', data: { items: new_albums, title: 'New Arrivals' } })} />
+                            <HorizontalScroll>
+                                {new_albums.slice(0, 15).map((album, i) => (
+                                    <StandardCard
+                                        key={album.id}
+                                        item={album}
+                                        index={i}
+                                        subtitle="New Album"
+                                        onClick={() => onNavigate({ id: 'peel-reveal', data: album })}
+                                    />
+                                ))}
+                            </HorizontalScroll>
+                        </section>
+                    )}
+
+                    {/* 5. VIBE CHECK (Dynamic Playlists) */}
+                    {vibePlaylists.length > 0 && (
+                        <section className="px-8">
+                            <SectionHeader title="Vibe Check" subtitle="Moods & Moments" />
+                            <div className="flex flex-wrap gap-x-12 gap-y-10 mt-6 justify-start">
+                                {vibePlaylists.map((playlist, i) => (
+                                    <div key={playlist.id} className="flex justify-center">
+                                        <VibeAlbumCard
+                                            item={playlist}
+                                            onClick={() => onNavigate({ id: 'playlist', data: playlist })}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* 6. TOP CHARTS */}
+                    {top_charts && top_charts.length > 0 && (
+                        <section className="pl-8">
+                            <SectionHeader title="Top Charts" />
+                            <HorizontalScroll>
+                                {top_charts.map((playlist, i) => (
+                                    <FeatureCard
+                                        key={playlist.id}
+                                        item={playlist}
+                                        index={i}
+                                        description="Top 50"
+                                        onClick={() => onNavigate({ id: 'playlist', data: playlist })}
+                                    />
+                                ))}
+                            </HorizontalScroll>
+                        </section>
+                    )}
+
+                    {/* 7. LANGUAGE BASED PLAYLISTS */}
+                    {top_playlists && top_playlists.length > 0 && (
+                        <section className="pl-8">
+                            <SectionHeader title={`Best of ${displayLangs[0]}`} subtitle="Editor's Picks" />
+                            <HorizontalScroll>
+                                {top_playlists.map((playlist, i) => (
+                                    <FeatureCard
+                                        key={playlist.id}
+                                        item={playlist}
+                                        index={i}
+                                        description="Featured Playlist"
+                                        onClick={() => onNavigate({ id: 'playlist', data: playlist })}
+                                    />
+                                ))}
+                            </HorizontalScroll>
+                        </section>
+                    )}
+
+                    {/* 8. RETRO REWIND */}
+                    {retro && retro.length > 0 && (
+                        <section className="pl-8">
+                            <SectionHeader title="Retro Rewind" subtitle="Classics you love" />
+                            <HorizontalScroll>
+                                {retro.slice(0, 15).map((song, i) => (
+                                    <StandardCard
+                                        key={song.id}
+                                        item={song}
+                                        index={i}
+                                        subtitle={song.year}
+                                        onClick={() => onPlaySong(song)}
+                                    />
+                                ))}
+                            </HorizontalScroll>
+                        </section>
+                    )}
+
+                </motion.div>
+            </AnimatePresence>
         </div>
     );
 }
