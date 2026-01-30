@@ -60,10 +60,8 @@ const MONO_STYLES = `
 
     /* === SIDEBAR === */
     .sidebar {
-        background: rgba(255, 255, 255, 0.015);
-        backdrop-filter: blur(60px);
-        -webkit-backdrop-filter: blur(60px);
-        border-right: 1px solid rgba(255, 255, 255, 0.03);
+        background: black;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     /* === PLAYER === */
@@ -252,7 +250,7 @@ export function DiscoveryLayout() {
     };
 
     return (
-        <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
+        <div className="fixed inset-0 bg-zinc-950 text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
             <style>{MONO_STYLES}</style>
             <div className="noise" />
 

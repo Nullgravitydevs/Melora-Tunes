@@ -188,7 +188,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                                     >
                                         {/* Rank / Play Icon */}
                                         <div className="w-8 flex justify-center text-white/40 font-mono text-sm group-hover:text-white">
-                                            <span className="group-hover:hidden block">{active && playing ? <Disc3 className="animate-spin text-green-400" size={16} /> : i + 1}</span>
+                                            <span className="group-hover:hidden block">{active && playing ? <Disc3 className="animate-spin text-white" size={16} /> : i + 1}</span>
                                             <Play size={16} fill="currentColor" className="hidden group-hover:block text-white" />
                                         </div>
 
@@ -197,11 +197,11 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                                             <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 shadow-lg bg-zinc-800">
                                                 <img src={typeof item.image === 'string' ? item.image : (item.image?.[item.image.length - 1]?.link || '')} className="w-full h-full object-cover" />
                                                 <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                                    {playing ? <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" /> : <Play fill="white" size={16} className="text-white" />}
+                                                    {playing ? <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" /> : <Play fill="white" size={16} className="text-white" />}
                                                 </div>
                                             </div>
                                             <div className="min-w-0">
-                                                <h4 className={`font-bold text-base truncate ${active ? 'text-green-400' : 'text-white'}`}>{decodeHtml(item.name)}</h4>
+                                                <h4 className={`font-bold text-base truncate ${active ? 'text-white' : 'text-white'}`}>{decodeHtml(item.name)}</h4>
                                                 <p className="text-white/40 text-xs truncate group-hover:text-white/60 transition-colors">{decodeHtml(item.primaryArtists)}</p>
                                             </div>
                                         </div>

@@ -159,10 +159,10 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                                             onClick={() => isActive ? togglePlay() : playSong(i)}
                                             className={`group flex items-center gap-3 p-2.5 cursor-pointer transition-all ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}>
                                             <div className="w-5 flex items-center justify-center">
-                                                {isActive && isPlaying ? <Disc3 className="animate-spin text-green-400" size={14} /> : <span className={`font-mono text-[10px] ${isActive ? 'text-green-400' : 'text-white/40'}`}>{i + 1}</span>}
+                                                {isActive && isPlaying ? <Disc3 className="animate-spin text-white" size={14} /> : <span className={`font-mono text-[10px] ${isActive ? 'text-white font-bold' : 'text-white/40'}`}>{i + 1}</span>}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <h4 className={`text-sm font-medium truncate ${isActive ? 'text-green-400' : 'text-white'}`}>{decodeHtml(song.name)}</h4>
+                                                <h4 className={`text-sm font-medium truncate ${isActive ? 'text-white font-bold' : 'text-white'}`}>{decodeHtml(song.name)}</h4>
                                                 <p className="text-white/40 text-[10px] truncate">{decodeHtml(song.primaryArtists)}</p>
                                             </div>
                                             <span className="text-white/30 text-[10px] font-mono">{song.duration ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}` : ''}</span>

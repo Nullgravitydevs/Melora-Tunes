@@ -158,9 +158,9 @@ export function PeelRevealView({ album, onBack, onPlay }: PeelRevealViewProps) {
                                         <motion.div key={track.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }}
                                             onClick={() => playInstantMix({ id: `album-${album.id}`, title: album.name, color: 'blue', songs: tracks, currentSongIndex: i })}
                                             className={`group flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}>
-                                            <span className={`w-6 text-center font-mono text-xs ${isActive ? 'text-green-400' : 'text-white/40'}`}>{isActive && isPlaying ? <Disc3 className="animate-spin" size={14} /> : i + 1}</span>
+                                            <span className={`w-6 text-center font-mono text-xs ${isActive ? 'text-white font-bold' : 'text-white/40'}`}>{isActive && isPlaying ? <Disc3 className="animate-spin" size={14} /> : i + 1}</span>
                                             <div className="flex-1 min-w-0">
-                                                <h4 className={`font-medium truncate ${isActive ? 'text-green-400' : 'text-white'}`}>{decodeHtml(track.name)}</h4>
+                                                <h4 className={`font-medium truncate ${isActive ? 'text-white font-bold' : 'text-white'}`}>{decodeHtml(track.name)}</h4>
                                                 <p className="text-white/40 text-xs truncate">{decodeHtml(track.primaryArtists)}</p>
                                             </div>
                                             <span className="text-white/30 text-xs font-mono">{Math.floor(parseInt(String(track.duration)) / 60)}:{(parseInt(String(track.duration)) % 60).toString().padStart(2, '0')}</span>

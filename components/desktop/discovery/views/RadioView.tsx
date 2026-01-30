@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Radio, Mic2, Calendar, Zap, Play, Signal } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { SectionHeader, HorizontalScroll } from "../home/HomeComponents";
-import { JioSaavnSong, searchSongs, searchArtists } from "@/lib/jiosaavn";
+import { JioSaavnSong, searchSongs, searchArtists, fixImageUrl } from "@/lib/jiosaavn";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
 
@@ -50,7 +50,7 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                     if (results && results.length > 0 && results[0].image) {
                         // Use the highest quality image available
                         const highRes = results[0].image.find((i: any) => i.quality === '500x500')?.link || results[0].image[0]?.link;
-                        return { ...station, image: highRes || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80' };
+                        return { ...station, image: highRes ? fixImageUrl(highRes, '500x500') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80' };
                     }
                 } catch (e) {
                     console.error("Failed to fetch image for", station.label, e);
@@ -111,11 +111,10 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                     {artistStations.map((station, i) => (
                         <motion.div
                             key={station.id}
-                            whileHover={{ y: -5 }}
                             onClick={() => startRadio(station)}
-                            className="bg-white/[0.03] p-4 rounded-2xl border border-white/5 cursor-pointer group hover:bg-white/[0.06] transition-colors w-40 flex-shrink-0"
+                            className="bg-black p-4 rounded-2xl border border-white/10 cursor-pointer group hover:border-white/20 transition-colors w-48 flex-shrink-0"
                         >
-                            <div className="aspect-square rounded-full overflow-hidden mb-4 shadow-lg border-2 border-transparent group-hover:border-green-400 transition-colors relative">
+                            <div className="aspect-square rounded-full overflow-hidden mb-4 shadow-lg border-2 border-transparent group-hover:border-white transition-colors relative">
                                 <img
                                     src={station.image}
                                     className="w-full h-full object-cover"
@@ -143,7 +142,7 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                         <div
                             key={station.id}
                             onClick={() => startRadio(station)}
-                            className="h-24 bg-white/5 rounded-xl flex items-center px-4 gap-4 cursor-pointer hover:bg-white/10 transition-colors border border-white/5 group relative overflow-hidden"
+                            className="h-40 bg-black rounded-xl flex items-center px-4 gap-4 cursor-pointer hover:border-white/20 transition-colors border border-white/10 group relative overflow-hidden"
                         >
                             {/* Background Image subtle */}
                             <img src={station.image} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity blur-sm" />
@@ -171,7 +170,7 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                         <div
                             key={station.id}
                             onClick={() => startRadio(station)}
-                            className="bg-zinc-900/50 border border-white/5 p-4 rounded-xl hover:border-white/20 transition-all cursor-pointer group"
+                            className="bg-black border border-white/10 p-4 rounded-xl hover:border-white/30 transition-all cursor-pointer group"
                         >
                             <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: `${station.color}20`, color: station.color }}>
                                 <station.icon size={20} />

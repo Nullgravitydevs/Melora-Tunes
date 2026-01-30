@@ -37,7 +37,7 @@ export function SmartHero({ item, type, greeting, isPlaying, onPlay, onToggle }:
     const artUrl = getArt();
 
     return (
-        <div className="relative h-[400px] w-full overflow-hidden group">
+        <div className="relative h-[60vh] min-h-[500px] w-full mb-8 group overflow-hidden">
             {/* 1. CINEMATIC BACKGROUND BLUR */}
             <div className="absolute inset-0 overflow-hidden">
                 <motion.div
@@ -69,7 +69,7 @@ export function SmartHero({ item, type, greeting, isPlaying, onPlay, onToggle }:
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
 
             {/* 3. CONTENT CONTAINER */}
-            <div className="relative h-full flex flex-col justify-end p-8 md:p-12 z-10">
+            <div className="relative h-full flex flex-col justify-end px-8 py-12 z-10">
                 <div className="max-w-4xl flex items-end gap-8">
 
                     {/* Primary Artwork - Shadow & Depth */}

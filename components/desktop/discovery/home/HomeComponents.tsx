@@ -59,7 +59,7 @@ export function PosterCard({ item, index, subtitle, onClick }: { item: any; inde
             onClick={onClick}
             className="group relative flex-shrink-0 w-48 cursor-pointer"
         >
-            <div className="aspect-[2/3] w-full rounded-xl overflow-hidden mb-3 relative shadow-lg bg-white/5">
+            <div className="aspect-[2/3] w-full rounded-xl overflow-hidden mb-3 relative shadow-lg bg-zinc-950 border border-white/5">
                 {getArt() ? (
                     <img src={getArt()} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
@@ -91,7 +91,9 @@ export function PosterCard({ item, index, subtitle, onClick }: { item: any; inde
 
 /* --- CARD: FEATURE (Wide, for Playlists/Editorials) --- */
 export function FeatureCard({ item, index, description, onClick }: { item: any; index: number; description?: string; onClick: () => void }) {
+    const [imgError, setImgError] = React.useState(false);
     const getArt = () => {
+        if (imgError) return '';
         if (!item?.image) return '';
         if (typeof item.image === 'string') return item.image;
         if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
@@ -104,11 +106,16 @@ export function FeatureCard({ item, index, description, onClick }: { item: any; 
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05 }}
             onClick={onClick}
-            className="group relative flex-shrink-0 w-80 h-48 rounded-xl overflow-hidden cursor-pointer shadow-lg bg-zinc-900"
+            className="group relative flex-shrink-0 w-80 h-48 rounded-xl overflow-hidden cursor-pointer shadow-lg bg-black border border-white/5"
         >
             {getArt() && (
                 <div className="absolute inset-0">
-                    <img src={getArt()} alt="" className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-40 transition-all duration-700" />
+                    <img
+                        src={getArt()}
+                        alt=""
+                        onError={() => setImgError(true)}
+                        className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-40 transition-all duration-700"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-r from-black via-black/50 to-transparent" />
                 </div>
             )}
@@ -131,7 +138,9 @@ export function FeatureCard({ item, index, description, onClick }: { item: any; 
 
 /* --- CARD: STANDARD (Square, for Songs/Albums) --- */
 export function StandardCard({ item, index, subtitle, onClick, rank }: { item: any; index: number; subtitle?: string; onClick: () => void; rank?: number }) {
+    const [imgError, setImgError] = React.useState(false);
     const getArt = () => {
+        if (imgError) return '';
         if (!item?.image) return '';
         if (typeof item.image === 'string') return item.image;
         if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
@@ -146,9 +155,14 @@ export function StandardCard({ item, index, subtitle, onClick, rank }: { item: a
             onClick={onClick}
             className="group w-40 md:w-48 flex-shrink-0 cursor-pointer"
         >
-            <div className="relative aspect-square rounded-xl overflow-hidden mb-3 bg-zinc-900 shadow-md">
+            <div className="relative aspect-square rounded-xl overflow-hidden mb-3 bg-zinc-950 shadow-md border border-white/5">
                 {getArt() ? (
-                    <img src={getArt()} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 group-hover:opacity-80" />
+                    <img
+                        src={getArt()}
+                        alt={item.name}
+                        onError={() => setImgError(true)}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 group-hover:opacity-80"
+                    />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-zinc-800">
                         <Music size={32} className="text-white/20" />
@@ -177,7 +191,9 @@ export function StandardCard({ item, index, subtitle, onClick, rank }: { item: a
 
 /* --- NEW: VIBE ALBUM CARD (Realistic CD Animation) --- */
 export function VibeAlbumCard({ item, onClick }: { item: any; onClick: () => void }) {
+    const [imgError, setImgError] = React.useState(false);
     const getArt = () => {
+        if (imgError) return '';
         if (!item?.image) return '';
         if (typeof item.image === 'string') return item.image;
         if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
@@ -203,7 +219,7 @@ export function VibeAlbumCard({ item, onClick }: { item: any; onClick: () => voi
 
                     {/* Tiny Art Center */}
                     <div className="absolute top-[35%] left-[35%] w-[30%] h-[30%] rounded-full overflow-hidden border-2 border-neutral-300">
-                        <img src={getArt()} className="w-full h-full object-cover scale-[4]" />
+                        {getArt() && <img src={getArt()} className="w-full h-full object-cover scale-[4]" onError={() => setImgError(true)} />}
                     </div>
                     {/* Center Hole */}
                     <div className="absolute top-[46%] left-[46%] w-2 h-2 bg-black rounded-full shadow-[inset_0_1px_2px_rgba(255,255,255,0.4)]" />
@@ -212,7 +228,7 @@ export function VibeAlbumCard({ item, onClick }: { item: any; onClick: () => voi
 
             {/* The Sleeve (On Top) */}
             <div className="relative w-full h-full rounded-lg overflow-hidden shadow-2xl z-10 bg-zinc-900 border border-white/5">
-                <img src={getArt()} alt={item.title} className="w-full h-full object-cover" />
+                {getArt() && <img src={getArt()} alt={item.title} className="w-full h-full object-cover" onError={() => setImgError(true)} />}
 
                 {/* Glassy Overlay with Title */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-100 flex items-end p-2.5">
@@ -228,7 +244,9 @@ export function VibeAlbumCard({ item, onClick }: { item: any; onClick: () => voi
 
 /* --- QUICK PICK ITEM --- */
 export function QuickPickItem({ item, index, onClick }: { item: any; index: number; onClick: () => void }) {
+    const [imgError, setImgError] = React.useState(false);
     const getArt = () => {
+        if (imgError) return '';
         if (!item?.image) return '';
         if (typeof item.image === 'string') return item.image;
         if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '150x150')?.link || item.image[0]?.link || '';
@@ -241,10 +259,21 @@ export function QuickPickItem({ item, index, onClick }: { item: any; index: numb
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.03 }}
             onClick={onClick}
-            className="flex items-center gap-3 p-2 pr-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group border border-white/5 hover:border-white/10"
+            className="flex items-center gap-3 p-2 pr-4 rounded-lg bg-transparent hover:bg-white/5 transition-colors cursor-pointer group border border-white/5 hover:border-white/10"
         >
-            <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
-                <img src={getArt()} alt={item.title} className="w-full h-full object-cover" />
+            <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-zinc-800">
+                {getArt() ? (
+                    <img
+                        src={getArt()}
+                        alt={item.title}
+                        onError={() => setImgError(true)}
+                        className="w-full h-full object-cover"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Music size={16} className="text-white/20" />
+                    </div>
+                )}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Play size={16} fill="currentColor" className="text-white" />
                 </div>
@@ -291,7 +320,7 @@ export function CompactCard({ item, index, onClick }: { item: any; index: number
     };
 
     return (
-        <div onClick={onClick} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group">
+        <div onClick={onClick} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group border-b border-white/5 last:border-0 hover:border-transparent">
             <span className="font-bold text-white/20 w-4 text-center group-hover:text-white/60">{index + 1}</span>
             <img src={getArt()} className="w-12 h-12 rounded-lg object-cover bg-zinc-800" />
             <div className="flex-1 min-w-0">

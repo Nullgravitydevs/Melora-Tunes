@@ -806,8 +806,15 @@ export function normalizeLanguage(lang?: string | string[]): string {
 export function fixImageUrl(url: string, quality: string): string {
     if (!url) return '';
     if (url.includes('jioimages.cdn.jio.com')) return url; // Don't touch Jio cdn
+
+    // Ensure https
+    let finalUrl = url;
+    if (finalUrl.startsWith('http://')) {
+        finalUrl = finalUrl.replace('http://', 'https://');
+    }
+
     // Generic replacement for saavncdn
-    return url.replace(/150x150|50x50|500x500/g, quality);
+    return finalUrl.replace(/150x150|50x50|500x500/g, quality);
 }
 
 export function formatImage(image: any): { quality: string; link: string }[] {

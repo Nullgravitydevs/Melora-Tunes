@@ -27,10 +27,8 @@ const LIBRARY_STYLES = `
     }
     
     .glass-card {
-        background: rgba(255, 255, 255, 0.02);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.04);
+        background: black;
+        border: 1px solid rgba(255, 255, 255, 0.08);
         transition: all 0.25s ease;
     }
     .glass-card:hover {
@@ -652,7 +650,7 @@ function CreatePlaylistModal({ onClose, onCreate }: { onClose: () => void; onCre
                 exit={{ scale: 0.95, opacity: 0 }}
                 className="w-full max-w-md p-6 rounded-2xl"
                 style={{
-                    background: 'rgba(30, 30, 30, 0.95)',
+                    background: '#09090b', // zinc-950
                     border: '1px solid rgba(255, 255, 255, 0.1)'
                 }}
                 onClick={e => e.stopPropagation()}

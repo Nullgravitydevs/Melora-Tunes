@@ -14,11 +14,14 @@ interface HomeViewProps {
     isPlaying: boolean;
 }
 
-function getGreeting() {
+function getGreeting(name?: string) {
     const hours = new Date().getHours();
-    if (hours < 12) return "Good Morning";
-    if (hours < 18) return "Good Afternoon";
-    return "Good Evening";
+    let timeGreeting = "Good Morning";
+    if (hours >= 12 && hours < 18) timeGreeting = "Good Afternoon";
+    if (hours >= 18) timeGreeting = "Good Evening";
+
+    if (name) return `${timeGreeting}, ${name}`;
+    return timeGreeting;
 }
 
 // === PREMIUM SKELETON LOADER ===
@@ -44,10 +47,12 @@ function HomeSkeleton() {
 }
 
 // === SMART HERO COMPONENT ===
-function SmartHero({ song, onPlay }: { song: JioSaavnSong | null; onPlay: (s: JioSaavnSong) => void }) {
+function SmartHero({ song, onPlay, userName }: { song: JioSaavnSong | null; onPlay: (s: JioSaavnSong) => void; userName?: string }) {
     if (!song) return null;
 
+    const [imgError, setImgError] = useState(false);
     const getArt = (quality: string = '500x500') => {
+        if (imgError) return '';
         if (!song.image) return '';
         if (typeof song.image === 'string') return song.image;
         if (Array.isArray(song.image)) return song.image.find(i => i.quality === quality)?.link || song.image[0]?.link || '';
@@ -59,7 +64,7 @@ function SmartHero({ song, onPlay }: { song: JioSaavnSong | null; onPlay: (s: Ji
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="relative h-[26rem] mx-8 mb-10 group overflow-hidden rounded-[2rem]"
+            className="relative h-[45vh] min-h-[350px] w-full mb-8 group overflow-hidden"
         >
             {/* Dynamic Blurry Background */}
             <div className="absolute inset-0 z-0">
@@ -69,6 +74,7 @@ function SmartHero({ song, onPlay }: { song: JioSaavnSong | null; onPlay: (s: Ji
                         animate={{ scale: 1 }}
                         transition={{ duration: 10, ease: "linear", repeat: Infinity, repeatType: "mirror" }}
                         src={getArt()} alt="" className="w-full h-full object-cover blur-3xl opacity-40 scale-125"
+                        onError={() => setImgError(true)}
                     />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-r from-[#090909] via-[#090909]/80 to-transparent" />
@@ -83,7 +89,18 @@ function SmartHero({ song, onPlay }: { song: JioSaavnSong | null; onPlay: (s: Ji
                     transition={{ delay: 0.2, duration: 0.6 }}
                     className="shrink-0 w-72 h-72 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/10 hidden md:block"
                 >
-                    <img src={getArt()} alt={song.name} className="w-full h-full object-cover" />
+                    {getArt() ? (
+                        <img
+                            src={getArt()}
+                            alt={song.name}
+                            className="w-full h-full object-cover"
+                            onError={() => setImgError(true)}
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+                            <Music size={48} className="text-white/20" />
+                        </div>
+                    )}
                 </motion.div>
 
                 {/* Right: Info */}
@@ -97,7 +114,7 @@ function SmartHero({ song, onPlay }: { song: JioSaavnSong | null; onPlay: (s: Ji
                         <span className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-md text-[10px] font-bold tracking-widest text-white/80 uppercase">
                             Pick of the Day
                         </span>
-                        <span className="text-white/40 text-sm font-medium tracking-wide">• {getGreeting()}</span>
+                        <span className="text-white/40 text-sm font-medium tracking-wide">• {getGreeting(userName)}</span>
                     </motion.div>
 
                     <motion.h1
@@ -147,6 +164,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
     const [heroSong, setHeroSong] = useState<JioSaavnSong | null>(null);
     const [vibePlaylists, setVibePlaylists] = useState<JioSaavnSong[]>([]);
     const [displayLangs, setDisplayLangs] = useState<string[]>(['English']);
+    const [userName, setUserName] = useState<string>(""); // Added userName state
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -154,13 +172,23 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
         try {
             // 1. Get Settings
             let storedLangs = ['english'];
+            let name = ""; // Initialize name
             try {
                 const stored = localStorage.getItem('melora-settings');
-                if (stored && JSON.parse(stored).languages) {
-                    const l = JSON.parse(stored).languages;
-                    storedLangs = Array.isArray(l) ? l : [l];
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (parsed.languages) {
+                        const l = parsed.languages;
+                        storedLangs = Array.isArray(l) ? l : [l];
+                    }
+                    if (parsed.userName) { // Load userName
+                        name = parsed.userName;
+                    }
                 }
-            } catch (e) { }
+            } catch (e) {
+                console.error("Failed to parse melora-settings from localStorage", e);
+            }
+            setUserName(name); // Set userName state
 
             const validLangs = storedLangs.map(l => l.toLowerCase().trim()).filter(Boolean);
             const langString = validLangs.join(',') || 'english';
@@ -224,14 +252,14 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
                     animate={{ opacity: 1 }}
                     className="space-y-12"
                 >
-                    {/* 1. SMART HERO */}
-                    <SmartHero song={heroSong} onPlay={onPlaySong} />
-
-                    {/* 2. QUICK PICKS */}
+                    {/* 1. HERO SECTION */}
+                    <section className="mt-[-20px]">
+                        <SmartHero song={heroSong} onPlay={onPlaySong} userName={userName} />
+                    </section>          {/* 2. QUICK PICKS */}
                     {quick_picks && quick_picks.length > 0 && (
-                        <section className="px-8">
+                        <section>
                             <SectionHeader title="Quick Picks" subtitle="Start Listening" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-8">
                                 {quick_picks.slice(0, 12).map((song, i) => (
                                     <QuickPickItem
                                         key={song.id}
@@ -246,7 +274,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
                     {/* 3. TRENDING NOW */}
                     {new_trending.length > 0 && (
-                        <section className="pl-8">
+                        <section>
                             <SectionHeader title="Trending Now" onSeeAll={() => onNavigate({ id: 'trending', data: { items: new_trending, title: 'Trending Now' } })} />
                             <HorizontalScroll>
                                 {new_trending.slice(0, 15).map((song, i) => (
@@ -265,7 +293,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
                     {/* 4. NEW ARRIVALS (Albums) */}
                     {new_albums.length > 0 && (
-                        <section className="pl-8">
+                        <section>
                             <SectionHeader title="New Arrivals" onSeeAll={() => onNavigate({ id: 'albums', data: { items: new_albums, title: 'New Arrivals' } })} />
                             <HorizontalScroll>
                                 {new_albums.slice(0, 15).map((album, i) => (
@@ -283,9 +311,9 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
                     {/* 5. VIBE CHECK (Dynamic Playlists) */}
                     {vibePlaylists.length > 0 && (
-                        <section className="px-8">
+                        <section>
                             <SectionHeader title="Vibe Check" subtitle="Moods & Moments" />
-                            <div className="flex flex-wrap gap-x-12 gap-y-10 mt-6 justify-start">
+                            <div className="flex flex-wrap gap-x-12 gap-y-10 mt-6 justify-start px-8">
                                 {vibePlaylists.map((playlist, i) => (
                                     <div key={playlist.id} className="flex justify-center">
                                         <VibeAlbumCard
@@ -300,7 +328,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
                     {/* 6. TOP CHARTS */}
                     {top_charts && top_charts.length > 0 && (
-                        <section className="pl-8">
+                        <section>
                             <SectionHeader title="Top Charts" />
                             <HorizontalScroll>
                                 {top_charts.map((playlist, i) => (
@@ -318,7 +346,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
                     {/* 7. LANGUAGE BASED PLAYLISTS */}
                     {top_playlists && top_playlists.length > 0 && (
-                        <section className="pl-8">
+                        <section>
                             <SectionHeader title={`Best of ${displayLangs[0]}`} subtitle="Editor's Picks" />
                             <HorizontalScroll>
                                 {top_playlists.map((playlist, i) => (
@@ -336,7 +364,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
                     {/* 8. RETRO REWIND */}
                     {retro && retro.length > 0 && (
-                        <section className="pl-8">
+                        <section>
                             <SectionHeader title="Retro Rewind" subtitle="Classics you love" />
                             <HorizontalScroll>
                                 {retro.slice(0, 15).map((song, i) => (

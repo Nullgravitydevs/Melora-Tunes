@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Headphones, Disc, Activity, TrendingUp, Play, Mic2, Globe, Grid } from "lucide-react";
-import { searchPlaylists, searchAlbums, searchSongs, getTopCharts } from "@/lib/jiosaavn";
+import { searchPlaylists, searchAlbums, searchSongs, getTopCharts, fixImageUrl } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { usePlayback } from "@/components/providers/playback-context";
 import { StandardCard, FeatureCard, HorizontalScroll } from "../home/HomeComponents";
@@ -17,11 +17,12 @@ interface ExploreViewProps {
 // Helper to get best image
 const getHighQualityImage = (image: any) => {
     if (!image) return '';
-    if (typeof image === 'string') return image;
-    if (Array.isArray(image)) {
-        return image.find((i: any) => i.quality === '500x500')?.link || image[0]?.link || '';
+    let url = '';
+    if (typeof image === 'string') url = image;
+    else if (Array.isArray(image)) {
+        url = image.find((i: any) => i.quality === '500x500')?.link || image[0]?.link || '';
     }
-    return '';
+    return url ? fixImageUrl(url, '500x500') : '';
 };
 
 export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
@@ -117,15 +118,37 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
     return (
         <div className="min-h-full pb-32 space-y-12">
 
-            {/* HERO TITLE (Sticky/Floating effect usually, but static here for simplicity) */}
-            <div className="px-8 pt-8">
-                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                    <h1 className="text-4xl md:text-5xl font-black text-white mb-2 flex items-center gap-3">
-                        <TrendingUp size={40} className="text-pink-500" />
-                        Explore
-                    </h1>
-                    <p className="text-white/40 font-medium text-lg">What's happening in the world of music.</p>
-                </motion.div>
+            {/* VISUAL HERO HEADER */}
+            <div className="relative h-[40vh] min-h-[300px] w-full overflow-hidden mb-8 group">
+                {/* Collage Background */}
+                <div className="absolute inset-0 grid grid-cols-3 md:grid-cols-6 opacity-20 group-hover:opacity-30 transition-opacity duration-1000 scale-105">
+                    {content.newReleases.slice(0, 18).map((item, i) => (
+                        <div key={i} className="relative aspect-square">
+                            <img src={getHighQualityImage(item.image)} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
+                        </div>
+                    ))}
+                </div>
+
+                {/* Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-[#09090b]/80 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#09090b] via-transparent to-transparent" />
+
+                {/* Content */}
+                <div className="absolute bottom-0 left-0 p-8 md:p-12 max-w-4xl z-10">
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="px-3 py-1 bg-pink-500/20 text-pink-500 border border-pink-500/20 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                                <TrendingUp size={14} /> Discovery Hub
+                            </span>
+                        </div>
+                        <h1 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tighter">
+                            Explore
+                        </h1>
+                        <p className="text-xl md:text-2xl text-white/50 font-medium leading-relaxed max-w-xl">
+                            What's happening in the world of music. Charts, trends, and new releases.
+                        </p>
+                    </motion.div>
+                </div>
             </div>
 
             {/* 1. GLOBAL CHART TOPPERS (Square Cards, Apple Style) */}
@@ -152,7 +175,7 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
                         <div
                             key={song.id}
                             onClick={() => onNavigate({ id: 'song', data: song })} // Or play directly?
-                            className="group flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer border border-white/5 hover:border-white/10"
+                            className="group flex items-center gap-4 p-3 rounded-xl bg-transparent hover:bg-white/5 transition-colors cursor-pointer border border-white/5 hover:border-white/10"
                         >
                             <div className="w-16 h-16 rounded-lg overflow-hidden relative flex-shrink-0">
                                 <img src={getHighQualityImage(song.image)} className="w-full h-full object-cover" />
@@ -229,43 +252,46 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
             </section>
 
             {/* 6. REGIONAL BLOCK (Bollywood, Tollywood, Hollywood) */}
-            <div className="bg-gradient-to-b from-white/5 to-transparent rounded-3xl p-6 mx-4 space-y-12 border border-white/5">
-                <div className="flex items-center gap-3 mb-8">
-                    <Headphones className="text-purple-400" size={32} />
-                    <h2 className="text-3xl font-bold">Global Sounds</h2>
+            <div className="bg-black border border-white/10 rounded-[2.5rem] p-8 mx-4 space-y-12 backdrop-blur-md relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-transparent opacity-30" />
+                <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-8">
+                        <Headphones className="text-purple-400" size={32} />
+                        <h2 className="text-3xl font-bold">Global Sounds</h2>
+                    </div>
+
+                    {/* Bollywood */}
+                    <section>
+                        <Header title="Bollywood Hits" />
+                        <HorizontalScroll>
+                            {content.bollywood.map((item, i) => (
+                                <CompactCard key={item.id} item={item} subtitle="Hindi" onClick={() => onNavigate({ id: 'playlist', data: item })} />
+                            ))}
+                        </HorizontalScroll>
+                    </section>
+
+                    {/* Tollywood */}
+                    <section>
+                        <Header title="Tollywood Beats" />
+                        <HorizontalScroll>
+                            {content.tollywood.map((item, i) => (
+                                <CompactCard key={item.id} item={item} subtitle="Telugu" onClick={() => onNavigate({ id: 'playlist', data: item })} />
+                            ))}
+                        </HorizontalScroll>
+                    </section>
+
+                    {/* Hollywood */}
+                    <section>
+                        <Header title="Hollywood & Western" />
+                        <HorizontalScroll>
+                            {content.hollywood.map((item, i) => (
+                                <CompactCard key={item.id} item={item} subtitle="English" onClick={() => onNavigate({ id: 'playlist', data: item })} />
+                            ))}
+                        </HorizontalScroll>
+                    </section>
                 </div>
 
-                {/* Bollywood */}
-                <section>
-                    <Header title="Bollywood Hits" />
-                    <HorizontalScroll>
-                        {content.bollywood.map((item, i) => (
-                            <CompactCard key={item.id} item={item} subtitle="Hindi" onClick={() => onNavigate({ id: 'playlist', data: item })} />
-                        ))}
-                    </HorizontalScroll>
-                </section>
-
-                {/* Tollywood */}
-                <section>
-                    <Header title="Tollywood Beats" />
-                    <HorizontalScroll>
-                        {content.tollywood.map((item, i) => (
-                            <CompactCard key={item.id} item={item} subtitle="Telugu" onClick={() => onNavigate({ id: 'playlist', data: item })} />
-                        ))}
-                    </HorizontalScroll>
-                </section>
-
-                {/* Hollywood */}
-                <section>
-                    <Header title="Hollywood & Western" />
-                    <HorizontalScroll>
-                        {content.hollywood.map((item, i) => (
-                            <CompactCard key={item.id} item={item} subtitle="English" onClick={() => onNavigate({ id: 'playlist', data: item })} />
-                        ))}
-                    </HorizontalScroll>
-                </section>
             </div>
-
         </div>
     );
 }

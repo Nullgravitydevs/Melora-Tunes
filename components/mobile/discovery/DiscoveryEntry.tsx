@@ -419,7 +419,7 @@ function SettingsTab() {
                     <h3 className="text-xs font-bold uppercase text-white/40 tracking-widest px-2">Account</h3>
                     <div className="bg-neutral-900/50 border border-white/5 rounded-3xl overflow-hidden divide-y divide-white/5">
                         <div className="p-5 flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-blue-500" />
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-zinc-400 to-zinc-600" />
                             <div>
                                 <p className="font-bold">Justin</p>
                                 <p className="text-xs text-white/50">Premium Plan</p>

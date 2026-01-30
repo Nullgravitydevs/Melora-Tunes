@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server } from "lucide-react";
+import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server, User } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
@@ -15,7 +15,7 @@ interface DesktopSettingsModalProps {
     currentLayout?: 'deck' | 'ipod' | 'discovery';
 }
 
-type SettingsTab = 'experience' | 'audio' | 'library' | 'stats' | 'support' | 'about';
+type SettingsTab = 'profile' | 'experience' | 'audio' | 'library' | 'stats' | 'support' | 'about';
 
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const {
@@ -24,14 +24,20 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     } = usePlayback();
 
     // Local State for Performance (Detached from Context)
-    const [activeTab, setActiveTab] = useState<SettingsTab>('experience');
+    const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [languages, setLanguages] = useState<string[]>([]);
+
+    // Profile State
+    const [profileName, setProfileName] = useState("");
+    const [profileDOB, setProfileDOB] = useState("");
 
     // Load settings once on mount
     useEffect(() => {
         const s = loadSettings();
         setLanguages(s.languages || ['english', 'hindi']);
+        if (s.userName) setProfileName(s.userName);
+        if (s.userDOB) setProfileDOB(s.userDOB);
     }, []);
 
     const updateLanguages = (newLangs: string[]) => {
@@ -40,9 +46,14 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
         saveSettings({ languages: newLangs });
     };
 
+    const saveProfile = () => {
+        saveSettings({ userName: profileName, userDOB: profileDOB });
+    };
+
     if (!isOpen) return null;
 
     const tabs = [
+        { id: 'profile', label: 'Profile', icon: User },
         { id: 'experience', label: 'Experience', icon: Monitor },
         { id: 'audio', label: 'Audio', icon: Volume2 },
         { id: 'library', label: 'Library', icon: Database },
@@ -111,6 +122,65 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                         </button>
 
                         <div className="max-w-2xl mx-auto py-4">
+                            {/* PROFILE TAB */}
+                            {activeTab === 'profile' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <header>
+                                        <h1 className="text-3xl font-bold text-white mb-2">My Profile</h1>
+                                        <p className="text-zinc-500">Manage your identity.</p>
+                                    </header>
+
+                                    <div className="bg-zinc-900/40 p-8 rounded-3xl border border-white/5 space-y-6">
+                                        <div className="flex items-center gap-6 mb-8">
+                                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-2xl">
+                                                {profileName ? profileName.charAt(0).toUpperCase() : <User size={40} />}
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-bold text-white">{profileName || "Guest User"}</h3>
+                                                <p className="text-zinc-500 text-sm">Local Profile</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-6">
+                                            <div>
+                                                <label className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Display Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={profileName}
+                                                    onChange={(e) => {
+                                                        setProfileName(e.target.value);
+                                                    }}
+                                                    onBlur={saveProfile}
+                                                    placeholder="Enter your name"
+                                                    className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Date of Birth</label>
+                                                <input
+                                                    type="date"
+                                                    value={profileDOB}
+                                                    onChange={(e) => {
+                                                        setProfileDOB(e.target.value);
+                                                    }}
+                                                    onBlur={saveProfile}
+                                                    className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 flex justify-end">
+                                            <button
+                                                onClick={saveProfile}
+                                                className="px-6 py-2 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors text-sm"
+                                            >
+                                                Save Changes
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* EXPERIENCE TAB */}
                             {activeTab === 'experience' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
