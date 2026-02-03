@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Play, Pause, Clock, TrendingUp, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown } from "lucide-react";
+import { Search, X, Play, Pause, Clock, TrendingUp, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
@@ -74,7 +74,7 @@ interface SearchViewProps {
 }
 
 export function SearchView({ onNavigate }: SearchViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality } = usePlayback();
+    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality, isDownloaded } = usePlayback();
 
     // FIX 1: Stable search mix ID to prevent memory leak
     const SEARCH_MIX_ID = 'search-results';
@@ -457,6 +457,13 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                                                     {hasFLAC && track.preferredQuality !== 'flac' && track.preferredQuality !== 'hires' && (
                                                         <span className="quality-badge quality-flac flex-shrink-0 opacity-60">
                                                             +FLAC
+                                                        </span>
+                                                    )}
+
+                                                    {/* Downloaded badge */}
+                                                    {isDownloaded(track.id) && (
+                                                        <span className="flex-shrink-0 text-emerald-400" title="Downloaded">
+                                                            <Download size={12} />
                                                         </span>
                                                     )}
                                                 </div>

@@ -4,7 +4,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Heart, Clock, ListMusic, Plus, Play, Pause, MoreHorizontal,
-    Shuffle, Music, Trash2, ChevronRight, Disc, User, Pin as PinIcon
+    Shuffle, Music, Trash2, ChevronRight, Disc, User, Pin as PinIcon,
+    Download
 } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
@@ -69,7 +70,8 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
         currentSong, isPlaying, togglePlay,
         addMix, loadMix, deleteMix, playInstantMix,
         qualityPreference, showToast, togglePin,
-        savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist
+        savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist,
+        isDownloaded
     } = usePlayback();
 
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'liked');
@@ -317,6 +319,11 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                         <span className={`quality-badge ${quality.class} flex-shrink-0`}>
                             {quality.label}
                         </span>
+                        {isDownloaded(song.id) && (
+                            <span className="flex-shrink-0 text-emerald-400" title="Downloaded">
+                                <Download size={12} />
+                            </span>
+                        )}
                     </div>
                     <p className="text-sm text-white/40 truncate">{song.primaryArtists}</p>
                 </div>
