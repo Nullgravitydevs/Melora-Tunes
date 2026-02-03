@@ -83,6 +83,8 @@ interface PlaybackContextType {
     addMix: (mix: Mix) => boolean;
     updateMix: (mixId: string, updates: Partial<Mix>) => void;
     deleteMix: (mixId: string) => void;
+    undoDeleteMix: () => void;
+    deletedMixBackup: { mix: Mix; index: number } | null;
     addSongToMix: (mixId: string, song: JioSaavnSong | PlayableTrack) => void;
     isLoaded: boolean;
     activeMix: Mix | undefined;
@@ -144,6 +146,14 @@ interface PlaybackContextType {
     // Active Streaming Quality
     activeQuality: AudioQuality | null;
 
+    // Library: Albums & Artists
+    savedAlbums: any[];
+    savedArtists: any[];
+    toggleSaveAlbum: (album: any) => void;
+    toggleFollowArtist: (artist: any) => void;
+    isAlbumSaved: (id: string) => boolean;
+    isArtistFollowed: (id: string) => boolean;
+
     // Toasts
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
@@ -177,9 +187,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [downloadedState, setDownloadedState] = useState<Record<string, AudioQuality[]>>({});
     const [activeQuality, setActiveQuality] = useState<AudioQuality | null>(null);
 
+    // Library State
+    const [savedAlbums, setSavedAlbums] = useState<any[]>([]);
+    const [savedArtists, setSavedArtists] = useState<any[]>([]);
+
     // Toast State
     const [toast, setToast] = useState<ToastState | null>(null);
     const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Undo Delete State
+    const [deletedMixBackup, setDeletedMixBackup] = useState<{ mix: Mix; index: number } | null>(null);
+    const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // EQ Hook
     const eq = useEqualizer();
@@ -236,17 +254,29 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                // Sanitize
-                const sanitized = parsed.map((m: Mix) => ({
-                    ...m,
-                    songs: m.songs.filter(s => {
-                        const song = isPlayableTrack(s) ? (s.song || s.original) : s;
-                        if (!song) return false;
-                        return !song.id.startsWith('mock-') && !song.name.startsWith('Track ');
-                    })
-                })).filter((m: Mix) => {
+                // Sanitize and Color Migration
+                const sanitized = parsed.map((m: Mix) => {
+                    const validColors = ["orange", "purple", "white", "green", "red", "blue", "cyan", "pink", "teal", "yellow", "black"];
+
+                    // Validation only, no auto-assignment of random colors
+                    let color = m.color;
+                    if (m.color && !validColors.includes(m.color)) {
+                        color = 'purple'; // Default fallback only if invalid
+                    }
+
+                    return {
+                        ...m,
+                        color,
+                        songs: m.songs.filter(s => {
+                            const song = isPlayableTrack(s) ? (s.song || s.original) : s;
+                            if (!song) return false;
+                            return !song.id.startsWith('mock-') && !song.name.startsWith('Track ');
+                        })
+                    };
+                }).filter((m: Mix) => {
+                    // Only filter duplicate Discovery Mix entries with wrong ID
                     if (m.title === 'Discovery Mix' && m.id !== DISCOVERY_MIX_ID) return false;
-                    return !['Pawan Kalyan Hits', 'DSP Hits', 'Megastar Hits', 'Yuvan Shankar Raja'].includes(m.title);
+                    return true;
                 });
 
                 // Enforce Discovery Mix at Top
@@ -321,6 +351,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (savedRecent) {
             try { setRecentlyPlayed(JSON.parse(savedRecent)); } catch (e) { console.error(e); }
         }
+        const savedAlb = localStorage.getItem('melora-saved-albums');
+        if (savedAlb) {
+            try { setSavedAlbums(JSON.parse(savedAlb)); } catch (e) { console.error(e); }
+        }
+        const savedArt = localStorage.getItem('melora-saved-artists');
+        if (savedArt) {
+            try { setSavedArtists(JSON.parse(savedArt)); } catch (e) { console.error(e); }
+        }
     }, []);
 
     // Persist liked songs
@@ -331,11 +369,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [likedSongs]);
 
     // Persist recently played
+
     useEffect(() => {
         if (recentlyPlayed.length > 0) {
             localStorage.setItem('melora-recently-played', JSON.stringify(recentlyPlayed));
         }
     }, [recentlyPlayed]);
+
+    useEffect(() => {
+        localStorage.setItem('melora-saved-albums', JSON.stringify(savedAlbums));
+    }, [savedAlbums]);
+
+    useEffect(() => {
+        localStorage.setItem('melora-saved-artists', JSON.stringify(savedArtists));
+    }, [savedArtists]);
 
     // Toggle like function
     // Toggle like function
@@ -369,6 +416,34 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const isLiked = useCallback((songId: string) => {
         return likedSongs.some(s => s.id === songId);
     }, [likedSongs]);
+
+    // NEW: Album & Artist Helpers
+    const toggleSaveAlbum = useCallback((album: any) => {
+        setSavedAlbums(prev => {
+            const exists = prev.some(a => a.id === album.id);
+            if (exists) {
+                showToast(`Removed "${album.name || album.title}" from Library`, 'info');
+                return prev.filter(a => a.id !== album.id);
+            }
+            showToast(`Added "${album.name || album.title}" to Library`, 'success');
+            return [album, ...prev];
+        });
+    }, [showToast]);
+
+    const toggleFollowArtist = useCallback((artist: any) => {
+        setSavedArtists(prev => {
+            const exists = prev.some(a => a.id === artist.id);
+            if (exists) {
+                showToast(`Unfollowed ${artist.name}`, 'info');
+                return prev.filter(a => a.id !== artist.id);
+            }
+            showToast(`Followed ${artist.name}`, 'success');
+            return [artist, ...prev];
+        });
+    }, [showToast]);
+
+    const isAlbumSaved = useCallback((id: string) => savedAlbums.some(a => a.id === id), [savedAlbums]);
+    const isArtistFollowed = useCallback((id: string) => savedArtists.some(a => a.id === id), [savedArtists]);
 
     // [FIX Bug 20] Reset downgrade guard on song change
     useEffect(() => {
@@ -415,11 +490,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             const isSystem = mix.id === DISCOVERY_MIX_ID || mix.id === 'quick-play' || mix.id === 'search-results';
             const userTapeCount = prev.filter(m => m.id !== DISCOVERY_MIX_ID).length;
 
-            if (!isSystem && userTapeCount >= 8) {
-                console.log("Limit blocked (atomic check).");
-                limitReached = true;
-                return prev;
-            }
+            // Limit Check REMOVED - User allows unlimited Discovery playlists
+            // Visual Limit moved to DeckStage
+            // if (!isSystem && userTapeCount >= 8) ... -> Removed
 
             // 3. Add new
             return [...prev, mix];
@@ -472,11 +545,52 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             showToast("Cannot delete the Discovery Mix!", 'error');
             return;
         }
+
+        // Find the mix and its position before deleting
+        const mixIndex = mixes.findIndex(m => m.id === mixId);
+        const mixToDelete = mixes[mixIndex];
+
+        if (!mixToDelete) return;
+
+        // Store backup for undo
+        setDeletedMixBackup({ mix: mixToDelete, index: mixIndex });
+
+        // Clear any existing undo timeout
+        if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+
+        // Set 5-second timer to clear the backup
+        undoTimeoutRef.current = setTimeout(() => {
+            setDeletedMixBackup(null);
+        }, 5000);
+
+        // Delete the mix
         setMixes(prev => prev.filter(m => m.id !== mixId));
+
         if (activeMixId === mixId) {
             setActiveMixId(null);
             setIsPlaying(false);
         }
+
+        showToast(`Deleted "${mixToDelete.title}" - Tap to Undo`, 'info');
+    };
+
+    const undoDeleteMix = () => {
+        if (!deletedMixBackup) return;
+
+        const { mix, index } = deletedMixBackup;
+
+        // Restore mix at original position
+        setMixes(prev => {
+            const newMixes = [...prev];
+            newMixes.splice(index, 0, mix);
+            return newMixes;
+        });
+
+        // Clear backup and timeout
+        setDeletedMixBackup(null);
+        if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+
+        showToast(`Restored "${mix.title}"`, 'success');
     };
 
     // --- Persistence Effects ---
@@ -1555,6 +1669,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         addMix,
         updateMix,
         deleteMix,
+        undoDeleteMix,
+        deletedMixBackup,
         addSongToMix,
         isLoaded,
         activeMix,
@@ -1575,7 +1691,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         eq,
         downloadSong, removeDownload, isDownloaded,
         playInstantMix,
-        showToast,
+        savedAlbums,
+        savedArtists,
+        toggleSaveAlbum,
+        toggleFollowArtist,
+        isAlbumSaved,
+        isArtistFollowed,
+        showToast
     };
 
     return (
@@ -1641,7 +1763,6 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         </PlaybackContext.Provider >
     );
 }
-
 export function usePlayback() {
     const context = useContext(PlaybackContext);
     if (context === undefined) {

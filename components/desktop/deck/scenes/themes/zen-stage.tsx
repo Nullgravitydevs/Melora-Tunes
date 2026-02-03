@@ -3,7 +3,8 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Camera, Pencil, Mic2, SlidersHorizontal, Sun, Moon } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Camera, Pencil, Mic2, SlidersHorizontal, Sun, Moon, ListMusic } from "lucide-react";
+import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
@@ -73,6 +74,7 @@ export function ZenStage({
 
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
+    const [isRackOpen, setIsRackOpen] = useState(false);
 
     // Drag Logic Helpers
     const isDraggingRef = useRef(false);
@@ -158,6 +160,11 @@ export function ZenStage({
                         )}>
                             Cinema Mode
                         </button>
+                        <button onPointerDown={(e) => e.stopPropagation()} onClick={() => setIsRackOpen(true)} className={clsx("font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1 flex items-center gap-2",
+                            isDark ? "text-white/50 hover:text-white hover:border-white/30" : "text-black/50 hover:text-black hover:border-black/30"
+                        )}>
+                            <ListMusic size={14} /> Rack
+                        </button>
                         <button onPointerDown={(e) => e.stopPropagation()} onClick={onCreateMix} className={clsx("font-mono text-sm tracking-widest uppercase transition-colors border-b border-transparent pb-1",
                             isDark ? "text-white/50 hover:text-white hover:border-white/30" : "text-black/50 hover:text-black hover:border-black/30"
                         )}>
@@ -205,90 +212,116 @@ export function ZenStage({
                             isDark ? "text-white" : "text-black"
                         )}>Your Mixtapes</motion.h2>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pb-4">
-                            {mixes.map((mix) => {
-                                if (mix.id === activeMixId) return null;
+                            {mixes
+                                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                                .map((mix) => {
+                                    if (mix.id === activeMixId) return null;
 
-                                return (
-                                    <motion.div
-                                        key={mix.id}
-                                        layout
-                                        drag
-                                        dragConstraints={containerRef}
-                                        dragElastic={0.2}
-                                        dragMomentum
-                                        onDragStart={handleDragStart}
-                                        onDragEnd={(e, info) => handleDragEnd(e, info, mix.id)}
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        whileHover={{ scale: 1.05, zIndex: 50, transition: { duration: 0.2 } }}
-                                        whileDrag={{ scale: 1.1, zIndex: 100, rotate: 2, cursor: "grabbing" }}
-                                        onClick={() => handleClick(() => {
-                                            playClunk();
-                                            loadMix(mix.id);
-                                        })}
-                                        className={clsx("group relative w-full aspect-[3/2] rounded-lg shadow-lg border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing overflow-visible z-0 transition-colors",
-                                            isDark ? "bg-[#111] border-white/10" : "bg-white border-black/10 shadow-xl"
-                                        )}
-                                    >
-                                        {/* Screws */}
-                                        <div className={clsx("absolute top-2 left-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
-                                        <div className={clsx("absolute top-2 right-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
-                                        <div className={clsx("absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
-                                        <div className={clsx("absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+                                    // Color Logic
+                                    const cassetteColors: Record<string, string> = {
+                                        // Zen is monochrome/minimal.
+                                        purple: "bg-zinc-900",
+                                        orange: "bg-zinc-900",
+                                        green: "bg-zinc-900",
+                                        red: "bg-zinc-900",
+                                        white: "bg-zinc-200",
+                                        blue: "bg-zinc-900",
+                                        yellow: "bg-zinc-900",
+                                        cyan: "bg-zinc-900",
+                                        pink: "bg-zinc-900",
+                                        black: "bg-zinc-900"
+                                    };
 
-                                        {/* Label */}
-                                        <div className={clsx("relative mx-1 mt-1 h-3/5 rounded-sm shadow-sm p-1 transform rotate-0 group-hover:rotate-[0.5deg] transition-all duration-500 flex flex-col justify-center items-center overflow-hidden z-10",
-                                            isDark ? "bg-white" : "bg-zinc-100 border border-zinc-200"
-                                        )}>
-                                            <div className="absolute top-1 left-1 font-mono font-bold text-black text-xs opacity-60">A</div>
-                                            <h3 className="font-hand font-bold text-sm text-black tracking-tight text-center line-clamp-2 w-full px-1">
-                                                {mix.title}
-                                            </h3>
-                                            <p className="font-mono text-[8px] text-black/40 absolute bottom-1 uppercase tracking-widest">Melora High Bias</p>
-                                        </div>
+                                    // Zen Aesthetic: Ignore mix color for body, enforce theme monochrome
+                                    // But keep mix.color for accents if we want (currently not used much)
+                                    // Effectively: Dark Mode -> Zinc 900, Light Mode -> Zinc 200
 
-                                        {/* Reels */}
-                                        <div className={clsx("mx-2 mb-1 h-8 rounded-full flex items-center justify-between px-2 relative border",
-                                            isDark ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"
-                                        )}>
-                                            {/* Left Reel */}
-                                            <div className={clsx("w-6 h-6 bg-transparent rounded-full border-2 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700",
-                                                isDark ? "border-white/40" : "border-black/40"
+                                    const effectiveColor = mix.color || 'black';
+                                    const colorClass = isDark ? "bg-zinc-900" : "bg-zinc-200";
+                                    const isDarkCassette = isDark; // In dark mode, tapes are dark. In light mode, tapes are light.
+
+                                    return (
+                                        <motion.div
+                                            key={mix.id}
+                                            layout
+                                            drag
+                                            dragConstraints={containerRef}
+                                            dragElastic={0.2}
+                                            dragMomentum
+                                            onDragStart={handleDragStart}
+                                            onDragEnd={(e, info) => handleDragEnd(e, info, mix.id)}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            whileHover={{ scale: 1.05, zIndex: 50, transition: { duration: 0.2 } }}
+                                            whileDrag={{ scale: 1.1, zIndex: 100, rotate: 2, cursor: "grabbing" }}
+                                            onClick={() => handleClick(() => {
+                                                playClunk();
+                                                loadMix(mix.id);
+                                            })}
+                                            className={clsx("group relative w-full aspect-[3/2] rounded-lg shadow-lg border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing overflow-visible z-0 transition-colors",
+                                                colorClass,
+                                                isDarkCassette ? "border-white/10" : "border-black/10 shadow-xl"
+                                            )}
+                                        >
+                                            {/* Screws */}
+                                            <div className={clsx("absolute top-2 left-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+                                            <div className={clsx("absolute top-2 right-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+                                            <div className={clsx("absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+                                            <div className={clsx("absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full flex items-center justify-center", isDark ? "bg-white/10" : "bg-black/10")}><div className={clsx("w-1 h-[0.5px] rotate-45", isDark ? "bg-white/30" : "bg-black/30")}></div></div>
+
+                                            {/* Label */}
+                                            <div className={clsx("relative mx-1 mt-1 h-3/5 rounded-sm shadow-sm p-1 transform rotate-0 group-hover:rotate-[0.5deg] transition-all duration-500 flex flex-col justify-center items-center overflow-hidden z-10",
+                                                isDark ? "bg-white" : "bg-zinc-100 border border-zinc-200"
                                             )}>
-                                                <div className={clsx("w-1.5 h-1.5 rounded-full", isDark ? "bg-white" : "bg-black")}></div>
-                                                <div className={clsx("absolute inset-0 border rounded-full border-dashed", isDark ? "border-white/20" : "border-black/20")}></div>
+                                                <div className="absolute top-1 left-1 font-mono font-bold text-black text-xs opacity-60">A</div>
+                                                <h3 className="font-hand font-bold text-sm text-black tracking-tight text-center line-clamp-2 w-full px-1">
+                                                    {mix.title}
+                                                </h3>
+                                                <p className="font-mono text-[8px] text-black/40 absolute bottom-1 uppercase tracking-widest">Melora High Bias</p>
                                             </div>
 
-                                            <div className="flex-grow h-3 mx-1 flex items-center justify-center">
-                                                <span className={clsx("text-[5px] font-mono", isDark ? "text-white/30" : "text-black/30")}>TYPE I</span>
-                                            </div>
-
-                                            {/* Right Reel */}
-                                            <div className={clsx("w-6 h-6 bg-transparent rounded-full border-2 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700",
-                                                isDark ? "border-white/40" : "border-black/40"
+                                            {/* Reels */}
+                                            <div className={clsx("mx-2 mb-1 h-8 rounded-full flex items-center justify-between px-2 relative border",
+                                                isDark ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"
                                             )}>
-                                                <div className={clsx("w-1.5 h-1.5 rounded-full", isDark ? "bg-white" : "bg-black")}></div>
-                                                <div className={clsx("absolute inset-0 border rounded-full border-dashed", isDark ? "border-white/20" : "border-black/20")}></div>
+                                                {/* Left Reel */}
+                                                <div className={clsx("w-6 h-6 bg-transparent rounded-full border-2 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700",
+                                                    isDark ? "border-white/40" : "border-black/40"
+                                                )}>
+                                                    <div className={clsx("w-1.5 h-1.5 rounded-full", isDark ? "bg-white" : "bg-black")}></div>
+                                                    <div className={clsx("absolute inset-0 border rounded-full border-dashed", isDark ? "border-white/20" : "border-black/20")}></div>
+                                                </div>
+
+                                                <div className="flex-grow h-3 mx-1 flex items-center justify-center">
+                                                    <span className={clsx("text-[5px] font-mono", isDark ? "text-white/30" : "text-black/30")}>TYPE I</span>
+                                                </div>
+
+                                                {/* Right Reel */}
+                                                <div className={clsx("w-6 h-6 bg-transparent rounded-full border-2 flex items-center justify-center relative group-hover:rotate-180 transition-transform duration-700",
+                                                    isDark ? "border-white/40" : "border-black/40"
+                                                )}>
+                                                    <div className={clsx("w-1.5 h-1.5 rounded-full", isDark ? "bg-white" : "bg-black")}></div>
+                                                    <div className={clsx("absolute inset-0 border rounded-full border-dashed", isDark ? "border-white/20" : "border-black/20")}></div>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Song Count Badge */}
-                                        <div className={clsx("absolute -right-1 top-2/3 text-[8px] font-bold py-0.5 px-1.5 rounded-l-sm shadow-md",
-                                            isDark ? "bg-white text-black" : "bg-black text-white"
-                                        )}>
-                                            {mix.songs.length} SONGS
-                                        </div>
+                                            {/* Song Count Badge */}
+                                            <div className={clsx("absolute -right-1 top-2/3 text-[8px] font-bold py-0.5 px-1.5 rounded-l-sm shadow-md",
+                                                isDark ? "bg-white text-black" : "bg-black text-white"
+                                            )}>
+                                                {mix.songs.length} SONGS
+                                            </div>
 
-                                        {/* Action Buttons (Edit/Snapshot/Share/Add) */}
-                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Edit"><Pencil size={10} className="text-black" /></button>
-                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Snapshot"><Camera size={10} className="text-black" /></button>
-                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Share"><Share2 size={10} className="text-black" /></button>
-                                            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Add Songs"><Plus size={10} className="text-black" /></button>
-                                        </div>
-                                    </motion.div>
-                                );
-                            })}
+                                            {/* Action Buttons (Edit/Snapshot/Share/Add) */}
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Edit"><Pencil size={10} className="text-black" /></button>
+                                                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Snapshot"><Camera size={10} className="text-black" /></button>
+                                                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Share"><Share2 size={10} className="text-black" /></button>
+                                                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white rounded-full shadow hover:scale-110 transition-transform" title="Add Songs"><Plus size={10} className="text-black" /></button>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
                             <div
                                 onClick={onCreateMix}
                                 className={clsx("w-full aspect-[3/2] rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group gap-2",
@@ -543,6 +576,9 @@ export function ZenStage({
                     {/* Footer Content */}
                 </footer>
             </div>
-        </div>
+
+
+            <TapeRackModal isOpen={isRackOpen} onClose={() => setIsRackOpen(false)} />
+        </div >
     );
 }

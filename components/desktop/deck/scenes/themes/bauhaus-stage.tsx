@@ -10,7 +10,8 @@ import { useAudio } from "@/hooks/use-audio";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { Mic2, SlidersHorizontal } from "lucide-react";
+import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
+import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 
 interface BauhausStageProps {
     currentTheme: ThemeKey;
@@ -92,7 +93,7 @@ function DraggableMixCard({
             dragElastic={0.1}
             whileDrag={{ scale: 1.05, zIndex: 100, rotate: 0 }}
             whileHover={{ scale: 1.02, zIndex: 50 }}
-            className={clsx("absolute top-0 left-0 cursor-grab active:cursor-grabbing w-[200px]", isActive && "opacity-50 pointer-events-none grayscale")}
+            className={clsx("absolute top-0 left-0 cursor-grab active:cursor-grabbing w-[200px] group", isActive && "opacity-50 pointer-events-none grayscale")}
             onDragEnd={(e, info) => {
                 // Check drop on player
                 if (playerRef.current) {
@@ -112,11 +113,23 @@ function DraggableMixCard({
             <div
                 id={`mix-card-${mix.id}`}
                 className={clsx(
-                    "relative p-3 border-2 border-[#1a1a1a] transition-transform transform aspect-[3/2] flex flex-col justify-between shadow-[6px_6px_0px_0px_#1a1a1a] bg-white"
+                    "relative p-3 border-2 border-[#1a1a1a] transition-transform transform aspect-[3/2] flex flex-col justify-between shadow-[6px_6px_0px_0px_#1a1a1a]",
+                    // Bauhaus Color Mapping: Strict Theme-Controlled Colors (Ignoring mix.color)
+                    (() => {
+                        // Deterministic Hash based on Mix ID - Theme decides the color, not the playlist
+                        const primaryOptions = ['red', 'blue', 'yellow'];
+                        let hash = 0;
+                        for (let i = 0; i < mix.id.length; i++) hash = mix.id.charCodeAt(i) + ((hash << 5) - hash);
+                        const effectiveColor = primaryOptions[Math.abs(hash) % primaryOptions.length];
+
+                        return effectiveColor === 'red' ? "bg-red-600" :
+                            effectiveColor === 'blue' ? "bg-blue-600" :
+                                "bg-yellow-400";
+                    })()
                 )}
             >
                 {/* Action Buttons */}
-                <div className="absolute top-2 right-2 flex flex-row gap-1 z-20 no-snapshot opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute -top-3 -right-3 flex flex-row gap-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity bg-white border-2 border-black p-1 shadow-lg pointer-events-auto">
                     <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white border border-black hover:bg-yellow-300"><Pencil size={10} /></button>
                     <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white border border-black hover:bg-yellow-300"><Camera size={10} /></button>
                     <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white border border-black hover:bg-yellow-300"><Share2 size={10} /></button>
@@ -165,6 +178,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
     const { playClick, playEject } = useAudio();
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
+    const [isRackOpen, setIsRackOpen] = useState(false);
 
     // Memoize activeMix
     const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId) || null, [mixes, activeMixId]);
@@ -240,6 +254,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                         <button onClick={onCreateMix} className="flex items-center gap-2 bg-[#ffcc00] text-[#1a1a1a] border-2 border-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all text-sm">
                             <Plus size={14} /> Create Mix
                         </button>
+                        <button onClick={() => setIsRackOpen(true)} className="flex items-center gap-2 bg-white text-[#1a1a1a] border-2 border-[#1a1a1a] px-4 py-2 uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all text-sm">
+                            <ListMusic size={14} /> Rack
+                        </button>
                         <div className="relative">
                             <button onClick={() => onOpenThemeSelector?.()} className="p-3 bg-white border-2 border-[#1a1a1a] hover:bg-gray-100 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all">
                                 <Palette size={20} />
@@ -253,26 +270,29 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
 
                 <main className="h-full relative overflow-hidden">
                     {/* Free Floating Tapes */}
-                    {mixes.map(mix => {
-                        if (!positions[mix.id]) return null;
-                        return (
-                            <DraggableMixCard
-                                key={mix.id}
-                                mix={mix}
-                                position={positions[mix.id]}
-                                isActive={activeMixId === mix.id}
-                                containerRef={containerRef}
-                                playerRef={playerRef}
-                                onDragEnd={handlePosChange}
-                                loadMix={loadMix}
-                                playClick={playClick}
-                                onEditMix={onEditMix}
-                                onSnapshotMix={onSnapshotMix}
-                                onShareMix={onShareMix}
-                                onOpenSearch={onOpenSearch}
-                            />
-                        );
-                    })}
+                    {mixes
+                        .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                        .slice(0, 9)
+                        .map(mix => {
+                            if (!positions[mix.id]) return null;
+                            return (
+                                <DraggableMixCard
+                                    key={mix.id}
+                                    mix={mix}
+                                    position={positions[mix.id]}
+                                    isActive={activeMixId === mix.id}
+                                    containerRef={containerRef}
+                                    playerRef={playerRef}
+                                    onDragEnd={handlePosChange}
+                                    loadMix={loadMix}
+                                    playClick={playClick}
+                                    onEditMix={onEditMix}
+                                    onSnapshotMix={onSnapshotMix}
+                                    onShareMix={onShareMix}
+                                    onOpenSearch={onOpenSearch}
+                                />
+                            );
+                        })}
 
                     {/* Right Column: Player (Fixed Position but Draggable) */}
                     <motion.section
@@ -437,6 +457,8 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                     )}
                 </AnimatePresence>
             </div>
+
+            <TapeRackModal isOpen={isRackOpen} onClose={() => setIsRackOpen(false)} />
         </div>
     );
 }

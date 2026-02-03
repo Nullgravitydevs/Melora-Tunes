@@ -17,7 +17,7 @@ interface ArtistViewProps {
 }
 
 export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId } = usePlayback();
+    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, toggleFollowArtist, isArtistFollowed } = usePlayback();
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -134,7 +134,7 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
                     {artistImage ? (
                         <img src={artistImage} alt="" className="w-48 h-48 rounded-full object-cover shadow-2xl border-4 border-white/10" />
                     ) : (
-                        <div className="w-48 h-48 rounded-full bg-white/10 flex items-center justify-center">
+                        <div className="w-48 h-48 rounded-full bg-black border border-white/10 flex items-center justify-center">
                             <User size={48} className="text-white/30" />
                         </div>
                     )}
@@ -160,16 +160,17 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
                 </motion.button>
                 <motion.button
                     onClick={() => playAll(true)}
-                    className="p-3 rounded-full bg-white/10 hover:bg-white/15"
+                    className="p-3 rounded-full bg-black border border-white/10 hover:border-white/20 transition-colors"
                     whileTap={{ scale: 0.9 }}
                 >
                     <Shuffle size={18} />
                 </motion.button>
                 <motion.button
-                    className="p-3 rounded-full bg-white/10 hover:bg-white/15"
+                    onClick={() => toggleFollowArtist(artist)}
+                    className={`p-3 rounded-full bg-black border hover:border-white/20 transition-colors ${isArtistFollowed(artist.id) ? 'border-red-500/50' : 'border-white/10'}`}
                     whileTap={{ scale: 0.9 }}
                 >
-                    <Heart size={18} />
+                    <Heart size={18} fill={isArtistFollowed(artist.id) ? "currentColor" : "none"} className={isArtistFollowed(artist.id) ? "text-red-500" : ""} />
                 </motion.button>
             </div>
 

@@ -13,7 +13,8 @@ import { decodeHtml } from "@/lib/utils";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { Mic2, SlidersHorizontal } from "lucide-react";
+import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
+import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { Visualizer } from "@/components/ui/visualizer";
 
 interface OpenDeckStageProps {
@@ -59,6 +60,7 @@ export function OpenDeckStage({
 
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
+    const [isRackOpen, setIsRackOpen] = useState(false);
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
@@ -149,6 +151,7 @@ export function OpenDeckStage({
                 <div className="flex items-center gap-4">
                     <nav className="hidden md:flex items-center gap-5">
                         <button onClick={onCinemaMode} className="text-[#101814] text-[10px] font-semibold tracking-widest uppercase hover:text-[#2d8652]">Cinema Mode</button>
+                        <button onClick={() => setIsRackOpen(true)} className="text-[#101814] text-[10px] font-semibold tracking-widest uppercase hover:text-[#2d8652] flex items-center gap-1"><ListMusic size={12} /> Rack</button>
                         <button onClick={onCreateMix} className="text-[#101814] text-[10px] font-semibold tracking-widest uppercase hover:text-[#2d8652]">+ Create Mix</button>
                     </nav>
                     <div className="flex gap-2">
@@ -172,50 +175,52 @@ export function OpenDeckStage({
                     {/* Scrollable cassette list */}
                     <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="flex flex-col gap-4 pb-4">
-                            {mixes.map((mix, index) => {
-                                const style = getStyleForMix(index);
-                                const isInsidePlayer = isLoaded && activeMixId === mix.id;
-                                const isDragging = draggingMix?.mix.id === mix.id;
+                            {mixes
+                                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                                .map((mix, index) => {
+                                    const style = getStyleForMix(index);
+                                    const isInsidePlayer = isLoaded && activeMixId === mix.id;
+                                    const isDragging = draggingMix?.mix.id === mix.id;
 
-                                return (
-                                    <div
-                                        key={mix.id}
-                                        onPointerDown={(e) => { if (!isInsidePlayer) handleDragStart(mix, index, e); }}
-                                        onClick={() => { if (!isInsidePlayer && !draggingMix) { playClick(); loadMix(mix.id); } }}
-                                        className={clsx(
-                                            "select-none shrink-0",
-                                            isInsidePlayer ? "opacity-40 cursor-default" : "cursor-grab",
-                                            isDragging && "opacity-20"
-                                        )}
-                                    >
-                                        <div className={`w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-lg relative overflow-hidden`}>
-                                            <div className="absolute inset-1 flex items-center justify-center">
-                                                <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
-                                                    <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
-                                                    <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
-                                                </div>
-                                            </div>
-                                            <div className="absolute bottom-1.5 left-2 right-2">
-                                                <p className={`text-[8px] font-bold tracking-tight ${style.text} truncate`}>{mix.title.toUpperCase()}</p>
-                                            </div>
-                                            {isInsidePlayer && (
-                                                <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
-                                                    <span className="text-[7px] font-bold text-white uppercase tracking-wider">Playing</span>
-                                                </div>
+                                    return (
+                                        <div
+                                            key={mix.id}
+                                            onPointerDown={(e) => { if (!isInsidePlayer) handleDragStart(mix, index, e); }}
+                                            onClick={() => { if (!isInsidePlayer && !draggingMix) { playClick(); loadMix(mix.id); } }}
+                                            className={clsx(
+                                                "select-none shrink-0",
+                                                isInsidePlayer ? "opacity-40 cursor-default" : "cursor-grab",
+                                                isDragging && "opacity-20"
                                             )}
-                                            {/* Hover Actions Overlay */}
-                                            {!isInsidePlayer && !isDragging && (
-                                                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
-                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Settings"><Pencil size={10} className="text-slate-800" /></button>
-                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Snapshot"><Camera size={10} className="text-slate-800" /></button>
-                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Share"><Share2 size={10} className="text-slate-800" /></button>
-                                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Add Songs"><Plus size={10} className="text-slate-800" /></button>
+                                        >
+                                            <div className={`w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-lg relative overflow-hidden`}>
+                                                <div className="absolute inset-1 flex items-center justify-center">
+                                                    <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
+                                                        <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
+                                                        <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
+                                                    </div>
                                                 </div>
-                                            )}
+                                                <div className="absolute bottom-1.5 left-2 right-2">
+                                                    <p className={`text-[8px] font-bold tracking-tight ${style.text} truncate`}>{mix.title.toUpperCase()}</p>
+                                                </div>
+                                                {isInsidePlayer && (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
+                                                        <span className="text-[7px] font-bold text-white uppercase tracking-wider">Playing</span>
+                                                    </div>
+                                                )}
+                                                {/* Hover Actions Overlay */}
+                                                {!isInsidePlayer && !isDragging && (
+                                                    <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
+                                                        <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Settings"><Pencil size={10} className="text-slate-800" /></button>
+                                                        <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Snapshot"><Camera size={10} className="text-slate-800" /></button>
+                                                        <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Share"><Share2 size={10} className="text-slate-800" /></button>
+                                                        <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="p-1 bg-white/90 rounded-full hover:bg-white" title="Add Songs"><Plus size={10} className="text-slate-800" /></button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
                         </div>
                     </div>
                 </div>
@@ -394,6 +399,8 @@ export function OpenDeckStage({
                     )}
                 </AnimatePresence>
             </div>
-        </div >
+
+            <TapeRackModal isOpen={isRackOpen} onClose={() => setIsRackOpen(false)} />
+        </div>
     );
 }

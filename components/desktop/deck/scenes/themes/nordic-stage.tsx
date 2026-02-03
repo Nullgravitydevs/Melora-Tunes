@@ -13,7 +13,8 @@ import { decodeHtml } from "@/lib/utils";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { Mic2, SlidersHorizontal } from "lucide-react";
+import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
+import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 
 interface NordicStageProps {
     currentTheme: ThemeKey;
@@ -58,6 +59,7 @@ export function NordicStage({
     const { playClick, playEject } = useAudio();
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
+    const [isRackOpen, setIsRackOpen] = useState(false);
     const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId) || null, [mixes, activeMixId]);
 
     const formatTime = (seconds: number) => {
@@ -86,6 +88,9 @@ export function NordicStage({
                         <button onClick={onCinemaMode} className="hidden md:block font-mono text-sm tracking-widest uppercase hover:text-blue-400 transition-colors border-b border-transparent hover:border-blue-400 pb-1">
                             Cinema Mode
                         </button>
+                        <button onClick={() => setIsRackOpen(true)} className="hidden md:block font-mono text-sm tracking-widest uppercase hover:text-blue-400 transition-colors border-b border-transparent hover:border-blue-400 pb-1 flex items-center gap-2">
+                            <ListMusic size={14} /> Rack
+                        </button>
                         <button onClick={onCreateMix} className="font-mono text-sm tracking-widest uppercase hover:text-blue-400 transition-colors border-b border-transparent hover:border-blue-400 pb-1">
                             + Create Mix
                         </button>
@@ -110,90 +115,101 @@ export function NordicStage({
                         <h2 className="font-mono text-sm tracking-widest text-slate-500 mb-6 border-b border-slate-800 pb-2 inline-block uppercase">Your Mixtapes</h2>
 
                         <div className="flex-1 overflow-y-auto pr-4 space-y-4 [&::-webkit-scrollbar]:hidden">
-                            {mixes.map((mix) => (
-                                <div
-                                    key={mix.id}
-                                    onClick={() => {
-                                        if (activeMixId === mix.id) return; // Prevent reload
-                                        playClick();
-                                        loadMix(mix.id);
-                                    }}
-                                    className={clsx(
-                                        "group flex items-center justify-between p-4 rounded-lg cursor-pointer transition-all duration-300 border",
-                                        mix.id === activeMixId
-                                            ? "bg-slate-800 border-blue-500/50 shadow-lg"
-                                            : "bg-slate-800/50 border-slate-700 hover:bg-slate-800 hover:border-slate-600"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        {/* Mini Cassette Icon */}
-                                        {(() => {
-                                            const colorMap: Record<string, string> = {
-                                                orange: "from-orange-500 to-orange-600 border-orange-400",
-                                                purple: "from-purple-500 to-purple-600 border-purple-400",
-                                                white: "from-slate-200 to-slate-300 border-slate-400",
-                                                green: "from-green-500 to-green-600 border-green-400",
-                                                red: "from-red-500 to-red-600 border-red-400",
-                                                blue: "from-blue-500 to-blue-600 border-blue-400",
-                                                cyan: "from-cyan-500 to-cyan-600 border-cyan-400",
-                                                pink: "from-pink-500 to-pink-600 border-pink-400",
-                                                black: "from-slate-800 to-slate-900 border-slate-600",
-                                            };
-                                            const colorClass = colorMap[mix.color] || "from-slate-600 to-slate-700 border-slate-500";
-                                            const isWhite = mix.color === 'white';
+                            {mixes
+                                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                                .map((mix) => (
+                                    <div
+                                        key={mix.id}
+                                        onClick={() => {
+                                            if (activeMixId === mix.id) return; // Prevent reload
+                                            playClick();
+                                            loadMix(mix.id);
+                                        }}
+                                        className={clsx(
+                                            "group flex items-center justify-between p-4 rounded-lg cursor-pointer transition-all duration-300 border",
+                                            mix.id === activeMixId
+                                                ? "bg-slate-800 border-blue-500/50 shadow-lg"
+                                                : "bg-slate-800/50 border-slate-700 hover:bg-slate-800 hover:border-slate-600"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            {/* Mini Cassette Icon */}
+                                            {(() => {
+                                                const colorMap: Record<string, string> = {
+                                                    orange: "from-orange-500 to-orange-600 border-orange-400",
+                                                    purple: "from-purple-500 to-purple-600 border-purple-400",
+                                                    white: "from-slate-200 to-slate-300 border-slate-400",
+                                                    green: "from-green-500 to-green-600 border-green-400",
+                                                    red: "from-red-500 to-red-600 border-red-400",
+                                                    blue: "from-blue-500 to-blue-600 border-blue-400",
+                                                    cyan: "from-cyan-500 to-cyan-600 border-cyan-400",
+                                                    pink: "from-pink-500 to-pink-600 border-pink-400",
+                                                    black: "from-slate-800 to-slate-900 border-slate-600",
+                                                    yellow: "from-yellow-400 to-yellow-500 border-yellow-300",
+                                                };
 
-                                            return (
-                                                <div className={clsx(
-                                                    "w-12 h-8 bg-gradient-to-br rounded flex items-center justify-center border shadow-sm",
-                                                    colorClass
-                                                )}>
+                                                // Nordic Color Logic: Deterministic Hash (Ignore mix.color)
+                                                // Theme decides the color based on ID to ensure Icy Aesthetic
+                                                const icyOptions = ['blue', 'cyan', 'white', 'purple'];
+                                                let hash = 0;
+                                                for (let i = 0; i < mix.id.length; i++) hash = mix.id.charCodeAt(i) + ((hash << 5) - hash);
+                                                const effectiveColor = icyOptions[Math.abs(hash) % icyOptions.length];
+
+                                                const colorClass = colorMap[effectiveColor] || "from-slate-600 to-slate-700 border-slate-500";
+                                                const isWhite = effectiveColor === 'white';
+
+                                                return (
                                                     <div className={clsx(
-                                                        "w-6 h-4 rounded-sm flex items-center justify-around",
-                                                        isWhite ? "bg-slate-300" : "bg-black/30"
+                                                        "w-12 h-8 bg-gradient-to-br rounded flex items-center justify-center border shadow-sm",
+                                                        colorClass
                                                     )}>
-                                                        <div className={clsx("w-1.5 h-1.5 rounded-full border", isWhite ? "border-slate-500" : "border-white/50")}></div>
-                                                        <div className={clsx("w-1.5 h-1.5 rounded-full border", isWhite ? "border-slate-500" : "border-white/50")}></div>
+                                                        <div className={clsx(
+                                                            "w-6 h-4 rounded-sm flex items-center justify-around",
+                                                            isWhite ? "bg-slate-300" : "bg-black/30"
+                                                        )}>
+                                                            <div className={clsx("w-1.5 h-1.5 rounded-full border", isWhite ? "border-slate-500" : "border-white/50")}></div>
+                                                            <div className={clsx("w-1.5 h-1.5 rounded-full border", isWhite ? "border-slate-500" : "border-white/50")}></div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })()}
-                                        <div>
-                                            <h3 className={clsx("font-mono font-bold text-sm", mix.id === activeMixId ? "text-blue-400" : "text-white")}>{mix.title}</h3>
-                                            <p className="text-xs text-slate-400">{mix.songs.length} songs</p>
+                                                );
+                                            })()}
+                                            <div>
+                                                <h3 className={clsx("font-mono font-bold text-sm", mix.id === activeMixId ? "text-blue-400" : "text-white")}>{mix.title}</h3>
+                                                <p className="text-xs text-slate-400">{mix.songs.length} songs</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }}
+                                                className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                                            >
+                                                <Settings size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }}
+                                                className="p-2 bg-blue-600 hover:bg-blue-500 rounded text-white"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }}
+                                                className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                                                title="Snapshot"
+                                            >
+                                                <Camera size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }}
+                                                className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                                                title="Share"
+                                            >
+                                                <Share2 size={14} />
+                                            </button>
                                         </div>
                                     </div>
-
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }}
-                                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
-                                        >
-                                            <Settings size={14} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }}
-                                            className="p-2 bg-blue-600 hover:bg-blue-500 rounded text-white"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }}
-                                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
-                                            title="Snapshot"
-                                        >
-                                            <Camera size={14} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }}
-                                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
-                                            title="Share"
-                                        >
-                                            <Share2 size={14} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     </section>
 
@@ -357,6 +373,9 @@ export function NordicStage({
                     )}
                 </AnimatePresence>
             </div>
-        </div>
+
+
+            <TapeRackModal isOpen={isRackOpen} onClose={() => setIsRackOpen(false)} />
+        </div >
     );
 }

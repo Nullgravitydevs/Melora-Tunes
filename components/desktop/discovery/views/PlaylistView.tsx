@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2 } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
@@ -15,7 +15,7 @@ interface PlaylistViewProps {
 }
 
 export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId } = usePlayback();
+    const { addMix, updateMix, loadMix, deleteMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin, mixes, qualityPreference, showToast } = usePlayback();
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [filteredSongs, setFilteredSongs] = useState<JioSaavnSong[]>([]);
@@ -24,7 +24,8 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
 
     // Metadata
     const title = playlistData?.title || playlistData?.name || playlistData?.listname || 'Unknown Playlist';
-    const subtitle = playlistData?.subtitle || playlistData?.description || 'Curated Playlist';
+    const isUserMix = mixes.some(m => m.id === playlist?.id);
+    const subtitle = playlistData?.subtitle || playlistData?.description || (isUserMix ? 'Custom Playlist' : 'Curated Playlist');
     const image = getImage(playlistData);
 
     function getImage(item: any) {
@@ -41,9 +42,30 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                 setIsLoading(false);
                 return;
             }
+
+            // 0. PRIORITY: Local Mixes (User Created)
+            // If this playlist exists in our local store, use that data directly.
+            // This prevents "Smart Fallback" from searching the web for your private playlist name.
+            const localMix = mixes.find(m => m.id === playlist.id);
+            if (localMix && localMix.songs && localMix.songs.length > 0) {
+                console.log(`[PlaylistView] Loaded local mix: ${localMix.title}`);
+                // Ensure songs are formatted correctly? They should be since they come from API/Search.
+                setSongs(localMix.songs);
+                setIsLoading(false);
+                return;
+            }
+
+            // Also check if the PROP passed has songs (e.g. passed from LibraryView)
+            if (playlist.songs && Array.isArray(playlist.songs) && playlist.songs.length > 0) {
+                console.log(`[PlaylistView] Using passed songs prop.`);
+                setSongs(playlist.songs);
+                setIsLoading(false);
+                return;
+            }
+
             setIsLoading(true);
             try {
-                // 1. Try Direct Fetch
+                // 1. Try Direct Fetch (Remote)
                 console.log(`[PlaylistView] Fetching details for: ${playlist.id}`);
                 let details = await getPlaylistDetails(playlist.id);
 
@@ -88,38 +110,26 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
             }
         };
         load();
-    }, [playlist?.id, title]);
+    }, [playlist?.id, title, mixes]); // Add mixes to dependencym, so if we add a song, it updates? No, this is mount logic mostly.
 
-    // Filter Songs by Language (User Requirement Step 2)
+    // Filter Songs by Language (RELAXED)
     useEffect(() => {
         if (songs.length === 0) {
             setFilteredSongs([]);
             return;
         }
 
-        const settings = loadSettings();
-        const languages = settings.languages || ['english', 'hindi'];
-
-        // Filter logic as requested
-        const filtered = songs.filter(song => {
-            // Include if song language matches ANY user language
-            // Or if song has NO language (safety fallback)
-            // Or if it's explicitly instrumental?
-            const songLang = (song.language || '').toLowerCase();
-            return languages.some(l => songLang.includes(l.toLowerCase()));
-        });
-
-        // If filter removes EVERYTHING (e.g. user has incompatible languages for this chart),
-        // we should probably show something or just empty?
-        // The user said: "Telugu chart -> Telugu songs only". 
-        // If I open Telugu chart but only speak English, I see 0 songs. This is correct behavior per request.
-        setFilteredSongs(filtered);
+        // User feedback: Don't hide songs in playlists user explicitly clicked.
+        // If I click "Telugu Hits", I want to see Telugu songs even if my setting is English.
+        // Only filter if it's a "For You" generated list, but for specific playlists, show all.
+        setFilteredSongs(songs);
 
     }, [songs]); // Re-run when songs load
 
     // Display duration
-    const totalDuration = filteredSongs.reduce((acc, s) => acc + (s.duration || 0), 0);
+    const totalDuration = filteredSongs.reduce((acc, s) => acc + (typeof s.duration === 'string' ? parseInt(s.duration) : s.duration || 0), 0);
     const formatDuration = (secs: number) => {
+        if (!secs) return '0 min';
         const mins = Math.floor(secs / 60);
         const hours = Math.floor(mins / 60);
         if (hours > 0) return `${hours} hr ${mins % 60} min`;
@@ -148,7 +158,41 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
         loadMix(PLAYLIST_MIX_ID);
     };
 
+    // Delete Playlist
+    const deletePlaylistHandler = () => {
+        if (confirm(`Are you sure you want to delete "${title}"?`)) {
+            // Check if it's the active mix first?
+            deleteMix(playlist.id);
+            showToast(`Deleted "${title}"`, 'info');
+            onBack();
+        }
+    };
+
+    // Remove Song
+    const removeSong = (e: React.MouseEvent, index: number) => {
+        e.stopPropagation();
+        if (!isUserMix) return;
+
+        const newSongs = [...songs];
+        const removed = newSongs.splice(index, 1);
+
+        setSongs(newSongs); // Optimistic UI
+
+        // Update Actual Mix in Context
+        const userMix = mixes.find(m => m.id === playlist.id);
+        if (userMix) {
+            // We need to pass the FULL mix object or checking how updateMix works
+            // updateMix(id, partial)
+            updateMix(playlist.id, { songs: newSongs });
+        }
+
+        showToast(`Removed "${removed[0]?.name || 'song'}"`, 'success');
+    };
+
+    // Play a specific song
     const playSong = (index: number) => {
+        if (filteredSongs.length === 0) return;
+
         const newMix: Mix = {
             id: PLAYLIST_MIX_ID,
             title: title,
@@ -156,12 +200,14 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
             songs: filteredSongs,
             currentSongIndex: index
         };
+
         const added = addMix(newMix);
         if (!added) {
             updateMix(PLAYLIST_MIX_ID, { songs: filteredSongs, currentSongIndex: index });
         }
         loadMix(PLAYLIST_MIX_ID);
     };
+
 
     return (
         <div className="min-h-full">
@@ -238,6 +284,53 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                 <motion.button className="p-3 rounded-full bg-white/10 hover:bg-white/15">
                     <Heart size={18} />
                 </motion.button>
+
+                {/* Delete Playlist (User Only) */}
+                {isUserMix && (
+                    <motion.button
+                        onClick={deletePlaylistHandler}
+                        className="p-3 rounded-full bg-white/10 hover:bg-red-500/20 hover:text-red-500 text-white/50 transition-colors"
+                        title="Delete Playlist"
+                    >
+                        <Trash2 size={18} />
+                    </motion.button>
+                )}
+
+                {/* Pin Button for Deck Sync */}
+                {/* Pin Button for Deck Sync */}
+                <motion.button
+                    onClick={() => {
+                        const existingMix = mixes.find(m => m.id === playlist.id);
+                        if (existingMix) {
+                            togglePin(playlist.id);
+                        } else {
+                            // Convert to Mix before pinning
+                            const newMix: Mix = {
+                                id: playlist.id,
+                                title: title,
+                                color: 'blue', // Default color
+                                songs: songs.map(s => ({ ...s, preferredQuality: qualityPreference })),
+                                currentSongIndex: 0,
+                                pinned: true // Explicitly set pinned on creation
+                            };
+                            addMix(newMix); // This will add AND likely trigger toast
+                            showToast(`Pinned "${title}" to Deck`, 'success');
+                        }
+                    }}
+                    className={`p-3 rounded-full transition-colors ${mixes.find(m => m.id === playlist.id)?.pinned ? 'bg-blue-500 text-white' : 'bg-white/10 hover:bg-white/15 text-white/50'}`}
+                    whileTap={{ scale: 0.9 }}
+                    title={mixes.find(m => m.id === playlist.id)?.pinned ? "Unpin from Deck" : "Pin to Deck"}
+                >
+                    <div className="relative">
+                        <PinIcon size={18} />
+                        {mixes.find(m => m.id === playlist.id)?.pinned && (
+                            <motion.div
+                                layoutId="pinned-badge"
+                                className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full"
+                            />
+                        )}
+                    </div>
+                </motion.button>
             </div>
 
             {/* Track List */}
@@ -282,27 +375,44 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
 
                                 <div className="flex-1 min-w-0">
                                     <p className={`font-medium truncate ${currentSong?.id === song.id ? 'text-white' : 'text-white/80'}`}>
-                                        {decodeHtml(song.name)}
+                                        {decodeHtml(song.name || (song as any).title || 'Unknown Title')}
                                     </p>
                                     <p className="text-sm text-white/40 truncate">
-                                        {decodeHtml(song.primaryArtists || 'Unknown Artist')}
+                                        {decodeHtml(song.primaryArtists || (song as any).artist || 'Unknown Artist')}
                                     </p>
                                 </div>
 
                                 <span className="text-sm text-white/25 tabular-nums">
-                                    {song.duration ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}` : ''}
+                                    {(() => {
+                                        const d = typeof song.duration === 'string' ? parseInt(song.duration) : song.duration;
+                                        if (!d) return '--:--';
+                                        return `${Math.floor(d / 60)}:${(d % 60).toString().padStart(2, '0')}`;
+                                    })()}
                                 </span>
 
-                                <button className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <MoreHorizontal size={16} className="text-white/40" />
+                                <button
+                                    onClick={(e) => isUserMix ? removeSong(e, i) : undefined}
+                                    className={`p-2 opacity-0 group-hover:opacity-100 transition-opacity ${isUserMix ? 'hover:text-red-500 text-white/40' : 'text-white/40'}`}
+                                    title={isUserMix ? "Remove from Playlist" : "Options"}
+                                >
+                                    {isUserMix ? <Trash2 size={16} /> : <MoreHorizontal size={16} />}
                                 </button>
                             </motion.div>
                         ))}
                     </div>
                 ) : (
                     <div className="py-20 text-center text-zinc-500">
-                        <div className="mb-2">No songs available in your selected languages.</div>
-                        <div className="text-xs">Check Settings to enable more languages.</div>
+                        {songs.length === 0 ? (
+                            <>
+                                <div className="mb-2">This playlist is empty.</div>
+                                <div className="text-xs">Add songs from the Search or Explore pages!</div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="mb-2">No songs available in your selected languages.</div>
+                                <div className="text-xs">Check Settings to enable more languages.</div>
+                            </>
+                        )}
                     </div>
                 )}
             </div>

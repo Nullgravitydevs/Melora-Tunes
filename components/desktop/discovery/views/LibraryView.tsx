@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Heart, Clock, ListMusic, Plus, Play, Pause, MoreHorizontal,
-    Shuffle, Music, Trash2, ChevronRight
+    Shuffle, Music, Trash2, ChevronRight, Disc, User, Pin as PinIcon
 } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
@@ -52,7 +52,7 @@ const LIBRARY_STYLES = `
     .quality-320 { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); }
 `;
 
-type TabType = 'liked' | 'recent' | 'playlists';
+type TabType = 'liked' | 'recent' | 'playlists' | 'albums' | 'artists';
 
 interface LibraryViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
@@ -63,13 +63,13 @@ interface LibraryViewProps {
    LIBRARY VIEW - Liked Songs, Recently Played, Playlists
    Muzza-inspired "Best Search" & Sort Features
    ============================================================================ */
-
 export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
     const {
         likedSongs, recentlyPlayed, mixes,
         currentSong, isPlaying, togglePlay,
         addMix, loadMix, deleteMix, playInstantMix,
-        qualityPreference, showToast
+        qualityPreference, showToast, togglePin,
+        savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist
     } = usePlayback();
 
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'liked');
@@ -132,6 +132,26 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
         // TODO: Add Sort for songs if requested. For now, Liked is usually "Recently Added" (FIFO/LIFO)
         return list;
     }, [likedSongs, searchQuery]);
+
+    // 3. Saved Albums
+    const filteredAlbums = useMemo(() => {
+        let list = [...savedAlbums];
+        if (searchQuery.trim()) {
+            const lowerQ = searchQuery.toLowerCase();
+            list = list.filter(a => (a.name || a.title || '').toLowerCase().includes(lowerQ));
+        }
+        return list;
+    }, [savedAlbums, searchQuery]);
+
+    // 4. Followed Artists
+    const filteredArtists = useMemo(() => {
+        let list = [...savedArtists];
+        if (searchQuery.trim()) {
+            const lowerQ = searchQuery.toLowerCase();
+            list = list.filter(a => (a.name || '').toLowerCase().includes(lowerQ));
+        }
+        return list;
+    }, [savedArtists, searchQuery]);
 
     // Helper: Extract timestamp from ID if possible
     function extractTimestamp(id: string): number {
@@ -340,7 +360,7 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="glass-card p-4 rounded-xl cursor-pointer group"
-                onClick={() => loadMix(playlist.id)}
+                onClick={() => onNavigate({ id: 'playlist', data: playlist })}
             >
                 <div className="flex items-center gap-4">
                     {/* Cover */}
@@ -367,15 +387,28 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                             className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
+                            title="Play"
                         >
                             <Play size={16} fill="currentColor" className="ml-0.5" />
                         </motion.button>
+
+                        {/* Pin Button */}
+                        <motion.button
+                            onClick={(e) => { e.stopPropagation(); togglePin(playlist.id); }}
+                            className={`p-2 rounded-full hover:bg-white/10 ${playlist.pinned ? 'text-blue-400' : 'text-white/40'}`}
+                            whileTap={{ scale: 0.9 }}
+                            title={playlist.pinned ? "Unpin from Deck" : "Pin to Deck"}
+                        >
+                            <PinIcon size={16} className={playlist.pinned ? "fill-blue-400" : ""} />
+                        </motion.button>
+
                         <motion.button
                             onClick={(e) => { e.stopPropagation(); handleDeletePlaylist(playlist.id, playlist.title); }}
-                            className="p-2 rounded-full hover:bg-white/10"
+                            className="p-2 rounded-full hover:bg-white/10 hover:text-red-500 text-white/40"
                             whileTap={{ scale: 0.9 }}
+                            title="Delete"
                         >
-                            <Trash2 size={16} className="text-white/40" />
+                            <Trash2 size={16} />
                         </motion.button>
                     </div>
 
@@ -387,6 +420,8 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
 
     const tabs: { id: TabType; label: string; icon: React.ReactNode; count: number }[] = [
         { id: 'liked', label: 'Liked Songs', icon: <Heart size={16} />, count: likedSongs.length },
+        { id: 'albums', label: 'Albums', icon: <Disc size={16} />, count: savedAlbums.length },
+        { id: 'artists', label: 'Artists', icon: <User size={16} />, count: savedArtists.length },
         { id: 'recent', label: 'Recently Played', icon: <Clock size={16} />, count: recentlyPlayed.length },
         { id: 'playlists', label: 'Playlists', icon: <ListMusic size={16} />, count: userPlaylists.length },
     ];
@@ -428,7 +463,7 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={`Search ${activeTab === 'playlists' ? 'playlists...' : 'liked songs...'}`}
+                                placeholder={`Search ${activeTab === 'playlists' ? 'playlists...' : activeTab === 'albums' ? 'albums...' : activeTab === 'artists' ? 'artists...' : 'liked songs...'}`}
                                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-white/20 text-sm text-white placeholder-white/30 transition-all font-medium"
                             />
                             {/* Search Icon */}
@@ -598,6 +633,100 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                         {searchQuery ? `No playlists matching "${searchQuery}"` : "No playlists yet"}
                                     </p>
                                     {!searchQuery && <p className="text-sm text-white/20 mt-1">Create one to get started</p>}
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* Albums Tab */}
+                    {activeTab === 'albums' && (
+                        <motion.div
+                            key="albums"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                        >
+                            {filteredAlbums.length > 0 ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                    {filteredAlbums.map((album, i) => (
+                                        <motion.div
+                                            key={album.id || i}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: i * 0.05 }}
+                                            onClick={() => onNavigate({ id: 'album', data: album })}
+                                            className="glass-card p-3 rounded-xl cursor-pointer group hover:bg-white/10"
+                                        >
+                                            <div className="relative aspect-square mb-3 rounded-lg overflow-hidden bg-white/5 shadow-lg">
+                                                {getArt(album) ? (
+                                                    <img src={getArt(album)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <Disc size={32} className="text-white/20" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onNavigate({ id: 'album', data: album }); }}
+                                                    className="absolute bottom-2 right-2 p-2.5 rounded-full bg-white text-black opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all shadow-xl"
+                                                >
+                                                    <Play size={16} fill="currentColor" className="ml-0.5" />
+                                                </button>
+                                            </div>
+                                            <h3 className="font-semibold text-white/90 truncate mb-0.5">{album.name || album.title}</h3>
+                                            <p className="text-xs text-white/50 truncate">{album.primaryArtists || 'Unknown Artist'}</p>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-20">
+                                    <Disc size={48} className="mx-auto text-white/10 mb-4" />
+                                    <p className="text-white/40">No saved albums</p>
+                                    <p className="text-sm text-white/20 mt-1">Save your favorite albums to see them here</p>
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* Artists Tab */}
+                    {activeTab === 'artists' && (
+                        <motion.div
+                            key="artists"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                        >
+                            {filteredArtists.length > 0 ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                    {filteredArtists.map((artist, i) => (
+                                        <motion.div
+                                            key={artist.id || i}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: i * 0.05 }}
+                                            onClick={() => onNavigate({ id: 'artist', data: artist })}
+                                            className="glass-card p-4 rounded-xl cursor-pointer group hover:bg-white/10 flex flex-col items-center text-center"
+                                        >
+                                            <div className="relative w-32 h-32 mb-3 rounded-full overflow-hidden bg-white/5 shadow-lg border-2 border-white/5 group-hover:border-white/20 transition-colors">
+                                                {artist.image ? (
+                                                    <img src={artist.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <User size={32} className="text-white/20" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                                            </div>
+                                            <h3 className="font-semibold text-white/90 truncate w-full mb-0.5">{artist.name}</h3>
+                                            <p className="text-xs text-white/50 uppercase tracking-widest">Artist</p>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-20">
+                                    <User size={48} className="mx-auto text-white/10 mb-4" />
+                                    <p className="text-white/40">No followed artists</p>
+                                    <p className="text-sm text-white/20 mt-1">Follow artists to see them here</p>
                                 </div>
                             )}
                         </motion.div>

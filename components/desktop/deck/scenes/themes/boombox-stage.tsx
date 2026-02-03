@@ -15,7 +15,8 @@ import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { getThumbnailUrl } from "@/lib/jiosaavn";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { Mic2, SlidersHorizontal } from "lucide-react";
+import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
+import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 
 interface BoomboxStageProps {
     currentTheme: ThemeKey;
@@ -126,7 +127,10 @@ function DraggablePolaroid({
             whileHover={{ scale: 1.05, zIndex: 50 }}
         >
             {!isInsidePlayer && (
-                <div className="bg-white p-2 pb-6 shadow-lg transition-all duration-300">
+                <div className={clsx("p-2 pb-6 shadow-lg transition-all duration-300",
+                    // Boombox Color Logic: Uniform Polaroid Style (Clean/Retro)
+                    "bg-white"
+                )}>
                     <div className="w-24 h-24 relative overflow-hidden">
                         {albumArt ? (
                             <img
@@ -185,6 +189,7 @@ export function BoomboxStage({
 
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
+    const [isRackOpen, setIsRackOpen] = useState(false);
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
@@ -284,9 +289,16 @@ export function BoomboxStage({
                     <button onClick={onCinemaMode} className="bg-white/30 backdrop-blur-sm px-5 py-1 text-white font-bold text-sm transform -rotate-1 shadow hover:-translate-y-1 transition-transform">
                         <Tv size={14} className="inline mr-1" /> Cinema
                     </button>
-                    <button onClick={onCreateMix} className="bg-white/30 backdrop-blur-sm px-5 py-1 text-white font-bold text-sm transform rotate-1 shadow hover:-translate-y-1 transition-transform">
+                    <button onClick={() => setIsRackOpen(true)} className="bg-white/30 backdrop-blur-sm px-5 py-1 text-white font-bold text-sm transform rotate-1 shadow hover:-translate-y-1 transition-transform border border-white/20">
+                        <ListMusic size={14} className="inline mr-1" /> Rack
+                    </button>
+                    <button onClick={onCreateMix} className="bg-white/30 backdrop-blur-sm px-5 py-1 text-white font-bold text-sm transform -rotate-1 shadow hover:-translate-y-1 transition-transform">
                         <Plus size={14} className="inline mr-1" /> New Tape
                     </button>
+                    {/* Slot Indicator */}
+                    <span className="bg-black/30 backdrop-blur-sm px-3 py-1 text-white/80 text-xs font-bold rounded transform rotate-1">
+                        {mixes.filter(m => m.pinned).length}/8 Pinned
+                    </span>
                 </nav>
                 <div className="flex gap-2">
                     <button onClick={onOpenThemeSelector} className="bg-neutral-800 border-2 border-neutral-600 rounded-full p-2 hover:border-yellow-400 transition-colors shadow-lg"><Palette size={18} className="text-white" /></button>
@@ -399,28 +411,31 @@ export function BoomboxStage({
             </div>
 
             {/* DRAGGABLE POLAROIDS - Each manages its own position from persisted state */}
-            {mixes.map((mix) => {
-                const pos = positions[mix.id];
-                if (!pos) return null; // Wait for init
+            {mixes
+                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                .slice(0, 9) // Allow 9 polaroids (Discovery + 8 Pinned)
+                .map((mix) => {
+                    const pos = positions[mix.id];
+                    if (!pos) return null; // Wait for init
 
-                return (
-                    <DraggablePolaroid
-                        key={mix.id}
-                        mix={mix}
-                        position={pos}
-                        isInsidePlayer={isLoaded && activeMixId === mix.id}
-                        albumArt={getMixImage(mix)}
-                        playerRef={playerRef}
-                        onDropOnPlayer={handleDropOnPlayer}
-                        onHoverPlayer={setIsOverPlayer}
-                        onEditMix={onEditMix}
-                        onSnapshotMix={onSnapshotMix}
-                        onOpenSearch={onOpenSearch}
-                        onShareMix={onShareMix}
-                        onPositionChange={updatePosition}
-                    />
-                );
-            })}
+                    return (
+                        <DraggablePolaroid
+                            key={mix.id}
+                            mix={mix}
+                            position={pos}
+                            isInsidePlayer={isLoaded && activeMixId === mix.id}
+                            albumArt={getMixImage(mix)}
+                            playerRef={playerRef}
+                            onDropOnPlayer={handleDropOnPlayer}
+                            onHoverPlayer={setIsOverPlayer}
+                            onEditMix={onEditMix}
+                            onSnapshotMix={onSnapshotMix}
+                            onOpenSearch={onOpenSearch}
+                            onShareMix={onShareMix}
+                            onPositionChange={updatePosition}
+                        />
+                    );
+                })}
 
             {/* Overlays */}
             {/* Overlays */}
@@ -453,6 +468,8 @@ export function BoomboxStage({
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+
+            <TapeRackModal isOpen={isRackOpen} onClose={() => setIsRackOpen(false)} />
+        </div >
     );
 }

@@ -32,15 +32,13 @@ const SEARCH_STYLES = `
     }
     
     .glass-result {
-        background: rgba(255, 255, 255, 0.02);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.04);
+        background: black;
+        border: 1px solid rgba(255, 255, 255, 0.08);
         transition: all 0.25s ease;
     }
     .glass-result:hover {
-        background: rgba(255, 255, 255, 0.06);
-        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.15);
         transform: translateY(-2px);
         box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.5);
     }
@@ -55,9 +53,9 @@ const SEARCH_STYLES = `
     }
     .quality-hires { background: rgba(255, 200, 100, 0.15); color: rgba(255, 200, 100, 0.9); }
     .quality-flac { background: rgba(180, 140, 255, 0.15); color: rgba(180, 140, 255, 0.9); }
-    .quality-320 { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.7); }
-    .quality-160 { background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.5); }
-    .quality-96 { background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.3); }
+    .quality-320 { background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.5); }
+    .quality-160 { background: rgba(255, 255, 255, 0.03); color: rgba(255, 255, 255, 0.3); }
+    .quality-96 { background: rgba(255, 255, 255, 0.02); color: rgba(255, 255, 255, 0.2); }
     
     .source-badge {
         font-size: 8px;
@@ -226,10 +224,9 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
                             className="absolute top-24 left-1/2 -translate-x-1/2 w-72 p-4 rounded-2xl"
                             style={{
-                                background: 'rgba(30, 30, 30, 0.95)',
-                                backdropFilter: 'blur(40px)',
+                                background: '#09090b', // zinc-950
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                                boxShadow: '0 20px 60px -20px rgba(0, 0, 0, 0.6)'
+                                boxShadow: '0 20px 60px -20px rgba(0, 0, 0, 0.8)'
                             }}
                             onClick={e => e.stopPropagation()}
                         >
@@ -297,11 +294,9 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                         <div
                             className="relative flex items-center gap-4 px-6 py-5 rounded-2xl"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.03)',
-                                backdropFilter: 'blur(40px) saturate(180%)',
-                                WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+                                background: 'black',
                                 border: '1px solid rgba(255, 255, 255, 0.08)',
-                                boxShadow: '0 20px 60px -20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+                                boxShadow: '0 20px 60px -20px rgba(0, 0, 0, 0.5)'
                             }}
                         >
                             {isSearching ? (
@@ -510,8 +505,8 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                                                 onClick={() => { setQuery(term); handleSearch(term); }}
                                                 className="px-5 py-2.5 rounded-full text-sm font-medium transition-all"
                                                 style={{
-                                                    background: 'rgba(255, 255, 255, 0.04)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.06)'
+                                                    background: 'transparent',
+                                                    border: '1px solid rgba(255, 255, 255, 0.1)'
                                                 }}
                                                 whileHover={{
                                                     scale: 1.02,
@@ -542,8 +537,8 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                                             onClick={() => { setQuery(term); handleSearch(term); }}
                                             className="flex items-center gap-5 p-5 rounded-xl text-left transition-all"
                                             style={{
-                                                background: 'rgba(255, 255, 255, 0.02)',
-                                                border: '1px solid rgba(255, 255, 255, 0.04)'
+                                                background: 'black',
+                                                border: '1px solid rgba(255, 255, 255, 0.08)'
                                             }}
                                             whileHover={{
                                                 scale: 1.01,

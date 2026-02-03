@@ -14,7 +14,7 @@ interface AlbumViewProps {
 }
 
 export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId } = usePlayback();
+    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, toggleSaveAlbum, isAlbumSaved, togglePin, mixes, showToast } = usePlayback();
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -54,10 +54,12 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
 
     const ALBUM_MIX_ID = `album-${albumData?.id || 'unknown'}`;
 
+    const newMixTemplate = (list = songs) => ({ id: ALBUM_MIX_ID, title: albumName, color: 'white' as const, songs: list, currentSongIndex: 0 });
+
     const playAll = (shuffle = false) => {
         if (songs.length === 0) return;
         const list = shuffle ? [...songs].sort(() => Math.random() - 0.5) : songs;
-        const newMix: Mix = { id: ALBUM_MIX_ID, title: albumName, color: 'white', songs: list, currentSongIndex: 0 };
+        const newMix: Mix = newMixTemplate(list);
         const added = addMix(newMix);
         if (!added) updateMix(ALBUM_MIX_ID, { songs: list, currentSongIndex: 0 });
         loadMix(ALBUM_MIX_ID);
@@ -131,15 +133,46 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                             <motion.button onClick={() => playAll(false)} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="px-5 py-2 bg-white text-black rounded-full font-bold text-sm tracking-wide shadow-lg flex items-center gap-1.5">
                                 <Play fill="currentColor" size={16} /> PLAY
                             </motion.button>
-                            <motion.button onClick={() => playAll(true)} whileTap={{ scale: 0.9 }} className="w-9 h-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20 text-white/80"><Shuffle size={16} /></motion.button>
-                            <motion.button whileTap={{ scale: 0.9 }} className="w-9 h-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20 text-white/80"><Heart size={16} /></motion.button>
+                            <motion.button onClick={() => playAll(true)} whileTap={{ scale: 0.9 }} className="w-9 h-9 rounded-full bg-black border border-white/10 flex items-center justify-center hover:border-white/30 text-white/80 transition-colors"><Shuffle size={16} /></motion.button>
+                            <motion.button
+                                onClick={() => toggleSaveAlbum(albumData)}
+                                whileTap={{ scale: 0.9 }}
+                                className={`w-9 h-9 rounded-full bg-black border flex items-center justify-center transition-colors ${isAlbumSaved(albumData?.id) ? 'border-primary text-primary' : 'border-white/10 hover:border-white/30 text-white/80'}`}
+                            >
+                                <Heart size={16} fill={isAlbumSaved(albumData?.id) ? "currentColor" : "none"} className={isAlbumSaved(albumData?.id) ? "text-red-500" : ""} />
+                            </motion.button>
+                            {/* Pin Button */}
+                            <motion.button
+                                onClick={() => {
+                                    const existingMix = mixes.find(m => m.id === ALBUM_MIX_ID);
+                                    if (existingMix) {
+                                        togglePin(ALBUM_MIX_ID);
+                                    } else {
+                                        const newMix: Mix = { ...newMixTemplate(), pinned: true };
+                                        addMix(newMix); // Auto-add and pin
+                                        showToast(`Pinned "${albumName}" to Deck`, 'success');
+                                    }
+                                }}
+                                whileTap={{ scale: 0.9 }}
+                                className={`w-9 h-9 rounded-full bg-black border flex items-center justify-center transition-colors ${mixes.find(m => m.id === ALBUM_MIX_ID)?.pinned ? 'border-blue-500 text-blue-500' : 'border-white/10 hover:border-white/30 text-white/80'}`}
+                            >
+                                <div className="relative">
+                                    <Disc3 size={16} className={mixes.find(m => m.id === ALBUM_MIX_ID)?.pinned ? "text-blue-500" : ""} />
+                                    {mixes.find(m => m.id === ALBUM_MIX_ID)?.pinned && (
+                                        <motion.div
+                                            layoutId="pinned-badge-album"
+                                            className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"
+                                        />
+                                    )}
+                                </div>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
 
                 {/* === GLASS TRACKLIST (Compact) === */}
                 <div className="px-4">
-                    <div className="bg-black/30 backdrop-blur-xl border border-white/5 rounded-xl p-1 shadow-xl">
+                    <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-1 shadow-2xl">
                         {/* Header Row */}
                         <div className="grid grid-cols-[auto_1fr_auto] gap-3 px-3 py-2 text-[9px] font-bold text-white/30 uppercase tracking-widest border-b border-white/5">
                             <span className="w-5 text-center">#</span>

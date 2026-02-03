@@ -105,6 +105,36 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
         }
     }, [initialTheme]);
 
+    // Keyboard Shortcuts for Deck Mode
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if user is typing in an input/textarea
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            switch (e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    next();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    prev();
+                    break;
+                case 'KeyM':
+                    e.preventDefault();
+                    setVolume(volume > 0 ? 0 : 1); // Mute/Unmute
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [togglePlay, next, prev, volume, setVolume]);
+
     // THEME SWITCHER LOGIC
     const handleThemeChange = () => {
         playClick();
@@ -165,13 +195,11 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
             return;
         }
         playClick();
-        const colors: Mix["color"][] = ["orange", "purple", "white", "green", "red", "blue", "cyan", "pink", "black"];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
+        // [CLEANUP] No more random colors - Theme handles visual, data uses fixed default
         const newMix: Mix = {
             id: crypto.randomUUID(),
             title: newMixTitle,
-            color: randomColor,
+            color: 'purple',
             songs: [],
             currentSongIndex: 0
         };
@@ -511,10 +539,11 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                                 <button
                                     onClick={() => {
                                         if (!newMixTitle.trim()) return;
+                                        // [CLEANUP] No more random colors
                                         const newMix: Mix = {
                                             id: Date.now().toString(),
                                             title: newMixTitle,
-                                            color: (['orange', 'purple', 'green', 'red', 'blue', 'cyan', 'pink', 'black'] as const)[Math.floor(Math.random() * 8)],
+                                            color: 'purple',
                                             songs: [],
                                             currentSongIndex: 0
                                         };

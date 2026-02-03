@@ -14,7 +14,8 @@ import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { getThumbnailUrl } from "@/lib/jiosaavn";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { Mic2, SlidersHorizontal } from "lucide-react";
+import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
+import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 
 interface SilverFrostStageProps {
     currentTheme: ThemeKey;
@@ -48,6 +49,7 @@ export function SilverFrostStage({
     const [hoveredMix, setHoveredMix] = useState<string | null>(null);
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
+    const [isRackOpen, setIsRackOpen] = useState(false);
 
     const formatTime = (seconds: number) => {
         if (!Number.isFinite(seconds) || isNaN(seconds)) return "0:00";
@@ -57,7 +59,12 @@ export function SilverFrostStage({
     };
 
     const getMixImage = (mix: Mix): string | null => {
-        if (mix.songs.length > 0) return getThumbnailUrl(mix.songs[0] as any);
+        if (mix.songs.length > 0) {
+            const firstItem = mix.songs[0];
+            // Handle PlayableTrack (has .song) vs raw JioSaavnSong
+            const actualSong = (firstItem as any)?.song || firstItem;
+            return getThumbnailUrl(actualSong);
+        }
         return null;
     };
 
@@ -83,6 +90,7 @@ export function SilverFrostStage({
                     </div>
                     <nav className="hidden md:flex items-center gap-8 ml-10">
                         <button onClick={onCinemaMode} className="text-sm font-bold border-b-2 border-[#00aaff] pb-1 text-slate-800"><Tv size={14} className="inline mr-1" />Cinema</button>
+                        <button onClick={() => setIsRackOpen(true)} className="text-sm font-medium text-slate-600 hover:text-[#00aaff] transition-colors"><ListMusic size={14} className="inline mr-1" />Rack</button>
                         <button onClick={onCreateMix} className="text-sm font-medium text-slate-600 hover:text-[#00aaff] transition-colors"><Plus size={14} className="inline mr-1" />Create Mix</button>
                     </nav>
                 </div>
@@ -105,45 +113,60 @@ export function SilverFrostStage({
                     <div className="mb-6">
                         <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.2em] mb-1">Mixtape Rack</h3>
                         <p className="text-[11px] text-[#00aaff] font-bold">Mechanical Axis Active</p>
+                        <span className="text-[10px] text-slate-500 mt-1 block">{mixes.filter(m => m.pinned).length}/8 slots used</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                        {mixes.map((mix) => {
-                            const isActive = activeMixId === mix.id && isLoaded;
-                            const albumArt = getMixImage(mix);
-                            return (
-                                <div
-                                    key={mix.id}
-                                    onClick={() => { playClick(); loadMix(mix.id); }}
-                                    onMouseEnter={() => setHoveredMix(mix.id)}
-                                    onMouseLeave={() => setHoveredMix(null)}
-                                    className={clsx(
-                                        "p-1 rounded-lg cursor-pointer transition-all",
-                                        "bg-white/40 backdrop-blur-sm border border-white/60 shadow-sm",
-                                        isActive && "scale-[1.02] shadow-[0_0_15px_rgba(0,170,255,0.4)] border-[#00aaff]/40",
-                                        !isActive && "opacity-70 hover:opacity-100"
-                                    )}
-                                >
-                                    <div className="h-20 w-full rounded-md bg-cover bg-center mb-2 relative overflow-hidden"
-                                        style={{ backgroundImage: albumArt ? `url(${albumArt})` : 'linear-gradient(135deg, #ccc 0%, #999 100%)' }}>
-                                        {isActive && <span className="absolute bottom-1 left-1 bg-[#00aaff] text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">Playing</span>}
-                                        {hoveredMix === mix.id && !isActive && (
-                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
-                                                <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Pencil size={12} className="text-gray-700" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Camera size={12} className="text-gray-700" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Share"><Share2 size={12} className="text-gray-700" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
-                                            </div>
+                        {mixes
+                            .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                            .map((mix) => {
+                                const isActive = activeMixId === mix.id && isLoaded;
+                                const albumArt = getMixImage(mix);
+                                // Silverfrost Color Logic: UNIFORM FROST
+                                // All cassettes use the same silver/frost gradient - no playlist colors
+                                const fallbackBg = "linear-gradient(135deg, #c1d2e0 0%, #8ea6b8 100%)";
+
+                                return (
+                                    <div
+                                        key={mix.id}
+                                        onClick={() => { playClick(); loadMix(mix.id); }}
+                                        onMouseEnter={() => setHoveredMix(mix.id)}
+                                        onMouseLeave={() => setHoveredMix(null)}
+                                        className={clsx(
+                                            "p-1 rounded-lg cursor-pointer transition-all",
+                                            "bg-white/40 backdrop-blur-sm border border-white/60 shadow-sm",
+                                            isActive && "scale-[1.02] shadow-[0_0_15px_rgba(0,170,255,0.4)] border-[#00aaff]/40",
+                                            !isActive && "opacity-70 hover:opacity-100"
                                         )}
+                                    >
+                                        <div className="h-20 w-full rounded-md mb-2 relative overflow-hidden"
+                                            style={{ background: fallbackBg }}>
+                                            {albumArt && (
+                                                <img
+                                                    src={albumArt}
+                                                    alt={mix.title}
+                                                    className="w-full h-full object-cover"
+                                                    draggable={false}
+                                                />
+                                            )}
+                                            {isActive && <span className="absolute bottom-1 left-1 bg-[#00aaff] text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">Playing</span>}
+                                            {hoveredMix === mix.id && !isActive && (
+                                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
+                                                    <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Pencil size={12} className="text-gray-700" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Camera size={12} className="text-gray-700" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Share"><Share2 size={12} className="text-gray-700" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="px-2 pb-2">
+                                            <p className="text-xs font-bold truncate">{mix.title}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase font-medium">{mix.songs.length} tracks</p>
+                                        </div>
                                     </div>
-                                    <div className="px-2 pb-2">
-                                        <p className="text-xs font-bold truncate">{mix.title}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase font-medium">{mix.songs.length} tracks</p>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-white/30">
@@ -350,6 +373,9 @@ export function SilverFrostStage({
                     </div>
                 )}
             </AnimatePresence>
+
+
+            <TapeRackModal isOpen={isRackOpen} onClose={() => setIsRackOpen(false)} />
         </div >
     );
 }
