@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Sparkles, TrendingUp, Music, Heart, Zap, Coffee, Activity, Calendar } from "lucide-react";
+import { Play, Sparkles, TrendingUp, Music, Heart, Zap, Coffee, Activity, Calendar, AlertCircle, RefreshCcw } from "lucide-react";
 import { getStrictLaunchData, LaunchData, JioSaavnSong, searchPlaylists } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { StandardCard, FeatureCard, HorizontalScroll, SectionHeader, RadioCard, CompactCard, QuickPickItem, MoodCard, VibeAlbumCard } from "../home/HomeComponents";
@@ -240,7 +240,32 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
     if (loading) return <HomeSkeleton />;
 
-    if (error || !launchData) return null; // Error state handled by parent or toast
+    if (error || !launchData) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="glass-card p-12 rounded-3xl max-w-md border border-white/10"
+                >
+                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
+                        <AlertCircle size={40} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">Something went wrong</h2>
+                    <p className="text-white/40 mb-8">
+                        {error || "We couldn't load the content. Please check your connection or try again."}
+                    </p>
+                    <button
+                        onClick={() => fetchData()}
+                        className="flex items-center gap-2 px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto"
+                    >
+                        <RefreshCcw size={18} />
+                        Try Again
+                    </button>
+                </motion.div>
+            </div>
+        );
+    }
 
     const { new_trending, new_albums, top_playlists, moods, retro, top_charts, radio, quick_picks } = launchData;
 

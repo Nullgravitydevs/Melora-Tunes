@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, useAnimation, useMotionValue, useTransform, PanInfo } from "framer-motion";
-import { ChevronRight, Play, Disc3, ArrowLeft } from "lucide-react";
+import { ChevronRight, Play, Disc3, ArrowLeft, AlertCircle, RefreshCcw } from "lucide-react";
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { usePlayback } from "@/components/providers/playback-context";
 import { decodeHtml } from "@/lib/utils";
@@ -17,6 +17,7 @@ export function PeelRevealView({ album, onBack, onPlay }: PeelRevealViewProps) {
     const [phase, setPhase] = useState<'sealed' | 'opened'>('sealed');
     const [tracks, setTracks] = useState<JioSaavnSong[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const { playInstantMix, isPlaying, currentSong } = usePlayback();
 
     const dragX = useMotionValue(0);
@@ -42,6 +43,7 @@ export function PeelRevealView({ album, onBack, onPlay }: PeelRevealViewProps) {
             setTracks(data || []);
         } catch (e) {
             console.error(e);
+            setError("Failed to load album tracks.");
         } finally {
             setLoading(false);
         }
@@ -146,28 +148,38 @@ export function PeelRevealView({ album, onBack, onPlay }: PeelRevealViewProps) {
                     {/* TRACKLIST (Appears immediately below) */}
                     {phase === 'opened' && (
                         <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", damping: 20, delay: 0.1 }} className="w-full max-w-3xl px-4 mt-2">
-                            <div className="flex items-center justify-center gap-3 mb-4">
-                                <button onClick={playAll} className="px-8 py-3 rounded-full bg-white text-black font-bold tracking-wide shadow-lg flex items-center gap-2 hover:scale-105 active:scale-95 transition-all">
-                                    <Play fill="currentColor" size={20} /> PLAY ALBUM
-                                </button>
-                            </div>
-                            <div className="bg-black/30 backdrop-blur-xl border border-white/5 rounded-2xl p-1 shadow-xl">
-                                {tracks.map((track, i) => {
-                                    const isActive = currentSong?.id === track.id;
-                                    return (
-                                        <motion.div key={track.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }}
-                                            onClick={() => playInstantMix({ id: `album-${album.id}`, title: album.name, color: 'blue', songs: tracks, currentSongIndex: i })}
-                                            className={`group flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}>
-                                            <span className={`w-6 text-center font-mono text-xs ${isActive ? 'text-white font-bold' : 'text-white/40'}`}>{isActive && isPlaying ? <Disc3 className="animate-spin" size={14} /> : i + 1}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className={`font-medium truncate ${isActive ? 'text-white font-bold' : 'text-white'}`}>{decodeHtml(track.name)}</h4>
-                                                <p className="text-white/40 text-xs truncate">{decodeHtml(track.primaryArtists)}</p>
-                                            </div>
-                                            <span className="text-white/30 text-xs font-mono">{Math.floor(parseInt(String(track.duration)) / 60)}:{(parseInt(String(track.duration)) % 60).toString().padStart(2, '0')}</span>
-                                        </motion.div>
-                                    );
-                                })}
-                            </div>
+                            {error ? (
+                                <div className="bg-black/30 backdrop-blur-xl border border-white/5 rounded-2xl p-8 text-center">
+                                    <AlertCircle size={32} className="mx-auto text-red-500 mb-3" />
+                                    <h3 className="text-lg font-bold text-white mb-2">Error Loading Tracks</h3>
+                                    <p className="text-white/40 text-sm mb-6">{error}</p>
+                                    <button
+                                        onClick={() => { setError(null); loadTracks(); }}
+                                        className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
+                                    >
+                                        <RefreshCcw size={16} />
+                                        Try Again
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="bg-black/30 backdrop-blur-xl border border-white/5 rounded-2xl p-1 shadow-xl">
+                                    {tracks.map((track, i) => {
+                                        const isActive = currentSong?.id === track.id;
+                                        return (
+                                            <motion.div key={track.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }}
+                                                onClick={() => playInstantMix({ id: `album-${album.id}`, title: album.name, color: 'blue', songs: tracks, currentSongIndex: i })}
+                                                className={`group flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}>
+                                                <span className={`w-6 text-center font-mono text-xs ${isActive ? 'text-white font-bold' : 'text-white/40'}`}>{isActive && isPlaying ? <Disc3 className="animate-spin" size={14} /> : i + 1}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className={`font-medium truncate ${isActive ? 'text-white font-bold' : 'text-white'}`}>{decodeHtml(track.name)}</h4>
+                                                    <p className="text-white/40 text-xs truncate">{decodeHtml(track.primaryArtists)}</p>
+                                                </div>
+                                                <span className="text-white/30 text-xs font-mono">{Math.floor(parseInt(String(track.duration)) / 60)}:{(parseInt(String(track.duration)) % 60).toString().padStart(2, '0')}</span>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </motion.div>
                     )}
                 </div>

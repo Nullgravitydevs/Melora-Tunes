@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, Clock, ArrowLeft, Music, MoreHorizontal, User } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, Clock, ArrowLeft, Music, MoreHorizontal, User, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchSongs, JioSaavnSong } from "@/lib/jiosaavn";
 
@@ -21,6 +21,7 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const artistName = artist?.name || artist?.primaryArtists || 'Unknown Artist';
     const artistImage = getImage(artist);
@@ -41,10 +42,12 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
                 setSongs(results);
             } catch (e) {
                 console.error('Failed to load artist songs:', e);
+                setError("Failed to load artist popular songs.");
             } finally {
                 setIsLoading(false);
             }
         };
+        setError(null);
         load();
     }, [artistName]);
 
@@ -183,6 +186,19 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
                         {[1, 2, 3, 4, 5].map(i => (
                             <div key={i} className="h-16 rounded-lg bg-white/5 animate-pulse" />
                         ))}
+                    </div>
+                ) : error ? (
+                    <div className="py-12 text-center bg-white/[0.02] rounded-2xl border border-white/5">
+                        <AlertCircle size={32} className="mx-auto text-red-500 mb-3" />
+                        <h3 className="text-lg font-bold text-white mb-2">Error Loading Artist</h3>
+                        <p className="text-white/40 text-sm mb-6">{error}</p>
+                        <button
+                            onClick={() => { setError(null); setIsLoading(true); }}
+                            className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
+                        >
+                            <RefreshCcw size={16} />
+                            Try Again
+                        </button>
                     </div>
                 ) : (
                     <div className="space-y-1">

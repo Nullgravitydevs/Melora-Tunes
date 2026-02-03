@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, ArrowLeft, MoreHorizontal, Clock, Disc3 } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, ArrowLeft, MoreHorizontal, Clock, Disc3, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getAlbumDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
@@ -18,6 +18,7 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [albumData, setAlbumData] = useState<any>(album);
 
     const albumName = albumData?.name || albumData?.title || 'Unknown Album';
@@ -45,10 +46,12 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                 }
             } catch (e) {
                 console.error('Failed to load album:', e);
+                setError("Failed to load album tracks.");
             } finally {
                 setIsLoading(false);
             }
         };
+        setError(null);
         load();
     }, [album?.id]);
 
@@ -183,6 +186,19 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                         {/* Songs */}
                         {isLoading ? (
                             <div className="space-y-1 p-2">{[1, 2, 3, 4, 5].map(i => <div key={i} className="h-10 bg-white/5 rounded-lg animate-pulse" />)}</div>
+                        ) : error ? (
+                            <div className="p-12 text-center">
+                                <AlertCircle size={32} className="mx-auto text-red-500 mb-3" />
+                                <h3 className="text-lg font-bold text-white mb-2">Error Loading Album</h3>
+                                <p className="text-white/40 text-sm mb-6">{error}</p>
+                                <button
+                                    onClick={() => { setError(null); setIsLoading(true); }}
+                                    className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
+                                >
+                                    <RefreshCcw size={16} />
+                                    Try Again
+                                </button>
+                            </div>
                         ) : (
                             <div className="divide-y divide-white/5">
                                 {songs.map((song, i) => {

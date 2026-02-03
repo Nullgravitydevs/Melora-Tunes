@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Disc3, Play, Heart, MoreHorizontal, Clock, Shuffle, PlusCircle, Check } from "lucide-react";
+import { ChevronLeft, Disc3, Play, Heart, MoreHorizontal, Clock, Shuffle, PlusCircle, Check, AlertCircle, RefreshCcw } from "lucide-react";
 import { StandardCard, FeatureCard, PosterCard, QuickPickItem } from "../home/HomeComponents";
 import { getTrending, getNewReleases, getTopCharts, searchPlaylists, searchSongs, JioSaavnSong } from "@/lib/jiosaavn";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
@@ -21,6 +21,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
     const [title, setTitle] = useState(sectionTitle || "");
     const [items, setItems] = useState<JioSaavnSong[]>(initialData || []);
     const [loading, setLoading] = useState(!initialData);
+    const [error, setError] = useState<string | null>(null);
     const { playInstantMix, isPlaying, currentSong, activeMixId, togglePlay, toggleLike, isLiked, addMix, updateMix, loadMix, addSongToMix } = usePlayback();
 
     // Context Menu State
@@ -96,6 +97,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
             setItems(data);
         } catch (e) {
             console.error(e);
+            setError("Failed to load content. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -157,8 +159,29 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
 
             <div className="px-6 md:px-8 mt-4">
                 {loading ? (
-                    <div className="flex items-center justify-center h-64">
+                    <div className="flex items-center justify-center h-[50vh]">
                         <div className="animate-spin text-white/20"><Disc3 size={40} /></div>
+                    </div>
+                ) : error ? (
+                    <div className="flex flex-col items-center justify-center h-[50vh] p-8 text-center">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="glass-card p-10 rounded-3xl max-w-sm border border-white/10"
+                        >
+                            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                                <AlertCircle size={32} />
+                            </div>
+                            <h2 className="text-xl font-bold text-white mb-2">Oops!</h2>
+                            <p className="text-white/40 text-sm mb-6">{error}</p>
+                            <button
+                                onClick={() => { setError(null); loadContent(); }}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
+                            >
+                                <RefreshCcw size={16} />
+                                Try Again
+                            </button>
+                        </motion.div>
                     </div>
                 ) : isSongList ? (
                     /* === SEXY LIST LAYOUT === */

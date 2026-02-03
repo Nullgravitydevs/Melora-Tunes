@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Headphones, Disc, Activity, TrendingUp, Play, Mic2, Globe, Grid } from "lucide-react";
+import { Headphones, Disc, Activity, TrendingUp, Play, Mic2, Globe, Grid, AlertCircle, RefreshCcw } from "lucide-react";
 import { searchPlaylists, searchAlbums, searchSongs, getTopCharts, fixImageUrl } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { usePlayback } from "@/components/providers/playback-context";
@@ -50,6 +50,7 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
     });
 
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -93,8 +94,17 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
                 hollywood: holly
             });
 
-        } catch (e) { console.error("Explore Data Load Failed", e) }
+        } catch (e) {
+            console.error("Explore Data Load Failed", e);
+            setError("Failed to load global discovery content.");
+        }
         finally { setLoading(false) }
+    };
+
+    const handleRetry = () => {
+        setError(null);
+        setLoading(true);
+        loadData();
     };
 
     // Helper for Section Headers
@@ -111,6 +121,31 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
         return (
             <div className="min-h-full p-8 space-y-12 animate-pulse">
                 {[1, 2, 3].map(i => <div key={i} className="h-64 bg-white/5 rounded-3xl" />)}
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center py-32 text-center px-4">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-10 rounded-[2.5rem] bg-white/[0.03] border border-white/10 max-w-sm w-full"
+                >
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                        <AlertCircle size={32} />
+                    </div>
+                    <h2 className="text-xl font-bold text-white mb-2">Failed to load Explore</h2>
+                    <p className="text-white/40 text-sm mb-6">{error}</p>
+                    <button
+                        onClick={handleRetry}
+                        className="flex items-center gap-2 px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-all mx-auto text-sm"
+                    >
+                        <RefreshCcw size={16} />
+                        Try Again
+                    </button>
+                </motion.div>
             </div>
         );
     }

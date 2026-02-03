@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Play, Pause, Clock, TrendingUp, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download } from "lucide-react";
+import { Search, X, Play, Pause, Clock, TrendingUp, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
@@ -82,6 +82,7 @@ export function SearchView({ onNavigate }: SearchViewProps) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<PlayableTrack[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const [showSettings, setShowSettings] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -124,17 +125,21 @@ export function SearchView({ onNavigate }: SearchViewProps) {
         }
 
         setIsSearching(true);
+        setError(null);
         try {
             // Use the UNIFIED search that merges FLAC sources!
             const qFilter = qualityPreference === 'hires' ? 'hires' : qualityPreference === 'flac' ? 'flac' : qualityPreference === '320' ? '320' : undefined;
             const tracks = await searchUnified(q, language || undefined, 'song', qFilter);
             setResults(tracks);
 
-            const updated = [q, ...recentSearches.filter(s => s !== q)].slice(0, 8);
-            setRecentSearches(updated);
-            localStorage.setItem('discovery-recent-searches', JSON.stringify(updated));
+            if (tracks.length > 0) {
+                const updated = [q, ...recentSearches.filter(s => s !== q)].slice(0, 8);
+                setRecentSearches(updated);
+                localStorage.setItem('discovery-recent-searches', JSON.stringify(updated));
+            }
         } catch (e) {
             console.error('Search failed:', e);
+            setError("Search failed. Please check your connection.");
         } finally {
             setIsSearching(false);
         }
@@ -486,6 +491,39 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                                     );
                                 })}
                             </div>
+                        </motion.div>
+                    ) : error ? (
+                        <motion.div
+                            key="error"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex flex-col items-center justify-center py-20 text-center"
+                        >
+                            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500">
+                                <AlertCircle size={32} />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-1">Search Error</h3>
+                            <p className="text-white/40 text-sm mb-6">{error}</p>
+                            <button
+                                onClick={() => handleSearch(query)}
+                                className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors text-sm"
+                            >
+                                <RefreshCcw size={14} />
+                                Try Again
+                            </button>
+                        </motion.div>
+                    ) : query && !isSearching ? (
+                        <motion.div
+                            key="no-results"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex flex-col items-center justify-center py-24 text-center"
+                        >
+                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 text-white/20">
+                                <SearchX size={32} />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-1">No results for "{query}"</h3>
+                            <p className="text-white/40 text-sm">Try searching for something else</p>
                         </motion.div>
                     ) : !query ? (
                         <motion.div

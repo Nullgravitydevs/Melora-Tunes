@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2 } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
+import { PlayableTrack } from "@/lib/types";
 import { loadSettings } from "@/lib/settings";
 import { cn, decodeHtml } from "@/lib/utils";
 
@@ -17,9 +18,10 @@ interface PlaylistViewProps {
 export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps) {
     const { addMix, updateMix, loadMix, deleteMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin, mixes, qualityPreference, showToast } = usePlayback();
 
-    const [songs, setSongs] = useState<JioSaavnSong[]>([]);
-    const [filteredSongs, setFilteredSongs] = useState<JioSaavnSong[]>([]);
+    const [songs, setSongs] = useState<(JioSaavnSong | PlayableTrack)[]>([]);
+    const [filteredSongs, setFilteredSongs] = useState<(JioSaavnSong | PlayableTrack)[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [playlistData, setPlaylistData] = useState<any>(playlist);
 
     // Metadata
@@ -103,14 +105,17 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                 } else {
                     setSongs([]);
                 }
-            } catch (e) {
-                console.error('Failed to load playlist:', e);
+                setSongs(details || []);
+            } catch (err) {
+                console.error("[PlaylistView] Error loading playlist:", err);
+                setError("Failed to load playlist content.");
             } finally {
                 setIsLoading(false);
             }
         };
+        setError(null);
         load();
-    }, [playlist?.id, title, mixes]); // Add mixes to dependencym, so if we add a song, it updates? No, this is mount logic mostly.
+    }, [playlist?.id, title, mixes]); // Add mixes to dependency, so if we add a song, it updates? No, this is mount logic mostly.
 
     // Filter Songs by Language (RELAXED)
     useEffect(() => {
@@ -186,7 +191,7 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
             updateMix(playlist.id, { songs: newSongs });
         }
 
-        showToast(`Removed "${removed[0]?.name || 'song'}"`, 'success');
+        showToast(`Removed "${(removed[0] as any)?.name || (removed[0] as any)?.title || 'song'}"`, 'success');
     };
 
     // Play a specific song
@@ -375,10 +380,10 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
 
                                 <div className="flex-1 min-w-0">
                                     <p className={`font-medium truncate ${currentSong?.id === song.id ? 'text-white' : 'text-white/80'}`}>
-                                        {decodeHtml(song.name || (song as any).title || 'Unknown Title')}
+                                        {decodeHtml((song as any).name || (song as any).title || 'Unknown Title')}
                                     </p>
                                     <p className="text-sm text-white/40 truncate">
-                                        {decodeHtml(song.primaryArtists || (song as any).artist || 'Unknown Artist')}
+                                        {decodeHtml((song as any).primaryArtists || (song as any).artist || 'Unknown Artist')}
                                     </p>
                                 </div>
 
@@ -399,6 +404,27 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                                 </button>
                             </motion.div>
                         ))}
+                    </div>
+                ) : error ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="p-10 rounded-3xl bg-white/[0.03] border border-white/10 max-w-sm w-full"
+                        >
+                            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                                <AlertCircle size={32} />
+                            </div>
+                            <h2 className="text-xl font-bold text-white mb-2">Failed to load</h2>
+                            <p className="text-white/40 text-sm mb-6">{error}</p>
+                            <button
+                                onClick={() => { setError(null); setIsLoading(true); }}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
+                            >
+                                <RefreshCcw size={16} />
+                                Try Again
+                            </button>
+                        </motion.div>
                     </div>
                 ) : (
                     <div className="py-20 text-center text-zinc-500">
