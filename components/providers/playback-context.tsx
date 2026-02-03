@@ -92,6 +92,7 @@ interface PlaybackContextType {
     // Queue (Typed correctly)
     queue: JioSaavnSong[];
     currentIndex: number;
+    playIndex: (index: number) => void; // Jump to specific song in queue
 
     // Sleep Timer
     sleepTimer: { endTime: number; duration: number } | null;
@@ -1456,6 +1457,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(true);
     }, [shuffle, updateMix]);
 
+    // Play specific index in queue
+    const playIndex = useCallback((index: number) => {
+        if (!activeMix || index < 0 || index >= activeMix.songs.length) return;
+        updateMix(activeMix.id, { currentSongIndex: index });
+        setIsPlaying(true);
+    }, [updateMix]);
+
     // Lazarus Loop: Simplified (3 Strikes Rule)
     const retryCount = useRef(0);
     const handlePlaybackError = useCallback((msg: string) => {
@@ -1677,6 +1685,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         queue: normalizedQueue.filter((s): s is JioSaavnSong => !!s),
         currentIndex: activeMix?.currentSongIndex || 0,
+        playIndex,
 
         sleepTimer, setSleepTimer,
         // crossfadeDuration, setCrossfadeDuration,

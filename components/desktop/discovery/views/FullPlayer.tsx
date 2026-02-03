@@ -16,7 +16,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
         currentSong, isPlaying, togglePlay, next, prev,
         progress, duration, seek, volume, setVolume,
         shuffle, setShuffle, repeat, setRepeat,
-        showToast, queue, currentIndex, play
+        showToast, queue, currentIndex, playIndex
     } = usePlayback();
 
     const [lyrics, setLyrics] = useState<string | null>(null);
@@ -196,20 +196,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                             <div
                                                 key={song.id + i}
                                                 className={`flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer ${i === currentIndex ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                                                onClick={() => {
-                                                    // Logic to play specific song from queue
-                                                    // Since play() usually resumes, we might need seek or set index, but standard play(queue, index) is common.
-                                                    // usePlayback doesn't expose setIndex directly in the destructured props above, let's check.
-                                                    // Actually, usually we play immediate mix. 
-                                                    // WE WILL IMPLEMENT A SIMPLE PLAY HERE:
-                                                    // Actually we can't easily jump to index with current context unless exposed.
-                                                    // Checking context... it exposes 'setQueue' and 'play'.
-                                                    // 'playInstantMix' is used elsewhere.
-                                                    // Let's just highlight for now, or if we can, skip to it. 
-                                                    // actually skip(amount) is for seeking time.
-                                                    // We probably need a 'playIndex(i)' function or similar. 
-                                                    // For now, I'll just leave it as display.
-                                                }}
+                                                onClick={() => playIndex(i)}
                                             >
                                                 <div className="w-6 text-center text-sm text-white/30">
                                                     {i === currentIndex ? <div className="w-2 h-2 rounded-full bg-pink-500 mx-auto" /> : i + 1}
