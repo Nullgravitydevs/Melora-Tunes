@@ -7,19 +7,29 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack } from "@/lib/types";
 import { loadSettings } from "@/lib/settings";
-import { cn, decodeHtml } from "@/lib/utils";
+import { cn, decodeHtml, cleanTrackTitle } from "@/lib/utils";
+import { AddToPlaylistModal } from "@/components/desktop/discovery/modals/AddToPlaylistModal";
+import { Search } from "lucide-react";
 
 interface PlaylistViewProps {
     playlist: any;
     onBack: () => void;
     onNavigate: (view: { id: string; data?: any }) => void;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
-export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps) {
-    const { addMix, updateMix, loadMix, deleteMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin, mixes, qualityPreference, showToast } = usePlayback();
+export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: PlaylistViewProps) {
+    const {
+        addMix, updateMix, loadMix, deleteMix,
+        currentSong, isPlaying, togglePlay, activeMixId,
+        togglePin, mixes, qualityPreference, showToast,
+        toggleLike, isLiked, isDownloaded // Added missing handlers
+    } = usePlayback();
 
     const [songs, setSongs] = useState<(JioSaavnSong | PlayableTrack)[]>([]);
+    const [searchQuery, setSearchQuery] = useState(""); // Add search state
     const [filteredSongs, setFilteredSongs] = useState<(JioSaavnSong | PlayableTrack)[]>([]);
+    const [songToAdd, setSongToAdd] = useState<JioSaavnSong | PlayableTrack | null>(null); // For AddToPlaylistModal
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [playlistData, setPlaylistData] = useState<any>(playlist);
@@ -31,9 +41,22 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
     const image = getImage(playlistData);
 
     function getImage(item: any) {
-        if (!item?.image) return '';
-        if (typeof item.image === 'string') return item.image;
-        if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
+        // 1. Explicit Image (Remote Playlist)
+        if (item?.image) {
+            if (typeof item.image === 'string') return item.image;
+            if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
+        }
+
+        // 2. Fallback: First Song (User Playlist)
+        // We check the local 'songs' state if available, or the item.songs if passed
+        const trackList = songs.length > 0 ? songs : (item?.songs || []);
+        if (trackList.length > 0) {
+            const first = trackList[0];
+            const img = (first as any).image || (first as any).img || (first as any).art; // Handle various shapes
+            if (typeof img === 'string') return img;
+            if (Array.isArray(img)) return img.find((i: any) => i.quality === '500x500')?.link || img[0]?.link || '';
+        }
+
         return '';
     }
 
@@ -117,19 +140,26 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
         load();
     }, [playlist?.id, title, mixes]); // Add mixes to dependency, so if we add a song, it updates? No, this is mount logic mostly.
 
-    // Filter Songs by Language (RELAXED)
+    // Filter Songs by Search & Language
     useEffect(() => {
         if (songs.length === 0) {
             setFilteredSongs([]);
             return;
         }
 
-        // User feedback: Don't hide songs in playlists user explicitly clicked.
-        // If I click "Telugu Hits", I want to see Telugu songs even if my setting is English.
-        // Only filter if it's a "For You" generated list, but for specific playlists, show all.
-        setFilteredSongs(songs);
+        let filtered = [...songs];
 
-    }, [songs]); // Re-run when songs load
+        if (searchQuery.trim()) {
+            const lowQ = searchQuery.toLowerCase();
+            filtered = filtered.filter(s => {
+                const name = ((s as any).name || (s as any).title || '').toLowerCase();
+                const art = ((s as any).primaryArtists || (s as any).artist || '').toLowerCase();
+                return name.includes(lowQ) || art.includes(lowQ);
+            });
+        }
+
+        setFilteredSongs(filtered);
+    }, [songs, searchQuery]); // Re-run when songs load or search changes
 
     // Display duration
     const totalDuration = filteredSongs.reduce((acc, s) => acc + (typeof s.duration === 'string' ? parseInt(s.duration) : s.duration || 0), 0);
@@ -336,6 +366,18 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                         )}
                     </div>
                 </motion.button>
+
+                {/* Search Bar inside Playlist */}
+                <div className="relative w-64 mr-2">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={16} />
+                    <input
+                        type="text"
+                        placeholder="Search tracks..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-white placeholder-white/20 focus:bg-white/10 focus:border-white/20 transition-all outline-none"
+                    />
+                </div>
             </div>
 
             {/* Track List */}
@@ -367,6 +409,11 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                                         playSong(i);
                                     }
                                 }}
+                                draggable={true}
+                                onDragStart={(e: React.DragEvent) => {
+                                    e.dataTransfer.setData('application/json', JSON.stringify(song));
+                                    e.dataTransfer.effectAllowed = 'copy';
+                                }}
                                 className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-white/[0.04] cursor-pointer group transition-all"
                             >
                                 <span className="w-6 text-center text-sm text-white/30 group-hover:hidden">{i + 1}</span>
@@ -379,9 +426,14 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                                 </span>
 
                                 <div className="flex-1 min-w-0">
-                                    <p className={`font-medium truncate ${currentSong?.id === song.id ? 'text-white' : 'text-white/80'}`}>
-                                        {decodeHtml((song as any).name || (song as any).title || 'Unknown Title')}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <p className={`font-medium truncate ${currentSong?.id === (song as any).id ? 'text-blue-400' : 'text-white/80'}`}>
+                                            {decodeHtml((song as any).name || (song as any).title || 'Unknown Title')}
+                                        </p>
+                                        {isDownloaded((song as any).id) && (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500" title="Offline" />
+                                        )}
+                                    </div>
                                     <p className="text-sm text-white/40 truncate">
                                         {decodeHtml((song as any).primaryArtists || (song as any).artist || 'Unknown Artist')}
                                     </p>
@@ -395,13 +447,32 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                                     })()}
                                 </span>
 
-                                <button
-                                    onClick={(e) => isUserMix ? removeSong(e, i) : undefined}
-                                    className={`p-2 opacity-0 group-hover:opacity-100 transition-opacity ${isUserMix ? 'hover:text-red-500 text-white/40' : 'text-white/40'}`}
-                                    title={isUserMix ? "Remove from Playlist" : "Options"}
-                                >
-                                    {isUserMix ? <Trash2 size={16} /> : <MoreHorizontal size={16} />}
-                                </button>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <motion.button
+                                        onClick={(e) => { e.stopPropagation(); toggleLike(song); }}
+                                        className={`p-2 rounded-full transition-colors ${isLiked((song as any).id) ? 'text-pink-500' : 'text-white/40 hover:text-white'}`}
+                                    >
+                                        <Heart size={16} fill={isLiked((song as any).id) ? "currentColor" : "none"} />
+                                    </motion.button>
+
+                                    <motion.button
+                                        onClick={(e) => { e.stopPropagation(); setSongToAdd(song); }}
+                                        className="p-2 rounded-full text-white/40 hover:text-white transition-colors"
+                                        title="Add to Playlist"
+                                    >
+                                        <MoreHorizontal size={16} />
+                                    </motion.button>
+
+                                    {isUserMix && (
+                                        <motion.button
+                                            onClick={(e) => removeSong(e, i)}
+                                            className="p-2 rounded-full text-white/40 hover:text-red-500 transition-colors"
+                                            title="Remove from Playlist"
+                                        >
+                                            <Trash2 size={16} />
+                                        </motion.button>
+                                    )}
+                                </div>
                             </motion.div>
                         ))}
                     </div>
@@ -442,6 +513,11 @@ export function PlaylistView({ playlist, onBack, onNavigate }: PlaylistViewProps
                     </div>
                 )}
             </div>
+
+            <AddToPlaylistModal
+                song={songToAdd}
+                onClose={() => setSongToAdd(null)}
+            />
         </div>
     );
 }

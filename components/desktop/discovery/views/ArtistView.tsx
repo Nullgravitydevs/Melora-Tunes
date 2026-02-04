@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, Clock, ArrowLeft, Music, MoreHorizontal, User, AlertCircle, RefreshCcw } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, Clock, ArrowLeft, Music, MoreHorizontal, User, AlertCircle, RefreshCcw, BadgeCheck, Info } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
-import { searchSongs, JioSaavnSong } from "@/lib/jiosaavn";
+import { getArtistDetails, JioSaavnSong } from "@/lib/jiosaavn";
+import { HorizontalScroll, StandardCard, SectionHeader, VibeAlbumCard } from "../home/HomeComponents";
+import { decodeHtml } from "@/lib/utils";
 
 /* ============================================================================
    ARTIST VIEW - Artist Detail Page
@@ -14,14 +16,14 @@ interface ArtistViewProps {
     artist: any;
     onBack: () => void;
     onNavigate: (view: { id: string; data?: any }) => void;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
-export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, toggleFollowArtist, isArtistFollowed } = usePlayback();
-
-    const [songs, setSongs] = useState<JioSaavnSong[]>([]);
+export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: ArtistViewProps) {
+    const [bio, setBio] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [artistData, setArtistData] = useState<any>(null);
 
     const artistName = artist?.name || artist?.primaryArtists || 'Unknown Artist';
     const artistImage = getImage(artist);
@@ -33,23 +35,43 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
         return '';
     }
 
-    // Fetch artist songs
+    // Fetch artist profile
     useEffect(() => {
         const load = async () => {
             setIsLoading(true);
             try {
-                const results = await searchSongs(artistName, 30);
-                setSongs(results);
+                // If it's a JioSaavn object, it might have an ID. If string, we search.
+                let id = artist?.id;
+                if (!id) {
+                    const search = await import("@/lib/jiosaavn").then(m => m.searchArtists(artistName, 1, 1));
+                    id = search[0]?.id;
+                }
+
+                if (id) {
+                    const details = await getArtistDetails(id);
+                    if (details) {
+                        setArtistData(details);
+                        setSongs(details.topSongs || []);
+                        setAlbums(details.topAlbums || []);
+                        setSimilar(details.similarArtists || []);
+                        setBio(details.bio || []);
+                    }
+                } else {
+                    // Fallback to basic search if no ID found
+                    const { searchSongs } = await import("@/lib/jiosaavn");
+                    const results = await searchSongs(artistName, 30);
+                    setSongs(results);
+                }
             } catch (e) {
-                console.error('Failed to load artist songs:', e);
-                setError("Failed to load artist popular songs.");
+                console.error('Failed to load artist profile:', e);
+                setError("Failed to load artist profile.");
             } finally {
                 setIsLoading(false);
             }
         };
         setError(null);
         load();
-    }, [artistName]);
+    }, [artistName, artist?.id]);
 
     // FIX 1: Stable artist mix ID to prevent memory leak
     const ARTIST_MIX_ID = `artist-${artist?.id || artistName}`;
@@ -98,17 +120,10 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
         loadMix(ARTIST_MIX_ID);
     };
 
-    const getArt = (song: JioSaavnSong) => {
-        if (!song?.image) return '';
-        if (typeof song.image === 'string') return song.image;
-        if (Array.isArray(song.image)) return song.image.find(i => i.quality === '150x150')?.link || song.image[0]?.link || '';
-        return '';
-    };
-
     return (
         <div className="min-h-full">
             {/* Header */}
-            <div className="relative h-[340px] overflow-hidden">
+            <div className="relative h-[440px] overflow-hidden">
                 {/* Background Blur */}
                 {artistImage && (
                     <div
@@ -120,7 +135,7 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
                         }}
                     />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
 
                 {/* Back Button */}
                 <motion.button
@@ -133,119 +148,199 @@ export function ArtistView({ artist, onBack, onNavigate }: ArtistViewProps) {
                 </motion.button>
 
                 {/* Artist Info */}
-                <div className="absolute bottom-8 left-8 right-8 flex items-end gap-6">
+                <div className="absolute inset-x-8 bottom-12 flex items-end gap-8">
                     {artistImage ? (
-                        <img src={artistImage} alt="" className="w-48 h-48 rounded-full object-cover shadow-2xl border-4 border-white/10" />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="w-48 h-48 rounded-full overflow-hidden shadow-2xl border-4 border-white/10 shrink-0"
+                        >
+                            <img src={artistImage} alt="" className="w-full h-full object-cover" />
+                        </motion.div>
                     ) : (
-                        <div className="w-48 h-48 rounded-full bg-black border border-white/10 flex items-center justify-center">
-                            <User size={48} className="text-white/30" />
+                        <div className="w-48 h-48 rounded-full bg-white/5 flex items-center justify-center shrink-0 border-4 border-white/5">
+                            <User size={80} className="text-white/10" />
                         </div>
                     )}
-                    <div className="flex-1 pb-2">
-                        <span className="text-xs text-white/40 uppercase tracking-wider">Artist</span>
-                        <h1 className="text-5xl font-bold mb-2">{artistName}</h1>
-                        <p className="text-white/50">{songs.length} songs</p>
+
+                    <div className="flex-1 min-w-0 pb-2">
+                        <div className="flex items-center gap-2 mb-2">
+                            {artistData?.isVerified && (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+                                    <BadgeCheck size={12} /> Verified
+                                </div>
+                            )}
+                            <span className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Artist Profile</span>
+                        </div>
+                        <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter mb-4 truncate">{artistName}</h1>
+
+                        <div className="flex items-center gap-6">
+                            {artistData?.followerCount && (
+                                <div className="flex flex-col">
+                                    <span className="text-white font-bold">{parseInt(artistData.followerCount).toLocaleString()}</span>
+                                    <span className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Followers</span>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => toggleFollowArtist(artistData || artist)}
+                                className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${isArtistFollowed(artist?.id || artistData?.id) ? 'bg-white text-black border-white' : 'bg-transparent text-white border-white/20 hover:border-white'}`}
+                            >
+                                {isArtistFollowed(artist?.id || artistData?.id) ? 'Following' : 'Follow'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Actions */}
-            <div className="px-8 py-6 flex items-center gap-4">
+            {/* ARTIST ACTION BAR */}
+            <div className="px-8 py-8 flex items-center gap-6 sticky top-0 bg-black/40 backdrop-blur-xl z-30 -mt-2">
                 <motion.button
-                    onClick={() => playAll(false)}
-                    className="px-8 py-3 bg-white text-black rounded-full font-semibold flex items-center gap-2"
-                    style={{ boxShadow: '0 4px 20px rgba(255, 255, 255, 0.2)' }}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                    onClick={() => playAll()}
+                    className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center shadow-2xl shadow-white/10 hover:scale-105 active:scale-95 transition-all"
                 >
-                    <Play size={18} fill="currentColor" />
-                    Play
+                    <Play fill="currentColor" size={28} className="ml-1" />
                 </motion.button>
+
                 <motion.button
                     onClick={() => playAll(true)}
-                    className="p-3 rounded-full bg-black border border-white/10 hover:border-white/20 transition-colors"
-                    whileTap={{ scale: 0.9 }}
+                    className="p-3 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                    whileHover={{ rotate: 15 }}
                 >
-                    <Shuffle size={18} />
-                </motion.button>
-                <motion.button
-                    onClick={() => toggleFollowArtist(artist)}
-                    className={`p-3 rounded-full bg-black border hover:border-white/20 transition-colors ${isArtistFollowed(artist.id) ? 'border-red-500/50' : 'border-white/10'}`}
-                    whileTap={{ scale: 0.9 }}
-                >
-                    <Heart size={18} fill={isArtistFollowed(artist.id) ? "currentColor" : "none"} className={isArtistFollowed(artist.id) ? "text-red-500" : ""} />
+                    <Shuffle size={24} />
                 </motion.button>
             </div>
 
-            {/* Songs List */}
-            <div className="px-8 pb-32">
-                <h2 className="text-lg font-semibold mb-4">Popular</h2>
-
+            {/* ARTIST CONTENT */}
+            <div className="space-y-16 pb-40 min-h-[600px]">
                 {isLoading ? (
-                    <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-16 rounded-lg bg-white/5 animate-pulse" />
-                        ))}
-                    </div>
-                ) : error ? (
-                    <div className="py-12 text-center bg-white/[0.02] rounded-2xl border border-white/5">
-                        <AlertCircle size={32} className="mx-auto text-red-500 mb-3" />
-                        <h3 className="text-lg font-bold text-white mb-2">Error Loading Artist</h3>
-                        <p className="text-white/40 text-sm mb-6">{error}</p>
-                        <button
-                            onClick={() => { setError(null); setIsLoading(true); }}
-                            className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
-                        >
-                            <RefreshCcw size={16} />
-                            Try Again
-                        </button>
+                    <div className="px-8 space-y-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-1">
+                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                <div key={i} className="h-16 rounded-lg bg-white/5 animate-pulse" />
+                            ))}
+                        </div>
                     </div>
                 ) : (
-                    <div className="space-y-1">
-                        {songs.map((song, i) => (
-                            /* FIX 3: Smart toggle - same song = pause/play, different song = switch */
-                            <motion.div
-                                key={song.id + i}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ delay: i * 0.02 }}
-                                onClick={() => {
-                                    if (currentSong?.id === song.id && activeMixId === ARTIST_MIX_ID) {
-                                        togglePlay();
-                                    } else {
-                                        playSong(i);
-                                    }
-                                }}
-                                className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.04] cursor-pointer group transition-all"
-                            >
-                                {/* Number - FIX 2: Check activeMixId for correct icon */}
-                                <span className="w-6 text-center text-sm text-white/30 group-hover:hidden">{i + 1}</span>
-                                <span className="w-6 text-center hidden group-hover:block">
-                                    {currentSong?.id === song.id && activeMixId === ARTIST_MIX_ID && isPlaying ? (
-                                        <Pause size={14} className="text-white mx-auto" />
-                                    ) : (
-                                        <Play size={14} className="text-white mx-auto" fill="currentColor" />
-                                    )}
-                                </span>
+                    <>
+                        {/* 1. TOP SONGS */}
+                        {songs.length > 0 && (
+                            <section className="px-8">
+                                <SectionHeader title="Popular Songs" subtitle="Top Tracks" />
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-1">
+                                    {songs.slice(0, 10).map((song, i) => {
+                                        const active = currentSong?.id === song.id;
+                                        return (
+                                            <motion.div
+                                                key={song.id + i}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.05 }}
+                                                onClick={() => {
+                                                    if (active && activeMixId === ARTIST_MIX_ID) {
+                                                        togglePlay();
+                                                    } else {
+                                                        playSong(i);
+                                                    }
+                                                }}
+                                                draggable={true}
+                                                onDragStart={(e: React.DragEvent) => {
+                                                    e.dataTransfer.setData('application/json', JSON.stringify(song));
+                                                    e.dataTransfer.effectAllowed = 'copy';
+                                                }}
+                                                className={`group flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-white/5 transition-colors ${active ? 'bg-white/5' : ''}`}
+                                            >
+                                                <div className="w-6 text-center text-white/20 text-sm font-mono group-hover:hidden">{(i + 1).toString().padStart(2, '0')}</div>
+                                                <div className="w-6 text-center hidden group-hover:block border border-white/40 rounded-full h-6 w-6 flex items-center justify-center">
+                                                    {active && isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
+                                                </div>
 
-                                {/* Art + Info */}
-                                <img src={getArt(song)} alt="" className="w-12 h-12 rounded object-cover" />
-                                <div className="flex-1 min-w-0">
-                                    <p className={`font-medium truncate ${currentSong?.id === song.id ? 'text-white' : ''}`}>{song.name}</p>
-                                    <p className="text-sm text-white/40 truncate">{song.album?.name}</p>
+                                                <div className="w-12 h-12 rounded overflow-hidden bg-white/5 shrink-0">
+                                                    <img src={typeof song.image === 'string' ? song.image : (song.image?.[0]?.link || '')} className="w-full h-full object-cover" alt="" />
+                                                </div>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`font-bold truncate ${active ? 'text-blue-400' : 'text-white'}`}>{decodeHtml(song.name)}</p>
+                                                    <p className="text-xs text-white/40 truncate">{song.album?.name || 'Single'}</p>
+                                                </div>
+
+                                                <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100">
+                                                    <Heart size={16} className="text-white/20 hover:text-pink-500 transition-colors" />
+                                                    <span className="text-xs font-mono text-white/20">{song.duration ? `${Math.floor(Number(song.duration) / 60)}:${(Number(song.duration) % 60).toString().padStart(2, '0')}` : '--:--'}</span>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
                                 </div>
+                            </section>
+                        )}
 
-                                {/* Duration */}
-                                <span className="text-sm text-white/25 tabular-nums">
-                                    {song.duration ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}` : ''}
-                                </span>
+                        {/* 2. DISCOGRAPHY */}
+                        {albums.length > 0 && (
+                            <section>
+                                <SectionHeader title="Discography" subtitle="Released Albums" onSeeAll={() => onNavigate({ id: 'search', data: { query: artistName + ' albums' } })} />
+                                <HorizontalScroll>
+                                    {albums.map((album, i) => (
+                                        <VibeAlbumCard
+                                            key={album.id || i}
+                                            item={album}
+                                            onClick={() => onNavigate({ id: 'peel-reveal', data: album })}
+                                        />
+                                    ))}
+                                </HorizontalScroll>
+                            </section>
+                        )}
 
-                                {/* More */}
-                                <button className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <MoreHorizontal size={16} className="text-white/40" />
-                                </button>
-                            </motion.div>
-                        ))}
+                        {/* 3. ABOUT / BIO */}
+                        {bio.length > 0 && (
+                            <section className="px-8">
+                                <SectionHeader title={`About ${artistName}`} />
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="glass-card p-8 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer"
+                                    onClick={() => { }} // Could open a full bio modal
+                                >
+                                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <Info size={120} />
+                                    </div>
+                                    <div className="max-w-3xl relative z-10">
+                                        <p className="text-white/60 leading-relaxed text-lg line-clamp-4">
+                                            {bio.map((b: any) => b.text).join(' ')}
+                                        </p>
+                                        <button className="mt-6 text-sm font-bold uppercase tracking-widest text-white hover:text-blue-400 transition-colors">
+                                            Read Full Biography
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </section>
+                        )}
+
+                        {/* 4. SIMILAR ARTISTS */}
+                        {similar.length > 0 && (
+                            <section>
+                                <SectionHeader title="Fans Also Like" subtitle="Similar Artists" />
+                                <HorizontalScroll>
+                                    {similar.map((art, i) => (
+                                        <StandardCard
+                                            key={art.id || i}
+                                            item={art}
+                                            index={i}
+                                            subtitle="Artist"
+                                            onClick={() => onNavigate({ id: 'artist', data: art })}
+                                        />
+                                    ))}
+                                </HorizontalScroll>
+                            </section>
+                        )}
+                    </>
+                )}
+
+                {error && (
+                    <div className="py-20 text-center">
+                        <AlertCircle size={48} className="mx-auto text-red-500 mb-4 opacity-20" />
+                        <h2 className="text-xl font-bold text-white mb-2">Failed to load profile</h2>
+                        <p className="text-white/40 mb-8">{error}</p>
+                        <button onClick={() => window.location.reload()} className="px-10 py-3 bg-white text-black font-bold rounded-full">Refresh View</button>
                     </div>
                 )}
             </div>

@@ -16,6 +16,7 @@ interface UnifiedSearchProps {
     className?: string;
     showFilters?: boolean;
     autoFocus?: boolean;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
 // Quality badge colors
@@ -36,7 +37,8 @@ export function UnifiedSearch({
     placeholder = "Search songs, albums, artists...",
     className = "",
     showFilters = true,
-    autoFocus = false
+    autoFocus = false,
+    onContextMenu
 }: UnifiedSearchProps) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<PlayableTrack[]>([]);
@@ -149,6 +151,18 @@ export function UnifiedSearch({
                         key={track.id}
                         className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors cursor-pointer group"
                         onClick={() => handleSongClick(track)}
+                        onContextMenu={(e) => {
+                            if (track.song && onContextMenu) {
+                                onContextMenu(e, track.song);
+                            }
+                        }}
+                        draggable={true}
+                        onDragStart={(e: React.DragEvent) => {
+                            if (track.song) {
+                                e.dataTransfer.setData('application/json', JSON.stringify(track.song));
+                                e.dataTransfer.effectAllowed = 'copy';
+                            }
+                        }}
                     >
                         {/* Album Art */}
                         <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-800">
@@ -188,7 +202,44 @@ export function UnifiedSearch({
                     </div>
                 ))}
 
-                {/* Empty State */}
+                {/* Empty State / Recent Searches */}
+                {!query && !results.length && (
+                    <div className="py-4 px-2">
+                        {/* Recent Searches (Mock for now, will implement storage later) */}
+                        <div className="mb-6">
+                            <h3 className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">Recent Searches</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {['The Weeknd', 'Taylor Swift', 'Daft Punk', 'Top 50 Global'].map((term, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setQuery(term)}
+                                        className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-white/70 hover:text-white transition-colors"
+                                    >
+                                        {term}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Trending */}
+                        <div>
+                            <h3 className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">Trending Now</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {['#ViralHits', '#NewMusicFriday', '#LofiChill', '#WorkoutMetrics'].map((tag, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setQuery(tag.replace('#', ''))}
+                                        className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/30 text-sm text-pink-400 hover:text-pink-300 transition-colors"
+                                    >
+                                        {tag}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* No Results */}
                 {query && !isSearching && results.length === 0 && (
                     <div className="text-center py-8 text-gray-400">
                         No results found for "{query}"

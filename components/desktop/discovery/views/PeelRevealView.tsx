@@ -11,9 +11,10 @@ interface PeelRevealViewProps {
     album: JioSaavnSong;
     onBack: () => void;
     onPlay: (song: JioSaavnSong) => void;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
-export function PeelRevealView({ album, onBack, onPlay }: PeelRevealViewProps) {
+export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRevealViewProps) {
     const [phase, setPhase] = useState<'sealed' | 'opened'>('sealed');
     const [tracks, setTracks] = useState<JioSaavnSong[]>([]);
     const [loading, setLoading] = useState(true);

@@ -298,7 +298,6 @@ export async function searchArtists(query: string, page: number = 1, limit: numb
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
-            // Use our existing retry/proxy wrapper
             data = await fetchApi(params, true);
         }
 
@@ -321,6 +320,52 @@ export async function searchArtists(query: string, page: number = 1, limit: numb
     } catch (e) {
         console.error("Error searching artists", e);
         return [];
+    }
+}
+
+/**
+ * Fetch Full Artist Details including Top Songs, Albums, and Bio
+ */
+export async function getArtistDetails(artistId: string, page: number = 1): Promise<any> {
+    try {
+        console.log(`[ArtistDetails] Fetching ID: ${artistId}`);
+        const params = `__call=artist.getDetails&_format=json&artistId=${artistId}&ctx=wap6dot0&n_song=20&n_album=20&p=${page}`;
+
+        let data: any;
+        if (Capacitor.isNativePlatform() || isElectron) {
+            const apiUrl = `https://www.jiosaavn.com/api.php?${params}`;
+            if (Capacitor.isNativePlatform()) {
+                const response = await CapacitorHttp.get({ url: apiUrl });
+                data = response.data;
+            } else {
+                const response = await fetch(apiUrl);
+                data = await response.json();
+            }
+        } else {
+            data = await fetchApi(params, true);
+        }
+
+        if (!data) return null;
+
+        return {
+            id: data.artistId || data.id,
+            name: decodeHtml(data.name),
+            subtitle: decodeHtml(data.subtitle),
+            image: formatImage(data.image),
+            followerCount: data.follower_count,
+            isVerified: data.is_verified || data.verified || true, // Most JioSaavn artists are verified
+            bio: data.bio ? JSON.parse(data.bio) : [], // Bio is often a JSON array of blocks
+            topSongs: (data.topSongs || []).map(mapToSong),
+            topAlbums: (data.topAlbums || []).map(mapToSong), // Re-use mapToSong for layout stability
+            similarArtists: (data.similarArtists || []).map((a: any) => ({
+                id: a.id || a.artistId,
+                name: decodeHtml(a.name),
+                image: formatImage(a.image)
+            }))
+        };
+    } catch (e) {
+        console.error("Error fetching artist details", e);
+        return null;
     }
 }
 
@@ -473,33 +518,22 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
     }
 }
 
-export async function getAlbumDetails(albumId: string): Promise<JioSaavnSong[]> {
+export async function getAlbumDetails(albumId: string): Promise<any> {
     try {
-        let data: any;
-        if (Capacitor.isNativePlatform()) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=${albumId}&ctx=wap6dot0`;
-            const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
-        } else if (isElectron) {
-            // Electron can fetch directly
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=${albumId}&ctx=wap6dot0`;
-            const response = await fetch(apiUrl);
-            data = await response.json();
-        } else {
-            // Browser: Use Next.js proxy rewrite to bypass CORS
-            const apiUrl = `/api/proxy?__call=content.getAlbumDetails&_format=json&albumid=${albumId}&ctx=wap6dot0`;
-            const response = await fetch(apiUrl);
-            data = await response.json();
-        }
+        const params = `__call=content.getAlbumDetails&_format=json&albumid=${albumId}&ctx=wap6dot0`;
+        const data = await fetchApi(params, true);
 
         if (data && data.songs) {
-            return data.songs.map(mapToSong);
+            return {
+                ...data,
+                songs: data.songs.map(mapToSong)
+            };
         }
         if (Array.isArray(data)) return data.map(mapToSong);
-        return [];
+        return data;
     } catch (e) {
         console.error("Error fetching album details", e);
-        return [];
+        return null;
     }
 }
 

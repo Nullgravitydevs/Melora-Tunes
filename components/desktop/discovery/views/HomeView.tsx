@@ -12,6 +12,7 @@ interface HomeViewProps {
     onPlaySong: (song: JioSaavnSong) => void;
     currentSongId?: string;
     isPlaying: boolean;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
 function getGreeting(name?: string) {

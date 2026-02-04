@@ -4,19 +4,22 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, Pause, Shuffle, Heart, ArrowLeft, MoreHorizontal, Clock, Disc3, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
-import { getAlbumDetails, JioSaavnSong } from "@/lib/jiosaavn";
+import { getAlbumDetails, getArtistDetails, JioSaavnSong, searchAlbums } from "@/lib/jiosaavn";
+import { HorizontalScroll, StandardCard, SectionHeader, VibeAlbumCard } from "../home/HomeComponents";
 import { decodeHtml } from "@/lib/utils";
 
 interface AlbumViewProps {
     album: any;
     onBack: () => void;
     onNavigate: (view: { id: string; data?: any }) => void;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
-export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
+export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumViewProps) {
     const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, toggleSaveAlbum, isAlbumSaved, togglePin, mixes, showToast } = usePlayback();
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
+    const [moreFromArtist, setMoreFromArtist] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [albumData, setAlbumData] = useState<any>(album);
@@ -40,9 +43,21 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
             try {
                 const details = await getAlbumDetails(album.id);
                 if (details) {
-                    setAlbumData(details);
+                    const data = details as any;
+                    setAlbumData(data);
                     const songList = Array.isArray(details) ? details : (details as any).songs || [];
                     setSongs(songList);
+
+                    // Fetch more from artist
+                    if (data.primaryArtistsId) {
+                        const artistDetails = await getArtistDetails(data.primaryArtistsId);
+                        if (artistDetails?.topAlbums) {
+                            setMoreFromArtist(artistDetails.topAlbums.filter((a: any) => a.id !== album.id));
+                        }
+                    } else if (data.primaryArtists) {
+                        const results = await searchAlbums(data.primaryArtists, 1, 10);
+                        setMoreFromArtist(results.filter((a: any) => a.id !== album.id));
+                    }
                 }
             } catch (e) {
                 console.error('Failed to load album:', e);
@@ -110,10 +125,10 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                                 <div className="absolute inset-0 bg-[conic-gradient(from_0deg,#c0c0c0,#e8e8e8,#a0a0a0,#e8e8e8,#c0c0c0)] rounded-full" />
                                 <div className="absolute inset-0 rounded-full opacity-30 mix-blend-overlay" style={{ background: `conic-gradient(from 0deg, transparent 0%, #ff0000 10%, #00ff00 20%, #0000ff 30%, transparent 40%)` }} />
                                 <div className="absolute inset-0 rounded-full opacity-30" style={{ background: 'repeating-radial-gradient(transparent 0, transparent 1.5px, #000 2px)' }} />
-                                <div className="absolute top-[35%] left-[35%] width-[30%] height-[30%] rounded-full overflow-hidden border-2 border-neutral-300/20">
-                                    <img src={albumImage} className="w-[54px] h-[54px] object-cover" />
+                                <div className="absolute top-[35%] left-[35%] w-[30%] h-[30%] rounded-full overflow-hidden border-2 border-neutral-300/20">
+                                    <img src={albumImage} className="w-full h-full object-cover" />
                                 </div>
-                                <div className="absolute top-[46%] left-[46%] w-4 h-4 bg-black rounded-full shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
+                                <div className="absolute top-[46.5%] left-[46.5%] w-[7%] h-[7%] bg-black rounded-full shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                             </div>
                         </motion.div>
 
@@ -174,13 +189,13 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                 </div>
 
                 {/* === GLASS TRACKLIST (Compact) === */}
-                <div className="px-4">
+                <div className="px-4 mt-8">
                     <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-1 shadow-2xl">
                         {/* Header Row */}
                         <div className="grid grid-cols-[auto_1fr_auto] gap-3 px-3 py-2 text-[9px] font-bold text-white/30 uppercase tracking-widest border-b border-white/5">
                             <span className="w-5 text-center">#</span>
                             <span>Title</span>
-                            <Clock size={10} />
+                            <Clock size={10} className="ml-auto" />
                         </div>
 
                         {/* Songs */}
@@ -206,6 +221,11 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                                     return (
                                         <motion.div key={song.id + i} initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.01 }}
                                             onClick={() => isActive ? togglePlay() : playSong(i)}
+                                            draggable={true}
+                                            onDragStart={(e: React.DragEvent) => {
+                                                e.dataTransfer.setData('application/json', JSON.stringify(song));
+                                                e.dataTransfer.effectAllowed = 'copy';
+                                            }}
                                             className={`group flex items-center gap-3 p-2.5 cursor-pointer transition-all ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}>
                                             <div className="w-5 flex items-center justify-center">
                                                 {isActive && isPlaying ? <Disc3 className="animate-spin text-white" size={14} /> : <span className={`font-mono text-[10px] ${isActive ? 'text-white font-bold' : 'text-white/40'}`}>{i + 1}</span>}
@@ -214,7 +234,7 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                                                 <h4 className={`text-sm font-medium truncate ${isActive ? 'text-white font-bold' : 'text-white'}`}>{decodeHtml(song.name)}</h4>
                                                 <p className="text-white/40 text-[10px] truncate">{decodeHtml(song.primaryArtists)}</p>
                                             </div>
-                                            <span className="text-white/30 text-[10px] font-mono">{song.duration ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}` : ''}</span>
+                                            <span className="text-white/30 text-[10px] font-mono">{song.duration ? `${Math.floor(Number(song.duration) / 60)}:${(Number(song.duration) % 60).toString().padStart(2, '0')}` : ''}</span>
                                         </motion.div>
                                     );
                                 })}
@@ -222,6 +242,22 @@ export function AlbumView({ album, onBack, onNavigate }: AlbumViewProps) {
                         )}
                     </div>
                 </div>
+
+                {/* MORE FROM ARTIST */}
+                {!isLoading && moreFromArtist.length > 0 && (
+                    <section className="mt-20">
+                        <SectionHeader title={`More by ${decodeHtml(artistName)}`} onSeeAll={() => onNavigate({ id: 'artist', data: { id: albumData?.primaryArtistsId, name: artistName } })} />
+                        <HorizontalScroll>
+                            {moreFromArtist.map((a, i) => (
+                                <VibeAlbumCard
+                                    key={a.id || i}
+                                    item={a}
+                                    onClick={() => onNavigate({ id: 'peel-reveal', data: a })}
+                                />
+                            ))}
+                        </HorizontalScroll>
+                    </section>
+                )}
             </div>
             <style jsx global>{`.scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
         </div>

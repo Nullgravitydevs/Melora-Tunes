@@ -11,6 +11,7 @@ import { ensurePlayableTrack } from "@/lib/track-utils";
 
 interface RadioViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
 // === STATION DATA ===

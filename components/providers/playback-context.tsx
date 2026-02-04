@@ -314,9 +314,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (isLoaded) {
-            localStorage.setItem('melora-mixes', JSON.stringify(mixes));
+            try {
+                localStorage.setItem('melora-mixes', JSON.stringify(mixes));
+            } catch (e) {
+                if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+                    showToast("Storage Full: Try clearing some history or playlists", "error");
+                }
+            }
         }
-    }, [mixes, isLoaded]);
+    }, [mixes, isLoaded, showToast]);
 
     const setDefaults = () => {
         setMixes([
@@ -364,26 +370,54 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // Persist liked songs
     useEffect(() => {
-        if (likedSongs.length > 0) {
-            localStorage.setItem('melora-liked-songs', JSON.stringify(likedSongs));
+        if (isLoaded && likedSongs.length > 0) {
+            try {
+                localStorage.setItem('melora-liked-songs', JSON.stringify(likedSongs));
+            } catch (e) {
+                if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+                    showToast("Library Full: Cannot like more songs", "error");
+                }
+            }
         }
-    }, [likedSongs]);
+    }, [likedSongs, isLoaded, showToast]);
 
     // Persist recently played
 
     useEffect(() => {
-        if (recentlyPlayed.length > 0) {
-            localStorage.setItem('melora-recently-played', JSON.stringify(recentlyPlayed));
+        if (isLoaded && recentlyPlayed.length > 0) {
+            try {
+                localStorage.setItem('melora-recently-played', JSON.stringify(recentlyPlayed));
+            } catch (e) {
+                // Ignore recently played quota issues, just clear oldest if needed? 
+                // But localStorage doesn't support auto-pruning.
+                // We'll just ignore for now as history is less critical than Liked Songs
+            }
         }
-    }, [recentlyPlayed]);
+    }, [recentlyPlayed, isLoaded]);
 
     useEffect(() => {
-        localStorage.setItem('melora-saved-albums', JSON.stringify(savedAlbums));
-    }, [savedAlbums]);
+        if (isLoaded) {
+            try {
+                localStorage.setItem('melora-saved-albums', JSON.stringify(savedAlbums));
+            } catch (e) {
+                if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+                    showToast("Library Full: Cannot save more albums", "error");
+                }
+            }
+        }
+    }, [savedAlbums, isLoaded, showToast]);
 
     useEffect(() => {
-        localStorage.setItem('melora-saved-artists', JSON.stringify(savedArtists));
-    }, [savedArtists]);
+        if (isLoaded) {
+            try {
+                localStorage.setItem('melora-saved-artists', JSON.stringify(savedArtists));
+            } catch (e) {
+                if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+                    showToast("Library Full: Cannot follow more artists", "error");
+                }
+            }
+        }
+    }, [savedArtists, isLoaded, showToast]);
 
     // Toggle like function
     // Toggle like function

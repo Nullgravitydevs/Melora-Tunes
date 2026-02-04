@@ -57,21 +57,22 @@ type TabType = 'liked' | 'recent' | 'playlists' | 'albums' | 'artists';
 
 interface LibraryViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
-    initialTab?: TabType;
+    initialTab?: 'liked' | 'recent' | 'playlists';
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
 /* ============================================================================
    LIBRARY VIEW - Liked Songs, Recently Played, Playlists
    Muzza-inspired "Best Search" & Sort Features
    ============================================================================ */
-export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
+export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryViewProps) {
     const {
         likedSongs, recentlyPlayed, mixes,
         currentSong, isPlaying, togglePlay,
         addMix, loadMix, deleteMix, playInstantMix,
         qualityPreference, showToast, togglePin,
         savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist,
-        isDownloaded
+        isDownloaded, toggleLike, isLiked
     } = usePlayback();
 
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'liked');
@@ -80,7 +81,7 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
 
     // SEARCH & FILTER STATE
     const [searchQuery, setSearchQuery] = useState("");
-    const [sortType, setSortType] = useState<'date' | 'name'>('date');
+    const [sortType, setSortType] = useState<'date' | 'name' | 'artist'>('date');
     const [sortDescending, setSortDescending] = useState(true);
 
     // Sync active tab when prop changes
@@ -131,9 +132,22 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                 (song.album?.name || '').toLowerCase().includes(lowerQ)
             );
         }
-        // TODO: Add Sort for songs if requested. For now, Liked is usually "Recently Added" (FIFO/LIFO)
+
+        // Apply Sorting
+        if (sortType === 'name') {
+            list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        } else if (sortType === 'artist') {
+            list.sort((a, b) => (a.primaryArtists || '').localeCompare(b.primaryArtists || ''));
+        } else {
+            // Default: "Date Added" (Chronological)
+            // If descending, we want newest first, so we reverse the insertion order
+            if (sortDescending) list.reverse();
+            return list;
+        }
+
+        if (sortDescending) list.reverse();
         return list;
-    }, [likedSongs, searchQuery]);
+    }, [likedSongs, searchQuery, sortType, sortDescending]);
 
     // 3. Saved Albums
     const filteredAlbums = useMemo(() => {
@@ -142,8 +156,19 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
             const lowerQ = searchQuery.toLowerCase();
             list = list.filter(a => (a.name || a.title || '').toLowerCase().includes(lowerQ));
         }
+
+        if (sortType === 'name') {
+            list.sort((a, b) => (a.name || a.title || '').localeCompare(b.name || b.title || ''));
+        } else if (sortType === 'artist') {
+            list.sort((a, b) => (a.primaryArtists || '').localeCompare(b.primaryArtists || ''));
+        } else {
+            if (sortDescending) list.reverse();
+            return list;
+        }
+
+        if (sortDescending) list.reverse();
         return list;
-    }, [savedAlbums, searchQuery]);
+    }, [savedAlbums, searchQuery, sortType, sortDescending]);
 
     // 4. Followed Artists
     const filteredArtists = useMemo(() => {
@@ -152,8 +177,31 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
             const lowerQ = searchQuery.toLowerCase();
             list = list.filter(a => (a.name || '').toLowerCase().includes(lowerQ));
         }
+
+        if (sortType === 'name') {
+            list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        } else {
+            if (sortDescending) list.reverse();
+            return list;
+        }
+
+        if (sortDescending) list.reverse();
         return list;
-    }, [savedArtists, searchQuery]);
+    }, [savedArtists, searchQuery, sortType, sortDescending]);
+
+    // 5. Recently Played (Filtered)
+    const filteredRecentlyPlayed = useMemo(() => {
+        let list = [...recentlyPlayed];
+        if (searchQuery.trim()) {
+            const lowerQ = searchQuery.toLowerCase();
+            list = list.filter(song =>
+                (song.name || '').toLowerCase().includes(lowerQ) ||
+                (song.primaryArtists || '').toLowerCase().includes(lowerQ) ||
+                (song.album?.name || '').toLowerCase().includes(lowerQ)
+            );
+        }
+        return list;
+    }, [recentlyPlayed, searchQuery]);
 
     // Helper: Extract timestamp from ID if possible
     function extractTimestamp(id: string): number {
@@ -339,10 +387,10 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
 
                     <div className="hidden group-hover:flex items-center gap-2">
                         <motion.button
-                            onClick={(e) => { e.stopPropagation(); playSong(item, allItems); }}
-                            className="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
+                            onClick={(e) => { e.stopPropagation(); toggleLike(item); }}
+                            className={`p-1.5 rounded-full hover:bg-white/10 transition-colors ${isLiked(song.id) ? 'text-pink-500' : 'text-white/40 hover:text-white'}`}
                         >
-                            <Heart size={16} />
+                            <Heart size={16} fill={isLiked(song.id) ? "currentColor" : "none"} />
                         </motion.button>
                         <motion.button
                             onClick={(e) => { e.stopPropagation(); setSongToAdd(item); }}
@@ -461,58 +509,62 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                     ))}
                 </div>
 
-                {/* SEARCH BAR & FILTERS (Applied to Liked & Playlists) */}
-                {activeTab !== 'recent' && (
-                    <div className="flex flex-col md:flex-row gap-4 mb-6">
-                        {/* Search Input */}
-                        <div className="relative flex-1">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={`Search ${activeTab === 'playlists' ? 'playlists...' : activeTab === 'albums' ? 'albums...' : activeTab === 'artists' ? 'artists...' : 'liked songs...'}`}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-white/20 text-sm text-white placeholder-white/30 transition-all font-medium"
-                            />
-                            {/* Search Icon */}
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/30">
-                                    <circle cx="11" cy="11" r="8"></circle>
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                                </svg>
-                            </div>
+                {/* SEARCH BAR & FILTERS */}
+                <div className="flex flex-col md:flex-row gap-4 mb-6">
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={`Search ${activeTab === 'playlists' ? 'playlists...' : activeTab === 'albums' ? 'albums...' : activeTab === 'artists' ? 'artists...' : 'liked songs...'}`}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-white/20 text-sm text-white placeholder-white/30 transition-all font-medium"
+                        />
+                        {/* Search Icon */}
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/30">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
                         </div>
-
-                        {/* Sort Options (Only for Playlists for now) */}
-                        {activeTab === 'playlists' && (
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-xs font-semibold text-white/30 uppercase tracking-wider hidden md:block">Sort By:</span>
-                                <button
-                                    onClick={() => setSortType('date')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 transition-colors ${sortType === 'date' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
-                                >
-                                    Date
-                                </button>
-                                <button
-                                    onClick={() => setSortType('name')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 transition-colors ${sortType === 'name' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
-                                >
-                                    Name
-                                </button>
-                                <button
-                                    onClick={() => setSortDescending(!sortDescending)}
-                                    className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
-                                    title={sortDescending ? "Newest First" : "Oldest First"}
-                                >
-                                    {sortDescending ? (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7 7 7-7" /></svg>
-                                    ) : (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7-7-7 7" /></svg>
-                                    )}
-                                </button>
-                            </div>
-                        )}
                     </div>
-                )}
+
+                    {/* Sort Options (Consolidated) */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-semibold text-white/30 uppercase tracking-wider hidden md:block">Sort By:</span>
+                        <button
+                            onClick={() => setSortType('date')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 transition-colors ${sortType === 'date' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
+                        >
+                            Date
+                        </button>
+                        <button
+                            onClick={() => setSortType('name')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 transition-colors ${sortType === 'name' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
+                        >
+                            {activeTab === 'artists' ? 'Name' : 'Title'}
+                        </button>
+                        {(activeTab === 'liked' || activeTab === 'albums') && (
+                            <button
+                                onClick={() => setSortType('artist')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 transition-colors ${sortType === 'artist' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
+                            >
+                                Artist
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setSortDescending(!sortDescending)}
+                            className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                            title={sortDescending ? (sortType === 'date' ? "Newest First" : "Z-A") : (sortType === 'date' ? "Oldest First" : "A-Z")}
+                        >
+                            {sortDescending ? (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7 7 7-7" /></svg>
+                            ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7-7-7 7" /></svg>
+                            )}
+                        </button>
+                    </div>
+                </div>
 
                 {/* Content */}
                 <AnimatePresence mode="wait">
@@ -553,12 +605,18 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                     </div>
                                 </>
                             ) : (
-                                <div className="text-center py-20">
-                                    <Heart size={48} className="mx-auto text-white/10 mb-4" />
-                                    <p className="text-white/40">
-                                        {searchQuery ? `No liked songs matching "${searchQuery}"` : "No liked songs yet"}
-                                    </p>
-                                    {!searchQuery && <p className="text-sm text-white/20 mt-1">Tap the heart icon to save songs</p>}
+                                <div className="text-center py-24 glass-card rounded-[2rem] border border-white/5 bg-white/[0.02]">
+                                    <div className="w-20 h-20 bg-pink-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-pink-500">
+                                        <Heart size={32} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Your favorites will live here</h3>
+                                    <p className="text-white/40 max-w-xs mx-auto mb-8">Tap the heart on any song to save it to your library.</p>
+                                    <button
+                                        onClick={() => onNavigate({ id: 'explore' })}
+                                        className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition-all text-sm"
+                                    >
+                                        Start Exploring
+                                    </button>
                                 </div>
                             )}
                         </motion.div>
@@ -673,6 +731,16 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                                     </div>
                                                 )}
                                                 <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+
+                                                {/* Actions */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); toggleSaveAlbum(album); }}
+                                                    className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white/60 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md"
+                                                    title="Remove from Library"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onNavigate({ id: 'album', data: album }); }}
                                                     className="absolute bottom-2 right-2 p-2.5 rounded-full bg-white text-black opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all shadow-xl"
@@ -686,10 +754,18 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-center py-20">
-                                    <Disc size={48} className="mx-auto text-white/10 mb-4" />
-                                    <p className="text-white/40">No saved albums</p>
-                                    <p className="text-sm text-white/20 mt-1">Save your favorite albums to see them here</p>
+                                <div className="text-center py-24 glass-card rounded-[2rem] border border-white/5 bg-white/[0.02]">
+                                    <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-500">
+                                        <Disc size={32} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Collecting Albums?</h3>
+                                    <p className="text-white/40 max-w-xs mx-auto mb-8">Save your favorite albums to build your personal collection.</p>
+                                    <button
+                                        onClick={() => onNavigate({ id: 'explore' })}
+                                        className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition-all text-sm"
+                                    >
+                                        Find Albums
+                                    </button>
                                 </div>
                             )}
                         </motion.div>
@@ -723,6 +799,15 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                                     </div>
                                                 )}
                                                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+
+                                                {/* Actions */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); toggleFollowArtist(artist); }}
+                                                    className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white/60 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md"
+                                                    title="Unfollow Artist"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             </div>
                                             <h3 className="font-semibold text-white/90 truncate w-full mb-0.5">{artist.name}</h3>
                                             <p className="text-xs text-white/50 uppercase tracking-widest">Artist</p>
@@ -730,10 +815,18 @@ export function LibraryView({ onNavigate, initialTab }: LibraryViewProps) {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-center py-20">
-                                    <User size={48} className="mx-auto text-white/10 mb-4" />
-                                    <p className="text-white/40">No followed artists</p>
-                                    <p className="text-sm text-white/20 mt-1">Follow artists to see them here</p>
+                                <div className="text-center py-24 glass-card rounded-[2rem] border border-white/5 bg-white/[0.02]">
+                                    <div className="w-20 h-20 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-purple-500">
+                                        <User size={32} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Follow your idols</h3>
+                                    <p className="text-white/40 max-w-xs mx-auto mb-8">Your followed artists will appear here for quick access.</p>
+                                    <button
+                                        onClick={() => onNavigate({ id: 'search', data: { query: 'Top Artists' } })}
+                                        className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition-all text-sm"
+                                    >
+                                        Browse Artists
+                                    </button>
                                 </div>
                             )}
                         </motion.div>

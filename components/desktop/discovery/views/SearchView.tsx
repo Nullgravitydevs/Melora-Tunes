@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Play, Pause, Clock, TrendingUp, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
+import { Search, X, Play, Pause, Clock, TrendingUp, Grid, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
@@ -71,10 +71,12 @@ const SEARCH_STYLES = `
 
 interface SearchViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
+    onContextMenu?: (e: React.MouseEvent, song: any) => void;
 }
 
-export function SearchView({ onNavigate }: SearchViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality, isDownloaded } = usePlayback();
+export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
+    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality, isDownloaded, playInstantMix } = usePlayback();
+    const [trending, setTrending] = useState<{ id: string; title: string; subtitle: string; image: string; type: string; data?: any }[]>([]);
 
     // FIX 1: Stable search mix ID to prevent memory leak
     const SEARCH_MIX_ID = 'search-results';
@@ -208,6 +210,16 @@ export function SearchView({ onNavigate }: SearchViewProps) {
     };
 
     const trendingSearches = ['Arijit Singh', 'Diljit Dosanjh', 'Taylor Swift', 'Atif Aslam', 'Pritam', 'AR Rahman'];
+    const categories = [
+        { label: 'Charts', query: 'Top Charts', color: 'from-green-500 to-emerald-700', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745' },
+        { label: 'New Releases', query: 'New Releases', color: 'from-red-500 to-orange-700', image: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9' },
+        { label: 'Chill', query: 'Chill Lo-fi', color: 'from-blue-500 to-indigo-700', image: 'https://images.unsplash.com/photo-1514525253344-981c1cad1295' },
+        { label: 'Bollywood', query: 'Bollywood Hits', color: 'from-purple-500 to-pink-700', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4' },
+        { label: 'Romance', query: 'Romantic Songs', color: 'from-rose-500 to-pink-600', image: 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00' },
+        { label: 'Party', query: 'Party Hits', color: 'from-yellow-400 to-orange-500', image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30' },
+        { label: 'Devotional', query: 'Devotional', color: 'from-orange-400 to-yellow-600', image: 'https://images.unsplash.com/photo-1544124499-58912cbddadf' },
+        { label: 'Classical', query: 'Classical', color: 'from-amber-600 to-orange-800', image: 'https://images.unsplash.com/photo-1507838596373-012ba3aa974e' },
+    ];
 
     return (
         <>
@@ -567,32 +579,61 @@ export function SearchView({ onNavigate }: SearchViewProps) {
                             )}
 
                             {/* Trending Searches */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-5">
-                                    <TrendingUp size={16} className="text-white/30" />
-                                    <h2 className="text-sm text-white/40 uppercase tracking-wider">Trending</h2>
+                            <div className="mb-16">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <TrendingUp size={20} className="text-white/30" />
+                                    <h2 className="text-lg font-bold text-white/40 tracking-tight">Trending Now</h2>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {trendingSearches.map((term, i) => (
                                         <motion.button
                                             key={term}
-                                            initial={{ opacity: 0, y: 15 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: i * 0.05 }}
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: i * 0.04 }}
                                             onClick={() => { setQuery(term); handleSearch(term); }}
-                                            className="flex items-center gap-5 p-5 rounded-xl text-left transition-all"
+                                            className="flex items-center gap-4 p-4 rounded-2xl text-left transition-all group"
                                             style={{
-                                                background: 'black',
-                                                border: '1px solid rgba(255, 255, 255, 0.08)'
+                                                background: 'rgba(255, 255, 255, 0.03)',
+                                                border: '1px solid rgba(255, 255, 255, 0.05)'
                                             }}
                                             whileHover={{
-                                                scale: 1.01,
-                                                background: 'rgba(255, 255, 255, 0.05)'
+                                                scale: 1.02,
+                                                background: 'rgba(255, 255, 255, 0.08)',
+                                                borderColor: 'rgba(255, 255, 255, 0.1)'
                                             }}
-                                            whileTap={{ scale: 0.99 }}
+                                            whileTap={{ scale: 0.98 }}
                                         >
-                                            <span className="text-3xl font-bold text-white/10">{i + 1}</span>
-                                            <span className="font-medium text-white/70">{term}</span>
+                                            <span className="text-2xl font-black text-white/5 w-6 group-hover:text-blue-500/20 transition-colors">{i + 1}</span>
+                                            <span className="font-bold text-white/70 group-hover:text-white transition-colors">{term}</span>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Browse Categories */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-6">
+                                    <Grid size={20} className="text-white/30" />
+                                    <h2 className="text-lg font-bold text-white/40 tracking-tight">Browse All</h2>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {categories.map((cat, i) => (
+                                        <motion.button
+                                            key={cat.label}
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.2 + i * 0.04 }}
+                                            onClick={() => onNavigate({ id: 'hub', data: cat })}
+                                            className={`relative aspect-[16/9] rounded-2xl overflow-hidden p-4 text-left group shadow-xl`}
+                                        >
+                                            <div className={`absolute inset-0 bg-gradient-to-br ${cat.color}`} />
+                                            <img
+                                                src={cat.image}
+                                                alt=""
+                                                className="absolute bottom-0 right-0 w-24 h-24 object-cover translate-x-4 translate-y-4 -rotate-12 opacity-40 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"
+                                            />
+                                            <span className="relative z-10 text-xl font-bold text-white tracking-tight">{cat.label}</span>
                                         </motion.button>
                                     ))}
                                 </div>

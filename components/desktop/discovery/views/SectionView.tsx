@@ -15,9 +15,10 @@ interface SectionViewProps {
     initialData?: JioSaavnSong[];
     onNavigate: (view: { id: string; data?: any }) => void;
     onBack: () => void;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
-export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, onBack }: SectionViewProps) {
+export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, onBack, onContextMenu }: SectionViewProps) {
     const [title, setTitle] = useState(sectionTitle || "");
     const [items, setItems] = useState<JioSaavnSong[]>(initialData || []);
     const [loading, setLoading] = useState(!initialData);
@@ -207,6 +208,11 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: i * 0.02 }}
                                         onClick={() => handlePlay(item, i)}
+                                        draggable={true}
+                                        onDragStart={(e: React.DragEvent) => {
+                                            e.dataTransfer.setData('application/json', JSON.stringify(item));
+                                            e.dataTransfer.effectAllowed = 'copy';
+                                        }}
                                         className={`group grid grid-cols-[auto_1fr_auto_auto] gap-4 items-center px-4 py-3 cursor-pointer transition-all hover:bg-white/5 ${active ? 'bg-white/10' : ''}`}
                                     >
                                         {/* Rank / Play Icon */}

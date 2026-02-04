@@ -3,29 +3,31 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Headphones, Disc, Activity, TrendingUp, Play, Mic2, Globe, Grid, AlertCircle, RefreshCcw } from "lucide-react";
-import { searchPlaylists, searchAlbums, searchSongs, getTopCharts, fixImageUrl } from "@/lib/jiosaavn";
+import { searchPlaylists, searchAlbums, searchSongs, getTopCharts, fixImageUrl, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { usePlayback } from "@/components/providers/playback-context";
-import { StandardCard, FeatureCard, HorizontalScroll } from "../home/HomeComponents";
+import { StandardCard, FeatureCard, HorizontalScroll, SectionHeader } from "../home/HomeComponents";
 import { decodeHtml } from "@/lib/utils";
 
 interface ExploreViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
     initialMode?: 'explore' | 'radio';
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
-// Helper to get best image
-const getHighQualityImage = (image: any) => {
-    if (!image) return '';
-    let url = '';
-    if (typeof image === 'string') url = image;
-    else if (Array.isArray(image)) {
-        url = image.find((i: any) => i.quality === '500x500')?.link || image[0]?.link || '';
-    }
-    return url ? fixImageUrl(url, '500x500') : '';
-};
+export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu }: ExploreViewProps) {
 
-export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
+    // Helper to get best image
+    const getHighQualityImage = (image: any) => {
+        if (!image) return '';
+        let url = '';
+        if (typeof image === 'string') url = image;
+        else if (Array.isArray(image)) {
+            url = image.find((i: any) => i.quality === '500x500')?.link || image[0]?.link || '';
+        }
+        return url ? fixImageUrl(url, '500x500') : '';
+    };
+
     const { playInstantMix, showToast } = usePlayback();
 
     // State for all sections
@@ -107,15 +109,7 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
         loadData();
     };
 
-    // Helper for Section Headers
-    const Header = ({ title, subtitle }: { title: string, subtitle?: string }) => (
-        <div className="flex items-end justify-between mb-6 px-4">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
-                {subtitle && <p className="text-sm text-white/40 font-medium mt-1">{subtitle}</p>}
-            </div>
-        </div>
-    );
+
 
     if (loading) {
         return (
@@ -154,7 +148,7 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
         <div className="min-h-full pb-32 space-y-12">
 
             {/* VISUAL HERO HEADER */}
-            <div className="relative h-[40vh] min-h-[300px] w-full overflow-hidden mb-8 group">
+            <div className="relative h-[50vh] min-h-[400px] w-full overflow-hidden mb-8 group">
                 {/* Collage Background */}
                 <div className="absolute inset-0 grid grid-cols-3 md:grid-cols-6 opacity-20 group-hover:opacity-30 transition-opacity duration-1000 scale-105">
                     {content.newReleases.slice(0, 18).map((item, i) => (
@@ -169,26 +163,32 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
                 <div className="absolute inset-0 bg-gradient-to-r from-[#09090b] via-transparent to-transparent" />
 
                 {/* Content */}
-                <div className="absolute bottom-0 left-0 p-8 md:p-12 max-w-4xl z-10">
+                <div className="absolute bottom-0 left-0 p-8 md:p-16 max-w-4xl z-10 w-full">
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className="px-3 py-1 bg-pink-500/20 text-pink-500 border border-pink-500/20 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                                <TrendingUp size={14} /> Discovery Hub
+                        <div className="flex flex-wrap items-center gap-2 mb-6">
+                            <span className="px-3 py-1 bg-pink-500/20 text-pink-500 border border-pink-500/20 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <TrendingUp size={12} /> Live Updates
+                            </span>
+                            <span className="px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                Global Charts
+                            </span>
+                            <span className="px-3 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                Editor's Choice
                             </span>
                         </div>
-                        <h1 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tighter">
+                        <h1 className="text-6xl md:text-8xl font-black text-white mb-6 tracking-tighter leading-[0.9]">
                             Explore
                         </h1>
-                        <p className="text-xl md:text-2xl text-white/50 font-medium leading-relaxed max-w-xl">
-                            What's happening in the world of music. Charts, trends, and new releases.
+                        <p className="text-xl md:text-2xl text-white/40 font-medium leading-relaxed max-w-xl">
+                            Dive into the pulse of <span className="text-white/80">global music culture</span>. Hand-picked charts, viral sensations, and fresh discoveries.
                         </p>
                     </motion.div>
                 </div>
             </div>
 
             {/* 1. GLOBAL CHART TOPPERS (Square Cards, Apple Style) */}
-            <section className="px-4">
-                <Header title="Global Chart Toppers" subtitle="The biggest hits right now" />
+            <section>
+                <SectionHeader title="Global Chart Toppers" subtitle="The biggest hits right now" />
                 <HorizontalScroll>
                     {content.globalCharts.map((item, i) => (
                         <FeatureCard
@@ -203,9 +203,9 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
             </section>
 
             {/* 2. GLOBAL TRENDING (Wide Rows) */}
-            <section className="px-4">
-                <Header title="Global Trending" subtitle="Viral everywhere" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <section className="px-8">
+                <SectionHeader title="Global Trending" subtitle="Viral everywhere" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
                     {content.globalTrending.slice(0, 9).map((song, i) => (
                         <div
                             key={song.id}
@@ -228,8 +228,8 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
             </section>
 
             {/* 3. NEW RELEASES (Standard Cards) */}
-            <section className="px-4">
-                <Header title="New Releases" subtitle="Fresh from the studio" />
+            <section>
+                <SectionHeader title="New Releases" subtitle="Fresh from the studio" />
                 <HorizontalScroll>
                     {content.newReleases.map((album, i) => (
                         <StandardCard
@@ -244,8 +244,8 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
             </section>
 
             {/* 4. LIVE PERFORMANCES (Wide Cards) */}
-            <section className="px-4">
-                <Header title="Live Performances" subtitle="Experience the energy" />
+            <section>
+                <SectionHeader title="Live Performances" subtitle="Experience the energy" />
                 <HorizontalScroll>
                     {content.livePerformances.map((album, i) => (
                         <div
@@ -271,8 +271,8 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
             </section>
 
             {/* 5. TOP PLAYLISTS (Square) */}
-            <section className="px-4">
-                <Header title="Top Playlists" subtitle="Curated for you" />
+            <section>
+                <SectionHeader title="Top Playlists" subtitle="Curated for you" />
                 <HorizontalScroll>
                     {content.topPlaylists.map((playlist, i) => (
                         <StandardCard
@@ -297,7 +297,7 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
 
                     {/* Bollywood */}
                     <section>
-                        <Header title="Bollywood Hits" />
+                        <SectionHeader title="Bollywood Hits" />
                         <HorizontalScroll>
                             {content.bollywood.map((item, i) => (
                                 <CompactCard key={item.id} item={item} subtitle="Hindi" onClick={() => onNavigate({ id: 'playlist', data: item })} />
@@ -307,7 +307,7 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
 
                     {/* Tollywood */}
                     <section>
-                        <Header title="Tollywood Beats" />
+                        <SectionHeader title="Tollywood Beats" />
                         <HorizontalScroll>
                             {content.tollywood.map((item, i) => (
                                 <CompactCard key={item.id} item={item} subtitle="Telugu" onClick={() => onNavigate({ id: 'playlist', data: item })} />
@@ -317,7 +317,7 @@ export function ExploreView({ onNavigate, initialMode }: ExploreViewProps) {
 
                     {/* Hollywood */}
                     <section>
-                        <Header title="Hollywood & Western" />
+                        <SectionHeader title="Hollywood & Western" />
                         <HorizontalScroll>
                             {content.hollywood.map((item, i) => (
                                 <CompactCard key={item.id} item={item} subtitle="English" onClick={() => onNavigate({ id: 'playlist', data: item })} />

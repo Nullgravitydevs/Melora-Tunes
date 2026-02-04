@@ -17,6 +17,8 @@ import { RadioView } from "./views/RadioView";
 import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { SectionView } from "./views/SectionView";
 import { PeelRevealView } from "./views/PeelRevealView";
+import { TrackContextMenu } from "@/components/ui/track-context-menu";
+import { JioSaavnSong } from "@/lib/jiosaavn";
 
 
 /* ============================================================================
@@ -215,11 +217,61 @@ const MONO_STYLES = `
 
 // --- MAIN COMPONENT ---
 export function DiscoveryLayout() {
-    const [currentView, setCurrentView] = useState<ViewState>({ id: 'home' });
+    const [viewStack, setViewStack] = useState<ViewState[]>([{ id: 'home' }]);
+    const currentView = viewStack[viewStack.length - 1] || { id: 'home' };
+
     const [mounted, setMounted] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showFullPlayer, setShowFullPlayer] = useState(false);
-    const { mixes, currentSong, isPlaying, likedSongs, recentlyPlayed, loadMix, playInstantMix } = usePlayback();
+    const {
+        mixes, currentSong, isPlaying, likedSongs, recentlyPlayed,
+        loadMix, playInstantMix, setQueue, queue,
+        downloadSong, removeDownload, isDownloaded,
+        activeMixId, play, addSongToMix, showToast
+    } = usePlayback();
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null }>({
+        visible: false,
+        x: 0,
+        y: 0,
+        song: null
+    });
+
+    const handleContextMenu = (e: React.MouseEvent, song: JioSaavnSong) => {
+        e.preventDefault();
+        setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            song
+        });
+    };
+
+    const closeContextMenu = () => setContextMenu(prev => ({ ...prev, visible: false }));
+
+    // NAVIGATION HANDLERS
+    const handleNavigate = (view: ViewState) => {
+        // Prevent duplicate pushes of the same view if clicked multiple times
+        setViewStack(prev => {
+            const last = prev[prev.length - 1];
+            if (last.id === view.id && JSON.stringify(last.data) === JSON.stringify(view.data)) return prev;
+            return [...prev, view];
+        });
+    };
+
+    const handleBack = () => {
+        setViewStack(prev => {
+            if (prev.length <= 1) return prev; // Don't pop the last item (Home)
+            return prev.slice(0, -1);
+        });
+    };
+
+    // Replace direct SetCurrentView checks with handleNavigate where appropriate
+    // Ideally we expose these, but for Sidebar we can explicit set functionality
+    const resetTo = (view: ViewState) => {
+        setViewStack([view]);
+    };
 
 
     useEffect(() => { setMounted(true); }, []);
@@ -289,42 +341,37 @@ export function DiscoveryLayout() {
 
                     {/* Nav */}
                     <nav className="px-2.5 space-y-0.5">
-                        <NavItem icon={<Home size={18} />} label="Home" active={currentView.id === 'home'} onClick={() => setCurrentView({ id: 'home' })} />
-                        <NavItem icon={<Search size={18} />} label="Search" active={currentView.id === 'search'} onClick={() => setCurrentView({ id: 'search' })} />
-                        <NavItem icon={<Compass size={18} />} label="Explore" active={currentView.id === 'explore'} onClick={() => setCurrentView({ id: 'explore' })} />
-                        <NavItem icon={<Radio size={18} />} label="Radio" active={currentView.id === 'radio'} onClick={() => setCurrentView({ id: 'radio' })} />
-                        <NavItem icon={<Library size={18} />} label="Your Library" active={currentView.id === 'library'} onClick={() => setCurrentView({ id: 'library' })} />
+                        <NavItem icon={<Home size={18} />} label="Home" active={currentView.id === 'home'} onClick={() => resetTo({ id: 'home' })} />
+                        <NavItem icon={<Search size={18} />} label="Search" active={currentView.id === 'search'} onClick={() => resetTo({ id: 'search' })} />
+                        <NavItem icon={<Compass size={18} />} label="Explore" active={currentView.id === 'explore'} onClick={() => resetTo({ id: 'explore' })} />
+                        <NavItem icon={<Radio size={18} />} label="Radio" active={currentView.id === 'radio'} onClick={() => resetTo({ id: 'radio' })} />
+                        <NavItem icon={<Library size={18} />} label="Your Library" active={currentView.id === 'library'} onClick={() => resetTo({ id: 'library' })} />
                     </nav>
 
-                    {/* Settings at bottom */}
-                    <div className="px-2.5 mt-auto pb-2">
-                        <NavItem icon={<Settings size={18} />} label="Settings" onClick={() => setShowSettings(true)} subtle />
-                    </div>
-
                     {/* Quick Links */}
-                    <div className="px-2.5 mt-5 space-y-0.5">
+                    <div className="px-2.5 mt-4 space-y-0.5">
                         <QuickLink
                             icon={<Heart size={14} />}
                             label="Liked Songs"
                             count={likedSongs.length}
-                            onClick={() => setCurrentView({ id: 'library', data: { tab: 'liked' } })}
+                            onClick={() => handleNavigate({ id: 'library', data: { tab: 'liked' } })}
                         />
                         <QuickLink
                             icon={<Clock size={14} />}
                             label="Recently Played"
                             count={recentlyPlayed.length}
-                            onClick={() => setCurrentView({ id: 'library', data: { tab: 'recent' } })}
+                            onClick={() => handleNavigate({ id: 'library', data: { tab: 'recent' } })}
                         />
                     </div>
 
-                    <div className="mx-4 my-5 h-px bg-white/[0.04]" />
+                    <div className="mx-4 my-4 h-px bg-white/[0.04]" />
 
-                    {/* Playlists */}
-                    <div className="flex-1 overflow-y-auto scroll px-2.5">
-                        <div className="flex items-center justify-between px-2.5 py-1.5 mb-1">
+                    {/* Playlists - Takes remaining space */}
+                    <div className="flex-1 overflow-y-auto scroll px-2.5 min-h-0">
+                        <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 sticky top-0 bg-black/95 backdrop-blur-sm z-10">
                             <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20">Playlists</span>
                             <motion.button
-                                onClick={() => setCurrentView({ id: 'library', data: { tab: 'playlists' } })}
+                                onClick={() => handleNavigate({ id: 'library', data: { tab: 'playlists' } })}
                                 className="p-1 rounded text-white/20 hover:text-white/50 hover:bg-white/5"
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
@@ -332,23 +379,41 @@ export function DiscoveryLayout() {
                                 <Plus size={12} strokeWidth={2.5} />
                             </motion.button>
                         </div>
-                        {mixes
-                            .filter(m =>
-                                !m.id.startsWith('quick-') &&
-                                !m.id.startsWith('search-') &&
-                                !m.id.startsWith('album-') &&
-                                !m.id.startsWith('artist-')
-                            )
-                            .length > 0 ? (
-                            mixes
+                        <div className="pb-2">
+                            {mixes
                                 .filter(m =>
                                     !m.id.startsWith('quick-') &&
                                     !m.id.startsWith('search-') &&
                                     !m.id.startsWith('album-') &&
                                     !m.id.startsWith('artist-')
                                 )
-                                .map((m, i) => <PlaylistItem key={m.id} mix={m} index={i} onClick={() => { setCurrentView({ id: 'library', data: { tab: 'playlists', playlistId: m.id } }); loadMix(m.id); }} />)
-                        ) : <EmptyState />}
+                                .length > 0 ? (
+                                mixes
+                                    .filter(m =>
+                                        !m.id.startsWith('quick-') &&
+                                        !m.id.startsWith('search-') &&
+                                        !m.id.startsWith('album-') &&
+                                        !m.id.startsWith('artist-')
+                                    )
+                                    .map((m, i) => (
+                                        <PlaylistItem
+                                            key={m.id}
+                                            mix={m}
+                                            index={i}
+                                            onClick={() => { handleNavigate({ id: 'library', data: { tab: 'playlists', playlistId: m.id } }); loadMix(m.id); }}
+                                            onDropSong={(song) => {
+                                                addSongToMix(m.id, song);
+                                                showToast(`Added to ${m.title}`, 'success');
+                                            }}
+                                        />
+                                    ))
+                            ) : <EmptyState />}
+                        </div>
+                    </div>
+
+                    {/* Settings - Fixed at bottom */}
+                    <div className="px-2.5 py-3 border-t border-white/[0.04] bg-black z-20">
+                        <NavItem icon={<Settings size={18} />} label="Settings" onClick={() => setShowSettings(true)} subtle />
                     </div>
 
 
@@ -367,38 +432,42 @@ export function DiscoveryLayout() {
                         >
                             {currentView.id === 'home' && (
                                 <HomeView
-                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onNavigate={handleNavigate}
                                     onPlaySong={handlePlaySong}
                                     currentSongId={currentSong?.id}
                                     isPlaying={isPlaying}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
 
                             {currentView.id === 'search' && (
-                                <SearchView onNavigate={(view) => setCurrentView(view as ViewState)} />
+                                <SearchView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
                             )}
 
                             {currentView.id === 'artist' && currentView.data && (
                                 <ArtistView
                                     artist={currentView.data}
-                                    onBack={() => setCurrentView({ id: 'home' })}
-                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onBack={handleBack}
+                                    onNavigate={handleNavigate}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
 
                             {currentView.id === 'album' && currentView.data && (
                                 <AlbumView
                                     album={currentView.data}
-                                    onBack={() => setCurrentView({ id: 'home' })}
-                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onBack={handleBack}
+                                    onNavigate={handleNavigate}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
 
                             {currentView.id === 'playlist' && currentView.data && (
                                 <PlaylistView
                                     playlist={currentView.data}
-                                    onBack={() => setCurrentView({ id: 'home' })}
-                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onBack={handleBack}
+                                    onNavigate={handleNavigate}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
 
@@ -406,31 +475,34 @@ export function DiscoveryLayout() {
                             {currentView.id === 'peel-reveal' && currentView.data && (
                                 <PeelRevealView
                                     album={currentView.data}
-                                    onBack={() => setCurrentView({ id: 'home' })}
+                                    onBack={handleBack}
                                     onPlay={handlePlaySong}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
 
                             {currentView.id === 'library' && (
                                 <LibraryView
-                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onNavigate={handleNavigate}
                                     initialTab={currentView.data?.tab}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
 
                             {currentView.id === 'explore' && (
-                                <ExploreView onNavigate={(view) => setCurrentView(view as ViewState)} />
+                                <ExploreView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
                             )}
 
                             {currentView.id === 'radio' && (
-                                <RadioView onNavigate={(view) => setCurrentView(view as ViewState)} />
+                                <RadioView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
                             )}
 
                             {currentView.id === 'category-hub' && currentView.data && (
                                 <CategoryHubView
                                     data={currentView.data}
-                                    onBack={() => setCurrentView({ id: 'explore' })}
-                                    onNavigate={(view) => setCurrentView(view as ViewState)}
+                                    onBack={handleBack}
+                                    onNavigate={handleNavigate}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
 
@@ -439,8 +511,9 @@ export function DiscoveryLayout() {
                                     sectionId={String(currentView.id)}
                                     sectionTitle={currentView.data?.title}
                                     initialData={currentView.data?.items}
-                                    onNavigate={(view) => setCurrentView(view as ViewState)}
-                                    onBack={() => setCurrentView({ id: 'home' })}
+                                    onNavigate={handleNavigate}
+                                    onBack={handleBack}
+                                    onContextMenu={handleContextMenu}
                                 />
                             )}
                         </motion.div>
@@ -450,6 +523,24 @@ export function DiscoveryLayout() {
 
             {/* PLAYER */}
             <PlayerBar onExpand={() => setShowFullPlayer(true)} />
+
+            {/* Global Context Menu */}
+            <TrackContextMenu
+                visible={contextMenu.visible}
+                x={contextMenu.x}
+                y={contextMenu.y}
+                song={contextMenu.song}
+                onClose={closeContextMenu}
+                onPlay={(s) => { playInstantMix({ id: 'quick-play', title: 'Quick Play', color: 'blue', songs: [s], currentSongIndex: 0 }); }}
+                onAddToQueue={(s) => { setQueue([...queue, s]); }}
+                onGoToArtist={(id) => handleNavigate({ id: 'artist', data: id })}
+                onGoToAlbum={(id) => handleNavigate({ id: 'album', data: id })}
+                onStartRadio={(s) => handleNavigate({ id: 'radio', data: s })}
+                isDownloaded={contextMenu.song ? isDownloaded(contextMenu.song.id) : false}
+                onDownload={(s) => downloadSong(s)}
+                onRemoveDownload={(id) => removeDownload(id)}
+                onAddToPlaylist={(s) => { /* TODO: Open Playlist Modal */ console.log("Add to playlist", s.name); }}
+            />
         </div>
     );
 }
@@ -482,14 +573,42 @@ function QuickLink({ icon, label, count, onClick }: { icon: React.ReactNode; lab
     );
 }
 
-function PlaylistItem({ mix, index, onClick }: { mix: Mix; index: number; onClick: () => void }) {
+function PlaylistItem({ mix, index, onClick, onDropSong }: { mix: Mix; index: number; onClick: () => void; onDropSong: (song: any) => void }) {
+    const [isDragOver, setIsDragOver] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragOver(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        try {
+            const data = e.dataTransfer.getData('application/json');
+            if (data) {
+                const song = JSON.parse(data);
+                onDropSong(song);
+            }
+        } catch (err) {
+            console.error("Failed to parse dropped song", err);
+        }
+    };
+
     return (
         <motion.button
             onClick={onClick}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.02 }}
-            className="pl-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left"
+            className={`pl-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition-colors ${isDragOver ? 'bg-white/10 ring-1 ring-white/20' : ''}`}
         >
             <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center">
                 <Music size={12} className="text-white/40" />
