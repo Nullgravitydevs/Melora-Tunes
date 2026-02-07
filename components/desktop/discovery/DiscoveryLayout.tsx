@@ -19,6 +19,7 @@ import { SectionView } from "./views/SectionView";
 import { PeelRevealView } from "./views/PeelRevealView";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
 import { JioSaavnSong } from "@/lib/jiosaavn";
+import { PlaylistItem } from "@/components/shared/PlaylistItem";
 
 
 /* ============================================================================
@@ -636,54 +637,7 @@ function QuickLink({ icon, label, count, onClick }: { icon: React.ReactNode; lab
     );
 }
 
-function PlaylistItem({ mix, index, onClick, onDropSong, onContextMenu }: { mix: Mix; index: number; onClick: () => void; onDropSong: (song: any) => void; onContextMenu: (e: React.MouseEvent, id: string) => void }) {
-    const [isDragOver, setIsDragOver] = useState(false);
-
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(true);
-    };
-
-    const handleDragLeave = () => {
-        setIsDragOver(false);
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        try {
-            const data = e.dataTransfer.getData('application/json');
-            if (data) {
-                const song = JSON.parse(data);
-                onDropSong(song);
-            }
-        } catch (err) {
-            console.error("Failed to parse dropped song", err);
-        }
-    };
-
-    return (
-        <motion.button
-            onClick={onClick}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onContextMenu={(e) => onContextMenu(e, mix.id)}
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.02 }}
-            className={`pl-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition-colors ${isDragOver ? 'bg-white/10 ring-1 ring-white/20' : ''}`}
-        >
-            <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center">
-                <Music size={12} className="text-white/40" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-[12px] text-white/60 truncate">{mix.title}</p>
-                <p className="text-[10px] text-white/20">{mix.songs.length} songs</p>
-            </div>
-        </motion.button>
-    );
-}
+// PlaylistItem moved to @/components/shared/PlaylistItem
 
 function EmptyState() {
     return (

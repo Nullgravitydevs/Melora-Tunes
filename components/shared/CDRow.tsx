@@ -11,7 +11,7 @@ export interface CDRowProps {
     onAdd: (e?: React.MouseEvent) => void;
 }
 
-export function CDRow({ track, onPlay, onAdd }: CDRowProps) {
+export function CDRowComponent({ track, onPlay, onAdd }: CDRowProps) {
     // Extract Quality Badge
     let badge = null;
     const sources = track.sources || [];
@@ -51,7 +51,13 @@ export function CDRow({ track, onPlay, onAdd }: CDRowProps) {
                 {/* ALBUM ART (In Front) */}
                 <div className="absolute inset-0 rounded-md overflow-hidden bg-neutral-900 shadow-lg z-10 border border-white/5">
                     {art && (
-                        <img src={art} className="w-full h-full object-cover" alt={track.song?.name || "Album Art"} />
+                        <img
+                            src={art}
+                            className="w-full h-full object-cover"
+                            alt={track.song?.name || "Album Art"}
+                            loading="lazy"
+                            decoding="async"
+                        />
                     )}
                 </div>
             </div>
@@ -84,3 +90,7 @@ export function CDRow({ track, onPlay, onAdd }: CDRowProps) {
         </div>
     );
 }
+
+export const CDRow = React.memo(CDRowComponent, (prev, next) => {
+    return prev.track.id === next.track.id && prev.track.image === next.track.image;
+});

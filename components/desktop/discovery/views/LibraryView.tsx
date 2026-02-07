@@ -12,6 +12,7 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 import { isPlayableTrack, PlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
 import { AddToPlaylistModal } from "@/components/desktop/discovery/modals/AddToPlaylistModal";
+import { CDRow } from "@/components/shared/CDRow";
 
 /* ============================================================================
    LIBRARY VIEW - Liked Songs, Recently Played, Playlists
