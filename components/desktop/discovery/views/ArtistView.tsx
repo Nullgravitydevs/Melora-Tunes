@@ -20,10 +20,14 @@ interface ArtistViewProps {
 }
 
 export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: ArtistViewProps) {
+    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, isLiked, toggleLike, showToast, isArtistFollowed, toggleFollowArtist } = usePlayback();
     const [bio, setBio] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [artistData, setArtistData] = useState<any>(null);
+    const [songs, setSongs] = useState<JioSaavnSong[]>([]);
+    const [albums, setAlbums] = useState<any[]>([]);
+    const [similar, setSimilar] = useState<any[]>([]);
 
     const artistName = artist?.name || artist?.primaryArtists || 'Unknown Artist';
     const artistImage = getImage(artist);
@@ -243,10 +247,12 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                                     }
                                                 }}
                                                 draggable={true}
+                                                // @ts-ignore
                                                 onDragStart={(e: React.DragEvent) => {
                                                     e.dataTransfer.setData('application/json', JSON.stringify(song));
                                                     e.dataTransfer.effectAllowed = 'copy';
                                                 }}
+                                                onContextMenu={(e) => onContextMenu && onContextMenu(e, song)}
                                                 className={`group flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-white/5 transition-colors ${active ? 'bg-white/5' : ''}`}
                                             >
                                                 <div className="w-6 text-center text-white/20 text-sm font-mono group-hover:hidden">{(i + 1).toString().padStart(2, '0')}</div>

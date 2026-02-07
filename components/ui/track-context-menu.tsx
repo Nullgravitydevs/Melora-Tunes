@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { JioSaavnSong, getArtistStation } from "@/lib/jiosaavn";
+import { JioSaavnSong } from "@/lib/jiosaavn";
 import { Play, ListPlus, Radio, User, Disc, X, HardDrive, Trash2, ListMusic } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,6 +20,7 @@ interface TrackContextMenuProps {
     onDownload: (song: JioSaavnSong) => void;
     onRemoveDownload: (songId: string) => void;
     onAddToPlaylist: (song: JioSaavnSong) => void;
+    onRemoveFromPlaylist?: (song: JioSaavnSong) => void;
 }
 
 export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
@@ -36,7 +37,8 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
     isDownloaded,
     onDownload,
     onRemoveDownload,
-    onAddToPlaylist
+    onAddToPlaylist,
+    onRemoveFromPlaylist
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 

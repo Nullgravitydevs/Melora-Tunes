@@ -209,6 +209,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                                         transition={{ delay: i * 0.02 }}
                                         onClick={() => handlePlay(item, i)}
                                         draggable={true}
+                                        // @ts-ignore
                                         onDragStart={(e: React.DragEvent) => {
                                             e.dataTransfer.setData('application/json', JSON.stringify(item));
                                             e.dataTransfer.effectAllowed = 'copy';
@@ -312,8 +313,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                     if (activeMixId) {
                         // Dynamically import or cast if needed, but allow passing Song to addSongToMix handles it
                         // Assuming addSongToMix accepts JioSaavnSong based on context definition
-                        const addSong = (usePlayback as any).getState?.().addSongToMix || addSongToMix; // Safety if exposed differently
-                        addSong(activeMixId, s);
+                        addSongToMix(activeMixId, s);
                     }
                 }}
                 onGoToArtist={(id) => onNavigate({ id: 'artist', data: { id } })}

@@ -15,7 +15,7 @@ interface PlaylistViewProps {
     playlist: any;
     onBack: () => void;
     onNavigate: (view: { id: string; data?: any }) => void;
-    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
+    onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong, sourceId?: string) => void;
 }
 
 export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: PlaylistViewProps) {
@@ -410,10 +410,12 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                                     }
                                 }}
                                 draggable={true}
+                                // @ts-ignore
                                 onDragStart={(e: React.DragEvent) => {
                                     e.dataTransfer.setData('application/json', JSON.stringify(song));
                                     e.dataTransfer.effectAllowed = 'copy';
                                 }}
+                                onContextMenu={(e) => onContextMenu && onContextMenu(e, (song as any).song || song, playlist.id)}
                                 className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-white/[0.04] cursor-pointer group transition-all"
                             >
                                 <span className="w-6 text-center text-sm text-white/30 group-hover:hidden">{i + 1}</span>

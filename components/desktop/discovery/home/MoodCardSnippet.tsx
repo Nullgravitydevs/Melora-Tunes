@@ -1,4 +1,10 @@
 
+"use client";
+
+import React from "react";
+import { motion } from "framer-motion";
+import { Play, Music } from "lucide-react";
+
 /* --- CARD: MOOD (Vibe Check) --- */
 export function MoodCard({ title, color, onClick }: { title: string; color: string; onClick: () => void }) {
     // Dynamic Gradient Maps

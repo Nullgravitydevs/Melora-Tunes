@@ -346,3 +346,12 @@ function CompactCard({ item, subtitle, onClick }: any) {
         </div>
     )
 }
+function getHighQualityImage(image: any) {
+    if (!image) return '';
+    if (typeof image === 'string') return image;
+    if (Array.isArray(image)) {
+        // Try 500x500 first, then fallback to last (usually highest)
+        return image.find((i: any) => i.quality === '500x500')?.link || image[image.length - 1]?.link || '';
+    }
+    return '';
+}

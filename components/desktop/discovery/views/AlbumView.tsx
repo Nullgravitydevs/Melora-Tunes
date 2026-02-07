@@ -222,10 +222,12 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                                         <motion.div key={song.id + i} initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.01 }}
                                             onClick={() => isActive ? togglePlay() : playSong(i)}
                                             draggable={true}
+                                            // @ts-ignore
                                             onDragStart={(e: React.DragEvent) => {
                                                 e.dataTransfer.setData('application/json', JSON.stringify(song));
                                                 e.dataTransfer.effectAllowed = 'copy';
                                             }}
+                                            onContextMenu={(e) => onContextMenu && onContextMenu(e, song)}
                                             className={`group flex items-center gap-3 p-2.5 cursor-pointer transition-all ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}>
                                             <div className="w-5 flex items-center justify-center">
                                                 {isActive && isPlaying ? <Disc3 className="animate-spin text-white" size={14} /> : <span className={`font-mono text-[10px] ${isActive ? 'text-white font-bold' : 'text-white/40'}`}>{i + 1}</span>}

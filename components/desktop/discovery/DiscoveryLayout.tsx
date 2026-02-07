@@ -227,28 +227,52 @@ export function DiscoveryLayout() {
         mixes, currentSong, isPlaying, likedSongs, recentlyPlayed,
         loadMix, playInstantMix, setQueue, queue,
         downloadSong, removeDownload, isDownloaded,
-        activeMixId, play, addSongToMix, showToast
+        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix
     } = usePlayback();
 
     // Context Menu State
-    const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null }>({
+    const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null; sourceMixId?: string }>({
         visible: false,
         x: 0,
         y: 0,
         song: null
     });
 
-    const handleContextMenu = (e: React.MouseEvent, song: JioSaavnSong) => {
+    // Playlist Context Menu State
+    const [playlistMenu, setPlaylistMenu] = useState<{ visible: boolean; x: number; y: number; mixId: string | null }>({
+        visible: false,
+        x: 0,
+        y: 0,
+        mixId: null
+    });
+
+    const handleContextMenu = (e: React.MouseEvent, song: JioSaavnSong, sourceMixId?: string) => {
         e.preventDefault();
         setContextMenu({
             visible: true,
             x: e.clientX,
             y: e.clientY,
-            song
+            song,
+            sourceMixId
         });
+        setPlaylistMenu(prev => ({ ...prev, visible: false })); // Close other
     };
 
-    const closeContextMenu = () => setContextMenu(prev => ({ ...prev, visible: false }));
+    const handlePlaylistContextMenu = (e: React.MouseEvent, mixId: string) => {
+        e.preventDefault();
+        setPlaylistMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            mixId
+        });
+        setContextMenu(prev => ({ ...prev, visible: false })); // Close other
+    };
+
+    const closeContextMenu = () => {
+        setContextMenu(prev => ({ ...prev, visible: false }));
+        setPlaylistMenu(prev => ({ ...prev, visible: false }));
+    };
 
     // NAVIGATION HANDLERS
     const handleNavigate = (view: ViewState) => {
@@ -299,6 +323,28 @@ export function DiscoveryLayout() {
             songs: [song], // Ideally we'd pass the surrounding list if we had it, but HomeView doesn't pass context yet
             currentSongIndex: 0
         });
+    };
+
+    const handleCreatePlaylist = () => {
+        // Simple prompt for now, can upgrade to custom modal later
+        const name = window.prompt("Enter playlist name:", "New Playlist");
+        if (!name) return;
+
+        const newId = `user-${Date.now()}`;
+        const newMix: Mix = {
+            id: newId,
+            title: name,
+            songs: [],
+            color: 'blue', // Default
+            currentSongIndex: 0
+        };
+
+        if (addMix) {
+            addMix(newMix);
+            showToast(`Created "${name}"`, 'success');
+            // Navigate to the new empty playlist
+            handleNavigate({ id: 'playlist', data: newMix });
+        }
     };
 
     return (
@@ -371,7 +417,7 @@ export function DiscoveryLayout() {
                         <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 sticky top-0 bg-black/95 backdrop-blur-sm z-10">
                             <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20">Playlists</span>
                             <motion.button
-                                onClick={() => handleNavigate({ id: 'library', data: { tab: 'playlists' } })}
+                                onClick={handleCreatePlaylist}
                                 className="p-1 rounded text-white/20 hover:text-white/50 hover:bg-white/5"
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
@@ -401,6 +447,7 @@ export function DiscoveryLayout() {
                                             mix={m}
                                             index={i}
                                             onClick={() => { handleNavigate({ id: 'library', data: { tab: 'playlists', playlistId: m.id } }); loadMix(m.id); }}
+                                            onContextMenu={handlePlaylistContextMenu}
                                             onDropSong={(song) => {
                                                 addSongToMix(m.id, song);
                                                 showToast(`Added to ${m.title}`, 'success');
@@ -540,6 +587,22 @@ export function DiscoveryLayout() {
                 onDownload={(s) => downloadSong(s)}
                 onRemoveDownload={(id) => removeDownload(id)}
                 onAddToPlaylist={(s) => { /* TODO: Open Playlist Modal */ console.log("Add to playlist", s.name); }}
+                onRemoveFromPlaylist={
+                    contextMenu.sourceMixId && contextMenu.sourceMixId.startsWith('user-')
+                        ? (s) => {
+                            const mix = mixes.find(m => m.id === contextMenu.sourceMixId);
+                            if (mix && updateMix) {
+                                const newSongs = mix.songs.filter(song => {
+                                    // Handle both PlayableTrack and JioSaavnSong structures for ID check
+                                    const sId = (song as any).id || (song as any).song?.id;
+                                    return sId !== s.id;
+                                });
+                                updateMix(mix.id, { songs: newSongs });
+                                showToast("Removed from playlist", "success");
+                            }
+                        }
+                        : undefined
+                }
             />
         </div>
     );
@@ -573,7 +636,7 @@ function QuickLink({ icon, label, count, onClick }: { icon: React.ReactNode; lab
     );
 }
 
-function PlaylistItem({ mix, index, onClick, onDropSong }: { mix: Mix; index: number; onClick: () => void; onDropSong: (song: any) => void }) {
+function PlaylistItem({ mix, index, onClick, onDropSong, onContextMenu }: { mix: Mix; index: number; onClick: () => void; onDropSong: (song: any) => void; onContextMenu: (e: React.MouseEvent, id: string) => void }) {
     const [isDragOver, setIsDragOver] = useState(false);
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -605,6 +668,7 @@ function PlaylistItem({ mix, index, onClick, onDropSong }: { mix: Mix; index: nu
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onContextMenu={(e) => onContextMenu(e, mix.id)}
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.02 }}

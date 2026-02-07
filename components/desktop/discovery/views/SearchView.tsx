@@ -7,6 +7,7 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { useSearchHistory } from "@/components/hooks/useSearchHistory";
 
 /* ============================================================================
    SEARCH VIEW - Premium Glass Design with Unified Search
@@ -84,8 +85,9 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<PlayableTrack[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+
     const [error, setError] = useState<string | null>(null);
-    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const { history: recentSearches, addSearch, removeSearch, clearHistory } = useSearchHistory();
     const [showSettings, setShowSettings] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -113,10 +115,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
     // Focus input on mount
     useEffect(() => {
         inputRef.current?.focus();
-        try {
-            const saved = localStorage.getItem('discovery-recent-searches');
-            if (saved) setRecentSearches(JSON.parse(saved).slice(0, 8));
-        } catch (e) { /* ignore */ }
+
     }, []);
 
     // Debounced unified search
@@ -135,9 +134,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
             setResults(tracks);
 
             if (tracks.length > 0) {
-                const updated = [q, ...recentSearches.filter(s => s !== q)].slice(0, 8);
-                setRecentSearches(updated);
-                localStorage.setItem('discovery-recent-searches', JSON.stringify(updated));
+                addSearch(q);
             }
         } catch (e) {
             console.error('Search failed:', e);
@@ -547,35 +544,41 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                         >
                             {/* Recent Searches */}
                             {recentSearches.length > 0 && (
-                                <div className="mb-12">
-                                    <div className="flex items-center gap-2 mb-5">
-                                        <Clock size={16} className="text-white/30" />
-                                        <h2 className="text-sm text-white/40 uppercase tracking-wider">Recent</h2>
-                                    </div>
-                                    <div className="flex flex-wrap gap-3">
-                                        {recentSearches.map((term, i) => (
-                                            <motion.button
-                                                key={term + i}
-                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ delay: i * 0.04 }}
-                                                onClick={() => { setQuery(term); handleSearch(term); }}
-                                                className="px-5 py-2.5 rounded-full text-sm font-medium transition-all"
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                                                }}
-                                                whileHover={{
-                                                    scale: 1.02,
-                                                    background: 'rgba(255, 255, 255, 0.08)'
-                                                }}
-                                                whileTap={{ scale: 0.98 }}
+                                <>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <Clock size={16} className="text-white/30" />
+                                            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Recent Searches</h2>
+                                        </div>
+                                        {recentSearches.length > 0 && (
+                                            <button
+                                                onClick={clearHistory}
+                                                className="text-white/40 hover:text-red-400 text-xs transition-colors flex items-center gap-1"
                                             >
-                                                {term}
-                                            </motion.button>
+                                                <X size={12} /> Clear
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        {recentSearches.map((term, i) => (
+                                            <div key={i} className="group relative">
+                                                <button
+                                                    onClick={() => { setQuery(term); handleSearch(term); }}
+                                                    className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-sm text-white/70 hover:text-white transition-colors border border-white/5"
+                                                >
+                                                    {term}
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); removeSearch(term); }}
+                                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full items-center justify-center hidden group-hover:flex z-10"
+                                                >
+                                                    <X size={10} className="text-white" />
+                                                </button>
+                                            </div>
                                         ))}
                                     </div>
-                                </div>
+                                </>
                             )}
 
                             {/* Trending Searches */}
@@ -641,7 +644,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                         </motion.div>
                     ) : null}
                 </AnimatePresence>
-            </div>
+            </div >
         </>
     );
 }

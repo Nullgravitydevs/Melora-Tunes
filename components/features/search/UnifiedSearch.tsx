@@ -17,6 +17,7 @@ interface UnifiedSearchProps {
     showFilters?: boolean;
     autoFocus?: boolean;
     onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
+    onSearch?: (query: string) => void;
 }
 
 // Quality badge colors
@@ -38,7 +39,8 @@ export function UnifiedSearch({
     className = "",
     showFilters = true,
     autoFocus = false,
-    onContextMenu
+    onContextMenu,
+    onSearch
 }: UnifiedSearchProps) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<PlayableTrack[]>([]);
@@ -69,6 +71,7 @@ export function UnifiedSearch({
                 // Return type is Promise<PlayableTrack[]>
                 const data = await searchUnified(query, filter);
                 setResults(data);
+                // We typically don't add to history just by typing, waiting for user action like click
             } catch (e) {
                 console.error("Search error:", e);
             } finally {
@@ -91,7 +94,8 @@ export function UnifiedSearch({
         } else {
             onSongSelect(track);
         }
-    }, [onSongSelect]);
+        if (onSearch && query.trim()) onSearch(query.trim());
+    }, [onSongSelect, query, onSearch]);
 
     const getAvailableQualities = (track: PlayableTrack): AudioQuality[] => {
         // Get unique qualities available in sources
