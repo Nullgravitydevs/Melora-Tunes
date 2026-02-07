@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Heart, Volume2, ListMusic, Maximize2, ChevronDown, Music, Mic2, Share2, Copy } from "lucide-react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { getLyricsWithFallback } from "@/lib/jiosaavn";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface FullPlayerProps {
     isOpen: boolean;
@@ -279,44 +280,58 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                             {/* Main Controls */}
                             <div className="flex items-center justify-center gap-6 mb-10">
-                                <motion.button
-                                    onClick={() => setShuffle(!shuffle)}
-                                    className={`p-2 ${shuffle ? 'text-white' : 'text-white/40'}`}
-                                    whileTap={{ scale: 0.9 }}
-                                >
-                                    <Shuffle size={20} />
-                                </motion.button>
-                                <motion.button
-                                    onClick={prev}
-                                    className="p-3 text-white/80 hover:text-white"
-                                    whileTap={{ scale: 0.9 }}
-                                >
-                                    <SkipBack size={28} fill="currentColor" />
-                                </motion.button>
-                                <motion.button
-                                    onClick={togglePlay}
-                                    className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center"
-                                    style={{ boxShadow: '0 8px 30px rgba(255, 255, 255, 0.3)' }}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                >
-                                    {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
-                                </motion.button>
-                                <motion.button
-                                    onClick={next}
-                                    className="p-3 text-white/80 hover:text-white"
-                                    whileTap={{ scale: 0.9 }}
-                                >
-                                    <SkipForward size={28} fill="currentColor" />
-                                </motion.button>
-                                <motion.button
-                                    onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
-                                    className={`p-2 relative ${repeat !== 'off' ? 'text-white' : 'text-white/40'}`}
-                                    whileTap={{ scale: 0.9 }}
-                                >
-                                    <Repeat size={20} />
-                                    {repeat === 'one' && <span className="absolute text-[8px] font-bold top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">1</span>}
-                                </motion.button>
+                                <Tooltip text={shuffle ? "Disable Shuffle" : "Enable Shuffle"}>
+                                    <motion.button
+                                        onClick={() => setShuffle(!shuffle)}
+                                        className={`p-2 ${shuffle ? 'text-white' : 'text-white/40'}`}
+                                        whileTap={{ scale: 0.9 }}
+                                    >
+                                        <Shuffle size={20} />
+                                    </motion.button>
+                                </Tooltip>
+
+                                <Tooltip text="Previous">
+                                    <motion.button
+                                        onClick={prev}
+                                        className="p-3 text-white/80 hover:text-white"
+                                        whileTap={{ scale: 0.9 }}
+                                    >
+                                        <SkipBack size={28} fill="currentColor" />
+                                    </motion.button>
+                                </Tooltip>
+
+                                <Tooltip text={isPlaying ? "Pause" : "Play"}>
+                                    <motion.button
+                                        onClick={togglePlay}
+                                        className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center"
+                                        style={{ boxShadow: '0 8px 30px rgba(255, 255, 255, 0.3)' }}
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+                                    </motion.button>
+                                </Tooltip>
+
+                                <Tooltip text="Next">
+                                    <motion.button
+                                        onClick={next}
+                                        className="p-3 text-white/80 hover:text-white"
+                                        whileTap={{ scale: 0.9 }}
+                                    >
+                                        <SkipForward size={28} fill="currentColor" />
+                                    </motion.button>
+                                </Tooltip>
+
+                                <Tooltip text={repeat === 'one' ? "Disable Repeat" : repeat === 'all' ? "Repeat One" : "Repeat All"}>
+                                    <motion.button
+                                        onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
+                                        className={`p-2 relative ${repeat !== 'off' ? 'text-white' : 'text-white/40'}`}
+                                        whileTap={{ scale: 0.9 }}
+                                    >
+                                        <Repeat size={20} />
+                                        {repeat === 'one' && <span className="absolute text-[8px] font-bold top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">1</span>}
+                                    </motion.button>
+                                </Tooltip>
                             </div>
 
                             {/* Footer Actions */}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio } from "lucide-react";
+import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
@@ -20,6 +20,7 @@ import { PeelRevealView } from "./views/PeelRevealView";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { PlaylistItem } from "@/components/shared/PlaylistItem";
+import { Tooltip } from "@/components/ui/tooltip";
 
 
 /* ============================================================================
@@ -653,7 +654,7 @@ function EmptyState() {
 /* === PLAYER === */
 
 function PlayerBar({ onExpand }: { onExpand: () => void }) {
-    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat } = usePlayback();
 
     /* UPGRADE 3: Keyboard Shortcuts */
     useEffect(() => {
@@ -671,11 +672,19 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                         e.preventDefault();
                         next();
                     }
+                    else if (e.shiftKey) {
+                        e.preventDefault();
+                        seek(Math.min(1, progress + 0.05)); // +5%
+                    }
                     break;
                 case 'ArrowLeft':
                     if (e.metaKey || e.ctrlKey) {
                         e.preventDefault();
                         prev();
+                    }
+                    else if (e.shiftKey) {
+                        e.preventDefault();
+                        seek(Math.max(0, progress - 0.05)); // -5%
                     }
                     break;
             }
@@ -683,7 +692,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [togglePlay, next, prev]);
+    }, [togglePlay, next, prev, progress, seek]);
 
 
     const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
@@ -702,128 +711,163 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
             label: activeQuality.toUpperCase(),
             color: activeQuality === 'flac' || activeQuality === 'hires'
                 ? 'bg-white/15'
-                : 'bg-white/10'
+                : 'bg-white/5'
         };
     };
 
-    // FIX 1: Seek expects seconds, not ratio
+    const quality = getQuality();
+
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const r = e.currentTarget.getBoundingClientRect();
-        const ratio = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-        seek(ratio * duration); // Convert to seconds
+        seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
     };
-
-    const handleVolume = (e: React.MouseEvent<HTMLDivElement>) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
-    };
-
-
 
     // Hide completely when no song
     if (!currentSong) return null;
 
-    const quality = getQuality();
-
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-            <motion.div
-                initial={{ y: 100, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 100, opacity: 0 }}
-                className="flex items-center gap-4 px-4 py-3 rounded-2xl"
-                style={{
-                    background: 'rgba(20, 20, 20, 0.85)',
-                    backdropFilter: 'blur(40px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: '0 20px 60px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03) inset'
-                }}
-            >
-                {/* Album Art */}
-                <motion.div className="relative" whileHover={{ scale: 1.05 }}>
-                    {getArt() ? (
-                        <img src={getArt()} alt="" className="w-12 h-12 rounded-lg object-cover shadow-lg" />
-                    ) : (
-                        <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center">
-                            <Music size={16} className="text-white/30" />
-                        </div>
-                    )}
-                    {isPlaying && <div className="absolute inset-0 rounded-lg border border-white/20 breathing" />}
-                </motion.div>
-
-                {/* Track Info */}
-                <div className="min-w-0 w-36">
-                    <div className="flex items-center gap-2">
-                        <p className="text-[13px] font-medium truncate">{currentSong.name}</p>
-                        {quality && (
-                            <span className={`${quality.color} text-[9px] font-semibold px-1.5 py-0.5 rounded`}>
-                                {quality.label}
-                            </span>
+        <motion.div
+            initial={{ y: 100 }}
+            animate={{ y: 0 }}
+            className="h-[90px] bg-black border-t border-white/5 px-6 flex items-center justify-between relative z-50 player-bar"
+        >
+            {/* Song Info */}
+            <div className="flex items-center gap-4 w-[30%]">
+                <div className="relative group cursor-pointer" onClick={onExpand}>
+                    <div className={`w-14 h-14 rounded-lg overflow-hidden bg-white/5 shadow-lg border border-white/5 ${isPlaying ? 'animate-pulse-slow' : ''}`}>
+                        {getArt() ? (
+                            <img src={getArt()} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <Music size={20} className="text-white/20" />
+                            </div>
                         )}
                     </div>
-                    <p className="text-[11px] text-white/40 truncate">{currentSong.primaryArtists}</p>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                        <Maximize2 size={20} className="text-white" />
+                    </div>
                 </div>
 
-                {/* Like Button */}
-                <motion.button
-                    onClick={() => currentSong && toggleLike(currentSong)}
-                    className={`ctrl p-2 hover:text-pink-400 ${currentSong && isLiked(currentSong.id) ? 'text-pink-500' : 'text-white/30'}`}
-                    whileTap={{ scale: 0.85 }}
-                >
-                    <Heart size={16} fill={currentSong && isLiked(currentSong.id) ? "currentColor" : "none"} />
-                </motion.button>
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-medium text-white truncate cursor-pointer hover:underline" onClick={onExpand}>{currentSong.name}</p>
+                        {quality && (
+                            <Tooltip text={`Streaming: ${quality.label}`} position="top">
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${quality.color} text-white/70`}>
+                                    {quality.label}
+                                </span>
+                            </Tooltip>
+                        )}
+                    </div>
+                    <p className="text-xs text-white/40 truncate hover:text-white/60 cursor-pointer">{currentSong.primaryArtists}</p>
+                </div>
 
-                {/* Controls */}
-                <div className="flex items-center gap-2">
-                    <motion.button onClick={prev} className="ctrl p-2 text-white/50" whileTap={{ scale: 0.85 }}>
-                        <SkipBack size={16} fill="currentColor" />
-                    </motion.button>
-                    <motion.button
-                        onClick={togglePlay}
-                        className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center"
-                        style={{ boxShadow: '0 4px 20px rgba(255, 255, 255, 0.2)' }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.92 }}
+                <Tooltip text={isLiked(currentSong.id) ? "Remove from Library" : "Add to Library"}>
+                    <button
+                        onClick={() => currentSong && toggleLike(currentSong)}
+                        className={`ml-2 p-2 rounded-full hover:bg-white/10 transition-colors ${isLiked(currentSong.id) ? 'text-green-500' : 'text-white/20 hover:text-white'}`}
                     >
-                        {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
-                    </motion.button>
-                    <motion.button onClick={next} className="ctrl p-2 text-white/50" whileTap={{ scale: 0.85 }}>
-                        <SkipForward size={16} fill="currentColor" />
-                    </motion.button>
+                        <Heart size={18} fill={isLiked(currentSong.id) ? "currentColor" : "none"} />
+                    </button>
+                </Tooltip>
+            </div>
+
+            {/* Center Controls */}
+            <div className="flex flex-col items-center gap-2 w-[40%]">
+                <div className="flex items-center gap-6">
+                    <Tooltip text={shuffle ? "Disable Shuffle" : "Enable Shuffle"}>
+                        <button
+                            onClick={() => setShuffle(!shuffle)}
+                            className={`p-2 rounded-full transition-colors ${shuffle ? 'text-green-500' : 'text-white/30 hover:text-white'}`}
+                        >
+                            <Shuffle size={16} />
+                        </button>
+                    </Tooltip>
+
+                    <Tooltip text="Previous">
+                        <button onClick={prev} className="p-2 text-white/70 hover:text-white transition-colors">
+                            <SkipBack size={20} fill="currentColor" />
+                        </button>
+                    </Tooltip>
+
+                    <Tooltip text={isPlaying ? "Pause" : "Play"}>
+                        <button
+                            onClick={togglePlay}
+                            className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+                        >
+                            {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+                        </button>
+                    </Tooltip>
+
+                    <Tooltip text="Next">
+                        <button onClick={next} className="p-2 text-white/70 hover:text-white transition-colors">
+                            <SkipForward size={20} fill="currentColor" />
+                        </button>
+                    </Tooltip>
+
+                    <Tooltip text={repeat === 'one' ? "Disable Repeat" : repeat === 'all' ? "Repeat One" : "Repeat All"}>
+                        <button
+                            onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
+                            className={`p-2 rounded-full transition-colors relative ${repeat !== 'off' ? 'text-green-500' : 'text-white/30 hover:text-white'}`}
+                        >
+                            <Repeat size={16} />
+                            {repeat === 'one' && <span className="absolute text-[8px] font-bold top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-green-500">1</span>}
+                        </button>
+                    </Tooltip>
                 </div>
 
-                {/* Progress */}
-                <div className="flex items-center gap-2 w-36">
-                    {/* UPGRADE 1: Safer Progress Display (Handles both ratio 0-1 and absolute seconds) */}
-                    <span className="text-[10px] text-white/30 tabular-nums">{fmt(progress <= 1 ? progress * duration : progress)}</span>
-                    <div className="progress-track flex-1 h-1" onClick={handleSeek}>
+                <div className="w-full max-w-md flex items-center gap-3 text-xs text-white/30 font-mono">
+                    <span>{fmt(progress * duration)}</span>
+                    <div
+                        className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer relative group"
+                        onClick={handleSeek}
+                    >
                         <div
-                            className="progress-fill h-full"
-                            style={{ width: `${(progress <= 1 ? progress : progress / duration) * 100}%` }}
+                            className="absolute inset-y-0 left-0 bg-white/40 group-hover:bg-green-500 rounded-full transition-colors"
+                            style={{ width: `${progress * 100}%` }}
+                        />
+                        <div
+                            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ left: `${progress * 100}%` }}
                         />
                     </div>
-                    <span className="text-[10px] text-white/30 tabular-nums">{fmt(duration)}</span>
+                    <span>{fmt(duration)}</span>
                 </div>
+            </div>
 
-                {/* Volume */}
-                <div className="flex items-center gap-1.5 group">
-                    <Volume2 size={14} className="text-white/30" />
+            {/* Right Controls */}
+            <div className="flex items-center justify-end gap-2 w-[30%]">
+                <Tooltip text="Lyrics">
+                    <button className="p-2 text-white/30 hover:text-white">
+                        <ListMusic size={18} />
+                    </button>
+                </Tooltip>
+
+                <div className="flex items-center gap-2 group w-24">
+                    <Tooltip text={volume === 0 ? "Unmute" : "Mute"}>
+                        <button onClick={() => setVolume(volume === 0 ? 1 : 0)}>
+                            {volume === 0 ? <Volume2 size={18} className="text-white/30" /> : <Volume2 size={18} className="text-white/70" />}
+                        </button>
+                    </Tooltip>
                     <div
-                        className="w-14 h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer py-2 -my-2 flex items-center"
-                        onClick={handleVolume}
+                        className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer overflow-hidden"
+                        onClick={(e) => {
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
+                        }}
                     >
-                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden pointer-events-none">
-                            <div className="h-full bg-white/60 rounded-full" style={{ width: `${volume * 100}%` }} />
-                        </div>
+                        <div className="h-full bg-white/50 group-hover:bg-white transition-colors" style={{ width: `${volume * 100}%` }} />
                     </div>
                 </div>
 
-                {/* Expand */}
-                <motion.button onClick={onExpand} className="ctrl p-2 text-white/30" whileTap={{ scale: 0.85 }}>
-                    <Maximize2 size={14} />
-                </motion.button>
-            </motion.div>
-        </div>
+                <div className="w-px h-8 bg-white/10 mx-2" />
+
+                <Tooltip text="Expand Player">
+                    <button onClick={onExpand} className="p-2 text-white/30 hover:text-white transition-colors">
+                        <Maximize2 size={18} />
+                    </button>
+                </Tooltip>
+            </div>
+        </motion.div>
     );
 }
