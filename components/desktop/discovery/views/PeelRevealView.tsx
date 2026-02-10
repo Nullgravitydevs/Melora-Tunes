@@ -42,8 +42,7 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
         try {
             const data = await getAlbumDetails(album.id);
             setTracks(data || []);
-        } catch (e) {
-            console.error(e);
+        } catch {
             setError("Failed to load album tracks.");
         } finally {
             setLoading(false);
@@ -106,7 +105,7 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
                                     <div className="absolute inset-0 bg-[conic-gradient(from_0deg,#c0c0c0,#e8e8e8,#a0a0a0,#e8e8e8,#c0c0c0)] rounded-full" />
                                     <div className="absolute inset-0 rounded-full opacity-30 mix-blend-overlay" style={{ background: `conic-gradient(from 0deg, transparent 0%, #ff0000 10%, #00ff00 20%, #0000ff 30%, transparent 40%)` }} />
                                     <div className="absolute inset-0 rounded-full opacity-30" style={{ background: 'repeating-radial-gradient(transparent 0, transparent 1.5px, #000 2px)' }} />
-                                    <div className="absolute top-[35%] left-[35%] width-[30%] height-[30%] rounded-full overflow-hidden border-2 border-neutral-300/20 shadow-inner">
+                                    <div className="absolute top-[35%] left-[35%] w-[30%] h-[30%] rounded-full overflow-hidden border-2 border-neutral-300/20 shadow-inner">
                                         <img src={getArt()} className="w-[84px] h-[84px] object-cover" />
                                     </div>
                                     <div className="absolute top-[46%] left-[46%] w-5 h-5 bg-black rounded-full shadow-[inset_0_1px_3px_rgba(255,255,255,0.4)]" />

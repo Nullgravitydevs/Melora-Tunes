@@ -1,4 +1,5 @@
 import { PlayableTrack } from './types';
+import { safeSetItem } from './safe-storage';
 
 export interface Playlist {
     id: string;
@@ -24,7 +25,10 @@ class PlaylistDB {
 
     private saveAll(playlists: Playlist[]) {
         if (typeof window === 'undefined') return;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(playlists));
+        const success = safeSetItem(STORAGE_KEY, JSON.stringify(playlists));
+        if (!success) {
+            console.error('[PlaylistStore] Failed to save — storage full');
+        }
         // Dispatch event for UI updates
         window.dispatchEvent(new CustomEvent('melora-playlists-update'));
     }

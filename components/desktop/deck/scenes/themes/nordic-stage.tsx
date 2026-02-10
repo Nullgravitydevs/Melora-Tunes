@@ -15,6 +15,7 @@ import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 
 interface NordicStageProps {
     currentTheme: ThemeKey;
@@ -53,7 +54,7 @@ export function NordicStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq
+        isLoaded, eq, activeQuality
     } = usePlayback();
 
     const { playClick, playEject } = useAudio();
@@ -237,9 +238,12 @@ export function NordicStage({
                             <div className="bg-black/60 rounded-lg p-6 mb-6 border border-slate-800 h-28 flex flex-col items-center justify-center relative overflow-hidden">
                                 {isLoaded && activeMix ? (
                                     <>
-                                        <p className="font-mono text-sm text-slate-300 tracking-widest text-center truncate w-full px-4">
-                                            {currentSong ? decodeHtml(currentSong.name) : activeMix.title.toUpperCase()}
-                                        </p>
+                                        <div className="flex items-center justify-center gap-2 w-full px-4">
+                                            <p className="font-mono text-sm text-slate-300 tracking-widest text-center truncate">
+                                                {currentSong ? decodeHtml(currentSong.name) : activeMix.title.toUpperCase()}
+                                            </p>
+                                            {activeQuality && <QualityBadge quality={activeQuality} variant="mini" />}
+                                        </div>
                                         <p className="font-mono text-xs text-slate-500 mt-1 uppercase tracking-wider">
                                             {currentSong ? decodeHtml(currentSong.primaryArtists || "") : "Tape Loaded"}
                                         </p>

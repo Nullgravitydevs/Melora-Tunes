@@ -77,7 +77,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
             ] = await Promise.all([
                 searchPlaylists("Global Top 50", 1, 10),
                 searchPlaylists("Top Hits", 1, 10),
-                searchAlbums("New Releases 2025", 1, 10),
+                searchAlbums(`New Releases ${new Date().getFullYear()}`, 1, 10),
                 searchAlbums("Live Concert", 1, 10), // "Live Performance" often returns albums
                 searchSongs("Global Viral", 1, 10),
                 searchPlaylists("Bollywood Top Hits", 1, 10),
@@ -96,8 +96,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                 hollywood: holly
             });
 
-        } catch (e) {
-            console.error("Explore Data Load Failed", e);
+        } catch {
             setError("Failed to load global discovery content.");
         }
         finally { setLoading(false) }
@@ -209,7 +208,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                     {content.globalTrending.slice(0, 9).map((song, i) => (
                         <div
                             key={song.id}
-                            onClick={() => onNavigate({ id: 'song', data: song })} // Or play directly?
+                            onClick={() => { playInstantMix({ id: `trending-${song.id}`, title: song.name, color: 'blue', songs: content.globalTrending, currentSongIndex: i }); }}
                             className="group flex items-center gap-4 p-3 rounded-xl bg-transparent hover:bg-white/5 transition-colors cursor-pointer border border-white/5 hover:border-white/10"
                         >
                             <div className="w-16 h-16 rounded-lg overflow-hidden relative flex-shrink-0">

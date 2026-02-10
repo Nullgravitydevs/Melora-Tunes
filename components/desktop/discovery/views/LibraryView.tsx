@@ -79,6 +79,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'liked');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [songToAdd, setSongToAdd] = useState<JioSaavnSong | PlayableTrack | null>(null);
+    const [showConfirm, setShowConfirm] = useState<{ message: string; action: () => void } | null>(null);
 
     // SEARCH & FILTER STATE
     const [searchQuery, setSearchQuery] = useState("");
@@ -300,10 +301,10 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
 
     // Delete playlist
     const handleDeletePlaylist = (playlistId: string, name: string) => {
-        if (confirm(`Delete "${name}"?`)) {
-            deleteMix(playlistId);
-            showToast(`Deleted "${name}"`, 'info');
-        }
+        setShowConfirm({
+            message: `Delete "${name}"?`,
+            action: () => { deleteMix(playlistId); showToast(`Deleted "${name}"`, 'info'); }
+        });
     };
 
     // Render song row
@@ -848,6 +849,29 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                         song={songToAdd}
                         onClose={() => setSongToAdd(null)}
                     />
+                )}
+            </AnimatePresence>
+
+            {/* Confirm Modal */}
+            <AnimatePresence>
+                {showConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowConfirm(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 w-full max-w-xs"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <p className="text-white/80 text-[14px] font-medium text-center mb-5">{showConfirm.message}</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowConfirm(null)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] text-white/50 text-[13px] font-semibold hover:bg-white/[0.08] transition-colors">Cancel</button>
+                                <button onClick={() => { showConfirm.action(); setShowConfirm(null); }} className="flex-1 py-2.5 rounded-xl bg-red-500/80 text-white text-[13px] font-semibold hover:bg-red-500/70 transition-colors">Delete</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
                 )}
             </AnimatePresence>
         </>

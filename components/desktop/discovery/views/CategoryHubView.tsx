@@ -51,8 +51,8 @@ export function CategoryHubView({ data, onNavigate, onBack, onContextMenu }: Cat
             setPlaylists(playlistData || []);
             setAlbums(albumData || []);
             setArtists(artistData || []);
-        } catch (e) {
-            console.error("Hub Load Error", e);
+        } catch {
+            /* ignored */
         } finally {
             setLoading(false);
         }

@@ -175,25 +175,29 @@ class OfflineDB {
     /**
      * Returns a map of songId -> List of downloaded qualities.
      * Efficient for hydrating UI state.
+     * Uses a cursor to read only key fields, NOT full blobs.
      */
     async getDownloadedState(): Promise<Record<string, AudioQuality[]>> {
         const db = await this.open();
         return new Promise((resolve, reject) => {
             const tx = db.transaction(STORE_NAME, 'readonly');
-            // We can optimize by using keys only if needed, but getAll is fine for now
             const store = tx.objectStore(STORE_NAME);
-            const req = store.getAll();
+            const state: Record<string, AudioQuality[]> = {};
+
+            // Use a cursor to read only songId + quality without loading blobs
+            const req = store.openCursor();
 
             req.onsuccess = () => {
-                const records = req.result as OfflineSong[];
-                const state: Record<string, AudioQuality[]> = {};
-
-                records.forEach(r => {
-                    if (!state[r.songId]) state[r.songId] = [];
-                    state[r.songId].push(r.quality);
-                });
-
-                resolve(state);
+                const cursor = req.result;
+                if (cursor) {
+                    const record = cursor.value as OfflineSong;
+                    if (!state[record.songId]) state[record.songId] = [];
+                    state[record.songId].push(record.quality);
+                    cursor.continue();
+                } else {
+                    // Done iterating
+                    resolve(state);
+                }
             };
             req.onerror = () => reject(req.error);
         });

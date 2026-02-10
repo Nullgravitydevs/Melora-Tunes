@@ -1,4 +1,5 @@
 import { JioSaavnSong } from "./jiosaavn";
+import { safeSetItem } from "./safe-storage";
 
 export interface SongStats {
     id: string;
@@ -60,7 +61,7 @@ export function recordPlay(song: JioSaavnSong, duration: number) {
         stats.topArtists[artist] += 1;
     });
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+    safeSetItem(STORAGE_KEY, JSON.stringify(stats));
 }
 
 export function getTopSongs(limit = 10): SongStats[] {

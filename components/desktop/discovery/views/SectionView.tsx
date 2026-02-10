@@ -7,6 +7,7 @@ import { StandardCard, FeatureCard, PosterCard, QuickPickItem } from "../home/Ho
 import { getTrending, getNewReleases, getTopCharts, searchPlaylists, searchSongs, JioSaavnSong } from "@/lib/jiosaavn";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
+import { AddToPlaylistModal } from "../modals/AddToPlaylistModal";
 import { decodeHtml } from "@/lib/utils";
 
 interface SectionViewProps {
@@ -27,6 +28,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null }>({ visible: false, x: 0, y: 0, song: null });
+    const [addToPlaylistSong, setAddToPlaylistSong] = useState<JioSaavnSong | null>(null);
 
     useEffect(() => {
         if (initialData && initialData.length > 0) {
@@ -96,8 +98,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                     break;
             }
             setItems(data);
-        } catch (e) {
-            console.error(e);
+        } catch {
             setError("Failed to load content. Please try again.");
         } finally {
             setLoading(false);
@@ -322,8 +323,11 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                 isDownloaded={false}
                 onDownload={() => { }}
                 onRemoveDownload={() => { }}
-                onAddToPlaylist={() => { /* Feature coming soon: Playlist Picker Modal */ }}
+                onAddToPlaylist={(s) => setAddToPlaylistSong(s)}
             />
+            <AnimatePresence>
+                {addToPlaylistSong && <AddToPlaylistModal song={addToPlaylistSong} onClose={() => setAddToPlaylistSong(null)} />}
+            </AnimatePresence>
             <style jsx global>{`.scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
         </div>
     );

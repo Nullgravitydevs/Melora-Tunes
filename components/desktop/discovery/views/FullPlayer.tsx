@@ -6,6 +6,7 @@ import { X, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Heart, Volume2,
 import { usePlayback } from "@/components/providers/playback-context";
 import { getLyricsWithFallback } from "@/lib/jiosaavn";
 import { Tooltip } from "@/components/ui/tooltip";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 
 interface FullPlayerProps {
     isOpen: boolean;
@@ -17,7 +18,8 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
         currentSong, isPlaying, togglePlay, next, prev,
         progress, duration, seek, volume, setVolume,
         shuffle, setShuffle, repeat, setRepeat,
-        showToast, queue, currentIndex, playIndex
+        showToast, queue, currentIndex, playIndex,
+        isLiked, toggleLike, activeQuality
     } = usePlayback();
 
     const [lyrics, setLyrics] = useState<string | null>(null);
@@ -73,13 +75,16 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
     };
 
     const getQuality = () => {
-        if (!currentSong) return null;
-        const q = (currentSong as any).quality || (currentSong as any).downloadUrl?.[0]?.quality;
-        if (!q) return { label: 'HQ', color: 'bg-white/10' };
-        if (q.includes('320') || q === '320kbps') return { label: '320kbps', color: 'bg-white/10' };
-        if (q.includes('160') || q === '160kbps') return { label: '160kbps', color: 'bg-white/10' };
-        if (q.includes('lossless') || q.includes('flac')) return { label: 'FLAC', color: 'bg-white/15' };
-        return { label: 'HQ', color: 'bg-white/10' };
+        // Use activeQuality from context (truth of what's actually playing)
+        if (!activeQuality) return null;
+        const qMap: Record<string, { label: string; color: string }> = {
+            hires: { label: 'HI-RES', color: 'bg-white/15' },
+            flac: { label: 'FLAC', color: 'bg-white/15' },
+            '320': { label: '320kbps', color: 'bg-white/10' },
+            '160': { label: '160kbps', color: 'bg-white/10' },
+            '96': { label: '96kbps', color: 'bg-white/10' },
+        };
+        return qMap[activeQuality] || { label: 'HQ', color: 'bg-white/10' };
     };
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -338,10 +343,11 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-4">
                                     <motion.button
-                                        className="p-2 text-white/40 hover:text-pink-500 hover:bg-white/5 rounded-full"
+                                        onClick={() => currentSong && toggleLike(currentSong)}
+                                        className={`p-2 ${currentSong && isLiked((currentSong as any).id) ? 'text-pink-500' : 'text-white/40 hover:text-pink-500'} hover:bg-white/5 rounded-full`}
                                         whileTap={{ scale: 0.9 }}
                                     >
-                                        <Heart size={22} />
+                                        <Heart size={22} fill={currentSong && isLiked((currentSong as any).id) ? 'currentColor' : 'none'} />
                                     </motion.button>
 
                                     {/* Share Button */}

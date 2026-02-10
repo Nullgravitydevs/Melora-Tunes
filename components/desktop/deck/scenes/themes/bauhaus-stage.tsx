@@ -12,6 +12,7 @@ import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 
 interface BauhausStageProps {
     currentTheme: ThemeKey;
@@ -172,7 +173,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq
+        isLoaded, eq, activeQuality
     } = usePlayback();
 
     const { playClick, playEject } = useAudio();
@@ -358,6 +359,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                         <div className="flex gap-4">
                             <div className="flex-1 bg-[#d4d8cc] p-3 border-2 border-[#1a1a1a] shadow-inner font-mono flex justify-between items-center">
                                 <span className="text-[#1a1a1a] font-bold tracking-widest text-sm uppercase">STATUS: {isLoaded ? (isPlaying ? "PLAYING" : "PAUSED") : "EMPTY"}</span>
+                                {isLoaded && activeQuality && <QualityBadge quality={activeQuality} variant="mini" />}
                             </div>
                             <div className="w-16 bg-[#1a1a1a] flex items-center justify-center border-2 border-[#1a1a1a]">
                                 <span className="font-black text-white text-xl">A</span>

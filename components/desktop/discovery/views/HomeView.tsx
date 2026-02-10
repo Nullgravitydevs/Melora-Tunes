@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Play, Sparkles, TrendingUp, Music, Heart, Zap, Coffee, Activity, Calendar, AlertCircle, RefreshCcw } from "lucide-react";
 import { getStrictLaunchData, LaunchData, JioSaavnSong, searchPlaylists } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
-import { StandardCard, FeatureCard, HorizontalScroll, SectionHeader, RadioCard, CompactCard, QuickPickItem, MoodCard, VibeAlbumCard } from "../home/HomeComponents";
+import { StandardCard, FeatureCard, HorizontalScroll, SectionHeader, QuickPickItem, VibeAlbumCard } from "../home/HomeComponents";
 
 interface HomeViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
@@ -158,7 +158,7 @@ function SmartHero({ song, onPlay, userName }: { song: JioSaavnSong | null; onPl
 
 
 // === DATA FETCHING LOGIC ===
-export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: HomeViewProps) {
+export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onContextMenu }: HomeViewProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [launchData, setLaunchData] = useState<LaunchData | null>(null);
@@ -186,16 +186,14 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
                         name = parsed.userName;
                     }
                 }
-            } catch (e) {
-                console.error("Failed to parse melora-settings from localStorage", e);
+            } catch {
+                /* ignored */
             }
             setUserName(name); // Set userName state
 
             const validLangs = storedLangs.map(l => l.toLowerCase().trim()).filter(Boolean);
             const langString = validLangs.join(',') || 'english';
             setDisplayLangs(validLangs);
-
-            console.log(`[HomeView] 🌍 Fetching Ultimate Content for: ${langString}`);
 
             // 2. Call Enhanced API
             const data = await getStrictLaunchData(langString);
@@ -224,8 +222,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying }: H
 
             setVibePlaylists(vibes);
 
-        } catch (err) {
-            console.error("[HomeView]", err);
+        } catch {
             setError("Failed to load content.");
         } finally {
             setLoading(false);

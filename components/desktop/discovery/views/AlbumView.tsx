@@ -59,8 +59,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                         setMoreFromArtist(results.filter((a: any) => a.id !== album.id));
                     }
                 }
-            } catch (e) {
-                console.error('Failed to load album:', e);
+            } catch {
                 setError("Failed to load album tracks.");
             } finally {
                 setIsLoading(false);
@@ -207,7 +206,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                                 <h3 className="text-lg font-bold text-white mb-2">Error Loading Album</h3>
                                 <p className="text-white/40 text-sm mb-6">{error}</p>
                                 <button
-                                    onClick={() => { setError(null); setIsLoading(true); }}
+                                    onClick={() => { setError(null); setIsLoading(true); const reload = async () => { try { const details = await getAlbumDetails(album?.id); if (details) { setAlbumData(details); setSongs(Array.isArray(details) ? details : (details as any).songs || []); } } catch { setError('Failed to load album tracks.'); } finally { setIsLoading(false); } }; reload(); }}
                                     className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
                                 >
                                     <RefreshCcw size={16} />

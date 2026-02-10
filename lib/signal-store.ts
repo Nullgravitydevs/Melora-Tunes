@@ -1,5 +1,6 @@
 
 import { PlayableTrack } from './types';
+import { safeSetItem } from './safe-storage';
 
 const SIGNAL_KEY = 'melora_signals';
 const ARTIST_SIGNAL_KEY = 'melora_artist_signals';
@@ -133,12 +134,12 @@ export const SignalStore = {
             };
             // Append and prune
             const updatedArtists = [artistSignal, ...artistSignals].slice(0, MAX_SIGNALS);
-            localStorage.setItem(ARTIST_SIGNAL_KEY, JSON.stringify(updatedArtists));
+            safeSetItem(ARTIST_SIGNAL_KEY, JSON.stringify(updatedArtists));
         }
 
         // 4. Update Store
         const updated = [newSignal, ...signals].slice(0, MAX_SIGNALS);
-        localStorage.setItem(SIGNAL_KEY, JSON.stringify(updated));
+        safeSetItem(SIGNAL_KEY, JSON.stringify(updated));
     },
 
     // --- Analytics / Ranking ---

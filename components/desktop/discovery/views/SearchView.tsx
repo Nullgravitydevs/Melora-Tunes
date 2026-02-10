@@ -129,20 +129,19 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
         setError(null);
         try {
             // Use the UNIFIED search that merges FLAC sources!
-            const qFilter = qualityPreference === 'hires' ? 'hires' : qualityPreference === 'flac' ? 'flac' : qualityPreference === '320' ? '320' : undefined;
+            const qFilter = qualityPreference === 'hires' ? 'hires' : qualityPreference === 'flac' ? 'flac' : '320';
             const tracks = await searchUnified(q, language || undefined, 'song', qFilter);
             setResults(tracks);
 
             if (tracks.length > 0) {
                 addSearch(q);
             }
-        } catch (e) {
-            console.error('Search failed:', e);
+        } catch {
             setError("Search failed. Please check your connection.");
         } finally {
             setIsSearching(false);
         }
-    }, [recentSearches, qualityPreference, language]);
+    }, [qualityPreference, language]);
 
     const onQueryChange = (value: string) => {
         setQuery(value);
@@ -362,7 +361,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                                     qualityPreference === '160' ? '160kbps' :
                                         '320kbps'}
                         </span>
-                        {qualityPreference !== '320' && (
+                        {(qualityPreference === 'flac' || qualityPreference === 'hires') && (
                             <span className="text-white/20">• HiFi search enabled</span>
                         )}
                     </motion.div>
@@ -627,7 +626,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                                             initial={{ opacity: 0, y: 20 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.2 + i * 0.04 }}
-                                            onClick={() => onNavigate({ id: 'hub', data: cat })}
+                                            onClick={() => onNavigate({ id: 'category-hub', data: cat })}
                                             className={`relative aspect-[16/9] rounded-2xl overflow-hidden p-4 text-left group shadow-xl`}
                                         >
                                             <div className={`absolute inset-0 bg-gradient-to-br ${cat.color}`} />

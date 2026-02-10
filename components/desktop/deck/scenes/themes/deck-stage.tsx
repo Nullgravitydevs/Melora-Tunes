@@ -111,7 +111,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
         progress, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, mixes, addMix,
         updateMix, deleteMix, activeMixId, play,
         likedSongs, toggleLike, isLiked, recentlyPlayed, eq, isDownloaded,
-        downloadSong, removeDownload
+        downloadSong, removeDownload, activeQuality
     } = usePlayback();
 
     const isDraggingRef = useRef(false);
@@ -752,7 +752,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                 </span>
                                 {/* LCD Quality Badge */}
                                 <div className="ml-2 scale-90 origin-right">
-                                    <QualityBadge quality={currentTrack?.preferredQuality} variant="full" />
+                                    <QualityBadge quality={activeQuality} variant="full" />
                                 </div>
                             </div>
 

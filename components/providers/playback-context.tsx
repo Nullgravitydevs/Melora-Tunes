@@ -1047,6 +1047,16 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         return null;
     };
 
+    // --- HELPER: Map HiFi stream quality to AudioQuality ---
+    const mapHiFiQuality = (streamQuality: string | undefined): AudioQuality => {
+        if (!streamQuality) return 'flac';
+        const q = streamQuality.toUpperCase();
+        if (q === 'HI_RES_LOSSLESS' || q === 'HI_RES') return 'hires';
+        if (q === 'LOSSLESS') return 'flac';
+        if (q === 'HIGH') return '320'; // Tidal HIGH = 320kbps AAC
+        return 'flac'; // Safe default for unknown HiFi qualities
+    };
+
     // --- HELPER: Try HiFi (Tidal/Qobuz) ---
     const tryHiFi = async (track: PlayableTrack, allowSearch = true): Promise<{ url: string, quality: AudioQuality, keyName?: string } | null> => {
         // 1. Try existing sources first
@@ -1055,7 +1065,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             try {
                 const stream = await getHiFiStream(hifiSource.songId, hifiSource.provider as 'tidal' | 'qobuz');
                 if (stream?.url) {
-                    return { url: stream.url, quality: 'flac', keyName: stream.keyName };
+                    return { url: stream.url, quality: mapHiFiQuality(stream.quality), keyName: stream.keyName };
                 }
             } catch (e) {
                 console.warn("[HiFi] Source failed:", e);
@@ -1071,7 +1081,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     const match = searchResult.tracks[0];
                     const stream = await getHiFiStream(match.id, match.source);
                     if (stream?.url) {
-                        return { url: stream.url, quality: 'flac', keyName: stream.keyName };
+                        return { url: stream.url, quality: mapHiFiQuality(stream.quality), keyName: stream.keyName };
                     }
                 }
             } catch (e) {
@@ -1563,9 +1573,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [currentSong?.id, isPlaying, rawCurrentItem]);
 
     const seek = useCallback((amount: number) => {
-        // Fix: Explicitly specify 'seconds' to prevent ReactPlayer from interpreting <1 as fraction (percentage)
-        // This stops accidental jumps to 90% when seeking to 0.9s
-        audioPlayerRef.current?.seekTo(amount, 'seconds');
+        // amount is 0-1 fraction from progress bars, or seconds from iPod scrub
+        // Detect: if amount > 1, treat as seconds; otherwise treat as fraction
+        if (amount > 1) {
+            audioPlayerRef.current?.seekTo(amount, 'seconds');
+        } else {
+            audioPlayerRef.current?.seekTo(amount); // Default: fraction
+        }
     }, []);
 
 
@@ -1725,7 +1739,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // crossfadeDuration, setCrossfadeDuration,
         qualityPreference, setQualityPreference, // This will reference the function we define
         togglePin,
-        activeQuality: currentTrack ? currentTrack.preferredQuality : null,
+        activeQuality,
         stopAtEndOfSong, setStopAtEndOfSong,
         notificationsEnabled, setNotificationsEnabled,
         likedSongs, toggleLike, isLiked,

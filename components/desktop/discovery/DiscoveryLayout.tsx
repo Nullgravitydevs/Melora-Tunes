@@ -21,6 +21,7 @@ import { TrackContextMenu } from "@/components/ui/track-context-menu";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { PlaylistItem } from "@/components/shared/PlaylistItem";
 import { Tooltip } from "@/components/ui/tooltip";
+import { AddToPlaylistModal } from "./modals/AddToPlaylistModal";
 
 
 /* ============================================================================
@@ -240,6 +241,11 @@ export function DiscoveryLayout() {
         song: null
     });
 
+    // Add to Playlist Modal State
+    const [addToPlaylistSong, setAddToPlaylistSong] = useState<JioSaavnSong | null>(null);
+    const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+    const [newPlaylistName, setNewPlaylistName] = useState("New Playlist");
+
     // Playlist Context Menu State
     const [playlistMenu, setPlaylistMenu] = useState<{ visible: boolean; x: number; y: number; mixId: string | null }>({
         visible: false,
@@ -328,25 +334,27 @@ export function DiscoveryLayout() {
     };
 
     const handleCreatePlaylist = () => {
-        // Simple prompt for now, can upgrade to custom modal later
-        const name = window.prompt("Enter playlist name:", "New Playlist");
-        if (!name) return;
+        setNewPlaylistName("New Playlist");
+        setShowCreatePlaylist(true);
+    };
 
+    const confirmCreatePlaylist = () => {
+        const name = newPlaylistName.trim();
+        if (!name) return;
         const newId = `user-${Date.now()}`;
         const newMix: Mix = {
             id: newId,
             title: name,
             songs: [],
-            color: 'blue', // Default
+            color: 'blue',
             currentSongIndex: 0
         };
-
         if (addMix) {
             addMix(newMix);
             showToast(`Created "${name}"`, 'success');
-            // Navigate to the new empty playlist
             handleNavigate({ id: 'playlist', data: newMix });
         }
+        setShowCreatePlaylist(false);
     };
 
     return (
@@ -364,6 +372,43 @@ export function DiscoveryLayout() {
             {/* FULL PLAYER */}
             <AnimatePresence>
                 {showFullPlayer && <FullPlayer isOpen={showFullPlayer} onClose={() => setShowFullPlayer(false)} />}
+            </AnimatePresence>
+
+            {/* ADD TO PLAYLIST MODAL */}
+            <AnimatePresence>
+                {addToPlaylistSong && <AddToPlaylistModal song={addToPlaylistSong} onClose={() => setAddToPlaylistSong(null)} />}
+            </AnimatePresence>
+
+            {/* CREATE PLAYLIST MODAL */}
+            <AnimatePresence>
+                {showCreatePlaylist && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowCreatePlaylist(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 w-full max-w-sm"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <p className="text-white/80 text-[14px] font-semibold mb-4">Create Playlist</p>
+                            <input
+                                type="text"
+                                value={newPlaylistName}
+                                onChange={(e) => setNewPlaylistName(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && confirmCreatePlaylist()}
+                                placeholder="Playlist name..."
+                                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2.5 text-[13px] text-white placeholder:text-white/25 focus:outline-none focus:border-white/[0.15] mb-4"
+                                autoFocus
+                            />
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => setShowCreatePlaylist(false)} className="px-4 py-2 rounded-lg bg-white/[0.06] text-white/50 text-[13px] font-medium hover:bg-white/[0.08] transition-colors">Cancel</button>
+                                <button onClick={confirmCreatePlaylist} className="px-4 py-2 rounded-lg bg-white text-black text-[13px] font-semibold hover:bg-white/90 transition-colors">Create</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
             </AnimatePresence>
 
 
@@ -588,7 +633,7 @@ export function DiscoveryLayout() {
                 isDownloaded={contextMenu.song ? isDownloaded(contextMenu.song.id) : false}
                 onDownload={(s) => downloadSong(s)}
                 onRemoveDownload={(id) => removeDownload(id)}
-                onAddToPlaylist={(s) => { /* TODO: Open Playlist Modal */ console.log("Add to playlist", s.name); }}
+                onAddToPlaylist={(s) => setAddToPlaylistSong(s)}
                 onRemoveFromPlaylist={
                     contextMenu.sourceMixId && contextMenu.sourceMixId.startsWith('user-')
                         ? (s) => {
@@ -838,7 +883,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
             {/* Right Controls */}
             <div className="flex items-center justify-end gap-2 w-[30%]">
                 <Tooltip text="Lyrics">
-                    <button className="p-2 text-white/30 hover:text-white">
+                    <button onClick={() => onExpand()} className="p-2 text-white/30 hover:text-white">
                         <ListMusic size={18} />
                     </button>
                 </Tooltip>

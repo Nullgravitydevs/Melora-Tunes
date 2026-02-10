@@ -4,12 +4,7 @@ import React, { useRef } from "react";
 import { motion } from "framer-motion";
 import { Play, Pause, ChevronRight, Disc3, Music, Mic } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
-import CryptoJS from 'crypto-js';
-import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { JioSaavnSong } from "@/lib/jiosaavn";
-
-const DES_KEY = process.env.NEXT_PUBLIC_DES_KEY || '38346591';
-const isElectron = typeof window !== 'undefined' && /Electron/i.test(window.navigator.userAgent);
 
 /* --- LAYOUT WRAPPERS --- */
 
@@ -359,7 +354,19 @@ export function MoodCard({ title, color, onClick }: { title: string; color: stri
 }
 
 export function AlbumCard({ album, onClick }: { album: any; onClick: () => void }) {
+    const getImg = (item: any) => {
+        if (!item?.image) return '';
+        if (typeof item.image === 'string') return item.image;
+        if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
+        return '';
+    };
     return (
-        <div onClick={onClick}></div>
-    )
+        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onClick} className="w-40 flex-shrink-0 cursor-pointer group snap-start">
+            <div className="w-40 h-40 rounded-2xl overflow-hidden bg-white/5 shadow-lg mb-2">
+                <img src={getImg(album)} alt={album?.name || ''} className="w-full h-full object-cover" />
+            </div>
+            <p className="text-sm font-bold text-white truncate">{decodeHtml(album?.name || '')}</p>
+            <p className="text-xs text-white/40 truncate">{album?.year || decodeHtml(album?.primaryArtists || '')}</p>
+        </motion.div>
+    );
 }

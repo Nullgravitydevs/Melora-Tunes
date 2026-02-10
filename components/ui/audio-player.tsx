@@ -144,6 +144,80 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         return () => window.removeEventListener('click', unlock);
     }, [initAudioGraph]);
 
+    // MediaSession API — lock screen / OS-level media controls
+    useEffect(() => {
+        if (!('mediaSession' in navigator)) return;
+
+        // Update metadata when track info changes
+        if (title) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: title || 'Unknown',
+                artist: artist || 'Unknown Artist',
+                album: album || '',
+                artwork: artwork ? [
+                    { src: artwork, sizes: '96x96', type: 'image/jpeg' },
+                    { src: artwork.replace('150x150', '500x500').replace('50x50', '500x500'), sizes: '512x512', type: 'image/jpeg' },
+                ] : []
+            });
+        }
+    }, [title, artist, album, artwork]);
+
+    // MediaSession action handlers
+    useEffect(() => {
+        if (!('mediaSession' in navigator)) return;
+
+        const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
+            ['play', () => onPlayPause?.()],
+            ['pause', () => onPlayPause?.()],
+            ['previoustrack', () => onPrev?.()],
+            ['nexttrack', () => onNext?.()],
+            ['seekto', (details) => {
+                const active = getActive();
+                if (active && details.seekTime !== undefined) {
+                    active.currentTime = details.seekTime;
+                }
+            }],
+        ];
+
+        for (const [action, handler] of handlers) {
+            try {
+                navigator.mediaSession.setActionHandler(action, handler);
+            } catch {
+                // Some actions may not be supported on all platforms
+            }
+        }
+
+        return () => {
+            for (const [action] of handlers) {
+                try {
+                    navigator.mediaSession.setActionHandler(action, null);
+                } catch { }
+            }
+        };
+    }, [onPlayPause, onNext, onPrev, getActive]);
+
+    // Update MediaSession playback state
+    useEffect(() => {
+        if (!('mediaSession' in navigator)) return;
+        navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+    }, [playing]);
+
+    // Update MediaSession position state
+    useEffect(() => {
+        if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+
+        const active = getActive();
+        if (active && active.duration && isFinite(active.duration)) {
+            try {
+                navigator.mediaSession.setPositionState({
+                    duration: active.duration,
+                    playbackRate: speed,
+                    position: Math.min(active.currentTime, active.duration),
+                });
+            } catch { }
+        }
+    }, [playing, speed, activeId]);
+
     useImperativeHandle(ref, () => ({
         seekTo: (amount: number, type?: 'seconds' | 'fraction') => {
             const active = getActive();

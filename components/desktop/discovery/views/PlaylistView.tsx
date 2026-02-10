@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
@@ -33,6 +33,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [playlistData, setPlaylistData] = useState<any>(playlist);
+    const [showConfirm, setShowConfirm] = useState<{ message: string; action: () => void } | null>(null);
 
     // Metadata
     const title = playlistData?.title || playlistData?.name || playlistData?.listname || 'Unknown Playlist';
@@ -73,7 +74,6 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
             // This prevents "Smart Fallback" from searching the web for your private playlist name.
             const localMix = mixes.find(m => m.id === playlist.id);
             if (localMix && localMix.songs && localMix.songs.length > 0) {
-                console.log(`[PlaylistView] Loaded local mix: ${localMix.title}`);
                 // Ensure songs are formatted correctly? They should be since they come from API/Search.
                 setSongs(localMix.songs);
                 setIsLoading(false);
@@ -82,7 +82,6 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
 
             // Also check if the PROP passed has songs (e.g. passed from LibraryView)
             if (playlist.songs && Array.isArray(playlist.songs) && playlist.songs.length > 0) {
-                console.log(`[PlaylistView] Using passed songs prop.`);
                 setSongs(playlist.songs);
                 setIsLoading(false);
                 return;
@@ -91,7 +90,6 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
             setIsLoading(true);
             try {
                 // 1. Try Direct Fetch (Remote)
-                console.log(`[PlaylistView] Fetching details for: ${playlist.id}`);
                 let details = await getPlaylistDetails(playlist.id);
 
                 // 2. Smart Fallback: If empty, it might be a dynamic chart or bad ID.
@@ -106,7 +104,6 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                         const searchResults = await searchUnified(title, undefined, 'song', '320'); // Default to high quality
 
                         if (searchResults && searchResults.length > 0) {
-                            console.log(`[PlaylistView] Fallback successful. Found ${searchResults.length} tracks.`);
                             // Convert PlayableTrack back to JioSaavnSong structure for compatibility
                             // (Or update state type to support both, but for now map back)
                             details = searchResults.map(t => t.song || {
@@ -118,19 +115,17 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                                 // url: t.sources[0]?.url -- REMOVED (Type mismatch, resolved at runtime)
                             } as any);
                         }
-                    } catch (fallbackErr) {
-                        console.error('[PlaylistView] Fallback search failed:', fallbackErr);
+                    } catch {
+                        /* ignored */
                     }
                 }
 
                 if (details && Array.isArray(details)) {
                     setSongs(details);
                 } else {
-                    setSongs([]);
+                    setSongs(Array.isArray(details) ? details : []);
                 }
-                setSongs(details || []);
-            } catch (err) {
-                console.error("[PlaylistView] Error loading playlist:", err);
+            } catch {
                 setError("Failed to load playlist content.");
             } finally {
                 setIsLoading(false);
@@ -195,12 +190,10 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
 
     // Delete Playlist
     const deletePlaylistHandler = () => {
-        if (confirm(`Are you sure you want to delete "${title}"?`)) {
-            // Check if it's the active mix first?
-            deleteMix(playlist.id);
-            showToast(`Deleted "${title}"`, 'info');
-            onBack();
-        }
+        setShowConfirm({
+            message: `Are you sure you want to delete "${title}"?`,
+            action: () => { deleteMix(playlist.id); showToast(`Deleted "${title}"`, 'info'); onBack(); }
+        });
     };
 
     // Remove Song
@@ -316,7 +309,11 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                 >
                     <Shuffle size={18} />
                 </motion.button>
-                <motion.button className="p-3 rounded-full bg-white/10 hover:bg-white/15">
+                <motion.button
+                    onClick={() => { songs.forEach(s => { if (!isLiked(s.id)) toggleLike(s); }); showToast('Liked all songs', 'success'); }}
+                    className="p-3 rounded-full bg-white/10 hover:bg-white/15 hover:text-pink-500 transition-colors"
+                    whileTap={{ scale: 0.9 }}
+                >
                     <Heart size={18} />
                 </motion.button>
 
@@ -520,6 +517,29 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                 song={songToAdd}
                 onClose={() => setSongToAdd(null)}
             />
+
+            {/* Confirm Modal */}
+            <AnimatePresence>
+                {showConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowConfirm(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 w-full max-w-xs"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <p className="text-white/80 text-[14px] font-medium text-center mb-5">{showConfirm.message}</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowConfirm(null)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] text-white/50 text-[13px] font-semibold hover:bg-white/[0.08] transition-colors">Cancel</button>
+                                <button onClick={() => { showConfirm.action(); setShowConfirm(null); }} className="flex-1 py-2.5 rounded-xl bg-red-500/80 text-white text-[13px] font-semibold hover:bg-red-500/70 transition-colors">Delete</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

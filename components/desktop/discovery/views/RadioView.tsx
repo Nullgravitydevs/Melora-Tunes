@@ -53,8 +53,8 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                         const highRes = results[0].image.find((i: any) => i.quality === '500x500')?.link || results[0].image[0]?.link;
                         return { ...station, image: highRes ? fixImageUrl(highRes, '500x500') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80' };
                     }
-                } catch (e) {
-                    console.error("Failed to fetch image for", station.label, e);
+                } catch {
+                    /* ignored */
                 }
                 return { ...station, image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80' };
             }));
@@ -79,7 +79,7 @@ export function RadioView({ onNavigate }: RadioViewProps) {
             } else {
                 showToast("Station offline", "error");
             }
-        } catch (e) { console.error(e); }
+        } catch { /* ignored */ }
     };
 
     return (

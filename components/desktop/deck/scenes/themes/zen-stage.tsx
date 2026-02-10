@@ -12,6 +12,7 @@ import { Mix, usePlayback } from "@/components/providers/playback-context";
 import { Visualizer } from "@/components/ui/visualizer";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 
 interface ZenStageProps {
     currentTheme?: ThemeKey; // Made optional as unused
@@ -51,7 +52,7 @@ export function ZenStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration,
         loadMix, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq, isDownloaded
+        isLoaded, eq, isDownloaded, activeQuality
     } = usePlayback();
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -426,14 +427,7 @@ export function ZenStage({
                                     ) : "READY"}
                                 </span>
                                 {/* LCD Quality Badge */}
-                                {currentTrack && (currentTrack.preferredQuality === 'flac' || currentTrack.preferredQuality === 'hires' || currentTrack.sources?.some(s => s.quality === 'hires')) && (
-                                    <span className={clsx("text-[9px] font-black border px-1 rounded-sm tracking-tighter shrink-0 opacity-70 ml-2", isDark ? "text-white border-white/40" : "text-black border-black/40")}>
-                                        {currentTrack.sources?.some(s => s.quality === 'hires') ? 'HI-RES' : 'FLAC'}
-                                    </span>
-                                )}
-                                {currentTrack && currentTrack.preferredQuality === '320' && (
-                                    <span className={clsx("text-[9px] font-black border px-1 rounded-sm tracking-tighter shrink-0 opacity-70 ml-2", isDark ? "text-white border-white/40" : "text-black border-black/40")}>HQ</span>
-                                )}
+                                {activeQuality && <QualityBadge quality={activeQuality} variant="mini" className="ml-2 shrink-0" />}
                             </div>
 
                             {/* Visualizer - Render only if loaded for perf, or opacity handled */}

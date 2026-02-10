@@ -142,7 +142,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         stopAtEndOfSong, setStopAtEndOfSong,
         // bitrate, setBitrate, // Removed from context
         likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded,
-        playInstantMix
+        playInstantMix, activeQuality, qualityPreference, setQualityPreference
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
@@ -153,7 +153,6 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const [clickSounds, setClickSounds] = useState(true);
     const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush'>('classic');
     const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume');
-    const [bitrate, setBitrate] = useState<string>('320'); // Shim for build compatibility
     const [crossfadeDuration, setCrossfadeDuration] = useState<number>(0); // Shim for build compatibility
     const [isLocked, setIsLocked] = useState(false); // Hold Switch state
     const inputRef = useRef<HTMLInputElement>(null);
@@ -551,7 +550,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     // Play single song immediate (e.g. from songs list)
     const playSongNow = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack, isHiRes: boolean = false) => {
         if (isHiRes) {
-            setBitrate('flac');
+            setQualityPreference('flac');
             console.log("[iPod] Forcing Hi-Res Lossless Mode");
         }
 
@@ -575,7 +574,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 try {
                     // showToast("Resolving Hi-Res Stream..."); // Silent resolution
                     console.log("[iPod] JIT Resolving stream for:", song.name);
-                    const fallbackResults = await searchUnified(`${song.name} ${song.primaryArtists}`, 'song');
+                    const fallbackResults = await searchUnified(`${song.name} ${song.primaryArtists}`, undefined, 'song');
 
                     // Prefer best match (Unified Search returns merged tracks)
                     const bestMatch = fallbackResults[0];
@@ -624,7 +623,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         // ATOMIC PLAYBACK - No Race Conditions
         playInstantMix(targetMix);
         goToNowPlaying();
-    }, [mixes, playInstantMix, setBitrate, goToNowPlaying]);
+    }, [mixes, playInstantMix, setQualityPreference, goToNowPlaying]);
 
     const handleShowLyrics = useCallback(async (song: JioSaavnSong) => {
         if (!song) {
@@ -706,7 +705,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 // Structured Settings Menu
                 return [
                     {
-                        label: `Audio Quality: ${bitrate === 'flac' ? 'Lossless' : bitrate + 'kbps'}`,
+                        label: `Audio Quality: ${qualityPreference === 'flac' ? 'Lossless' : qualityPreference === 'hires' ? 'Hi-Res' : qualityPreference + 'kbps'}`,
                         type: 'navigation',
                         target: 'quality-settings'
                     },
@@ -811,10 +810,11 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             case 'quality-settings':
                 const qualities = ['flac', '320', '160', '96'] as const;
                 return qualities.map(q => ({
-                    label: `${q === 'flac' ? 'Lossless (FLAC)' : q + ' kbps'} ${q === '320' ? '(High)' : ''}${bitrate === q ? ' ✓' : ''}`,
+                    label: `${q === 'flac' ? 'Lossless (FLAC)' : q + ' kbps'} ${q === '320' ? '(High)' : ''}${qualityPreference === q ? ' ✓' : ''}`,
                     type: 'action',
                     action: () => {
-                        setBitrate(q);
+                        setQualityPreference(q);
+                        saveSettings({ qualityPreference: q });
                     }
                 })) as MenuItem[];
 
@@ -1256,6 +1256,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         // Update Scroll Direction Ref for Animations
         scrollDirectionRef.current = direction > 0 ? 'right' : 'left';
 
+        // Dispatch custom event for games/calendar/extras that listen independently
+        window.dispatchEvent(new CustomEvent('ipod-scroll', { detail: direction }));
+
         // Volume Settings Screen
         if (currentView.id === 'volume-settings') {
             const newVol = Math.max(0, Math.min(1, volume + (direction * 0.05)));
@@ -1347,7 +1350,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         setIsLoading(true);
         try {
             // Updated to Unified Search
-            const results = await searchUnified(query, 'song');
+            const results = await searchUnified(query, undefined, 'song');
             const songItems: MenuItem[] = results.map((track: PlayableTrack) => {
                 // Determine best badge for UI
                 let badge: string | undefined = undefined;
@@ -1490,6 +1493,10 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
     const handleSelect = useCallback(() => {
         registerActivity();
+
+        // Dispatch custom event for games/calendar/extras that listen independently
+        window.dispatchEvent(new CustomEvent('ipod-select'));
+
         // Special handling for Player View: Toggle Scrub/Volume
         if (currentView.viewType === 'player' || currentView.viewType === 'cinema') {
             if (controlMode === 'volume') {
@@ -1841,13 +1848,14 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             selectedIndex={currentView.selectedIndex}
                             currentSong={currentSong || undefined}
                             isPlaying={isPlaying}
-                            progress={duration > 0 ? progress / duration : 0}
+                            progress={progress}
                             duration={duration}
                             isLoading={isLoading}
                             searchQuery={currentView.searchQuery}
                             inputRef={inputRef}
                             onPlayPause={togglePlay}
                             onBack={handleBack}
+                            audioQuality={activeQuality || undefined}
                             onSearchChange={(q) => {
                                 // 1. Immediate UI Update (Fixes Lag)
                                 setViewStack(prev => {

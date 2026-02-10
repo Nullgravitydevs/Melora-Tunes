@@ -24,6 +24,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
     const [bio, setBio] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
     const [artistData, setArtistData] = useState<any>(null);
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [albums, setAlbums] = useState<any[]>([]);
@@ -66,8 +67,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                     const results = await searchSongs(artistName, 30);
                     setSongs(results);
                 }
-            } catch (e) {
-                console.error('Failed to load artist profile:', e);
+            } catch {
                 setError("Failed to load artist profile.");
             } finally {
                 setIsLoading(false);
@@ -75,7 +75,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
         };
         setError(null);
         load();
-    }, [artistName, artist?.id]);
+    }, [artistName, artist?.id, retryCount]);
 
     // FIX 1: Stable artist mix ID to prevent memory leak
     const ARTIST_MIX_ID = `artist-${artist?.id || artistName}`;
@@ -270,7 +270,9 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                                 </div>
 
                                                 <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100">
-                                                    <Heart size={16} className="text-white/20 hover:text-pink-500 transition-colors" />
+                                                    <button onClick={(e) => { e.stopPropagation(); toggleLike(song); }} className="transition-colors">
+                                                        <Heart size={16} className={isLiked(song.id) ? 'text-pink-500 fill-pink-500' : 'text-white/20 hover:text-pink-500'} />
+                                                    </button>
                                                     <span className="text-xs font-mono text-white/20">{song.duration ? `${Math.floor(Number(song.duration) / 60)}:${(Number(song.duration) % 60).toString().padStart(2, '0')}` : '--:--'}</span>
                                                 </div>
                                             </motion.div>
@@ -346,7 +348,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                         <AlertCircle size={48} className="mx-auto text-red-500 mb-4 opacity-20" />
                         <h2 className="text-xl font-bold text-white mb-2">Failed to load profile</h2>
                         <p className="text-white/40 mb-8">{error}</p>
-                        <button onClick={() => window.location.reload()} className="px-10 py-3 bg-white text-black font-bold rounded-full">Refresh View</button>
+                        <button onClick={() => { setError(null); setRetryCount(c => c + 1); }} className="px-10 py-3 bg-white text-black font-bold rounded-full">Refresh View</button>
                     </div>
                 )}
             </div>

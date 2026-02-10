@@ -32,6 +32,7 @@ export interface PlayerProps {
     onRepeatToggle?: () => void;
     onOpenQueue?: () => void;
 
+    activeQuality?: AudioQuality | null; // Actual resolved quality (source of truth)
     className?: string;
     dragConstraints?: React.RefObject<Element>;
     drag?: boolean;
@@ -163,7 +164,8 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
         isPlaying, hasCassette, cassetteTitle, cassetteColor = "orange", currentSong,
         onPlayToggle, onNext, onPrev, volume, onVolumeChange,
         progress = 0, onSeek, shuffle, onShuffleToggle, repeat = 'off', onRepeatToggle,
-        onOpenQueue, className, dragConstraints, drag = true, onEject, currentTrack
+        onOpenQueue, className, dragConstraints, drag = true, onEject, currentTrack,
+        activeQuality
     } = props;
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -318,7 +320,7 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
                             {/* LCD Quality Badge */}
                             {/* [MODIFIED] Use Unified QualityBadge (Full Variant) */}
                             <div className="absolute top-6 right-6 transform scale-75 origin-right">
-                                <QualityBadge quality={currentTrack?.preferredQuality} variant="full" />
+                                <QualityBadge quality={activeQuality} variant="full" />
                             </div>
                         </div>
                     </div>
@@ -490,7 +492,7 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
     const {
         isPlaying, hasCassette, currentSong,
         onPlayToggle, onNext, onPrev, volume, onVolumeChange,
-        progress = 0, onSeek, onEject, currentTrack
+        progress = 0, onSeek, onEject, currentTrack, activeQuality
     } = props;
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -567,7 +569,7 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
                         <div className="flex items-center gap-2 shrink-0 ml-2">
                             {/* [MODIFIED] Use Unified QualityBadge (Full Variant) */}
                             <div className="absolute top-2 right-4 transform scale-90 origin-right">
-                                <QualityBadge quality={currentTrack?.preferredQuality} variant="full" />
+                                <QualityBadge quality={activeQuality} variant="full" />
                             </div>
                         </div>
                     )}

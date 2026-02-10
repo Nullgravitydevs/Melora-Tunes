@@ -16,6 +16,7 @@ import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { Visualizer } from "@/components/ui/visualizer";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 
 interface OpenDeckStageProps {
     currentTheme: ThemeKey;
@@ -64,7 +65,7 @@ export function OpenDeckStage({
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek, eq
+        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek, eq, activeQuality
     } = usePlayback();
 
     const { playClick, playEject, playClunk, playInsert } = useAudio();
@@ -228,9 +229,12 @@ export function OpenDeckStage({
                 {/* Center: Player */}
                 <div className="col-span-6 flex flex-col items-center justify-center min-h-0 relative">
                     <div className="mb-4 text-center shrink-0">
-                        <h1 className="text-[#101814] tracking-[0.25em] text-xs font-bold uppercase">
-                            {isLoaded ? (currentSong ? decodeHtml(currentSong.name) : activeMix?.title) : "Insert Cassette"}
-                        </h1>
+                        <div className="flex items-center justify-center gap-2">
+                            <h1 className="text-[#101814] tracking-[0.25em] text-xs font-bold uppercase">
+                                {isLoaded ? (currentSong ? decodeHtml(currentSong.name) : activeMix?.title) : "Insert Cassette"}
+                            </h1>
+                            {isLoaded && activeQuality && <QualityBadge quality={activeQuality} variant="mini" />}
+                        </div>
                         <p className="text-[#5c8a6f] text-[9px] tracking-[0.15em] uppercase mt-0.5">
                             Zen Player • {isLoaded ? (isPlaying ? "Playing" : "Ready") : "Waiting"}
                         </p>

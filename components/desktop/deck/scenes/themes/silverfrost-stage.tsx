@@ -16,6 +16,7 @@ import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 
 interface SilverFrostStageProps {
     currentTheme: ThemeKey;
@@ -41,7 +42,7 @@ export function SilverFrostStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, togglePlay, next, prev, setVolume, isLoaded, seek,
-        shuffle, setShuffle, repeat, setRepeat, eq
+        shuffle, setShuffle, repeat, setRepeat, eq, activeQuality
     } = usePlayback();
 
     const { playClick, playClunk } = useAudio();
@@ -153,7 +154,6 @@ export function SilverFrostStage({
                                             {hoveredMix === mix.id && !isActive && (
                                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
                                                     <button onClick={(e) => { e.stopPropagation(); onEditMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Pencil size={12} className="text-gray-700" /></button>
-                                                    <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center"><Camera size={12} className="text-gray-700" /></button>
                                                     <button onClick={(e) => { e.stopPropagation(); onSnapshotMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Snapshot"><Camera size={12} className="text-gray-700" /></button>
                                                     <button onClick={(e) => { e.stopPropagation(); onShareMix?.(mix); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Share"><Share2 size={12} className="text-gray-700" /></button>
                                                     <button onClick={(e) => { e.stopPropagation(); onOpenSearch?.(mix.id); }} className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center" title="Add Songs"><Search size={12} className="text-gray-700" /></button>
@@ -231,8 +231,8 @@ export function SilverFrostStage({
                                 {/* HUD Overlay */}
                                 <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
                                     <div className="bg-black/60 backdrop-blur px-2 py-1 rounded border border-white/10">
-                                        <p className="text-[9px] text-[#00aaff] font-bold uppercase">Sample Rate</p>
-                                        <p className="text-xs text-white font-mono">320kbps</p>
+                                        <p className="text-[9px] text-[#00aaff] font-bold uppercase">Quality</p>
+                                        {activeQuality ? <QualityBadge quality={activeQuality} variant="mini" /> : <p className="text-xs text-white font-mono">--</p>}
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xl font-black text-slate-600 leading-none">{formatTime(Math.max(0, duration - (progress * duration)))}</p>

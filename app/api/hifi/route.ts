@@ -1,30 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchHiFi } from '@/lib/hifi';
+import { applyRateLimit, sanitizeParam, addSecurityHeaders } from '@/lib/api-middleware';
 
 export async function GET(request: NextRequest) {
+    const rateLimited = applyRateLimit(request);
+    if (rateLimited) return rateLimited;
+
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type');
-    const query = searchParams.get('q');
+    const query = sanitizeParam(searchParams.get('q'), 200);
 
     if (!type) return NextResponse.json({ success: false, error: 'Missing type' }, { status: 400 });
 
     try {
-        if (type === 'search' && query) {
-            console.log(`[API/HiFi] God Mode Search: ${query}`);
+        if (type === 'search') {
+            if (!query) {
+                return NextResponse.json({ success: false, error: 'Missing search query' }, { status: 400 });
+            }
 
-            // Execute Parallel Search (Client Logic running on Server)
+            console.log(`[API/HiFi] Search: ${query}`);
+
             const results = await searchHiFi(query);
 
             if (!results) {
-                return NextResponse.json({ success: false, error: 'No results' });
+                return NextResponse.json({ success: false, error: 'No results' }, { status: 404 });
             }
 
-            return NextResponse.json({
+            const response = NextResponse.json({
                 success: true,
                 source: results.source,
                 tracks: results.tracks,
                 albums: results.albums
             });
+            response.headers.set('Cache-Control', 'public, max-age=120, s-maxage=300');
+            return addSecurityHeaders(response);
         }
 
         // Note: Streams are handled CLIENT-SIDE by hifi-client.ts calling hifi.ts directly.

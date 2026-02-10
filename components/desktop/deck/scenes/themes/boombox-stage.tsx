@@ -17,6 +17,7 @@ import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
+import { QualityBadge } from "@/components/shared/QualityBadge";
 
 interface BoomboxStageProps {
     currentTheme: ThemeKey;
@@ -194,7 +195,7 @@ export function BoomboxStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, togglePlay, next, prev, setVolume, isLoaded, seek,
-        shuffle, setShuffle, repeat, setRepeat, eq
+        shuffle, setShuffle, repeat, setRepeat, eq, activeQuality
     } = usePlayback();
 
     const { playClick, playInsert } = useAudio();
@@ -332,7 +333,7 @@ export function BoomboxStage({
                                 <div className="relative h-14 rounded border-2 border-zinc-600/50 overflow-hidden" style={{ background: '#9ea792' }}>
                                     <div className="absolute inset-0 flex justify-between items-end p-2 text-neutral-800">
                                         <div className="flex flex-col"><span className="text-[8px] font-bold opacity-60 uppercase">Track</span><span className="text-lg font-bold font-mono leading-none">{isLoaded ? String(mixes.findIndex(m => m.id === activeMixId) + 1).padStart(2, '0') : '--'}</span></div>
-                                        <div className="flex flex-col items-center flex-1 mx-2"><span className="text-[10px] font-mono font-bold uppercase truncate max-w-[150px]">{isLoaded ? (currentSong ? decodeHtml(currentSong.name) : activeMix?.title) : 'Insert Tape'}</span></div>
+                                        <div className="flex flex-col items-center flex-1 mx-2"><span className="text-[10px] font-mono font-bold uppercase truncate max-w-[150px]">{isLoaded ? (currentSong ? decodeHtml(currentSong.name) : activeMix?.title) : 'Insert Tape'}</span>{isLoaded && activeQuality && <QualityBadge quality={activeQuality} variant="mini" />}</div>
                                         <div className="flex flex-col items-end"><span className="text-[8px] font-bold opacity-60 uppercase">Time</span><span className="text-base font-bold font-mono leading-none">{displayedTime}</span></div>
                                     </div>
                                 </div>
