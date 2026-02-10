@@ -2,9 +2,8 @@
 
 import { useRef, useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
-import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Maximize2, Pencil, Camera } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Maximize2, Pencil, Camera, Shuffle, Repeat } from "lucide-react";
 import { ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { Mix, usePlayback } from "@/components/providers/playback-context";
@@ -13,6 +12,8 @@ import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { QualityBadge } from "@/components/shared/QualityBadge";
+
+export interface Position { x: number; y: number; rotation: number; }
 
 interface BauhausStageProps {
     currentTheme: ThemeKey;
@@ -30,24 +31,6 @@ interface BauhausStageProps {
     onShareMix?: (mix: any) => void;
 }
 
-export interface Position { x: number; y: number; rotation: number; }
-
-// Helper to generate initial grid layout for free-floating canvas
-const generateGridPositions = (count: number): Record<string, Position> => {
-    const positions: Record<string, Position> = {};
-    const cols = 4;
-    const startX = 40;
-    const startY = 160;
-    const gapX = 220;
-    const gapY = 160;
-
-    for (let i = 0; i < count; i++) {
-        // We can't know IDs here without mixes, so this is just logic helper.
-        // We will do this in useEffect.
-        // This function is placeholder or we move logic to component.
-    }
-    return {};
-};
 
 // Extracted Draggable Card
 function DraggableMixCard({
@@ -172,8 +155,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq, activeQuality
+        loadMix, togglePlay, next, prev, seek, setVolume,
+        isLoaded, eq, activeQuality,
+        shuffle, setShuffle, repeat, setRepeat
     } = usePlayback();
 
     const { playClick, playEject } = useAudio();
@@ -396,6 +380,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
 
                         {/* Controls */}
                         <div className="flex justify-center items-center gap-3 mb-2">
+                            <button onClick={() => { playClick(); setShuffle(!shuffle); }} className={`w-8 h-8 rounded-full border-2 border-[#1a1a1a] flex items-center justify-center transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none ${shuffle ? 'bg-[#0052cc] text-white' : 'bg-white hover:bg-gray-100'}`} title={shuffle ? 'Shuffle: ON' : 'Shuffle: OFF'}>
+                                <Shuffle size={14} />
+                            </button>
                             <button onClick={() => { playClick(); prev(); }} className="w-10 h-10 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none">
                                 <SkipBack size={18} className="fill-current" />
                             </button>
@@ -404,6 +391,9 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                             </button>
                             <button onClick={() => { playClick(); next(); }} className="w-10 h-10 rounded-full border-2 border-[#1a1a1a] bg-white flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none">
                                 <SkipForward size={18} className="fill-current" />
+                            </button>
+                            <button onClick={() => { playClick(); setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'); }} className={`w-8 h-8 rounded-full border-2 border-[#1a1a1a] flex items-center justify-center relative transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none ${repeat !== 'off' ? 'bg-[#0052cc] text-white' : 'bg-white hover:bg-gray-100'}`} title={`Repeat: ${repeat.toUpperCase()}`}>
+                                <Repeat size={14} />{repeat === 'one' && <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-white text-[#0052cc] rounded-full w-3 h-3 flex items-center justify-center border border-[#1a1a1a]">1</span>}
                             </button>
                         </div>
 

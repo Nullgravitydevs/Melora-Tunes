@@ -9,7 +9,7 @@ import { ThemeConfig, ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { QualityBadge } from "@/components/shared/QualityBadge";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { decodeHtml } from "@/lib/utils";
-import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc, Share2, Sun, Moon } from "lucide-react";
+import { Settings, Smartphone, Palette, Maximize2, Plus, Pencil, Camera, Play, Pause, SkipBack, SkipForward, Volume2, Disc, Share2, Sun, Moon, Shuffle, Repeat } from "lucide-react";
 import { Visualizer } from "@/components/ui/visualizer";
 import { Mix } from "@/components/providers/playback-context";
 import { LyricsView } from "@/components/ui/lyrics-view";
@@ -782,6 +782,13 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             {/* Playback Controls */}
                             <div className="flex justify-center items-center gap-4 mb-6">
                                 <button
+                                    onClick={() => { playClick(); setShuffle(!shuffle); }}
+                                    className={`w-8 h-8 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center ${shuffle ? 'bg-gradient-to-b from-blue-400 to-blue-600 text-white border-2 border-blue-300' : 'bg-gradient-to-b from-gray-200 to-gray-400 text-gray-600 border border-gray-300 hover:from-gray-300 hover:to-gray-500'}`}
+                                    title={shuffle ? 'Shuffle: ON' : 'Shuffle: OFF'}
+                                >
+                                    <Shuffle size={14} />
+                                </button>
+                                <button
                                     onClick={() => { playClick(); prev(); }}
                                     className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-2 border-blue-300"
                                 >
@@ -798,6 +805,13 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center border-2 border-blue-300"
                                 >
                                     <SkipForward size={20} />
+                                </button>
+                                <button
+                                    onClick={() => { playClick(); setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'); }}
+                                    className={`w-8 h-8 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.2)] active:shadow-inner active:scale-95 transition-all flex items-center justify-center relative ${repeat !== 'off' ? 'bg-gradient-to-b from-blue-400 to-blue-600 text-white border-2 border-blue-300' : 'bg-gradient-to-b from-gray-200 to-gray-400 text-gray-600 border border-gray-300 hover:from-gray-300 hover:to-gray-500'}`}
+                                    title={`Repeat: ${repeat.toUpperCase()}`}
+                                >
+                                    <Repeat size={14} />{repeat === 'one' && <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-blue-500 text-white rounded-full w-3 h-3 flex items-center justify-center">1</span>}
                                 </button>
                             </div>
 

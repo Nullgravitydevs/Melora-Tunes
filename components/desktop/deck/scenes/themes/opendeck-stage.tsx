@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     Play, Pause, SkipBack, SkipForward, LogOut,
-    Palette, Settings, Pencil, Camera, Share2, Plus
+    Palette, Settings, Pencil, Camera, Share2, Plus, Shuffle, Repeat
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -65,7 +65,8 @@ export function OpenDeckStage({
 
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek, eq, activeQuality
+        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek, eq, activeQuality,
+        shuffle, setShuffle, repeat, setRepeat
     } = usePlayback();
 
     const { playClick, playEject, playClunk, playInsert } = useAudio();
@@ -311,10 +312,12 @@ export function OpenDeckStage({
                             </div>
 
                             {/* Controls */}
-                            <div className="h-12 border-t border-neutral-200 flex items-center justify-center gap-6 px-4">
+                            <div className="h-12 border-t border-neutral-200 flex items-center justify-center gap-4 px-4">
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); setShuffle(!shuffle); }} className={clsx("p-1.5", shuffle ? "text-[#2d8652]" : isLoaded ? "text-neutral-400 hover:text-[#2d8652]" : "text-neutral-300")} title={shuffle ? 'Shuffle: ON' : 'Shuffle: OFF'}><Shuffle size={15} /></button>
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); prev(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipBack size={18} className="fill-current" /></button>
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); togglePlay(); }} className="size-10 rounded-full bg-[#2d8652] flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-transform">{isPlaying ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current pl-0.5" />}</button>
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); next(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipForward size={18} className="fill-current" /></button>
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'); }} className={clsx("p-1.5 relative", repeat !== 'off' ? "text-[#2d8652]" : isLoaded ? "text-neutral-400 hover:text-[#2d8652]" : "text-neutral-300")} title={`Repeat: ${repeat.toUpperCase()}`}><Repeat size={15} />{repeat === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[7px] font-bold text-[#2d8652]">1</span>}</button>
                                 <div className="relative h-1 w-16 bg-neutral-200 rounded-full ml-3" onPointerDown={(e) => e.stopPropagation()}>
                                     <div className="absolute inset-y-0 left-0 bg-[#2d8652]/50 rounded-full" style={{ width: `${volume * 100}%` }} />
                                     <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer w-full" />

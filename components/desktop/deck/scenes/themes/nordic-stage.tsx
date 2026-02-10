@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import {
     SkipBack, SkipForward, Volume2, LogOut,
-    Palette, Settings, Plus, Camera, Share2, Play, Pause
+    Palette, Settings, Plus, Camera, Share2, Play, Pause, Shuffle, Repeat
 } from "lucide-react";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -54,7 +54,8 @@ export function NordicStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
         loadMix, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq, activeQuality
+        isLoaded, eq, activeQuality,
+        shuffle, setShuffle, repeat, setRepeat
     } = usePlayback();
 
     const { playClick, playEject } = useAudio();
@@ -277,7 +278,15 @@ export function NordicStage({
                             </div>
 
                             {/* Controls */}
-                            <div className="flex items-center justify-center gap-8 mb-8">
+                            <div className="flex items-center justify-center gap-6 mb-8">
+                                <button
+                                    onClick={() => { playClick(); setShuffle(!shuffle); }}
+                                    className={clsx("p-3 rounded-full transition-all", shuffle ? "text-blue-400 bg-slate-800" : "text-slate-500 hover:text-white hover:bg-slate-800")}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    title={shuffle ? 'Shuffle: ON' : 'Shuffle: OFF'}
+                                >
+                                    <Shuffle size={18} />
+                                </button>
                                 <button
                                     onClick={() => { playClick(); prev(); }}
                                     className="p-4 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
@@ -298,6 +307,14 @@ export function NordicStage({
                                     onPointerDown={(e) => e.stopPropagation()}
                                 >
                                     <SkipForward className="fill-current" size={24} />
+                                </button>
+                                <button
+                                    onClick={() => { playClick(); setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'); }}
+                                    className={clsx("p-3 rounded-full transition-all relative", repeat !== 'off' ? "text-blue-400 bg-slate-800" : "text-slate-500 hover:text-white hover:bg-slate-800")}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    title={`Repeat: ${repeat.toUpperCase()}`}
+                                >
+                                    <Repeat size={18} />{repeat === 'one' && <span className="absolute top-1 right-1 text-[8px] font-bold text-blue-400">1</span>}
                                 </button>
                             </div>
 

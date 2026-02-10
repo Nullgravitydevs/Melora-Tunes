@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { clsx } from "clsx";
-import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Camera, Pencil, Mic2, SlidersHorizontal, Sun, Moon, ListMusic } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, LogOut, Share2, Palette, Settings, Plus, Camera, Pencil, Mic2, SlidersHorizontal, Sun, Moon, ListMusic, Shuffle, Repeat } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
@@ -52,7 +52,8 @@ export function ZenStage({
     const {
         mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration,
         loadMix, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq, isDownloaded, activeQuality
+        isLoaded, eq, isDownloaded, activeQuality,
+        shuffle, setShuffle, repeat, setRepeat
     } = usePlayback();
 
     const { playClick, playClunk, playEject } = useAudio();
@@ -460,6 +461,9 @@ export function ZenStage({
 
                             {/* Main Controls */}
                             <div className="flex items-center justify-center gap-6 mb-8">
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => handleClick(() => { playClick(); setShuffle(!shuffle); })} className={clsx("p-2 transition-colors", shuffle ? (isDark ? "text-white" : "text-black") : (isDark ? "text-white/25 hover:text-white/50" : "text-black/25 hover:text-black/50"))} title={shuffle ? 'Shuffle: ON' : 'Shuffle: OFF'}>
+                                    <Shuffle size={16} />
+                                </button>
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => handleClick(() => { playClick(); prev(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
                                     <SkipBack size={20} className="fill-current" />
                                 </button>
@@ -474,6 +478,9 @@ export function ZenStage({
                                 </button>
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => handleClick(() => { playClick(); next(); })} className={clsx("p-3 transition-colors", isDark ? "text-white/40 hover:text-white" : "text-black/40 hover:text-black")}>
                                     <SkipForward size={20} className="fill-current" />
+                                </button>
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => handleClick(() => { playClick(); setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'); })} className={clsx("p-2 transition-colors relative", repeat !== 'off' ? (isDark ? "text-white" : "text-black") : (isDark ? "text-white/25 hover:text-white/50" : "text-black/25 hover:text-black/50"))} title={`Repeat: ${repeat.toUpperCase()}`}>
+                                    <Repeat size={16} />{repeat === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold">1</span>}
                                 </button>
                             </div>
 
