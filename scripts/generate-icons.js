@@ -1,18 +1,18 @@
 /**
- * Generate all app icons from melora-logo.svg
+ * Generate all app icons from melora-logo.png
  * Run: node scripts/generate-icons.js
  */
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-const SVG_PATH = path.join(__dirname, '..', 'public', 'melora-logo.svg');
+const LOGO_PATH = path.join(__dirname, '..', 'public', 'melora-logo.png');
 const PUBLIC = path.join(__dirname, '..', 'public');
 const ANDROID_RES = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
 
 async function generate() {
-    const svgBuffer = fs.readFileSync(SVG_PATH);
-    console.log('Generating app icons from melora-logo.svg...\n');
+    const srcBuffer = fs.readFileSync(LOGO_PATH);
+    console.log('Generating app icons from melora-logo.png...\n');
 
     // --- PWA / Web icons ---
     const webSizes = [
@@ -26,7 +26,7 @@ async function generate() {
     ];
 
     for (const { name, size } of webSizes) {
-        await sharp(svgBuffer)
+        await sharp(srcBuffer)
             .resize(size, size)
             .png({ quality: 100 })
             .toFile(path.join(PUBLIC, name));
@@ -34,7 +34,7 @@ async function generate() {
     }
 
     // Generate ICO-compatible favicon (actually a 32x32 PNG named .ico — browsers accept this)
-    await sharp(svgBuffer)
+    await sharp(srcBuffer)
         .resize(32, 32)
         .png()
         .toFile(path.join(PUBLIC, 'favicon.ico'));
@@ -55,14 +55,14 @@ async function generate() {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
             // Standard icon
-            await sharp(svgBuffer)
+            await sharp(srcBuffer)
                 .resize(size, size)
                 .png({ quality: 100 })
                 .toFile(path.join(dir, 'ic_launcher.png'));
 
             // Round icon
             // Create a circular mask by compositing
-            const roundedBuffer = await sharp(svgBuffer)
+            const roundedBuffer = await sharp(srcBuffer)
                 .resize(size, size)
                 .png()
                 .toBuffer();
@@ -80,7 +80,7 @@ async function generate() {
 
             // Foreground (for adaptive icons) - padded to 108dp equivalent
             const fgSize = Math.round(size * 108 / 48); // Scale up for adaptive icon safe zone
-            await sharp(svgBuffer)
+            await sharp(srcBuffer)
                 .resize(Math.round(size * 0.7), Math.round(size * 0.7)) // Inner content at 70%
                 .extend({
                     top: Math.round(size * 0.15),
@@ -105,7 +105,7 @@ async function generate() {
     if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true });
 
     for (const size of desktopSizes) {
-        await sharp(svgBuffer)
+        await sharp(srcBuffer)
             .resize(size, size)
             .png({ quality: 100 })
             .toFile(path.join(iconsDir, `${size}x${size}.png`));
