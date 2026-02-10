@@ -188,7 +188,7 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const songDuration = currentSong?.duration ? parseInt(currentSong.duration.toString()) : 200;
+    const songDuration = currentSong?.duration ? parseInt(currentSong.duration.toString()) : 0;
     const currentTime = progress * songDuration;
 
     return (

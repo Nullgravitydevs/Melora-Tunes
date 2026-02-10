@@ -225,10 +225,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     // Cleanup Toast on unmount
+    // Cleanup timers on unmount
     useEffect(() => {
         return () => {
             if (toastTimeoutRef.current) {
                 clearTimeout(toastTimeoutRef.current);
+            }
+            if (undoTimeoutRef.current) {
+                clearTimeout(undoTimeoutRef.current);
             }
         };
     }, []);
@@ -370,7 +374,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // Persist liked songs
     useEffect(() => {
-        if (isLoaded && likedSongs.length > 0) {
+        if (isLoaded) {
             try {
                 localStorage.setItem('melora-liked-songs', JSON.stringify(likedSongs));
             } catch (e) {
@@ -384,13 +388,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // Persist recently played
 
     useEffect(() => {
-        if (isLoaded && recentlyPlayed.length > 0) {
+        if (isLoaded) {
             try {
                 localStorage.setItem('melora-recently-played', JSON.stringify(recentlyPlayed));
             } catch (e) {
-                // Ignore recently played quota issues, just clear oldest if needed? 
-                // But localStorage doesn't support auto-pruning.
-                // We'll just ignore for now as history is less critical than Liked Songs
+                // Ignore recently played quota issues
             }
         }
     }, [recentlyPlayed, isLoaded]);

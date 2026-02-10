@@ -32,7 +32,13 @@ export function useAudio() {
         insertSoundRef.current = initAudio('/sounds/insert.wav');
 
         return () => {
-            // Cleanup
+            [clickSoundRef, clunkSoundRef, whirSoundRef, ejectSoundRef, insertSoundRef].forEach(ref => {
+                if (ref.current) {
+                    ref.current.pause();
+                    ref.current.src = '';
+                    ref.current = null;
+                }
+            });
         };
     }, []);
 

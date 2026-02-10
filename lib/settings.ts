@@ -72,12 +72,24 @@ export function clearCache(): void {
     if (typeof window === 'undefined') return;
 
     try {
-        // Clear all localStorage except settings
-        const settings = localStorage.getItem(STORAGE_KEY);
+        // Clear cache data but preserve user data (liked songs, playlists, recently played, settings)
+        const preserveKeys = [
+            STORAGE_KEY,
+            'melora-liked-songs',
+            'melora-recently-played',
+            'melora-mixes',
+            'melora-playlists',
+            'melora-saved-albums',
+            'melora-saved-artists',
+            'melora-search-history',
+        ];
+        const preserved = new Map<string, string>();
+        preserveKeys.forEach(key => {
+            const val = localStorage.getItem(key);
+            if (val) preserved.set(key, val);
+        });
         localStorage.clear();
-        if (settings) {
-            localStorage.setItem(STORAGE_KEY, settings);
-        }
+        preserved.forEach((val, key) => localStorage.setItem(key, val));
     } catch (error) {
         console.error('Failed to clear cache:', error);
     }

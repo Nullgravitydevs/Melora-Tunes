@@ -101,7 +101,8 @@ export async function searchUnified(
     console.log(`[UnifiedSearch] Query: "${cleanQuery}" | Pref: ${qualityPreference} (Lang: ${language})`);
 
     // 2. Determine Search Strategy (Optimization)
-    const shouldSearchHiFi = qualityPreference !== '320'; // SKIP HiFi if HQ explicit
+    // Only search HiFi for users who want high quality — skip for 320/160/96
+    const shouldSearchHiFi = ['auto', 'hires', 'flac'].includes(qualityPreference);
     const shouldSearchSaavn = true; // Always search Saavn as base/backup
 
     const promises: Promise<any>[] = [];
@@ -139,6 +140,7 @@ export async function searchUnified(
     const findMatch = (title: string, artist: string, duration: number): PlayableTrack | undefined => {
         const normTitle = normalizeStr(title);
         const normArtist = normalizeArtist(artist);
+        const rawTitleLower = title.toLowerCase();
 
         return uniqueTracks.find(t => {
             if (!t.song) return false;
@@ -151,10 +153,11 @@ export async function searchUnified(
             // 2. Artist Match
             if (tArtist !== normArtist) return false;
 
-            // 3. Anti-Merge Guard
+            // 3. Anti-Merge Guard — check raw titles, not normalized (normalizeStr strips these keywords)
             const keywords = ['live', 'remix', 'demo', 'acoustic', 'cover', 'reprised', 'edited'];
-            const tHasKeyword = keywords.some(k => tTitle.includes(k));
-            const newHasKeyword = keywords.some(k => normTitle.includes(k));
+            const rawExistingTitle = t.song.name.toLowerCase();
+            const tHasKeyword = keywords.some(k => rawExistingTitle.includes(k));
+            const newHasKeyword = keywords.some(k => rawTitleLower.includes(k));
 
             if (tHasKeyword !== newHasKeyword) return false;
 

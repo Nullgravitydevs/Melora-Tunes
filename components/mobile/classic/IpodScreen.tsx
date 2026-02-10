@@ -167,7 +167,8 @@ export function IpodScreen({
         let batteryRemoveListener: (() => void) | null = null;
 
         if (typeof navigator !== 'undefined' && (navigator as any).getBattery) {
-            (navigator as any).getBattery().then((battery: any) => {
+            (navigator as any).getBattery().catch(() => {/* Firefox/Safari unsupported */}).then((battery: any) => {
+                if (!battery) return;
                 const updateBattery = () => {
                     setBatteryLevel(Math.floor(battery.level * 100));
                     setIsCharging(battery.charging);

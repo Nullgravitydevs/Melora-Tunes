@@ -90,7 +90,9 @@ class HistoryStoreClass {
 
     clearHistory() {
         this.cache = [];
-        window.dispatchEvent(new Event('melora-history-update'));
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('melora-history-update'));
+        }
         db.clear(STORE_NAME).catch(console.error);
     }
 

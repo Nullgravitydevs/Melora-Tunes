@@ -42,11 +42,16 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
 
-    // User Request: "When setup is done and user open normally app show this (Interface Chooser)"
     const isSetupDone = localStorage.getItem('melora-setup-complete') === 'true';
 
     if (isSetupDone) {
-      setMode('LAUNCHER');
+      // Restore saved mode if it exists, otherwise show launcher
+      const savedMode = localStorage.getItem('melora-ui-mode') as UIMode | null;
+      if (savedMode && ['CLASSIC', 'DISCOVERY', 'DECK'].includes(savedMode)) {
+        setMode(savedMode);
+      } else {
+        setMode('LAUNCHER');
+      }
     } else {
       setMode('WELCOME');
     }

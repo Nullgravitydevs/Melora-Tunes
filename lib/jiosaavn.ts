@@ -237,7 +237,6 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
-            const response = await fetch(`/api/search?type=playlist&query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&language=${lang}`);
             data = await fetchApi(`__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&languages=${lang}`, true);
         }
 
