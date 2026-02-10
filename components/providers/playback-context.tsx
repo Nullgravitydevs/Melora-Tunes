@@ -237,11 +237,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // Derived State
-    const activeMix = mixes.find(m => m.id === activeMixId);
-    const rawCurrentItem = activeMix?.songs[activeMix.currentSongIndex];
+    // [PERF FIX #2] Memoize derived state to prevent recalculating on every render
+    const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId), [mixes, activeMixId]);
+    const rawCurrentItem = useMemo(() => activeMix?.songs[activeMix.currentSongIndex], [activeMix]);
     // Explicit return type to force narrowing
-    const currentSong: JioSaavnSong | undefined = isPlayableTrack(rawCurrentItem) ? rawCurrentItem.song : rawCurrentItem;
+    const currentSong: JioSaavnSong | undefined = useMemo(
+        () => isPlayableTrack(rawCurrentItem) ? rawCurrentItem.song : rawCurrentItem,
+        [rawCurrentItem]
+    );
 
     // Define currentTrack derived value correctly
     // If raw item is PlayableTrack, use it. If not, upgrade it with current Global Preference.
@@ -343,14 +346,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
 
 
-    const addSongToMix = (mixId: string, song: JioSaavnSong | PlayableTrack) => {
+    // [PERF FIX #4] Wrap in useCallback to stabilize reference
+    const addSongToMix = useCallback((mixId: string, song: JioSaavnSong | PlayableTrack) => {
         setMixes(prev => prev.map(mix => {
             if (mix.id === mixId) {
                 return { ...mix, songs: [...mix.songs, song] };
             }
             return mix;
         }));
-    };
+    }, []);
 
     // Load liked songs and recently played from localStorage
     useEffect(() => {
@@ -577,7 +581,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         });
     }, [activeMixId]);
 
-    const deleteMix = (mixId: string) => {
+    // [PERF FIX #4] Wrap in useCallback to stabilize reference
+    const deleteMix = useCallback((mixId: string) => {
         if (mixId === DISCOVERY_MIX_ID) {
             showToast("Cannot delete the Discovery Mix!", 'error');
             return;
@@ -609,9 +614,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         showToast(`Deleted "${mixToDelete.title}" - Tap to Undo`, 'info');
-    };
+    }, [mixes, activeMixId, showToast]);
 
-    const undoDeleteMix = () => {
+    const undoDeleteMix = useCallback(() => {
         if (!deletedMixBackup) return;
 
         const { mix, index } = deletedMixBackup;
@@ -628,7 +633,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
 
         showToast(`Restored "${mix.title}"`, 'success');
-    };
+    }, [deletedMixBackup, showToast]);
 
     // --- Persistence Effects ---
     // Load settings
@@ -637,7 +642,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (s.qualityPreference) setQualityPreferenceState(s.qualityPreference as AudioQuality);
         // Crossfade removed
     }, []);
-    const togglePin = (mixId: string) => {
+    // [PERF FIX #4] Wrap in useCallback
+    const togglePin = useCallback((mixId: string) => {
         setMixes(prev => prev.map(m => {
             if (m.id === mixId) {
                 const newPinned = !m.pinned;
@@ -646,12 +652,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             }
             return m;
         }));
-    };
+    }, [showToast]);
 
     // Sync active mix song to currentSong - REMOVED (Computed state)
 
     // --- Autoplay & Pre-fetch Logic ---
     const autoplayFetchedRef = useRef<string | null>(null);
+
+    // [PERF FIX #3] Store progress in a ref so the autoplay effect doesn't re-run ~4x/sec.
+    // The effect now only re-runs when song/mix/duration changes, and checks progress via ref.
+    const progressRef = useRef(0);
+    useEffect(() => { progressRef.current = progress; }, [progress]);
 
     useEffect(() => {
         if (!activeMixId || !isPlaying || duration <= 0 || !currentSong) return;
@@ -661,63 +672,59 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             autoplayFetchedRef.current = null;
         }
 
-        // Trigger 20 seconds before end
-        const threshold = Math.max(duration - 20, duration * 0.5);
+        // Use an interval to check progress threshold instead of reacting to every progress tick
+        const checkAutoplay = () => {
+            const currentProgress = progressRef.current;
+            const threshold = Math.max(duration - 20, duration * 0.5);
 
-        if (progress >= threshold && !autoplayFetchedRef.current && !isStationGenerating.current) {
-            const activeMix = mixes.find(m => m.id === activeMixId);
-            // Only fetch if we are actually at the end of the queue
-            if (activeMix && activeMix.currentSongIndex >= activeMix.songs.length - 1) {
-                console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
-                autoplayFetchedRef.current = currentSong.id; // Mark as fetching
-                isStationGenerating.current = true;
+            if (currentProgress >= threshold && !autoplayFetchedRef.current && !isStationGenerating.current) {
+                const activeMix = mixes.find(m => m.id === activeMixId);
+                if (activeMix && activeMix.currentSongIndex >= activeMix.songs.length - 1) {
+                    console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
+                    autoplayFetchedRef.current = currentSong.id;
+                    isStationGenerating.current = true;
 
-                // Use Discovery Engine to Extend
-                // Use the current song as the seed for continuity
-                const seed = ensurePlayableTrack(currentSong);
+                    const seed = ensurePlayableTrack(currentSong);
+                    const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
 
-                // Infer region from Mix title? Weak heuristic but works for now.
-                // e.g. "Telugu Mix" -> "telugu" (To be refined later)
-                const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
-
-                DiscoveryEngine.generateSessionMix(seed, inferredRegion)
-                    .then((newMix) => {
-                        isStationGenerating.current = false;
-                        // Use Ref to get latest state
-                        const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
-                        if (currentMix && currentMix.id === activeMixIdRef.current) {
-
-                            // Merge Strategy: Append new songs (excluding duplication)
-                            // Merge Strategy: Append new songs (excluding duplication)
-                            // Merge Strategy: Append new songs (excluding duplication)
-                            const newSongs = newMix.songs
-                                .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality)) // [FIX Bug 9] Normalize immediately
-                                .filter(sTrack => {
-                                    // [FIX Bug 19] Strict deduplication using PlayableTrack IDs
-                                    if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
-
-                                    return !currentMix.songs.some(existing => {
-                                        const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
-                                        return e === sTrack.id;
+                    DiscoveryEngine.generateSessionMix(seed, inferredRegion)
+                        .then((newMix) => {
+                            isStationGenerating.current = false;
+                            const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
+                            if (currentMix && currentMix.id === activeMixIdRef.current) {
+                                const newSongs = newMix.songs
+                                    .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality))
+                                    .filter(sTrack => {
+                                        if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
+                                        return !currentMix.songs.some(existing => {
+                                            const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
+                                            return e === sTrack.id;
+                                        });
                                     });
-                                });
 
-                            if (newSongs.length > 0) {
-                                console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
-                                updateMix(currentMix.id, { songs: [...currentMix.songs, ...newSongs] });
-                            } else {
-                                console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
+                                if (newSongs.length > 0) {
+                                    console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
+                                    updateMix(currentMix.id, { songs: [...currentMix.songs, ...newSongs] });
+                                } else {
+                                    console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
+                                }
                             }
-                        }
-                    })
-                    .catch(err => {
-                        console.error("[Autoplay] Failed to extend session:", err);
-                        isStationGenerating.current = false;
-                        // Allow retry?
-                    });
+                        })
+                        .catch(err => {
+                            console.error("[Autoplay] Failed to extend session:", err);
+                            isStationGenerating.current = false;
+                        });
+                }
             }
-        }
-    }, [progress, duration, activeMixId, isPlaying, currentSong, updateMix, qualityPreference]);
+        };
+
+        // Check every 5 seconds instead of on every progress tick
+        const interval = setInterval(checkAutoplay, 5000);
+        // Also check immediately
+        checkAutoplay();
+
+        return () => clearInterval(interval);
+    }, [duration, activeMixId, isPlaying, currentSong, updateMix, qualityPreference, mixes]);
 
     const loadMix = useCallback((mixId: string) => {
         // FIX 2: Request ID to prevent race condition on rapid taps
@@ -919,63 +926,6 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (quality) return qualities.includes(quality);
         return qualities.length > 0;
     }, [downloadedState]);
-
-    const downloadSong = async (songOrTrack: JioSaavnSong | PlayableTrack) => {
-        // Always derive "track" first to resolve the proper preferences
-        // Note: For pure JioSaavnSong input, ensurePlayableTrack creates a wrapper but ID might be provider ID.
-        // Unified Search results passed here are PlayableTracks with STABLE IDs.
-        const currentQualityPreference = qualityPreference as AudioQuality;
-        const track = ensurePlayableTrack(songOrTrack, currentQualityPreference);
-
-        const songMetadata = track.song;
-        if (!songMetadata) {
-            console.error("[Download] Failed: Missing song metadata in PlayableTrack");
-            return false;
-        }
-
-        try {
-            const targetQuality = track.preferredQuality;
-            console.log(`[Download] Attempting strict download: ${songMetadata.name} at ${targetQuality} (ID: ${track.id})`);
-
-            // Strict Rule 2: Downloads must NEVER silently downgrade.
-            const result = await resolvePlayableUrl(track); // Use resolver to find BEST url (Online check phase essentially)
-
-            // We specifically want the TARGET quality. resolvePlayableUrl falls back.
-            // We must verify the result quality matches strictly.
-            if (!result || result.quality !== targetQuality) {
-                if (result && result.quality !== targetQuality) {
-                    console.error(`[Download] Strict failure. Quality mismatch: Requested ${targetQuality} vs Resolved ${result.quality}`);
-                    showToast(`Download Failed: ${targetQuality} unavailable (Found ${result.quality})`, 'error');
-                } else {
-                    console.error(`[Download] Strict failure. Quality ${targetQuality} unavailable for ${songMetadata.name}`);
-                    showToast(`Download Failed: ${targetQuality} unavailable`, 'error');
-                }
-                return false;
-            }
-
-            if (result.url) {
-                // Critical: Save using the STABLE ID (track.id) so we can find it later
-                const songToSave = { ...songMetadata, id: track.id };
-                await OfflineStore.saveSong(songToSave, result.url, targetQuality);
-
-                // Update local state (Fix 2)
-                setDownloadedState(prev => {
-                    const newState = { ...prev };
-                    if (!newState[track.id]) newState[track.id] = [];
-                    if (!newState[track.id].includes(targetQuality)) {
-                        newState[track.id] = [...newState[track.id], targetQuality];
-                    }
-                    return newState;
-                });
-                showToast(`Downloaded ${songMetadata.name} in ${targetQuality}`, 'success');
-                return true;
-            }
-            return false;
-        } catch (e) {
-            console.error("Download failed", e);
-            return false;
-        }
-    };
 
     const removeDownload = useCallback(async (songId: string, quality?: AudioQuality) => {
         await OfflineStore.removeSong(songId, quality);
@@ -1233,6 +1183,55 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         console.error(`[Resolver] ✗ All Resolvers Failed`);
         return null;
     }, [showToast]);
+
+    const downloadSong = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack) => {
+        const currentQualityPreference = qualityPreference as AudioQuality;
+        const track = ensurePlayableTrack(songOrTrack, currentQualityPreference);
+
+        const songMetadata = track.song;
+        if (!songMetadata) {
+            console.error("[Download] Failed: Missing song metadata in PlayableTrack");
+            return false;
+        }
+
+        try {
+            const targetQuality = track.preferredQuality;
+            console.log(`[Download] Attempting strict download: ${songMetadata.name} at ${targetQuality} (ID: ${track.id})`);
+
+            const result = await resolvePlayableUrl(track);
+
+            if (!result || result.quality !== targetQuality) {
+                if (result && result.quality !== targetQuality) {
+                    console.error(`[Download] Strict failure. Quality mismatch: Requested ${targetQuality} vs Resolved ${result.quality}`);
+                    showToast(`Download Failed: ${targetQuality} unavailable (Found ${result.quality})`, 'error');
+                } else {
+                    console.error(`[Download] Strict failure. Quality ${targetQuality} unavailable for ${songMetadata.name}`);
+                    showToast(`Download Failed: ${targetQuality} unavailable`, 'error');
+                }
+                return false;
+            }
+
+            if (result.url) {
+                const songToSave = { ...songMetadata, id: track.id };
+                await OfflineStore.saveSong(songToSave, result.url, targetQuality);
+
+                setDownloadedState(prev => {
+                    const newState = { ...prev };
+                    if (!newState[track.id]) newState[track.id] = [];
+                    if (!newState[track.id].includes(targetQuality)) {
+                        newState[track.id] = [...newState[track.id], targetQuality];
+                    }
+                    return newState;
+                });
+                showToast(`Downloaded ${songMetadata.name} in ${targetQuality}`, 'success');
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error("Download failed", e);
+            return false;
+        }
+    }, [qualityPreference, resolvePlayableUrl, showToast]);
 
     const loadSongUrl = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack | undefined, overrideQuality?: AudioQuality) => {
         // Cleanup old URL if it's a blob to prevent memory leaks
@@ -1717,7 +1716,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         playInstantMix(mix);
     }, [playInstantMix]);
 
-    const value = {
+    // [PERF FIX #1] Memoize the queue derivation to stabilize reference
+    const filteredQueue = useMemo(() => normalizedQueue.filter((s): s is JioSaavnSong => !!s), [normalizedQueue]);
+    const activeMixCurrentIndex = activeMix?.currentSongIndex || 0;
+
+    // [PERF FIX #1] Memoize context value to prevent ALL consumers re-rendering on every state change.
+    // Without this, every progress tick (~4/s) creates a new object and re-renders the entire app.
+    const value = useMemo(() => ({
         mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration, shuffle, repeat,
         setMixes,
         setQueue,
@@ -1733,8 +1738,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         isLoaded,
         activeMix,
 
-        queue: normalizedQueue.filter((s): s is JioSaavnSong => !!s),
-        currentIndex: activeMix?.currentSongIndex || 0,
+        queue: filteredQueue,
+        currentIndex: activeMixCurrentIndex,
         playIndex,
 
         sleepTimer, setSleepTimer,
@@ -1757,7 +1762,25 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         isAlbumSaved,
         isArtistFollowed,
         showToast
-    };
+    }), [
+        mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration, shuffle, repeat,
+        setMixes, setQueue, loadMix, play, pause, togglePlay, next, prev, seek,
+        setVolume, setShuffle, setRepeat,
+        addMix, updateMix, deleteMix, undoDeleteMix, deletedMixBackup, addSongToMix,
+        isLoaded, activeMix,
+        filteredQueue, activeMixCurrentIndex, playIndex,
+        sleepTimer, setSleepTimer,
+        qualityPreference, setQualityPreference,
+        togglePin, activeQuality,
+        stopAtEndOfSong, setStopAtEndOfSong,
+        notificationsEnabled, setNotificationsEnabled,
+        likedSongs, toggleLike, isLiked,
+        recentlyPlayed, playbackSpeed, setPlaybackSpeed,
+        eq, downloadSong, removeDownload, isDownloaded,
+        playInstantMix,
+        savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist, isAlbumSaved, isArtistFollowed,
+        showToast
+    ]);
 
     return (
         <PlaybackContext.Provider value={value}>

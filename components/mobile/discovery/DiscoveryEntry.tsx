@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -66,9 +66,9 @@ export function DiscoveryEntry() {
         setViewStack([]);
     }, []);
 
-    const songName = currentSong ? decodeHtml((currentSong as any).name || (currentSong as any).title || "") : "";
-    const songArtist = currentSong ? decodeHtml((currentSong as any).primaryArtists || (currentSong as any).artist || "") : "";
-    const songArt = currentSong ? getArt(currentSong) : "";
+    const songName = useMemo(() => currentSong ? decodeHtml((currentSong as any).name || (currentSong as any).title || "") : "", [currentSong]);
+    const songArtist = useMemo(() => currentSong ? decodeHtml((currentSong as any).primaryArtists || (currentSong as any).artist || "") : "", [currentSong]);
+    const songArt = useMemo(() => currentSong ? getArt(currentSong) : "", [currentSong]);
     const topView = viewStack[viewStack.length - 1];
 
     return (

@@ -294,39 +294,54 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         showToast("Case is shiny new!");
     }, [showToast]);
 
-    // Activity & Backlight
-    const [lastActivity, setLastActivity] = useState(Date.now());
+    // [PERF FIX #5] Activity & Backlight — Use refs instead of state to avoid re-renders.
+    // mousemove fires dozens of times per second; using state caused the entire 2066-line
+    // component to re-render on every mouse movement.
+    const lastActivityRef = useRef(Date.now());
     const [backlight, setBacklight] = useState(1); // 0 (dim) to 1 (bright)
 
     useEffect(() => {
         const timeout = 10000; // 10 seconds to dim
         const interval = setInterval(() => {
-            const timeSinceActivity = Date.now() - lastActivity;
+            const timeSinceActivity = Date.now() - lastActivityRef.current;
             if (timeSinceActivity > timeout) {
-                setBacklight(Math.max(0, 1 - (timeSinceActivity - timeout) / 5000)); // Slowly dim over 5s
+                const newBacklight = Math.max(0, 1 - (timeSinceActivity - timeout) / 5000);
+                setBacklight(prev => {
+                    // Only update state if value actually changed (avoids unnecessary re-renders)
+                    const rounded = Math.round(newBacklight * 100) / 100;
+                    const prevRounded = Math.round(prev * 100) / 100;
+                    return rounded !== prevRounded ? rounded : prev;
+                });
             } else {
-                setBacklight(1);
+                setBacklight(prev => prev === 1 ? prev : 1);
             }
         }, 500);
         return () => clearInterval(interval);
-    }, [lastActivity]);
+    }, []); // No deps — uses ref, not state
 
     const registerActivity = useCallback(() => {
-        setLastActivity(Date.now());
-        setBacklight(1);
+        lastActivityRef.current = Date.now();
+        setBacklight(prev => prev === 1 ? prev : 1); // Only re-render if backlight was dimmed
     }, []);
 
     // Global Activity Listener for Backlight
     useEffect(() => {
-        const handleInteraction = () => registerActivity();
-        window.addEventListener('mousemove', handleInteraction);
-        window.addEventListener('keydown', handleInteraction);
-        window.addEventListener('click', handleInteraction);
+        let throttleTimer: NodeJS.Timeout | null = null;
+        const throttledRegister = () => {
+            if (!throttleTimer) {
+                registerActivity();
+                throttleTimer = setTimeout(() => { throttleTimer = null; }, 500);
+            }
+        };
+        window.addEventListener('mousemove', throttledRegister, { passive: true });
+        window.addEventListener('keydown', throttledRegister, { passive: true });
+        window.addEventListener('click', throttledRegister, { passive: true });
 
         return () => {
-            window.removeEventListener('mousemove', handleInteraction);
-            window.removeEventListener('keydown', handleInteraction);
-            window.removeEventListener('click', handleInteraction);
+            window.removeEventListener('mousemove', throttledRegister);
+            window.removeEventListener('keydown', throttledRegister);
+            window.removeEventListener('click', throttledRegister);
+            if (throttleTimer) clearTimeout(throttleTimer);
 
             // Cleanup timeouts
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);

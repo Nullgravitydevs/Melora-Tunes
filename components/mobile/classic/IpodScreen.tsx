@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight, Star, Heart, Music, Zap, Smile, Ghost, Skull, HardDrive } from "lucide-react";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, memo } from "react";
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { CinemaModeMobile as CinemaMode } from "./cinema-mode-mobile";
@@ -66,7 +66,8 @@ const slideVariants = {
     })
 };
 
-export function IpodScreen({
+// [PERF FIX #6] Wrap in React.memo to prevent re-renders when props haven't changed
+export const IpodScreen = memo(function IpodScreen({
     variant = 'menu',
     title,
     menuItems,
@@ -158,10 +159,13 @@ export function IpodScreen({
             const ampm = hours >= 12 ? 'PM' : 'AM';
             hours = hours % 12;
             hours = hours ? hours : 12; // the hour '0' should be '12'
-            setTime(`${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`);
+            setTime(prev => {
+                const newTime = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                return prev === newTime ? prev : newTime;
+            });
         };
         updateTime();
-        const interval = setInterval(updateTime, 1000); // Every second
+        const interval = setInterval(updateTime, 30000); // [PERF FIX #6b] Every 30s instead of 1s — minute precision is fine for status bar
 
         // Battery
         let batteryRemoveListener: (() => void) | null = null;
@@ -698,4 +702,4 @@ export function IpodScreen({
             </div>
         </div >
     );
-}
+}); // End React.memo

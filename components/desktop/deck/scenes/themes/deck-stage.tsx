@@ -1,7 +1,6 @@
 "use client";
 
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
 import { usePlayback } from "@/components/providers/playback-context";
 import { useAudio } from "@/hooks/use-audio";
@@ -35,14 +34,14 @@ interface DeckStageProps {
     onShareMix?: (mix: Mix) => void;
 }
 
+interface DragPosition { x: number; y: number; }
 
 export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowLyrics, onShowQueue, onShareMix, isMobileDevice }: DeckStageProps) {
     const [viewMode, setViewMode] = useState<'split' | 'rack' | 'player'>('split');
     const [isCompact, setIsCompact] = useState(false);
 
     // Drag Persistence State
-    interface Position { x: number; y: number; }
-    const [positions, setPositions] = useState<Record<string, Position>>({});
+    const [positions, setPositions] = useState<Record<string, DragPosition>>({});
 
     const updatePosition = useCallback((id: string, info: PanInfo) => {
         setPositions(prev => ({
@@ -554,6 +553,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                                                 e.stopPropagation();
                                                                 const node = document.getElementById(`studio-mix-${mix.id}`);
                                                                 if (node) {
+                                                                    import('html-to-image').then(({ toPng }) => {
                                                                     toPng(node, {
                                                                         filter: (n) => !n.classList?.contains('no-snapshot'),
                                                                         pixelRatio: 2,
@@ -577,6 +577,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                                                             setToast("Snapshot failed. Link copied!");
                                                                             setTimeout(() => setToast(null), 3000);
                                                                         });
+                                                                    });
                                                                 }
                                                             }}
                                                             className="flex items-center justify-center w-6 h-7 bg-[#f4f4f5] shadow-md hover:-translate-y-0.5 transition-transform rounded-t-sm"

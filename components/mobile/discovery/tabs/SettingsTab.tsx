@@ -210,8 +210,7 @@ export function SettingsTab() {
                             <p className="text-[12px] text-white/30 mb-2">Choose your visual interface</p>
 
                             {[
-                                { id: "DECK", title: "Deck Studio", desc: "Analog cassette physics", icon: Radio },
-                                { id: "DISCOVERY", title: "Discovery Glass", desc: "Modern digital library", icon: Disc },
+                                { id: "DISCOVERY", title: "Discovery Mobile", desc: "Modern touch-first player", icon: Disc },
                                 { id: "CLASSIC", title: "iPod Classic", desc: "Click Wheel interface", icon: Disc },
                             ].map((mode) => (
                                 <button

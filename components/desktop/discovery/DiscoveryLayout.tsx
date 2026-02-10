@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
@@ -254,7 +254,8 @@ export function DiscoveryLayout() {
         mixId: null
     });
 
-    const handleContextMenu = (e: React.MouseEvent, song: JioSaavnSong, sourceMixId?: string) => {
+    // [PERF FIX #7] Wrap all handlers in useCallback to prevent re-rendering child views
+    const handleContextMenu = useCallback((e: React.MouseEvent, song: JioSaavnSong, sourceMixId?: string) => {
         e.preventDefault();
         setContextMenu({
             visible: true,
@@ -263,10 +264,10 @@ export function DiscoveryLayout() {
             song,
             sourceMixId
         });
-        setPlaylistMenu(prev => ({ ...prev, visible: false })); // Close other
-    };
+        setPlaylistMenu(prev => ({ ...prev, visible: false }));
+    }, []);
 
-    const handlePlaylistContextMenu = (e: React.MouseEvent, mixId: string) => {
+    const handlePlaylistContextMenu = useCallback((e: React.MouseEvent, mixId: string) => {
         e.preventDefault();
         setPlaylistMenu({
             visible: true,
@@ -274,64 +275,58 @@ export function DiscoveryLayout() {
             y: e.clientY,
             mixId
         });
-        setContextMenu(prev => ({ ...prev, visible: false })); // Close other
-    };
+        setContextMenu(prev => ({ ...prev, visible: false }));
+    }, []);
 
-    const closeContextMenu = () => {
+    const closeContextMenu = useCallback(() => {
         setContextMenu(prev => ({ ...prev, visible: false }));
         setPlaylistMenu(prev => ({ ...prev, visible: false }));
-    };
+    }, []);
 
     // NAVIGATION HANDLERS
-    const handleNavigate = (view: ViewState) => {
-        // Prevent duplicate pushes of the same view if clicked multiple times
+    const handleNavigate = useCallback((view: ViewState) => {
         setViewStack(prev => {
             const last = prev[prev.length - 1];
             if (last.id === view.id && JSON.stringify(last.data) === JSON.stringify(view.data)) return prev;
             return [...prev, view];
         });
-    };
+    }, []);
 
-    const handleBack = () => {
+    const handleBack = useCallback(() => {
         setViewStack(prev => {
-            if (prev.length <= 1) return prev; // Don't pop the last item (Home)
+            if (prev.length <= 1) return prev;
             return prev.slice(0, -1);
         });
-    };
+    }, []);
 
-    // Replace direct SetCurrentView checks with handleNavigate where appropriate
-    // Ideally we expose these, but for Sidebar we can explicit set functionality
-    const resetTo = (view: ViewState) => {
+    const resetTo = useCallback((view: ViewState) => {
         setViewStack([view]);
-    };
+    }, []);
 
 
     useEffect(() => { setMounted(true); }, []);
 
-    const getAlbumArt = () => {
+    // [PERF FIX #7] Memoize derived value
+    const albumArt = useMemo(() => {
         if (!currentSong?.image) return '';
         if (typeof currentSong.image === 'string') return currentSong.image;
         if (Array.isArray(currentSong.image)) {
             return currentSong.image.find(i => i.quality === '500x500')?.link || currentSong.image[0]?.link || '';
         }
         return '';
-    };
+    }, [currentSong?.image]);
 
-    if (!mounted) return <div className="fixed inset-0 bg-black" />;
-
-    const handlePlaySong = (song: any) => {
-        // Wrap single song into a play context
-        // If the song is already in the current mix, maybe just play it?
-        // For Discovery mode simplicity, we treat single clicks as "Play this song now"
-        // We'll create a mini-mix for it.
+    const handlePlaySong = useCallback((song: any) => {
         playInstantMix({
             id: `quick-play-${song.id}`,
             title: song.name,
             color: 'blue',
-            songs: [song], // Ideally we'd pass the surrounding list if we had it, but HomeView doesn't pass context yet
+            songs: [song],
             currentSongIndex: 0
         });
-    };
+    }, [playInstantMix]);
+
+    if (!mounted) return <div className="fixed inset-0 bg-black" />;
 
     const handleCreatePlaylist = () => {
         setNewPlaylistName("New Playlist");
@@ -413,7 +408,7 @@ export function DiscoveryLayout() {
 
 
             {/* Album BG - Grayscale */}
-            {getAlbumArt() && <div className="album-blur" style={{ backgroundImage: `url(${getAlbumArt()})` }} />}
+            {albumArt && <div className="album-blur" style={{ backgroundImage: `url(${albumArt})` }} />}
 
             {/* Layout */}
             <div className="flex-1 flex overflow-hidden relative z-10">
@@ -702,6 +697,9 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
     const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat } = usePlayback();
 
     /* UPGRADE 3: Keyboard Shortcuts */
+    const progressRef = useRef(progress);
+    progressRef.current = progress;
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Ignore if typing in input
@@ -719,7 +717,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                     }
                     else if (e.shiftKey) {
                         e.preventDefault();
-                        seek(Math.min(1, progress + 0.05)); // +5%
+                        seek(Math.min(1, progressRef.current + 0.05)); // +5%
                     }
                     break;
                 case 'ArrowLeft':
@@ -729,7 +727,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                     }
                     else if (e.shiftKey) {
                         e.preventDefault();
-                        seek(Math.max(0, progress - 0.05)); // -5%
+                        seek(Math.max(0, progressRef.current - 0.05)); // -5%
                     }
                     break;
             }
@@ -737,7 +735,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [togglePlay, next, prev, progress, seek]);
+    }, [togglePlay, next, prev, seek]);
 
 
     const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
