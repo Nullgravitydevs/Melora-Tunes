@@ -14,7 +14,6 @@ export const metadata: Metadata = {
   description: "High-fidelity retro cassette player and iPod simulator.",
   generator: 'Next.js',
   manifest: '/manifest.json',
-  themeColor: "#000000",
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -22,8 +21,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/app-icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/app-icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icon-96.png", sizes: "96x96", type: "image/png" },
+      { url: "/app-icon-192x.png", sizes: "192x192", type: "image/png" },
+      { url: "/app-icon-512x.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
 };
@@ -33,6 +37,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: '#000000',
 };
 
 import { PwaRegister } from "@/components/pwa-register";

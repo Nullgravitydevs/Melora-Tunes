@@ -1,6 +1,6 @@
 {
   "name": "melora-tunes",
-  "version": "0.1.0",
+  "version": "1.0.0-beta.1",
   "private": true,
   "main": "desktop_app/main.js",
   "scripts": {

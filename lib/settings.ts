@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     theme: 'classic', // White/Classic iPod
     qualityPreference: '320', // Default to High Quality
     lastPlayedSongId: null,
-    version: '2.0.0',
+    version: '1.0.0-beta.1',
     languages: ['english', 'hindi'],
     stopAtEndOfSong: false,
     notificationsEnabled: true

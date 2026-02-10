@@ -237,6 +237,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
+    // GitHub Release Update Checker — runs once on mount
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            try {
+                const { checkForUpdate, isUpdateDismissed } = await import('@/lib/update-checker');
+                const update = await checkForUpdate();
+                if (update && !isUpdateDismissed(update.version)) {
+                    showToast(`Update ${update.version} available! Visit GitHub to download.`, 'info');
+                }
+            } catch { /* silent fail */ }
+        }, 5000); // Delay 5s after mount so it doesn't block startup
+        return () => clearTimeout(timer);
+    }, [showToast]);
+
     // [PERF FIX #2] Memoize derived state to prevent recalculating on every render
     const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId), [mixes, activeMixId]);
     const rawCurrentItem = useMemo(() => activeMix?.songs[activeMix.currentSongIndex], [activeMix]);
