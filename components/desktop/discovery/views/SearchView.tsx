@@ -77,7 +77,6 @@ interface SearchViewProps {
 
 export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
     const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality, isDownloaded, playInstantMix } = usePlayback();
-    const [trending, setTrending] = useState<{ id: string; title: string; subtitle: string; image: string; type: string; data?: any }[]>([]);
 
     // FIX 1: Stable search mix ID to prevent memory leak
     const SEARCH_MIX_ID = 'search-results';

@@ -29,6 +29,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [albums, setAlbums] = useState<any[]>([]);
     const [similar, setSimilar] = useState<any[]>([]);
+    const [bioExpanded, setBioExpanded] = useState(false);
 
     const artistName = artist?.name || artist?.primaryArtists || 'Unknown Artist';
     const artistImage = getImage(artist);
@@ -312,11 +313,11 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                         <Info size={120} />
                                     </div>
                                     <div className="max-w-3xl relative z-10">
-                                        <p className="text-white/60 leading-relaxed text-lg line-clamp-4">
+                                        <p className={`text-white/60 leading-relaxed text-lg transition-all duration-300 ${bioExpanded ? '' : 'line-clamp-4'}`}>
                                             {bio.map((b: any) => b.text).join(' ')}
                                         </p>
-                                        <button className="mt-6 text-sm font-bold uppercase tracking-widest text-white hover:text-blue-400 transition-colors">
-                                            Read Full Biography
+                                        <button onClick={(e) => { e.stopPropagation(); setBioExpanded(!bioExpanded); }} className="mt-6 text-sm font-bold uppercase tracking-widest text-white hover:text-blue-400 transition-colors">
+                                            {bioExpanded ? 'Show Less' : 'Read Full Biography'}
                                         </button>
                                     </div>
                                 </motion.div>

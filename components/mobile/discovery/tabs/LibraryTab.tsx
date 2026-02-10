@@ -127,7 +127,7 @@ export function LibraryTab({ onNavigate }: Props) {
                         <TabContent key="liked">
                             <PlayControls count={likedSongs.length} onPlay={() => playAll(likedSongs, "Liked Songs")} onShuffle={() => playAll(likedSongs, "Liked Songs", true)} />
                             {filterItems(likedSongs).length > 0 ? (
-                                <SongList songs={filterItems(likedSongs)} onPlay={(songs, i) => playAll(songs, "Liked Songs")} onUnlike={(song) => toggleLike(song)} showUnlike isDownloaded={isDownloaded} />
+                                <SongList songs={filterItems(likedSongs)} onPlay={(songs, i) => { const list = songs.slice(i).concat(songs.slice(0, i)); playAll(list, "Liked Songs"); }} onUnlike={(song) => toggleLike(song)} showUnlike isDownloaded={isDownloaded} />
                             ) : (
                                 <EmptyState message="No liked songs yet" sub="Tap the heart on any song" />
                             )}

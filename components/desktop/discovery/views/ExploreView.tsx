@@ -17,17 +17,6 @@ interface ExploreViewProps {
 
 export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu }: ExploreViewProps) {
 
-    // Helper to get best image
-    const getHighQualityImage = (image: any) => {
-        if (!image) return '';
-        let url = '';
-        if (typeof image === 'string') url = image;
-        else if (Array.isArray(image)) {
-            url = image.find((i: any) => i.quality === '500x500')?.link || image[0]?.link || '';
-        }
-        return url ? fixImageUrl(url, '500x500') : '';
-    };
-
     const { playInstantMix, showToast } = usePlayback();
 
     // State for all sections
@@ -345,12 +334,14 @@ function CompactCard({ item, subtitle, onClick }: any) {
         </div>
     )
 }
+
 function getHighQualityImage(image: any) {
     if (!image) return '';
-    if (typeof image === 'string') return image;
-    if (Array.isArray(image)) {
-        // Try 500x500 first, then fallback to last (usually highest)
-        return image.find((i: any) => i.quality === '500x500')?.link || image[image.length - 1]?.link || '';
+    let url = '';
+    if (typeof image === 'string') url = image;
+    else if (Array.isArray(image)) {
+        url = image.find((i: any) => i.quality === '500x500')?.link || image[0]?.link || '';
     }
-    return '';
+    return url ? fixImageUrl(url, '500x500') : '';
 }
+

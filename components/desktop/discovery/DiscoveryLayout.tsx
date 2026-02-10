@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat } from "lucide-react";
+import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2 } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
@@ -230,7 +230,7 @@ export function DiscoveryLayout() {
         mixes, currentSong, isPlaying, likedSongs, recentlyPlayed,
         loadMix, playInstantMix, setQueue, queue,
         downloadSong, removeDownload, isDownloaded,
-        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix
+        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix, togglePin
     } = usePlayback();
 
     // Context Menu State
@@ -614,6 +614,37 @@ export function DiscoveryLayout() {
             <PlayerBar onExpand={() => setShowFullPlayer(true)} />
 
             {/* Global Context Menu */}
+            {/* Playlist Context Menu */}
+            <AnimatePresence>
+                {playlistMenu.visible && playlistMenu.mixId && (
+                    <>
+                        <div className="fixed inset-0 z-[999]" onClick={closeContextMenu} />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.12 }}
+                            className="fixed z-[1000] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-1.5 min-w-[180px]"
+                            style={{ left: playlistMenu.x, top: playlistMenu.y }}
+                        >
+                            {(() => {
+                                const mix = mixes.find(m => m.id === playlistMenu.mixId);
+                                if (!mix) return null;
+                                return (
+                                    <>
+                                        <button onClick={() => { loadMix(mix.id); closeContextMenu(); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/80 hover:bg-white/[0.06] flex items-center gap-3"><Play size={14} /> Play</button>
+                                        <button onClick={() => { handleNavigate({ id: 'library', data: { tab: 'playlists', playlistId: mix.id } }); closeContextMenu(); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/80 hover:bg-white/[0.06] flex items-center gap-3"><ListMusic size={14} /> View Playlist</button>
+                                        <button onClick={() => { togglePin(mix.id); closeContextMenu(); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/80 hover:bg-white/[0.06] flex items-center gap-3">{mix.pinned ? '📌 Unpin' : '📌 Pin to Deck'}</button>
+                                        <div className="border-t border-white/[0.06] my-1" />
+                                        <button onClick={() => { deleteMix(mix.id); showToast('Playlist deleted', 'success'); closeContextMenu(); }} className="w-full px-4 py-2.5 text-left text-[13px] text-red-400 hover:bg-red-500/10 flex items-center gap-3"><Trash2 size={14} /> Delete</button>
+                                    </>
+                                );
+                            })()}
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
             <TrackContextMenu
                 visible={contextMenu.visible}
                 x={contextMenu.x}

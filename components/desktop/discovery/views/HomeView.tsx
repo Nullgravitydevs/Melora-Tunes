@@ -49,9 +49,9 @@ function HomeSkeleton() {
 
 // === SMART HERO COMPONENT ===
 function SmartHero({ song, onPlay, userName }: { song: JioSaavnSong | null; onPlay: (s: JioSaavnSong) => void; userName?: string }) {
-    if (!song) return null;
-
     const [imgError, setImgError] = useState(false);
+
+    if (!song) return null;
     const getArt = (quality: string = '500x500') => {
         if (imgError) return '';
         if (!song.image) return '';
