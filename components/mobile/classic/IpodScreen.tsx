@@ -624,13 +624,21 @@ export function IpodScreen({
                                             <h2 className="text-white font-bold text-xs truncate leading-snug drop-shadow-md flex-1 min-w-0">
                                                 {decodeHtml(currentSong?.name || "No Music")}
                                             </h2>
-                                            {audioQuality === 'FLAC' || audioQuality === 'flac' ? (
+                                            {audioQuality === 'hires' ? (
                                                 <span className="shrink-0 text-[7px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded font-bold border border-amber-500/30">
                                                     Hi-Res
+                                                </span>
+                                            ) : audioQuality === 'FLAC' || audioQuality === 'flac' ? (
+                                                <span className="shrink-0 text-[7px] bg-blue-500/20 text-blue-400 px-1 py-0.5 rounded font-bold border border-blue-500/30">
+                                                    FLAC
                                                 </span>
                                             ) : audioQuality === '320kbps' || audioQuality === '320' ? (
                                                 <span className="shrink-0 text-[7px] bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded font-bold border border-emerald-500/30">
                                                     HQ
+                                                </span>
+                                            ) : (audioQuality === '160' || audioQuality === '96') ? (
+                                                <span className="shrink-0 text-[7px] bg-zinc-500/20 text-zinc-400 px-1 py-0.5 rounded font-bold border border-zinc-500/30">
+                                                    SD
                                                 </span>
                                             ) : null}
                                             {/* Offline Tag (Player) */}

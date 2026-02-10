@@ -193,6 +193,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         {[
                                             { id: 'deck', title: 'Deck Studio', desc: 'Analog cassette physics.', icon: Radio },
                                             { id: 'discovery', title: 'Discovery Glass', desc: 'Modern digital library.', icon: Disc },
+                                            { id: 'classic', title: 'iPod Classic', desc: 'Click Wheel retro interface.', icon: Disc },
                                         ].map((mode) => (
                                             <button
                                                 key={mode.id}

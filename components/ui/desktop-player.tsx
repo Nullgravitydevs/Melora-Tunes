@@ -503,7 +503,7 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const songDuration = currentSong?.duration ? parseInt(currentSong.duration.toString()) : 200;
+    const songDuration = currentSong?.duration ? parseInt(currentSong.duration.toString()) : 0;
     const currentTime = progress * songDuration;
 
     return (
@@ -565,7 +565,7 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
                     </span>
 
                     {/* Studio Quality Indicator */}
-                    {currentTrack && (
+                    {activeQuality && (
                         <div className="flex items-center gap-2 shrink-0 ml-2">
                             {/* [MODIFIED] Use Unified QualityBadge (Full Variant) */}
                             <div className="absolute top-2 right-4 transform scale-90 origin-right">

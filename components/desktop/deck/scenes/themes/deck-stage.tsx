@@ -1,3 +1,5 @@
+"use client";
+
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { toPng } from 'html-to-image';
 import { clsx } from "clsx";
@@ -139,14 +141,14 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     const hasCassette = !!activeMix;
 
     const formatTime = (seconds: number) => {
-        if (!process.browser && typeof window === 'undefined') return "0:00"; // SSR guard
+        if (typeof window === 'undefined') return "0:00"; // SSR guard
         if (typeof seconds !== 'number' || isNaN(seconds) || !isFinite(seconds)) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const songDuration = duration > 0 ? duration : (currentSong?.duration ? parseInt(currentSong.duration.toString()) : 200);
+    const songDuration = duration > 0 ? duration : (currentSong?.duration ? parseInt(currentSong.duration.toString()) : 0);
     const currentTime = progress * songDuration;
 
     const handleDragEnd = useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo, id: string, isMix: boolean = false) => {

@@ -32,6 +32,7 @@ export function SearchTab({ onNavigate }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [qualityFilter, setQualityFilter] = useState<string>("auto");
     const inputRef = useRef<HTMLInputElement>(null);
+    const abortRef = useRef<AbortController | null>(null);
     const { history, addSearch, removeSearch, clearHistory } = useSearchHistory();
     const {
         playInstantMix, addMix, updateMix, loadMix, mixes, activeMixId,
@@ -49,19 +50,29 @@ export function SearchTab({ onNavigate }: Props) {
     // Debounced search
     useEffect(() => {
         if (!query.trim()) { setResults([]); return; }
+
+        // Cancel any previous in-flight request
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         const timeout = setTimeout(async () => {
             setIsLoading(true);
             try {
                 const settings = loadSettings();
                 const lang = (settings.languages || ["english", "hindi"]).join(",");
                 const r = await searchUnified(query, lang, "song", qualityFilter as any);
-                setResults(r);
-                if (r.length > 0) addSearch(query.trim());
+                if (!controller.signal.aborted) {
+                    setResults(r);
+                    if (r.length > 0) addSearch(query.trim());
+                }
             } catch { } finally {
-                setIsLoading(false);
+                if (!controller.signal.aborted) {
+                    setIsLoading(false);
+                }
             }
         }, 350);
-        return () => clearTimeout(timeout);
+        return () => { clearTimeout(timeout); controller.abort(); };
     }, [query, qualityFilter]);
 
     const playSong = (track: any, index: number) => {

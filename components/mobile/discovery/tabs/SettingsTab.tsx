@@ -559,10 +559,10 @@ export function SettingsTab() {
                                 </p>
                             </div>
                             <div className="flex flex-col gap-3 px-4">
-                                <a href="#" className="flex items-center justify-center gap-2 py-3 bg-white text-black rounded-2xl text-[13px] font-bold active:scale-95 transition-transform">
+                                <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white text-black rounded-2xl text-[13px] font-bold active:scale-95 transition-transform">
                                     <Coffee size={16} /> Buy us a Coffee
                                 </a>
-                                <a href="#" className="flex items-center justify-center gap-2 py-3 bg-white/[0.06] text-white/70 rounded-2xl text-[13px] font-bold border border-white/[0.06] active:scale-95 transition-transform">
+                                <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white/[0.06] text-white/70 rounded-2xl text-[13px] font-bold border border-white/[0.06] active:scale-95 transition-transform">
                                     <Github size={16} /> Star on GitHub
                                 </a>
                             </div>
@@ -589,12 +589,12 @@ export function SettingsTab() {
                                 </div>
                             </div>
 
-                            <a href="#" className="flex items-center justify-center gap-2 text-white/30 text-[12px] font-bold pt-4">
+                            <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-white/30 text-[12px] font-bold pt-4">
                                 <MessageCircle size={14} /> Join our Discord
                             </a>
 
                             <p className="text-[9px] text-white/10 pt-8">
-                                © 2024 Melora Tunes Project
+                                © 2026 Melora Tunes Project
                             </p>
                         </motion.div>
                     )}

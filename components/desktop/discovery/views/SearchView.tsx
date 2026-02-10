@@ -91,6 +91,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
     const [showSettings, setShowSettings] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
+    const abortRef = useRef<AbortController | null>(null);
 
     // Get user's preferred quality from settings
     const [qualityPreference, setQualityPreference] = useState<'hires' | 'flac' | '320' | '160'>('320');
@@ -125,21 +126,33 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
             return;
         }
 
+        // Cancel any in-flight request
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         setIsSearching(true);
         setError(null);
         try {
             // Use the UNIFIED search that merges FLAC sources!
             const qFilter = qualityPreference === 'hires' ? 'hires' : qualityPreference === 'flac' ? 'flac' : '320';
             const tracks = await searchUnified(q, language || undefined, 'song', qFilter);
-            setResults(tracks);
 
-            if (tracks.length > 0) {
-                addSearch(q);
+            // Only update if this request wasn't aborted
+            if (!controller.signal.aborted) {
+                setResults(tracks);
+                if (tracks.length > 0) {
+                    addSearch(q);
+                }
             }
         } catch {
-            setError("Search failed. Please check your connection.");
+            if (!controller.signal.aborted) {
+                setError("Search failed. Please check your connection.");
+            }
         } finally {
-            setIsSearching(false);
+            if (!controller.signal.aborted) {
+                setIsSearching(false);
+            }
         }
     }, [qualityPreference, language]);
 

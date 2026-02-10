@@ -1349,8 +1349,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
         setIsLoading(true);
         try {
-            // Updated to Unified Search
-            const results = await searchUnified(query, undefined, 'song');
+            // Updated to Unified Search - map low qualities to '320' for search filter
+            const searchQuality = (qualityPreference === '160' || qualityPreference === '96') ? '320' : qualityPreference;
+            const results = await searchUnified(query, undefined, 'song', searchQuality as any);
             const songItems: MenuItem[] = results.map((track: PlayableTrack) => {
                 // Determine best badge for UI
                 let badge: string | undefined = undefined;
