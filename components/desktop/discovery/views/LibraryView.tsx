@@ -13,6 +13,7 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 import { isPlayableTrack, PlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
 import { shuffleArray, getArt, formatDuration } from "@/lib/helpers";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { AddToPlaylistModal } from "@/components/desktop/discovery/modals/AddToPlaylistModal";
 import { CDRow } from "@/components/shared/CDRow";
 
@@ -877,27 +878,14 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
             </AnimatePresence>
 
             {/* Confirm Modal */}
-            <AnimatePresence>
-                {showConfirm && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                        onClick={() => setShowConfirm(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 w-full max-w-xs"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <p className="text-white/80 text-[14px] font-medium text-center mb-5">{showConfirm.message}</p>
-                            <div className="flex gap-3">
-                                <button onClick={() => setShowConfirm(null)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] text-white/50 text-[13px] font-semibold hover:bg-white/[0.08] transition-colors">Cancel</button>
-                                <button onClick={() => { showConfirm.action(); setShowConfirm(null); }} className="flex-1 py-2.5 rounded-xl bg-red-500/80 text-white text-[13px] font-semibold hover:bg-red-500/70 transition-colors">Delete</button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <ConfirmDialog
+                open={showConfirm !== null}
+                message={showConfirm?.message || ''}
+                onConfirm={() => showConfirm?.action()}
+                onCancel={() => setShowConfirm(null)}
+                confirmLabel="Delete"
+                destructive
+            />
         </>
     );
 }

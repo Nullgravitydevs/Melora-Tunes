@@ -3,11 +3,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Play, Pause, Clock, TrendingUp, Grid, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
+
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useSearchHistory } from "@/components/hooks/useSearchHistory";
+import { SearchResultItem } from "./SearchResultItem";
 
 /* ============================================================================
    SEARCH VIEW - Premium Glass Design with Unified Search
@@ -188,46 +190,22 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
         loadMix(SEARCH_MIX_ID);
     };
 
-    // Get quality badge styling
-    const getQualityClass = (quality: AudioQuality) => {
-        switch (quality) {
-            case 'hires': return 'quality-hires';
-            case 'flac': return 'quality-flac';
-            case '320': return 'quality-320';
-            case '160': return 'quality-160';
-            default: return 'quality-96';
+    // VIRTUALIZATION / LIMIT RENDER
+    const [renderLimit, setRenderLimit] = useState(10);
+    useEffect(() => {
+        if (results.length > 0) setRenderLimit(10);
+    }, [results]);
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+        if (scrollHeight - scrollTop - clientHeight < 300 && renderLimit < results.length) {
+            setRenderLimit(prev => Math.min(prev + 10, results.length));
         }
     };
 
-    // Get quality label
-    const getQualityLabel = (quality: AudioQuality) => {
-        switch (quality) {
-            case 'hires': return 'Hi-Res';
-            case 'flac': return 'FLAC';
-            case '320': return '320';
-            case '160': return '160';
-            default: return '96';
-        }
-    };
-
-    // Format duration
-    const formatDuration = (d: number | string | undefined) => {
-        const dur = typeof d === 'string' ? parseInt(d) : d;
-        if (!dur || isNaN(dur)) return '';
-        return `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`;
-    };
 
     const trendingSearches = ['Arijit Singh', 'Diljit Dosanjh', 'Taylor Swift', 'Atif Aslam', 'Pritam', 'AR Rahman'];
-    const categories = [
-        { label: 'Charts', query: 'Top Charts', color: 'from-white/20 to-white/5', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745' },
-        { label: 'New Releases', query: 'New Releases', color: 'from-white/15 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9' },
-        { label: 'Chill', query: 'Chill Lo-fi', color: 'from-white/10 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1514525253344-981c1cad1295' },
-        { label: 'Bollywood', query: 'Bollywood Hits', color: 'from-white/15 to-white/5', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4' },
-        { label: 'Romance', query: 'Romantic Songs', color: 'from-white/10 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00' },
-        { label: 'Party', query: 'Party Hits', color: 'from-white/20 to-white/5', image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30' },
-        { label: 'Devotional', query: 'Devotional', color: 'from-white/10 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1544124499-58912cbddadf' },
-        { label: 'Classical', query: 'Classical', color: 'from-white/15 to-white/5', image: 'https://images.unsplash.com/photo-1507838596373-012ba3aa974e' },
-    ];
+
 
     return (
         <>
@@ -298,7 +276,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                 )}
             </AnimatePresence>
 
-            <div className="min-h-full p-8">
+            <div className="min-h-full p-8" onScroll={handleScroll}>
                 {/* Premium Glassy Search Bar + Settings */}
                 <div className="max-w-2xl mx-auto mb-12">
                     <motion.div
@@ -307,12 +285,12 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                         className="relative"
                     >
                         {/* Glow effect */}
+                        {/* Glow effect - Optimized */}
                         <div
-                            className="absolute inset-0 rounded-2xl opacity-50"
+                            className="absolute inset-0 rounded-2xl opacity-20"
                             style={{
-                                background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.05) 0%, transparent 70%)',
-                                transform: 'translateY(10px) scaleX(0.9)',
-                                filter: 'blur(20px)'
+                                boxShadow: '0 0 60px rgba(255,255,255,0.05)',
+                                transform: 'translateY(10px) scaleX(0.9)'
                             }}
                         />
 
@@ -397,18 +375,18 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                             </div>
 
                             <div className="space-y-2">
-                                {results.map((track, i) => {
+                                {results.slice(0, renderLimit).map((track, i) => {
                                     // FIX 2: Check activeMixId for correct icon
                                     const isCurrentPlaying = currentSong?.id === track.id && activeMixId === SEARCH_MIX_ID;
-                                    const hasFLAC = track.sources.some(s => s.quality === 'flac' || s.quality === 'hires');
 
                                     return (
-                                        <motion.div
+                                        <SearchResultItem
                                             key={track.id + i}
-                                            initial={{ opacity: 0, x: -20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: i * 0.025 }}
-                                            /* FIX 3: Smart toggle - same song = pause/play, different song = switch */
+                                            track={track}
+                                            index={i}
+                                            isCurrentPlaying={isCurrentPlaying}
+                                            isPlaying={isPlaying}
+                                            activeQuality={activeQuality || undefined}
                                             onClick={() => {
                                                 if (currentSong?.id === track.id && activeMixId === SEARCH_MIX_ID) {
                                                     togglePlay();
@@ -416,100 +394,14 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                                                     playTrack(track, results);
                                                 }
                                             }}
-                                            className="glass-result flex items-center gap-4 p-4 rounded-xl cursor-pointer group"
-                                        >
-                                            {/* CD Art with Vinyl Effect */}
-                                            <div className="relative w-16 h-16 flex-shrink-0">
-                                                {/* Vinyl Ring */}
-                                                <div
-                                                    className={`absolute inset-0 rounded-full ${isCurrentPlaying && isPlaying ? 'cd-spinning' : ''}`}
-                                                    style={{
-                                                        background: 'conic-gradient(from 0deg, rgba(30,30,30,1) 0%, rgba(50,50,50,1) 25%, rgba(30,30,30,1) 50%, rgba(50,50,50,1) 75%, rgba(30,30,30,1) 100%)',
-                                                        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
-                                                    }}
-                                                >
-                                                    <div className="absolute inset-2 rounded-full border border-white/5 vinyl-groove" />
-                                                    <div className="absolute inset-4 rounded-full border border-white/5" />
-                                                    <div className="absolute inset-6 rounded-full border border-white/5" />
-                                                </div>
-
-                                                {/* Album Art (Center Label) */}
-                                                <motion.div
-                                                    className={`absolute inset-3 rounded-full overflow-hidden ${isCurrentPlaying && isPlaying ? 'cd-spinning' : ''}`}
-                                                    style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.3)' }}
-                                                >
-                                                    {track.art ? (
-                                                        <img src={track.art} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full bg-white/10 flex items-center justify-center">
-                                                            <Music size={12} className="text-white/30" />
-                                                        </div>
-                                                    )}
-                                                </motion.div>
-
-                                                {/* Center Hole */}
-                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-black border border-white/10" />
-
-                                                {/* Play Overlay */}
-                                                <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all">
-                                                    <motion.div
-                                                        className={`w-8 h-8 rounded-full bg-white text-black flex items-center justify-center shadow-lg transition-all ${isCurrentPlaying ? 'opacity-100 scale-100' : 'opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100'}`}
-                                                    >
-                                                        {isCurrentPlaying && isPlaying ? (
-                                                            <Pause size={14} fill="currentColor" />
-                                                        ) : (
-                                                            <Play size={14} fill="currentColor" className="ml-0.5" />
-                                                        )}
-                                                    </motion.div>
-                                                </div>
-                                            </div>
-
-                                            {/* Track Metadata */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <p className={`font-medium truncate ${isCurrentPlaying ? 'text-white' : 'text-white/80'}`}>
-                                                        {track.title}
-                                                    </p>
-
-                                                    {/* Quality Badge - FIX 4: Use activeQuality when current */}
-                                                    <span className={`quality-badge ${getQualityClass(isCurrentPlaying && activeQuality ? activeQuality : track.preferredQuality)} flex-shrink-0`}>
-                                                        {isCurrentPlaying && activeQuality
-                                                            ? activeQuality.toUpperCase()
-                                                            : getQualityLabel(track.preferredQuality)}
-                                                    </span>
-
-                                                    {/* Merged FLAC indicator - show if FLAC available but not preferred */}
-                                                    {hasFLAC && track.preferredQuality !== 'flac' && track.preferredQuality !== 'hires' && (
-                                                        <span className="quality-badge quality-flac flex-shrink-0 opacity-60">
-                                                            +FLAC
-                                                        </span>
-                                                    )}
-
-                                                    {/* Downloaded badge */}
-                                                    {isDownloaded(track.id) && (
-                                                        <span className="flex-shrink-0 text-emerald-400" title="Downloaded">
-                                                            <Download size={12} />
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                <p className="text-sm text-white/40 truncate mt-0.5">{track.artist}</p>
-                                            </div>
-
-                                            {/* Album */}
-                                            <p className="text-sm text-white/20 truncate max-w-28 hidden lg:block">
-                                                {track.song?.album?.name}
-                                            </p>
-
-                                            {/* Duration */}
-                                            <div className="text-right flex-shrink-0">
-                                                <span className="text-sm text-white/30 tabular-nums">
-                                                    {formatDuration(track.duration)}
-                                                </span>
-                                            </div>
-                                        </motion.div>
+                                        />
                                     );
                                 })}
+                                {renderLimit < results.length && (
+                                    <div className="py-8 flex justify-center opacity-40">
+                                        <Loader2 className="animate-spin" size={20} />
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     ) : error ? (
@@ -626,34 +518,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                             </div>
 
                             {/* Browse Categories */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-6">
-                                    <Grid size={20} className="text-white/30" />
-                                    <h2 className="text-lg font-bold text-white/40 tracking-tight">Browse All</h2>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {categories.map((cat, i) => (
-                                        <motion.button
-                                            key={cat.label}
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.2 + i * 0.04 }}
-                                            onClick={() => onNavigate({ id: 'category-hub', data: cat })}
-                                            className={`relative aspect-[16/9] rounded-2xl overflow-hidden p-4 text-left group shadow-xl`}
-                                        >
-                                            <div className={`absolute inset-0 bg-gradient-to-br ${cat.color}`} />
-                                            <img
-                                                src={cat.image}
-                                                alt=""
-                                                className="absolute bottom-0 right-0 w-24 h-24 object-cover translate-x-4 translate-y-4 -rotate-12 opacity-40 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"
-                                                loading="lazy"
-                                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                                            />
-                                            <span className="relative z-10 text-xl font-bold text-white tracking-tight">{cat.label}</span>
-                                        </motion.button>
-                                    ))}
-                                </div>
-                            </div>
+
                         </motion.div>
                     ) : null}
                 </AnimatePresence>

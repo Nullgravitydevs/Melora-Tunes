@@ -4,6 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Play, Music } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 
 interface QuickGridProps {
@@ -19,15 +20,6 @@ export function QuickGrid({ items, onPlay, currentSongId, isPlaying }: QuickGrid
     // Limit to 12 items for a perfect 3x4 or 2x6 grid
     const displayItems = items.slice(0, 12);
 
-    const getArt = (song: any) => {
-        if (!song?.image) return '';
-        if (typeof song.image === 'string') return song.image;
-        if (Array.isArray(song.image)) {
-            return song.image.find((i: any) => i.quality === '150x150')?.link || song.image[0]?.link || '';
-        }
-        return '';
-    };
-
     return (
         <div className="px-8 pb-4">
             <div className="flex items-center justify-between mb-4">
@@ -39,7 +31,7 @@ export function QuickGrid({ items, onPlay, currentSongId, isPlaying }: QuickGrid
                 {displayItems.map((song, i) => {
                     const isActive = currentSongId === song.id;
                     const isNowPlaying = isActive && isPlaying;
-                    const artUrl = getArt(song);
+                    const artUrl = getArt(song, '150x150');
 
                     return (
                         <motion.div

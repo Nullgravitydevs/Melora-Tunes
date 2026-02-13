@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { getStats } from "@/lib/stats";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
 
@@ -596,38 +597,13 @@ export function SettingsTab() {
             </div>
 
             {/* Confirm Modal */}
-            <AnimatePresence>
-                {showConfirm && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center px-8"
-                        onClick={() => setShowConfirm(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <p className="text-[14px] text-white/80 font-medium mb-6">{showConfirm.message}</p>
-                            <div className="flex gap-3">
-                                <button onClick={() => setShowConfirm(null)} className="flex-1 py-2.5 text-[13px] font-semibold text-white/50 bg-white/[0.05] rounded-xl active:bg-white/[0.08]">
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={showConfirm.action}
-                                    className={`flex-1 py-2.5 text-[13px] font-semibold rounded-xl active:scale-95 transition-transform ${
-                                        showConfirm.destructive
-                                            ? "bg-white/20 text-white"
-                                            : "bg-white text-black"
-                                    }`}
-                                >
-                                    Confirm
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <ConfirmDialog
+                open={showConfirm !== null}
+                message={showConfirm?.message || ''}
+                onConfirm={() => showConfirm?.action()}
+                onCancel={() => setShowConfirm(null)}
+                destructive={showConfirm?.destructive}
+            />
         </motion.div>
     );
 }

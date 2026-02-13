@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
 import { shuffleArray } from "@/lib/helpers";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { QualityBadge } from "@/components/shared/QualityBadge";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
@@ -287,27 +288,14 @@ export function LibraryTab({ onNavigate }: Props) {
             </div>
 
             {/* Confirm modal */}
-            <AnimatePresence>
-                {showConfirm && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm px-8"
-                        onClick={() => setShowConfirm(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 w-full max-w-xs"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <p className="text-white/80 text-[14px] font-medium text-center mb-5">{showConfirm.message}</p>
-                            <div className="flex gap-3">
-                                <button onClick={() => setShowConfirm(null)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] text-white/50 text-[13px] font-semibold active:scale-95 transition-transform">Cancel</button>
-                                <button onClick={() => { showConfirm.action(); setShowConfirm(null); }} className="flex-1 py-2.5 rounded-xl bg-red-500/80 text-white text-[13px] font-semibold active:scale-95 transition-transform">Delete</button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <ConfirmDialog
+                open={showConfirm !== null}
+                message={showConfirm?.message || ''}
+                onConfirm={() => showConfirm?.action()}
+                onCancel={() => setShowConfirm(null)}
+                confirmLabel="Delete"
+                destructive
+            />
         </motion.div>
     );
 }

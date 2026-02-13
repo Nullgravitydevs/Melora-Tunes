@@ -242,7 +242,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                                     }
                                                 }}
                                                 draggable={true}
-                                                // @ts-ignore
+                                                // @ts-expect-error
                                                 onDragStart={(e: React.DragEvent) => {
                                                     e.dataTransfer.setData('application/json', JSON.stringify(song));
                                                     e.dataTransfer.effectAllowed = 'copy';

@@ -409,8 +409,8 @@ export function DiscoveryLayout() {
             </AnimatePresence>
 
 
-            {/* Album BG - Grayscale */}
-            {albumArt && <div className="album-blur" style={{ backgroundImage: `url(${albumArt})` }} />}
+            {/* Album BG - Grayscale - REMOVED for Deep Black performance (covered by bg-black anyway) */}
+            {/* {albumArt && <div className="album-blur" style={{ backgroundImage: `url(${albumArt})` }} />} */}
 
             {/* Layout */}
             <div className="flex-1 flex overflow-hidden relative z-10">

@@ -8,6 +8,7 @@ import {
     MoreHorizontal, Clock, Calendar, MapPin, Disc, Music
 } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 
 interface ArtistViewProps {
@@ -35,16 +36,7 @@ export function ArtistView({
 }: ArtistViewProps) {
     const [activeTab, setActiveTab] = useState<'popular' | 'albums' | 'singles'>('popular');
 
-    // Safe Image Resolver
-    const getImage = (item: any) => {
-        const img = item?.image || item?.img;
-        if (Array.isArray(img)) {
-            return img[2]?.link || img[1]?.link || img[0]?.link || "";
-        }
-        return img || "";
-    };
-
-    const heroImage = getImage(details || artist);
+    const heroImage = getArt(details || artist);
     const name = decodeHtml(details?.name || artist?.name || "Artist");
     const followers = details?.follower_count ? parseInt(details.follower_count).toLocaleString() : "0";
 
@@ -174,7 +166,7 @@ export function ArtistView({
 
                                     <div className="flex items-center gap-4 min-w-0 pr-4">
                                         <div className="w-10 h-10 rounded-lg bg-gray-800 relative overflow-hidden shrink-0">
-                                            <Image src={getImage(song)} alt="" fill className="object-cover" unoptimized />
+                                            <Image src={getArt(song)} alt="" fill className="object-cover" unoptimized />
                                         </div>
                                         <span className="font-bold text-white truncate text-sm">{decodeHtml(song.name)}</span>
                                     </div>
@@ -192,7 +184,7 @@ export function ArtistView({
                             {(activeTab === 'albums' ? details?.albums : details?.singles)?.map((album: any) => (
                                 <div key={album.id} className="group p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer border border-white/5 hover:border-white/10">
                                     <div className="aspect-square rounded-xl overflow-hidden mb-4 relative shadow-lg bg-black/50">
-                                        <Image src={getImage(album)} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
+                                        <Image src={getArt(album)} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
                                                 <Play size={24} fill="black" className="ml-1 text-black" />
@@ -224,7 +216,7 @@ export function ArtistView({
                             {details?.albums?.slice(0, 3).map((album: any, i: number) => (
                                 <div key={album.id} className="flex gap-4 items-center group cursor-pointer p-3 hover:bg-white/5 rounded-xl transition-colors border border-transparent hover:border-white/5">
                                     <div className="w-12 h-12 rounded-lg bg-gray-800 flex overflow-hidden shrink-0 border border-white/5 group-hover:border-white/20 transition-colors relative">
-                                        <Image src={getImage(album)} alt="" fill className="object-cover" unoptimized />
+                                        <Image src={getArt(album)} alt="" fill className="object-cover" unoptimized />
                                     </div>
                                     <div className="min-w-0">
                                         <h4 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors truncate block max-w-[170px]">{decodeHtml(album.name)}</h4>
@@ -245,7 +237,7 @@ export function ArtistView({
                             {details?.similarArtists?.slice(0, 5).map((artist: any) => (
                                 <div key={artist.id} className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-2 -mx-2 rounded-xl transition-colors">
                                     <div className="w-12 h-12 rounded-full overflow-hidden border border-white/10 group-hover:border-white/30 transition-colors">
-                                        <Image src={getImage(artist)} alt="" width={48} height={48} className="object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all" unoptimized />
+                                        <Image src={getArt(artist)} alt="" width={48} height={48} className="object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all" unoptimized />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h4 className="text-sm font-bold text-white truncate">{decodeHtml(artist.name)}</h4>

@@ -215,7 +215,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                                         <motion.div key={song.id + i} initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.01 }}
                                             onClick={() => isActive ? togglePlay() : playSong(i)}
                                             draggable={true}
-                                            // @ts-ignore
+                                            // @ts-expect-error
                                             onDragStart={(e: React.DragEvent) => {
                                                 e.dataTransfer.setData('application/json', JSON.stringify(song));
                                                 e.dataTransfer.effectAllowed = 'copy';
