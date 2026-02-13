@@ -522,11 +522,16 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         Melora is an open-source passion project. If you love the music, consider supporting the development.
                                     </p>
                                     <div className="flex gap-4 justify-center pt-4">
-                                        <a href="#" className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors">
+                                        <a href="https://buymeacoffee.com/melora" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors">
                                             <Coffee size={18} /> Buy us a Coffee
                                         </a>
-                                        <a href="#" className="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-full font-bold hover:bg-zinc-700 transition-colors">
+                                        <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-full font-bold hover:bg-zinc-700 transition-colors">
                                             <Github size={18} /> Star on GitHub
+                                        </a>
+                                    </div>
+                                    <div className="pt-2">
+                                        <a href="https://discord.gg/657ZJJUkkH" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-6 py-3 bg-[#5865F2]/20 text-[#5865F2] rounded-full font-bold hover:bg-[#5865F2]/30 transition-colors border border-[#5865F2]/20">
+                                            <MessageCircle size={18} /> Join our Discord
                                         </a>
                                     </div>
                                 </div>
@@ -537,18 +542,21 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 text-center py-20">
                                     <div>
                                         <h1 className="text-5xl font-black text-white tracking-tighter mb-2">MELORA</h1>
-                                        <div className="px-3 py-1 bg-white/10 text-white rounded-full text-xs font-mono inline-block">v1.2.4-beta</div>
+                                        <div className="px-3 py-1 bg-white/10 text-white rounded-full text-xs font-mono inline-block">v3.0.0</div>
                                     </div>
                                     <p className="text-zinc-500 max-w-sm mx-auto">
                                         Designed for audiophiles who miss the tangible feel of music.
                                     </p>
-                                    <div className="pt-8">
-                                        <a href="#" className="text-zinc-400 hover:text-white flex items-center justify-center gap-2 text-sm font-bold transition-colors">
+                                    <div className="flex gap-4 justify-center pt-4">
+                                        <a href="https://discord.gg/657ZJJUkkH" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-5 py-2.5 bg-[#5865F2]/15 text-[#5865F2] rounded-full font-bold hover:bg-[#5865F2]/25 transition-colors border border-[#5865F2]/20">
                                             <MessageCircle size={16} /> Join our Discord
+                                        </a>
+                                        <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-5 py-2.5 bg-zinc-800 text-zinc-300 rounded-full font-bold hover:bg-zinc-700 transition-colors">
+                                            <Github size={16} /> GitHub
                                         </a>
                                     </div>
                                     <div className="text-[10px] text-zinc-700 pt-20">
-                                        © 2024 Melora Tunes Project
+                                        © 2026 Melora Tunes Project
                                     </div>
                                 </div>
                             )}

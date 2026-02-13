@@ -554,11 +554,14 @@ export function SettingsTab() {
                                 </p>
                             </div>
                             <div className="flex flex-col gap-3 px-4">
-                                <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white text-black rounded-2xl text-[13px] font-bold active:scale-95 transition-transform">
+                                <a href="https://buymeacoffee.com/melora" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white text-black rounded-2xl text-[13px] font-bold active:scale-95 transition-transform">
                                     <Coffee size={16} /> Buy us a Coffee
                                 </a>
                                 <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white/[0.06] text-white/70 rounded-2xl text-[13px] font-bold border border-white/[0.06] active:scale-95 transition-transform">
                                     <Github size={16} /> Star on GitHub
+                                </a>
+                                <a href="https://discord.gg/657ZJJUkkH" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#5865F2]/20 text-[#5865F2] rounded-2xl text-[13px] font-bold border border-[#5865F2]/20 active:scale-95 transition-transform">
+                                    <MessageCircle size={16} /> Join our Discord
                                 </a>
                             </div>
                         </motion.div>
@@ -569,7 +572,7 @@ export function SettingsTab() {
                         <motion.div key="about" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-center py-12 space-y-6">
                             <div>
                                 <h2 className="text-4xl font-black text-white tracking-tighter mb-2">MELORA</h2>
-                                <span className="px-3 py-1 bg-white/10 text-white rounded-full text-[10px] font-mono">v2.0.0</span>
+                                <span className="px-3 py-1 bg-white/10 text-white rounded-full text-[10px] font-mono">v3.0.0</span>
                             </div>
                             <p className="text-[13px] text-white/30 max-w-xs mx-auto">
                                 Designed for audiophiles who miss the tangible feel of music.
@@ -577,16 +580,21 @@ export function SettingsTab() {
 
                             <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl overflow-hidden mx-4">
                                 <div className="divide-y divide-white/[0.04]">
-                                    <InfoRow label="Version" value="2.0.0" />
+                                    <InfoRow label="Version" value="3.0.0" />
                                     <InfoRow label="Playlists" value={String(mixes.length)} />
                                     <InfoRow label="Recent Songs" value={String(recentlyPlayed.length)} />
                                     <InfoRow label="Liked Songs" value={String(likedSongs.length)} />
                                 </div>
                             </div>
 
-                            <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-white/30 text-[12px] font-bold pt-4">
-                                <MessageCircle size={14} /> Join our Discord
-                            </a>
+                            <div className="flex flex-col gap-3 px-6 pt-2">
+                                <a href="https://discord.gg/657ZJJUkkH" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-2.5 bg-[#5865F2]/15 text-[#5865F2] rounded-xl text-[12px] font-bold border border-[#5865F2]/20 active:scale-95 transition-transform">
+                                    <MessageCircle size={14} /> Join our Discord
+                                </a>
+                                <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-2.5 bg-white/[0.04] text-white/40 rounded-xl text-[12px] font-bold border border-white/[0.06] active:scale-95 transition-transform">
+                                    <Github size={14} /> GitHub
+                                </a>
+                            </div>
 
                             <p className="text-[9px] text-white/10 pt-8">
                                 © 2026 Melora Tunes Project

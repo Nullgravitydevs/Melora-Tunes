@@ -32,7 +32,7 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
         showToast, queue, currentIndex, playIndex,
         isLiked, toggleLike, activeQuality,
         qualityPreference, setQualityPreference,
-        setQueue, downloadSong, removeDownload, isDownloaded, activeMixId
+        setQueue, addToQueue, downloadSong, removeDownload, isDownloaded, activeMixId
     } = usePlayback();
 
     const [viewMode, setViewMode] = useState<'art' | 'queue'>('art');
@@ -115,7 +115,7 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                     }}
                     className="fixed inset-0 z-[100] bg-[#000000] overflow-hidden"
                 >
-                    {/* Performance Optimized Background */}
+                    {/* Performance Optimized Background - Premium Apple Style */}
                     {songArt && (
                         <motion.div
                             initial={{ opacity: 0 }}
@@ -123,19 +123,20 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                             transition={{ duration: 1 }}
                             className="absolute inset-0 z-0 pointer-events-none"
                         >
-                            {/* Single layer blur for better FPS */}
+                            {/* Primary Blur Layer */}
                             <div
-                                className="absolute inset-0 opacity-40"
+                                className="absolute inset-0 opacity-50"
                                 style={{
                                     backgroundImage: `url(${songArt})`,
                                     backgroundSize: 'cover',
                                     backgroundPosition: 'center',
-                                    filter: 'blur(100px) saturate(1.5) brightness(0.3)',
-                                    transform: 'scale(1.2)' // Slight scale to hide blur edges
+                                    filter: 'blur(120px) saturate(200%) brightness(0.4)',
+                                    transform: 'scale(1.2)'
                                 }}
                             />
-                            {/* Vignette */}
-                            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80" />
+                            {/* Secondary Atmosphere Layer */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/60" />
+                            <div className="absolute inset-0 bg-black/20 mix-blend-color-burn" />
                         </motion.div>
                     )}
 
@@ -145,9 +146,9 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                             <ChevronDown size={22} />
                         </button>
                         <div className="flex flex-col items-center">
-                            {/* Removed "Playing From" as per feedback */}
+                            <div className="w-10 h-1 bg-white/20 rounded-full mb-1" />
                         </div>
-                        <div className="w-10" /> {/* Spacer */}
+                        <div className="w-10" />
                     </div>
 
                     {/* Main Content Info - 2 Column Desktop */}
@@ -184,17 +185,17 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                 <>
                                     {/* Album Art Container */}
                                     <motion.div
-                                        className="relative w-full aspect-square max-w-[260px] mb-8 group"
+                                        className="relative w-full aspect-square max-w-[280px] mb-8 group"
                                         initial={{ scale: 0.9, opacity: 0 }}
                                         animate={{ scale: 1, opacity: 1 }}
                                         transition={{ duration: 0.5, delay: 0.1 }}
                                     >
-                                        <div className="absolute inset-0 rounded-3xl shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)]" />
+                                        <div className="absolute inset-0 rounded-3xl shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]" />
                                         {songArt ? (
                                             <img
                                                 src={songArt}
                                                 alt={currentSong.name}
-                                                className="relative w-full h-full rounded-3xl object-cover border border-white/5"
+                                                className="relative w-full h-full rounded-3xl object-cover border border-white/5 select-none"
                                             />
                                         ) : (
                                             <div className="w-full h-full rounded-3xl bg-white/5 flex items-center justify-center border border-white/5">
@@ -204,17 +205,17 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                     </motion.div>
 
                                     {/* Track Info */}
-                                    <div className="w-full mb-8 flex items-end justify-between">
+                                    <div className="w-full mb-6 flex items-end justify-between px-1">
                                         <div className="flex-1 min-w-0 pr-8">
                                             <motion.h1
                                                 layoutId="player-title"
-                                                className="text-xl md:text-2xl font-bold text-white tracking-tight leading-tight truncate mb-1"
+                                                className="text-2xl md:text-3xl font-bold text-white tracking-tight leading-tight truncate mb-1.5"
                                             >
                                                 {decodeHtml(currentSong.name)}
                                             </motion.h1>
                                             <div className="flex items-center gap-2 group/artist">
                                                 <motion.p
-                                                    className="text-sm text-white/60 font-medium truncate cursor-pointer hover:text-white transition-colors"
+                                                    className="text-base text-white/60 font-medium truncate cursor-pointer hover:text-white transition-colors"
                                                     onClick={() => {
                                                         const artistId = currentSong.primaryArtistsId?.split(',')[0].trim();
                                                         if (artistId && onGoToArtist) onGoToArtist(artistId);
@@ -228,7 +229,7 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                                         const artistId = currentSong.primaryArtistsId?.split(',')[0].trim();
                                                         if (artistId && onGoToArtist) onGoToArtist(artistId);
                                                     }}
-                                                    className="opacity-0 group-hover/artist:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded-full"
+                                                    className="opacity-0 group-hover/artist:opacity-100 transition-opacity p-1.5 hover:bg-white/10 rounded-full"
                                                 >
                                                     <ChevronDown size={14} className="rotate-[-90deg] text-white/40" />
                                                 </button>
@@ -238,14 +239,14 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                             <div className="relative">
                                                 <button
                                                     onClick={handleMenu}
-                                                    className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                                                    className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors backdrop-blur-sm"
                                                 >
                                                     <MoreHorizontal size={20} />
                                                 </button>
                                             </div>
                                             <button
                                                 onClick={() => toggleLike(currentSong)}
-                                                className={`w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all ${isLiked(currentSong.id) ? 'text-pink-500 bg-pink-500/10' : 'text-white/40 hover:text-white'}`}
+                                                className={`w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all backdrop-blur-sm ${isLiked(currentSong.id) ? 'text-pink-500 bg-pink-500/10' : 'text-white/40 hover:text-white'}`}
                                             >
                                                 <Heart size={20} fill={isLiked(currentSong.id) ? "currentColor" : "none"} />
                                             </button>
@@ -253,91 +254,141 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                     </div>
 
                                     {/* Progress Scrubber */}
-                                    <div className="w-full mb-10 group" onMouseDown={handleSeek}>
-                                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden cursor-pointer relative">
+                                    <div className="w-full mb-10 group cursor-pointer" onMouseDown={handleSeek}>
+                                        <div className="h-1 bg-white/10 rounded-full overflow-hidden relative">
                                             <motion.div
-                                                className="h-full bg-white rounded-full relative"
+                                                className="h-full bg-white/80 group-hover:bg-white rounded-full relative transition-colors"
                                                 style={{ width: `${progress * 100}%` }}
                                                 layoutId="progress-bar"
                                             >
-                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-md scale-0 group-hover:scale-100 transition-transform" />
+                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform" />
                                             </motion.div>
                                         </div>
-                                        <div className="flex justify-between mt-2 text-xs font-medium text-white/30 tabular-nums">
+                                        <div className="flex justify-between mt-2 text-xs font-semibold text-white/30 tabular-nums tracking-wide">
                                             <span>{fmt(progress * duration)}</span>
                                             <span>-{fmt(duration - (progress * duration))}</span>
                                         </div>
                                     </div>
 
                                     {/* Playback Controls */}
-                                    <div className="flex items-center justify-center gap-10 mb-10">
+                                    <div className="flex items-center justify-center gap-6 mb-8 text-white">
                                         <button
                                             onClick={() => setShuffle(!shuffle)}
-                                            className={`transition-all ${shuffle ? 'text-white' : 'text-white/20 hover:text-white/50'}`}
+                                            className={`transition-all hover:scale-110 active:scale-90 ${shuffle ? 'text-accent-blue' : 'text-white/20 hover:text-white/50'}`}
                                         >
-                                            <Shuffle size={20} />
+                                            <Shuffle size={18} />
                                         </button>
 
-                                        <button onClick={prev} className="text-white/80 hover:text-white transition-transform active:scale-90">
-                                            <SkipBack size={36} fill="currentColor" />
+                                        <button onClick={prev} className="text-white hover:text-white/80 transition-transform active:scale-90 opacity-90 hover:opacity-100">
+                                            <SkipBack size={32} fill="currentColor" />
                                         </button>
 
                                         <button
                                             onClick={togglePlay}
-                                            className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+                                            className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.4)]"
                                         >
-                                            {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+                                            {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
                                         </button>
 
-                                        <button onClick={next} className="text-white/80 hover:text-white transition-transform active:scale-90">
-                                            <SkipForward size={36} fill="currentColor" />
+                                        <button onClick={next} className="text-white hover:text-white/80 transition-transform active:scale-90 opacity-90 hover:opacity-100">
+                                            <SkipForward size={32} fill="currentColor" />
                                         </button>
 
                                         <button
                                             onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
-                                            className={`relative transition-all ${repeat !== 'off' ? 'text-white' : 'text-white/20 hover:text-white/50'}`}
+                                            className={`relative transition-all hover:scale-110 active:scale-90 ${repeat !== 'off' ? 'text-accent-blue' : 'text-white/20 hover:text-white/50'}`}
                                         >
-                                            <Repeat size={20} />
+                                            <Repeat size={18} />
                                             {repeat === 'one' && (
                                                 <span className="absolute -top-1 -right-1 text-[8px] font-black bg-white text-black w-3 h-3 flex items-center justify-center rounded-full">1</span>
                                             )}
                                         </button>
+
+                                        {/* Grouped Secondary Controls */}
+                                        <Tooltip text="Lyrics">
+                                            <button
+                                                className={`transition-all hover:scale-110 active:scale-90 ${viewMode === 'art' && isSynced ? 'text-white' : 'text-white/20 hover:text-white/60'}`}
+                                                onClick={() => { /* Toggle Lyrics View if we had a dedicated view, or just visual feedback */ }}
+                                            >
+                                                <Mic2 size={18} />
+                                            </button>
+                                        </Tooltip>
+
+                                        <Tooltip text="Queue">
+                                            <button
+                                                onClick={() => setViewMode('queue')}
+                                                className="transition-all hover:scale-110 active:scale-90 text-white/20 hover:text-white/60"
+                                            >
+                                                <ListMusic size={18} />
+                                            </button>
+                                        </Tooltip>
                                     </div>
 
                                     {/* Volume & Toggles */}
-                                    <div className="w-full flex items-center gap-4">
-                                        <Volume2 size={18} className="text-white/30" />
-                                        <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setVolume((e.clientX - r.left) / r.width); }}>
-                                            <div className="h-full bg-white/60 hover:bg-white transition-colors" style={{ width: `${volume * 100}%` }} />
+                                    <div className="w-full flex items-center gap-4 mb-4 max-w-[280px]">
+                                        <Volume2 size={14} className="text-white/30" />
+                                        <div className="flex-1 h-[2px] bg-white/10 rounded-full overflow-hidden cursor-pointer group/vol" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setVolume((e.clientX - r.left) / r.width); }}>
+                                            <div className="h-full bg-white/40 group-hover/vol:bg-white/80 transition-colors" style={{ width: `${volume * 100}%` }} />
                                         </div>
+                                    </div>
 
-                                        <div className="w-px h-6 bg-white/10 mx-2" />
-
-                                        <Tooltip text="Lyrics">
-                                            <button className="text-white/40 hover:text-white transition-colors">
-                                                <Mic2 size={20} />
-                                            </button>
-                                        </Tooltip>
-                                        <Tooltip text="Queue">
-                                            <button onClick={() => setViewMode('queue')} className="text-white/40 hover:text-white transition-colors">
-                                                <ListMusic size={20} />
-                                            </button>
-                                        </Tooltip>
+                                    {/* Audio Tags (Moved Below Controls) */}
+                                    <div className="w-full mb-6">
+                                        {(() => {
+                                            const q = activeQuality || qualityPreference;
+                                            if (q === 'hires') {
+                                                return (
+                                                    <div className="flex flex-col gap-0.5 items-center opacity-60 hover:opacity-100 transition-opacity">
+                                                        <div className="flex items-center gap-1.5 text-amber-400 font-black text-[10px] uppercase tracking-tighter">
+                                                            <Disc3 size={10} /> <span>Hi-Res Studio Quality</span>
+                                                        </div>
+                                                        <div className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase">
+                                                            24-bit / 96kHz · Lossless
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            if (q === 'flac') {
+                                                return (
+                                                    <div className="flex flex-col gap-0.5 items-center opacity-60 hover:opacity-100 transition-opacity">
+                                                        <div className="flex items-center gap-1.5 text-blue-400 font-black text-[10px] uppercase tracking-tighter">
+                                                            <Disc3 size={10} /> <span>CD Quality</span>
+                                                        </div>
+                                                        <div className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase">
+                                                            16-bit / 44.1kHz · Lossless
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            if (q === '320') {
+                                                return (
+                                                    <div className="flex flex-col gap-0.5 items-center opacity-40 hover:opacity-80 transition-opacity">
+                                                        <div className="flex items-center gap-1.5 text-white/80 font-black text-[10px] uppercase tracking-tighter">
+                                                            <span>High Quality</span>
+                                                        </div>
+                                                        <div className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase">
+                                                            320kbps · AAC
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
                                     </div>
 
                                     {/* Up Next Preview */}
                                     {queue[currentIndex + 1] && (
-                                        <div className="w-full mt-10 p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4 group/upnext cursor-pointer hover:bg-white/10 transition-all" onClick={next}>
+                                        <div className="w-full p-3 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-3 group/upnext cursor-pointer hover:bg-white/10 backdrop-blur-md transition-all active:scale-[0.98]" onClick={next}>
                                             <div className="flex-shrink-0 relative">
-                                                <img src={getArt(queue[currentIndex + 1])} alt="" className="w-12 h-12 rounded-lg object-cover" />
-                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/upnext:opacity-100 transition-opacity rounded-lg">
-                                                    <Play size={16} fill="white" />
-                                                </div>
+                                                <img src={getArt(queue[currentIndex + 1])} alt="" className="w-10 h-10 rounded-md object-cover opacity-80 group-hover/upnext:opacity-100 transition-opacity" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-0.5">Up Next</p>
-                                                <p className="text-sm font-bold text-white truncate">{decodeHtml(queue[currentIndex + 1].name)}</p>
-                                                <p className="text-xs text-white/40 truncate">{decodeHtml(queue[currentIndex + 1].primaryArtists || '')}</p>
+                                                <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-0.5">Up Next</p>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs font-bold text-white/90 truncate mr-2">{decodeHtml(queue[currentIndex + 1].name)}</p>
+                                                    <Play size={10} fill="currentColor" className="text-white/0 group-hover/upnext:text-white/40 transition-all -ml-2 group-hover/upnext:ml-0" />
+                                                </div>
+                                                <p className="text-[10px] text-white/40 truncate">{decodeHtml(queue[currentIndex + 1].primaryArtists || '')}</p>
                                             </div>
                                         </div>
                                     )}
@@ -347,75 +398,9 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
 
                         {/* RIGHT: Lyrics / Metadata */}
                         <div className="w-1/2 pl-24 py-20 h-full flex flex-col justify-center">
-
-                            {/* Audio Tags & Quality */}
-                            <div className="mb-8 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-                                {(() => {
-                                    const q = activeQuality || qualityPreference;
-                                    if (q === 'hires') {
-                                        return (
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-tighter">
-                                                    <span>🔥 Hi-Res Studio Quality</span>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
-                                                    LOSSLESS · HI-RES · 24-bit / 96kHz
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    if (q === 'flac') {
-                                        return (
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-tighter">
-                                                    <span>💿 CD Quality Lossless</span>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
-                                                    LOSSLESS · CD · 16-bit / 44.1kHz
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    if (q === '320') {
-                                        return (
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2 text-white font-black text-xs uppercase tracking-tighter">
-                                                    <span>🎶 High-Quality Streaming</span>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
-                                                    HQ · 320 kbps
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    if (q === '160') {
-                                        return (
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2 text-white/80 font-black text-xs uppercase tracking-tighter">
-                                                    <span>🎵 Standard Streaming</span>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
-                                                    MQ · 160 kbps
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    return (
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2 text-white/60 font-black text-xs uppercase tracking-tighter">
-                                                <span>📻 Data Saver</span>
-                                            </div>
-                                            <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
-                                                LQ · 96 kbps
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-
                             <div className="flex-1 overflow-hidden relative" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}>
                                 {isSynced && lyrics.length > 0 ? (
-                                    <div className="space-y-6 py-[40vh]" ref={lyricsRef}>
+                                    <div className="space-y-8 py-[40vh]" ref={lyricsRef}>
                                         {lyrics.map((line, i) => {
                                             const isActive = i === activeLineIdx;
                                             return (
@@ -423,12 +408,14 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                                     key={i}
                                                     initial={false}
                                                     animate={{
-                                                        opacity: isActive ? 1 : 0.4,
+                                                        opacity: isActive ? 1 : 0.3,
                                                         scale: isActive ? 1.05 : 1,
-                                                        x: isActive ? 20 : 0
+                                                        x: isActive ? 10 : 0,
+                                                        filter: isActive ? 'blur(0px)' : 'blur(1px)'
                                                     }}
+                                                    transition={{ duration: 0.4 }}
                                                     onClick={() => seek(line.time / duration)}
-                                                    className={`text-2xl font-bold cursor-pointer transition-colors duration-500 ${isActive ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+                                                    className={`text-3xl font-bold cursor-pointer transition-colors duration-500 origin-left ${isActive ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
                                                 >
                                                     {line.text}
                                                 </motion.p>
@@ -436,7 +423,7 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                         })}
                                     </div>
                                 ) : plainLyrics ? (
-                                    <div className="text-2xl font-semibold text-white/60 leading-relaxed whitespace-pre-wrap">
+                                    <div className="text-3xl font-semibold text-white/60 leading-relaxed whitespace-pre-wrap">
                                         {plainLyrics}
                                     </div>
                                 ) : (
@@ -454,7 +441,7 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                         {...menuProps}
                         onClose={() => setMenuProps({ ...menuProps, visible: false })}
                         onPlay={(s: any) => { /* already playing */ }}
-                        onAddToQueue={(s: any) => { setQueue([...queue, s]); }}
+                        onAddToQueue={(s: any) => { addToQueue(s); }}
                         onGoToArtist={(id) => onGoToArtist?.(id)}
                         onGoToAlbum={(id) => onGoToAlbum?.(id)}
                         onStartRadio={() => { }}

@@ -232,7 +232,7 @@ export function DiscoveryLayout() {
         mixes, currentSong, isPlaying, likedSongs, recentlyPlayed,
         loadMix, playInstantMix, setQueue, queue,
         downloadSong, removeDownload, isDownloaded,
-        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix, togglePin
+        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix, togglePin, addToQueue
     } = usePlayback();
 
     // Context Menu State
@@ -678,7 +678,7 @@ export function DiscoveryLayout() {
                 song={contextMenu.song}
                 onClose={closeContextMenu}
                 onPlay={(s) => { playInstantMix({ id: 'quick-play', title: 'Quick Play', color: 'blue', songs: [s], currentSongIndex: 0 }); }}
-                onAddToQueue={(s) => { setQueue([...queue, s]); }}
+                onAddToQueue={(s) => { addToQueue(s); }}
                 onGoToArtist={handleGoToArtist}
                 onGoToAlbum={handleGoToAlbum}
                 onStartRadio={(s) => handleNavigate({ id: 'radio', data: s })}

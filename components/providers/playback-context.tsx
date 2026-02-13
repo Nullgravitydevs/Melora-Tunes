@@ -157,6 +157,7 @@ interface PlaybackContextType {
 
     // Toasts
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+    addToQueue: (song: JioSaavnSong | PlayableTrack) => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
@@ -1651,6 +1652,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const filteredQueue = useMemo(() => normalizedQueue.filter((s): s is JioSaavnSong => !!s), [normalizedQueue]);
     const activeMixCurrentIndex = activeMix?.currentSongIndex || 0;
 
+    const addToQueue = useCallback((song: JioSaavnSong | PlayableTrack) => {
+        if (!activeMixId) return;
+        addSongToMix(activeMixId, song);
+        showToast("Added to queue", "success");
+    }, [activeMixId, addSongToMix, showToast]);
+
     // [PERF FIX #1] Memoize context value to prevent ALL consumers re-rendering on every state change.
     // Without this, every progress tick (~4/s) creates a new object and re-renders the entire app.
     const value = useMemo(() => ({
@@ -1685,7 +1692,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         playbackSpeed, setPlaybackSpeed,
         eq,
         downloadSong, removeDownload, isDownloaded,
-        playInstantMix,
+        playInstantMix, addToQueue,
         savedAlbums,
         savedArtists,
         toggleSaveAlbum,
@@ -1708,7 +1715,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         likedSongs, toggleLike, isLiked,
         recentlyPlayed, playbackSpeed, setPlaybackSpeed,
         eq, downloadSong, removeDownload, isDownloaded,
-        playInstantMix,
+        playInstantMix, addToQueue,
         savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist, isAlbumSaved, isArtistFollowed,
         showToast
     ]);

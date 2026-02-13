@@ -75,7 +75,7 @@ export function Launcher({ onSelect }: LauncherProps) {
                 {/* Footer */}
                 <footer className="p-8 flex justify-center gap-8 mb-4">
                     <SocialLink href="https://github.com/NullGravity-Labs/Melora-Tunes" icon={<Github size={18} />} label="Open Source" />
-                    <SocialLink href="https://discord.gg/melora" icon={<MessageCircle size={18} />} label="Join Colony" />
+                    <SocialLink href="https://discord.gg/657ZJJUkkH" icon={<MessageCircle size={18} />} label="Join Colony" />
                     <SocialLink href="https://buymeacoffee.com/melora" icon={<Coffee size={18} />} label="Support" />
                 </footer>
             </div>
