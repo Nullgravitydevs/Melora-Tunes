@@ -510,7 +510,7 @@ export function DiscoveryLayout() {
                 </aside>
 
                 {/* MAIN */}
-                <main className="flex-1 overflow-y-auto scroll">
+                <main className="flex-1 overflow-y-auto scroll pb-24">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={currentView.id}
@@ -742,49 +742,34 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
         return () => document.removeEventListener('mousedown', handle);
     }, [showBarMenu]);
 
-    const qLabel = (q: string) => ({ hires: 'Hi-Res', flac: 'Lossless', '320': '320 kbps', '160': '160 kbps', '96': '96 kbps' }[q] || q);
+    const qLabel = (q: string) => ({ hires: 'Hi-Res', flac: 'FLAC', '320': '320k', '160': '160k', '96': '96k' }[q] || q);
+    const qLabelFull = (q: string) => ({ hires: 'Hi-Res', flac: 'Lossless', '320': '320 kbps', '160': '160 kbps', '96': '96 kbps' }[q] || q);
 
-    /* UPGRADE 3: Keyboard Shortcuts */
+    /* Keyboard Shortcuts */
     const progressRef = useRef(progress);
     progressRef.current = progress;
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore if typing in input
             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
-
             switch (e.code) {
                 case 'Space':
                     e.preventDefault();
                     togglePlay();
                     break;
                 case 'ArrowRight':
-                    if (e.metaKey || e.ctrlKey) {
-                        e.preventDefault();
-                        next();
-                    }
-                    else if (e.shiftKey) {
-                        e.preventDefault();
-                        seek(Math.min(1, progressRef.current + 0.05)); // +5%
-                    }
+                    if (e.metaKey || e.ctrlKey) { e.preventDefault(); next(); }
+                    else if (e.shiftKey) { e.preventDefault(); seek(Math.min(1, progressRef.current + 0.05)); }
                     break;
                 case 'ArrowLeft':
-                    if (e.metaKey || e.ctrlKey) {
-                        e.preventDefault();
-                        prev();
-                    }
-                    else if (e.shiftKey) {
-                        e.preventDefault();
-                        seek(Math.max(0, progressRef.current - 0.05)); // -5%
-                    }
+                    if (e.metaKey || e.ctrlKey) { e.preventDefault(); prev(); }
+                    else if (e.shiftKey) { e.preventDefault(); seek(Math.max(0, progressRef.current - 0.05)); }
                     break;
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [togglePlay, next, prev, seek]);
-
 
     const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
@@ -795,205 +780,165 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
         return '';
     };
 
-    // Get quality badge - use activeQuality from playback (source of truth)
-    const getQuality = () => {
-        if (!activeQuality) return null;
-        return {
-            label: activeQuality.toUpperCase(),
-            color: activeQuality === 'flac' || activeQuality === 'hires'
-                ? 'bg-white/15'
-                : 'bg-white/5'
-        };
-    };
-
-    const quality = getQuality();
-
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const r = e.currentTarget.getBoundingClientRect();
         seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
     };
 
-    // Hide completely when no song
     if (!currentSong) return null;
+
+    const qualityBadge = activeQuality ? activeQuality.toUpperCase() : null;
 
     return (
         <motion.div
-            initial={{ y: 100 }}
-            animate={{ y: 0 }}
-            className="h-[90px] bg-black border-t border-white/5 px-6 flex items-center justify-between relative z-50 player-bar"
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-4xl player-bar"
         >
-            {/* Song Info */}
-            <div className="flex items-center gap-4 w-[30%]">
-                <div className="relative group cursor-pointer" onClick={onExpand}>
-                    <div className={`w-14 h-14 rounded-lg overflow-hidden bg-white/5 shadow-lg border border-white/5 ${isPlaying ? 'animate-pulse-slow' : ''}`}>
-                        {getArt() ? (
-                            <img src={getArt()} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <Music size={20} className="text-white/20" />
-                            </div>
-                        )}
-                    </div>
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                        <Maximize2 size={20} className="text-white" />
-                    </div>
+            <div className="relative bg-[#111111]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden">
+                {/* Progress bar - thin line at top */}
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/[0.06]">
+                    <div className="h-full bg-white/50 transition-all duration-150" style={{ width: `${progress * 100}%` }} />
                 </div>
 
-                <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-medium text-white truncate cursor-pointer hover:underline" onClick={onExpand}>{currentSong.name}</p>
-                        {quality && (
-                            <Tooltip text={`Streaming: ${quality.label}`} position="top">
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${quality.color} text-white/70`}>
-                                    {quality.label}
-                                </span>
-                            </Tooltip>
-                        )}
-                    </div>
-                    <p className="text-xs text-white/40 truncate hover:text-white/60 cursor-pointer">{currentSong.primaryArtists}</p>
-                </div>
-
-                <Tooltip text={isLiked(currentSong.id) ? "Remove from Library" : "Add to Library"}>
-                    <button
-                        onClick={() => currentSong && toggleLike(currentSong)}
-                        className={`ml-2 p-2 rounded-full hover:bg-white/10 transition-colors ${isLiked(currentSong.id) ? 'text-white' : 'text-white/20 hover:text-white'}`}
-                    >
-                        <Heart size={18} fill={isLiked(currentSong.id) ? "currentColor" : "none"} />
-                    </button>
-                </Tooltip>
-            </div>
-
-            {/* Center Controls */}
-            <div className="flex flex-col items-center gap-2 w-[40%]">
-                <div className="flex items-center gap-6">
-                    <Tooltip text={shuffle ? "Disable Shuffle" : "Enable Shuffle"}>
-                        <button
-                            onClick={() => setShuffle(!shuffle)}
-                            className={`p-2 rounded-full transition-colors ${shuffle ? 'text-white' : 'text-white/30 hover:text-white'}`}
-                        >
-                            <Shuffle size={16} />
-                        </button>
-                    </Tooltip>
-
-                    <Tooltip text="Previous">
-                        <button onClick={prev} className="p-2 text-white/70 hover:text-white transition-colors">
-                            <SkipBack size={20} fill="currentColor" />
-                        </button>
-                    </Tooltip>
-
-                    <Tooltip text={isPlaying ? "Pause" : "Play"}>
-                        <button
-                            onClick={togglePlay}
-                            className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-                        >
-                            {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
-                        </button>
-                    </Tooltip>
-
-                    <Tooltip text="Next">
-                        <button onClick={next} className="p-2 text-white/70 hover:text-white transition-colors">
-                            <SkipForward size={20} fill="currentColor" />
-                        </button>
-                    </Tooltip>
-
-                    <Tooltip text={repeat === 'one' ? "Disable Repeat" : repeat === 'all' ? "Repeat One" : "Repeat All"}>
-                        <button
-                            onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
-                            className={`p-2 rounded-full transition-colors relative ${repeat !== 'off' ? 'text-white' : 'text-white/30 hover:text-white'}`}
-                        >
-                            <Repeat size={16} />
-                            {repeat === 'one' && <span className="absolute text-[8px] font-bold top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white">1</span>}
-                        </button>
-                    </Tooltip>
-                </div>
-
-                <div className="w-full max-w-md flex items-center gap-3 text-xs text-white/30 font-mono">
-                    <span>{fmt(progress * duration)}</span>
-                    <div
-                        className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer relative group"
-                        onClick={handleSeek}
-                    >
-                        <div
-                            className="absolute inset-y-0 left-0 bg-white/40 group-hover:bg-white rounded-full transition-colors"
-                            style={{ width: `${progress * 100}%` }}
-                        />
-                        <div
-                            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ left: `${progress * 100}%` }}
-                        />
-                    </div>
-                    <span>{fmt(duration)}</span>
-                </div>
-            </div>
-
-            {/* Right Controls */}
-            <div className="flex items-center justify-end gap-2 w-[30%]">
-                <Tooltip text="Lyrics">
-                    <button onClick={() => onExpand()} className="p-2 text-white/30 hover:text-white">
-                        <ListMusic size={18} />
-                    </button>
-                </Tooltip>
-
-                <div className="flex items-center gap-2 group w-24">
-                    <Tooltip text={volume === 0 ? "Unmute" : "Mute"}>
-                        <button onClick={() => setVolume(volume === 0 ? 1 : 0)}>
-                            {volume === 0 ? <Volume2 size={18} className="text-white/30" /> : <Volume2 size={18} className="text-white/70" />}
-                        </button>
-                    </Tooltip>
-                    <div
-                        className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer overflow-hidden"
-                        onClick={(e) => {
-                            const r = e.currentTarget.getBoundingClientRect();
-                            setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
-                        }}
-                    >
-                        <div className="h-full bg-white/50 group-hover:bg-white transition-colors" style={{ width: `${volume * 100}%` }} />
-                    </div>
-                </div>
-
-                <div className="w-px h-8 bg-white/10 mx-2" />
-
-                <Tooltip text="Expand Player">
-                    <button onClick={onExpand} className="p-2 text-white/30 hover:text-white transition-colors">
-                        <Maximize2 size={18} />
-                    </button>
-                </Tooltip>
-
-                {/* 3-dots menu */}
-                <div className="relative" ref={barMenuRef}>
-                    <Tooltip text="More">
-                        <button onClick={() => { setShowBarMenu(!showBarMenu); setShowBarQuality(false); }} className="p-2 text-white/30 hover:text-white transition-colors">
-                            <MoreHorizontal size={18} />
-                        </button>
-                    </Tooltip>
-                    {showBarMenu && (
-                        <div className="absolute bottom-full right-0 mb-2 w-52 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-1.5 z-50">
-                            {!showBarQuality ? (
-                                <>
-                                    <button onClick={() => { if (currentSong) { setQueue([...queue, currentSong]); showToast('Added to queue', 'success'); } setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Plus size={14} /> Add to Queue</button>
-                                    <button onClick={() => { setShowBarMenu(false); showToast('Use right-click on a song', 'info'); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><ListPlus size={14} /> Add to Playlist</button>
-                                    <div className="border-t border-white/[0.06] my-1" />
-                                    <button onClick={() => setShowBarQuality(true)} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Disc3 size={14} /> Quality: {qLabel(qualityPreference)}</button>
-                                    {currentSong && !isDownloaded(currentSong.id) && (
-                                        <button onClick={() => { downloadSong(currentSong); setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Download size={14} /> Download</button>
-                                    )}
-                                </>
+                <div className="flex items-center gap-4 px-4 py-3">
+                    {/* Album Art */}
+                    <div className="relative group cursor-pointer flex-shrink-0" onClick={onExpand}>
+                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/5 ring-1 ring-white/[0.08]">
+                            {getArt() ? (
+                                <img src={getArt()} className="w-full h-full object-cover" />
                             ) : (
-                                <>
-                                    <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-white/30">Quality</div>
-                                    {(['hires', 'flac', '320', '160', '96'] as AudioQuality[]).map(q => (
-                                        <button key={q} onClick={() => { setQualityPreference(q); setShowBarQuality(false); setShowBarMenu(false); showToast(`Quality: ${qLabel(q)}`, 'success'); }}
-                                            className={`w-full px-4 py-2.5 text-left text-[13px] hover:bg-white/[0.06] flex items-center justify-between ${qualityPreference === q ? 'text-white font-semibold' : 'text-white/60'}`}>
-                                            <span>{qLabel(q)}</span>
-                                            {qualityPreference === q && <span className="text-white">✓</span>}
-                                        </button>
-                                    ))}
-                                    <div className="border-t border-white/[0.06] my-1" />
-                                    <button onClick={() => setShowBarQuality(false)} className="w-full px-4 py-2 text-left text-[13px] text-white/40 hover:bg-white/[0.06]">← Back</button>
-                                </>
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <Music size={18} className="text-white/20" />
+                                </div>
                             )}
                         </div>
-                    )}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                            <Maximize2 size={14} className="text-white" />
+                        </div>
+                    </div>
+
+                    {/* Song Info */}
+                    <div className="min-w-0 w-36 flex-shrink-0">
+                        <div className="flex items-center gap-1.5">
+                            <p className="text-[13px] font-semibold text-white truncate cursor-pointer hover:underline" onClick={onExpand}>
+                                {currentSong.name}
+                            </p>
+                            {qualityBadge && (
+                                <span className="text-[8px] font-bold px-1 py-px rounded bg-white/10 text-white/60 flex-shrink-0">
+                                    {qualityBadge}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-[11px] text-white/35 truncate">{currentSong.primaryArtists}</p>
+                    </div>
+
+                    {/* Playback Controls */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={prev} className="p-1.5 text-white/50 hover:text-white transition-colors">
+                            <SkipBack size={16} fill="currentColor" />
+                        </button>
+                        <button
+                            onClick={togglePlay}
+                            className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform mx-1"
+                        >
+                            {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
+                        </button>
+                        <button onClick={next} className="p-1.5 text-white/50 hover:text-white transition-colors">
+                            <SkipForward size={16} fill="currentColor" />
+                        </button>
+                    </div>
+
+                    {/* Progress */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-[10px] text-white/25 tabular-nums font-mono w-8 text-right flex-shrink-0">{fmt(progress * duration)}</span>
+                        <div
+                            className="flex-1 h-1 bg-white/[0.08] rounded-full cursor-pointer relative group"
+                            onClick={handleSeek}
+                        >
+                            <div
+                                className="absolute inset-y-0 left-0 bg-white/40 group-hover:bg-white/70 rounded-full transition-colors"
+                                style={{ width: `${progress * 100}%` }}
+                            />
+                            <div
+                                className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                style={{ left: `${progress * 100}%`, transform: `translate(-50%, -50%)` }}
+                            />
+                        </div>
+                        <span className="text-[10px] text-white/25 tabular-nums font-mono w-8 flex-shrink-0">{fmt(duration)}</span>
+                    </div>
+
+                    {/* Volume */}
+                    <div className="flex items-center gap-1.5 group w-20 flex-shrink-0">
+                        <button onClick={() => setVolume(volume === 0 ? 1 : 0)} className="text-white/30 hover:text-white/70 transition-colors">
+                            {volume === 0 ? <Volume2 size={14} className="text-white/20" /> : <Volume2 size={14} />}
+                        </button>
+                        <div
+                            className="flex-1 h-[3px] bg-white/[0.08] rounded-full cursor-pointer overflow-hidden"
+                            onClick={(e) => {
+                                const r = e.currentTarget.getBoundingClientRect();
+                                setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
+                            }}
+                        >
+                            <div className="h-full bg-white/40 group-hover:bg-white/70 transition-colors" style={{ width: `${volume * 100}%` }} />
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <Tooltip text="Expand">
+                            <button onClick={onExpand} className="p-1.5 text-white/25 hover:text-white transition-colors">
+                                <Maximize2 size={15} />
+                            </button>
+                        </Tooltip>
+
+                        <Tooltip text={isLiked(currentSong.id) ? "Unlike" : "Like"}>
+                            <button
+                                onClick={() => currentSong && toggleLike(currentSong)}
+                                className={`p-1.5 transition-colors ${isLiked(currentSong.id) ? 'text-white' : 'text-white/25 hover:text-white'}`}
+                            >
+                                <Heart size={15} fill={isLiked(currentSong.id) ? "currentColor" : "none"} />
+                            </button>
+                        </Tooltip>
+
+                        {/* 3-dots menu */}
+                        <div className="relative" ref={barMenuRef}>
+                            <Tooltip text="More">
+                                <button onClick={() => { setShowBarMenu(!showBarMenu); setShowBarQuality(false); }} className="p-1.5 text-white/25 hover:text-white transition-colors">
+                                    <MoreHorizontal size={15} />
+                                </button>
+                            </Tooltip>
+                            {showBarMenu && (
+                                <div className="absolute bottom-full right-0 mb-2 w-52 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-1.5 z-50">
+                                    {!showBarQuality ? (
+                                        <>
+                                            <button onClick={() => { if (currentSong) { setQueue([...queue, currentSong]); showToast('Added to queue', 'success'); } setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Plus size={14} /> Add to Queue</button>
+                                            <button onClick={() => { setShowBarMenu(false); showToast('Use right-click on a song', 'info'); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><ListPlus size={14} /> Add to Playlist</button>
+                                            <div className="border-t border-white/[0.06] my-1" />
+                                            <button onClick={() => setShowBarQuality(true)} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Disc3 size={14} /> Quality: {qLabelFull(qualityPreference)}</button>
+                                            {currentSong && !isDownloaded(currentSong.id) && (
+                                                <button onClick={() => { downloadSong(currentSong); setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Download size={14} /> Download</button>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-white/30">Quality</div>
+                                            {(['hires', 'flac', '320', '160', '96'] as AudioQuality[]).map(q => (
+                                                <button key={q} onClick={() => { setQualityPreference(q); setShowBarQuality(false); setShowBarMenu(false); showToast(`Quality: ${qLabelFull(q)}`, 'success'); }}
+                                                    className={`w-full px-4 py-2.5 text-left text-[13px] hover:bg-white/[0.06] flex items-center justify-between ${qualityPreference === q ? 'text-white font-semibold' : 'text-white/60'}`}>
+                                                    <span>{qLabelFull(q)}</span>
+                                                    {qualityPreference === q && <span className="text-white">✓</span>}
+                                                </button>
+                                            ))}
+                                            <div className="border-t border-white/[0.06] my-1" />
+                                            <button onClick={() => setShowBarQuality(false)} className="w-full px-4 py-2 text-left text-[13px] text-white/40 hover:bg-white/[0.06]">← Back</button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </motion.div>

@@ -20,12 +20,15 @@ export function useLyrics(currentSong: JioSaavnSong | undefined) {
             return;
         }
 
+        let cancelled = false;
+
         const fetchLyrics = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                // Use metadata for search
                 const { synced, text } = await getSyncedLyrics(currentSong);
+
+                if (cancelled) return;
 
                 if (synced && text) {
                     const parsed = parseLRC(text);
@@ -39,16 +42,19 @@ export function useLyrics(currentSong: JioSaavnSong | undefined) {
                 }
 
             } catch (err) {
+                if (cancelled) return;
                 console.error("Lyrics fetch failed", err);
                 setError("Failed to load lyrics");
                 setLyrics([]);
             } finally {
-                setIsLoading(false);
+                if (!cancelled) setIsLoading(false);
             }
         };
 
         fetchLyrics();
-    }, [currentSong]);
+
+        return () => { cancelled = true; };
+    }, [currentSong?.id]);
 
     return { lyrics, plainLyrics, isSynced, isLoading, error };
 }

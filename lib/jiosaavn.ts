@@ -449,19 +449,49 @@ export async function getLyricsWithFallback(song: JioSaavnSong): Promise<string 
         return jiosaavnLyrics;
     }
 
+    // Try LRCLib (returns syncedLyrics / plainLyrics)
     try {
         console.log('JioSaavn failed, trying LRCLib fallback...');
-        const response = await fetch(
-            `/api/lyrics-fallback?track=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.primaryArtists)}`
-        );
-        const data = await response.json();
-        if (data.lyrics && data.lyrics.trim().length > 0) {
-            console.log('Found lyrics from LRCLib!');
-            return data.lyrics;
+        const albumName = song.album?.name || '';
+        const durationStr = song.duration ? String(song.duration) : '';
+        let lrcUrl = `/api/lyrics-fallback?track=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.primaryArtists)}`;
+        if (albumName) lrcUrl += `&album=${encodeURIComponent(albumName)}`;
+        if (durationStr) lrcUrl += `&duration=${durationStr}`;
+        const response = await fetch(lrcUrl);
+        if (response.ok) {
+            const data = await response.json();
+            // LRCLib returns syncedLyrics (LRC format) and plainLyrics
+            if (data.syncedLyrics && data.syncedLyrics.trim().length > 0) {
+                console.log('Found synced lyrics from LRCLib!');
+                return data.syncedLyrics;
+            }
+            if (data.plainLyrics && data.plainLyrics.trim().length > 0) {
+                console.log('Found plain lyrics from LRCLib!');
+                return data.plainLyrics;
+            }
         }
     } catch (error) {
         console.error('LRCLib fallback failed:', error);
     }
+
+    // Try Musixmatch
+    try {
+        console.log('LRCLib failed, trying Musixmatch fallback...');
+        const { Musixmatch } = await import('@/lib/musixmatch');
+        const mx = new Musixmatch();
+        const result = await mx.getSyncedLyrics(
+            song.name,
+            song.primaryArtists || '',
+            song.duration ? parseInt(String(song.duration)) : 0
+        );
+        if (result && result.text && result.text.trim().length > 0) {
+            console.log(`Found ${result.synced ? 'synced' : 'plain'} lyrics from Musixmatch!`);
+            return result.text;
+        }
+    } catch (error) {
+        console.error('Musixmatch fallback failed:', error);
+    }
+
     return null;
 }
 

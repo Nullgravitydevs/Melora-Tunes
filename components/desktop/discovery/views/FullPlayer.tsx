@@ -115,23 +115,26 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-[100] bg-black"
                 >
-                    {/* BG Blur */}
+                    {/* Multi-layer BG */}
                     {getArt() && (
-                        <div className="absolute inset-0" style={{
-                            backgroundImage: `url(${getArt()})`,
-                            backgroundSize: 'cover', backgroundPosition: 'center',
-                            filter: 'blur(120px) brightness(0.12) saturate(0.3)',
-                            transform: 'scale(1.5)'
-                        }} />
+                        <>
+                            <div className="absolute inset-0" style={{
+                                backgroundImage: `url(${getArt()})`,
+                                backgroundSize: 'cover', backgroundPosition: 'center',
+                                filter: 'blur(100px) brightness(0.15) saturate(0.4)',
+                                transform: 'scale(1.6)'
+                            }} />
+                            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+                        </>
                     )}
 
                     {/* Top Bar */}
                     <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5">
-                        <button onClick={onClose} className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm font-medium">
-                            <ChevronDown size={20} /> BACK
+                        <button onClick={onClose} className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm font-medium backdrop-blur-sm bg-white/[0.04] hover:bg-white/[0.08] px-3 py-1.5 rounded-full">
+                            <ChevronDown size={18} /> Back
                         </button>
-                        <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-white/30">
-                            <Disc3 size={12} className={isPlaying ? 'animate-spin' : ''} />
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/25">
+                            <Disc3 size={11} className={isPlaying ? 'animate-spin' : ''} />
                             NOW PLAYING
                         </div>
                         <div className="w-20" />
@@ -140,10 +143,9 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                     {/* 2-Column Layout */}
                     <div className="relative z-10 h-full flex">
 
-                        {/* ── LEFT COLUMN: Art + Controls ── */}
-                        <div className="w-1/2 flex flex-col items-center justify-center px-12 py-20">
+                        {/* LEFT COLUMN: Art + Controls */}
+                        <div className="w-1/2 flex flex-col items-center justify-center px-16 py-24">
                             {viewMode === 'queue' ? (
-                                /* Queue View */
                                 <div className="w-full max-w-md flex-1 flex flex-col overflow-hidden">
                                     <div className="flex items-center justify-between mb-4">
                                         <h2 className="text-lg font-bold flex items-center gap-2"><ListMusic size={18} /> Queue</h2>
@@ -163,58 +165,66 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                     </div>
                                 </div>
                             ) : (
-                                /* Art View */
                                 <>
-                                    {/* Album Art */}
-                                    <div className="relative mb-8">
+                                    {/* Album Art - Premium with shadow glow */}
+                                    <div className="relative mb-10 group">
                                         {getArt() ? (
-                                            <img src={getArt()} alt="" className="w-72 h-72 xl:w-80 xl:h-80 rounded-2xl object-cover shadow-[0_20px_80px_rgba(0,0,0,0.6)]" />
+                                            <>
+                                                {/* Soft glow behind art */}
+                                                <div className="absolute -inset-8 rounded-3xl opacity-30 blur-3xl" style={{
+                                                    backgroundImage: `url(${getArt()})`,
+                                                    backgroundSize: 'cover', backgroundPosition: 'center'
+                                                }} />
+                                                <img src={getArt()} alt=""
+                                                    className="relative w-72 h-72 xl:w-80 xl:h-80 2xl:w-[22rem] 2xl:h-[22rem] rounded-2xl object-cover shadow-[0_25px_100px_rgba(0,0,0,0.5)] ring-1 ring-white/10"
+                                                />
+                                            </>
                                         ) : (
-                                            <div className="w-72 h-72 xl:w-80 xl:h-80 rounded-2xl bg-white/10 flex items-center justify-center">
-                                                <Music size={64} className="text-white/20" />
+                                            <div className="w-72 h-72 xl:w-80 xl:h-80 rounded-2xl bg-white/[0.06] flex items-center justify-center ring-1 ring-white/10">
+                                                <Music size={64} className="text-white/15" />
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Track Info */}
-                                    <div className="text-center mb-6 max-w-sm">
-                                        <h1 className="text-2xl font-bold truncate">{decodeHtml(currentSong.name)}</h1>
-                                        <p className="text-white/50 mt-1 truncate">{decodeHtml(currentSong.primaryArtists || '')}</p>
+                                    <div className="text-center mb-8 max-w-sm">
+                                        <h1 className="text-2xl xl:text-3xl font-bold tracking-tight">{decodeHtml(currentSong.name)}</h1>
+                                        <p className="text-white/45 mt-2 text-base">{decodeHtml(currentSong.primaryArtists || '')}</p>
                                         {currentSong.album?.name && (
-                                            <p className="text-sm text-white/25 mt-0.5 truncate">{decodeHtml(currentSong.album.name)}</p>
+                                            <p className="text-sm text-white/20 mt-1">{decodeHtml(currentSong.album.name)}</p>
                                         )}
                                     </div>
                                 </>
                             )}
 
-                            {/* Progress Bar */}
-                            <div className="w-full max-w-sm mb-6">
-                                <div className="h-1.5 bg-white/10 rounded-full cursor-pointer overflow-hidden group" onClick={handleSeek}>
-                                    <div className="h-full bg-white rounded-full relative transition-all" style={{ width: `${progress * 100}%` }}>
-                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" />
+                            {/* Progress Bar - Thicker, more interactive */}
+                            <div className="w-full max-w-sm mb-8">
+                                <div className="h-[5px] bg-white/[0.08] rounded-full cursor-pointer overflow-hidden group" onClick={handleSeek}>
+                                    <div className="h-full bg-white/60 group-hover:bg-white rounded-full relative transition-all" style={{ width: `${progress * 100}%` }}>
+                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
                                     </div>
                                 </div>
-                                <div className="flex justify-between mt-2 text-xs text-white/40 tabular-nums">
+                                <div className="flex justify-between mt-2.5 text-[11px] text-white/30 tabular-nums font-mono">
                                     <span>{fmt(progress * duration)}</span>
                                     <span>{fmt(duration)}</span>
                                 </div>
                             </div>
 
                             {/* Main Controls */}
-                            <div className="flex items-center gap-6 mb-6">
-                                <button onClick={() => setShuffle(!shuffle)} className={`p-2 ${shuffle ? 'text-white' : 'text-white/40'} hover:text-white transition-colors`}>
+                            <div className="flex items-center gap-7 mb-8">
+                                <button onClick={() => setShuffle(!shuffle)} className={`p-2.5 rounded-full transition-colors ${shuffle ? 'text-white bg-white/[0.08]' : 'text-white/30'} hover:text-white`}>
                                     <Shuffle size={18} />
                                 </button>
-                                <button onClick={prev} className="p-2 text-white/80 hover:text-white transition-colors">
-                                    <SkipBack size={24} fill="currentColor" />
+                                <button onClick={prev} className="p-2 text-white/70 hover:text-white transition-colors hover:scale-110 active:scale-90">
+                                    <SkipBack size={26} fill="currentColor" />
                                 </button>
-                                <button onClick={togglePlay} className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-[0_4px_25px_rgba(255,255,255,0.2)]">
-                                    {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                                <button onClick={togglePlay} className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-[0_4px_30px_rgba(255,255,255,0.25)]">
+                                    {isPlaying ? <Pause size={26} fill="currentColor" /> : <Play size={26} fill="currentColor" className="ml-1" />}
                                 </button>
-                                <button onClick={next} className="p-2 text-white/80 hover:text-white transition-colors">
-                                    <SkipForward size={24} fill="currentColor" />
+                                <button onClick={next} className="p-2 text-white/70 hover:text-white transition-colors hover:scale-110 active:scale-90">
+                                    <SkipForward size={26} fill="currentColor" />
                                 </button>
-                                <button onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')} className={`p-2 relative ${repeat !== 'off' ? 'text-white' : 'text-white/40'} hover:text-white transition-colors`}>
+                                <button onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')} className={`p-2.5 rounded-full relative transition-colors ${repeat !== 'off' ? 'text-white bg-white/[0.08]' : 'text-white/30'} hover:text-white`}>
                                     <Repeat size={18} />
                                     {repeat === 'one' && <span className="absolute text-[8px] font-bold top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">1</span>}
                                 </button>
@@ -222,35 +232,35 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                             {/* Footer Row */}
                             <div className="flex items-center gap-3 w-full max-w-sm">
-                                <button onClick={() => currentSong && toggleLike(currentSong)} className={`p-2 rounded-full hover:bg-white/10 transition-colors ${isLiked(currentSong.id) ? 'text-white' : 'text-white/30'}`}>
+                                <button onClick={() => currentSong && toggleLike(currentSong)} className={`p-2 rounded-full hover:bg-white/10 transition-colors ${isLiked(currentSong.id) ? 'text-white' : 'text-white/25'}`}>
                                     <Heart size={20} fill={isLiked(currentSong.id) ? 'currentColor' : 'none'} />
                                 </button>
 
                                 <div className="flex items-center gap-2 flex-1 group">
-                                    <button onClick={() => setVolume(volume === 0 ? 1 : 0)} className="text-white/40 hover:text-white">
+                                    <button onClick={() => setVolume(volume === 0 ? 1 : 0)} className="text-white/35 hover:text-white">
                                         {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
                                     </button>
-                                    <div className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer overflow-hidden"
+                                    <div className="flex-1 h-1 bg-white/[0.08] rounded-full cursor-pointer overflow-hidden"
                                         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))); }}>
                                         <div className="h-full bg-white/50 group-hover:bg-white transition-colors" style={{ width: `${volume * 100}%` }} />
                                     </div>
                                 </div>
 
-                                <button onClick={() => setViewMode(viewMode === 'queue' ? 'art' : 'queue')} className={`p-2 rounded-full hover:bg-white/10 ${viewMode === 'queue' ? 'text-white bg-white/10' : 'text-white/30'}`}>
+                                <button onClick={() => setViewMode(viewMode === 'queue' ? 'art' : 'queue')} className={`p-2 rounded-full hover:bg-white/10 ${viewMode === 'queue' ? 'text-white bg-white/10' : 'text-white/25'}`}>
                                     <ListMusic size={18} />
                                 </button>
 
-                                <button onClick={handleShare} className="p-2 rounded-full text-white/30 hover:bg-white/10 hover:text-white">
+                                <button onClick={handleShare} className="p-2 rounded-full text-white/25 hover:bg-white/10 hover:text-white">
                                     <Share2 size={18} />
                                 </button>
 
                                 {/* 3-dots menu */}
                                 <div className="relative" ref={menuRef}>
-                                    <button onClick={() => { setShowMenu(!showMenu); setShowQualityPicker(false); }} className="p-2 rounded-full text-white/30 hover:bg-white/10 hover:text-white">
+                                    <button onClick={() => { setShowMenu(!showMenu); setShowQualityPicker(false); }} className="p-2 rounded-full text-white/25 hover:bg-white/10 hover:text-white">
                                         <MoreHorizontal size={18} />
                                     </button>
                                     {showMenu && (
-                                        <div className="absolute bottom-full right-0 mb-2 w-52 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-1.5 z-50">
+                                        <div className="absolute bottom-full right-0 mb-2 w-52 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-1.5 z-50">
                                             {!showQualityPicker ? (
                                                 <>
                                                     <MenuBtn icon={<Plus size={14} />} label="Add to Queue" onClick={handleAddToQueue} />
@@ -283,30 +293,30 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                             {/* Quality Streaming Badge */}
                             {activeQuality && (
-                                <div className="mt-4 flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest">
+                                <div className="mt-5 flex items-center gap-2.5 text-[10px] text-white/20 uppercase tracking-[0.15em]">
                                     <Disc3 size={10} className={isPlaying ? 'animate-spin' : ''} />
                                     <span>HIGH-QUALITY STREAMING</span>
-                                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-bold">
+                                    <span className="px-2 py-0.5 rounded-md bg-white/[0.08] text-white/40 font-bold border border-white/[0.06]">
                                         {activeQuality === 'hires' ? 'HI-RES' : activeQuality === 'flac' ? 'LOSSLESS' : `${activeQuality} kbps`}
                                     </span>
                                 </div>
                             )}
                         </div>
 
-                        {/* ── RIGHT COLUMN: Synced Lyrics ── */}
-                        <div className="w-1/2 flex flex-col py-20 pr-12 pl-4">
+                        {/* RIGHT COLUMN: Synced Lyrics */}
+                        <div className="w-1/2 flex flex-col py-24 pr-14 pl-6">
                             {/* Up Next */}
                             {queue.length > 0 && currentIndex < queue.length - 1 && (
-                                <div className="flex items-center gap-3 p-3 bg-white/[0.04] backdrop-blur-sm rounded-xl mb-4 cursor-pointer hover:bg-white/[0.06] transition-colors"
+                                <div className="flex items-center gap-3 p-3.5 bg-white/[0.03] backdrop-blur-sm rounded-2xl mb-5 cursor-pointer hover:bg-white/[0.06] transition-all border border-white/[0.04]"
                                     onClick={() => next()}>
-                                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                                        <Radio size={16} className="text-white/40" />
+                                    <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center flex-shrink-0">
+                                        <Radio size={16} className="text-white/30" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[11px] text-white/30 uppercase tracking-widest font-bold">Up Next</p>
-                                        <p className="text-sm text-white/60 truncate">{decodeHtml(queue[currentIndex + 1]?.name || '')}</p>
+                                        <p className="text-[10px] text-white/25 uppercase tracking-[0.15em] font-bold">Up Next</p>
+                                        <p className="text-sm text-white/55 truncate mt-0.5">{decodeHtml(queue[currentIndex + 1]?.name || '')}</p>
                                     </div>
-                                    <span className="text-xs text-white/20 font-mono">
+                                    <span className="text-xs text-white/15 font-mono">
                                         {(() => { const s = queue[currentIndex + 1]; if (!s?.duration) return ''; const d = parseInt(String(s.duration)); return `${Math.floor(d / 60)}:${(d % 60).toString().padStart(2, '0')}`; })()}
                                     </span>
                                 </div>
@@ -314,28 +324,26 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                             {/* Lyrics */}
                             <div className="flex-1 overflow-y-auto relative" style={{
-                                maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
-                                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+                                maskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
+                                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)'
                             }}>
                                 {lyricsLoading ? (
                                     <div className="h-full flex items-center justify-center text-white/20">
                                         <div className="flex flex-col items-center gap-3">
-                                            <Disc3 size={28} className="animate-spin text-white/30" />
+                                            <Disc3 size={28} className="animate-spin text-white/25" />
                                             <span className="text-sm">Loading lyrics...</span>
                                         </div>
                                     </div>
                                 ) : isSynced && lyrics.length > 0 ? (
-                                    /* Apple-style synced lyrics */
-                                    <div className="flex flex-col gap-4 py-[40vh]" ref={lyricsRef}>
+                                    <div className="flex flex-col gap-5 py-[40vh]" ref={lyricsRef}>
                                         {lyrics.map((line, i) => {
                                             const isActive = i === activeLineIdx;
                                             const isPast = i < activeLineIdx;
                                             return (
                                                 <p key={i}
-                                                    className={`text-2xl xl:text-3xl font-bold leading-snug cursor-pointer transition-all duration-500 ease-out
-                                                        ${isActive ? 'text-white scale-[1.02] origin-left' : isPast ? 'text-white/20' : 'text-white/30'}
+                                                    className={`text-[1.65rem] xl:text-[1.9rem] font-bold leading-snug cursor-pointer transition-all duration-500 ease-out
+                                                        ${isActive ? 'text-white scale-[1.01] origin-left' : isPast ? 'text-white/15' : 'text-white/25'}
                                                     `}
-                                                    style={{ filter: isActive ? 'blur(0px)' : 'blur(0.3px)' }}
                                                     onClick={() => seek(line.time / duration)}
                                                 >
                                                     {line.text}
@@ -345,16 +353,16 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                     </div>
                                 ) : plainLyrics ? (
                                     <div className="h-full flex items-center">
-                                        <p className="text-xl leading-loose text-white/50 whitespace-pre-wrap font-medium">
+                                        <p className="text-lg leading-[2] text-white/40 whitespace-pre-wrap font-medium">
                                             {plainLyrics}
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="h-full flex items-center justify-center">
-                                        <div className="text-center text-white/15">
-                                            <Mic2 size={48} className="mx-auto mb-4" />
-                                            <p className="text-lg font-medium">No lyrics available</p>
-                                            <p className="text-sm mt-1">Lyrics will appear here when available</p>
+                                        <div className="text-center text-white/10">
+                                            <Mic2 size={52} className="mx-auto mb-5" strokeWidth={1.5} />
+                                            <p className="text-lg font-semibold text-white/20">No lyrics available</p>
+                                            <p className="text-sm mt-1.5 text-white/10">Lyrics will appear here when available</p>
                                         </div>
                                     </div>
                                 )}
@@ -362,19 +370,19 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                             {/* About the Artist */}
                             {currentSong.primaryArtists && (
-                                <div className="mt-4 flex items-center gap-3 p-3 bg-white/[0.03] rounded-xl">
-                                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                <div className="mt-5 flex items-center gap-3 p-3.5 bg-white/[0.03] rounded-2xl border border-white/[0.04]">
+                                    <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center flex-shrink-0 overflow-hidden ring-1 ring-white/[0.06]">
                                         {getArt() ? (
                                             <img src={getArt()} alt="" className="w-full h-full object-cover" />
                                         ) : (
-                                            <Music size={16} className="text-white/30" />
+                                            <Music size={16} className="text-white/25" />
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[11px] text-white/30 uppercase tracking-widest font-bold">About the Artist</p>
-                                        <p className="text-sm text-white/60 truncate">{decodeHtml(currentSong.primaryArtists)}</p>
+                                        <p className="text-[10px] text-white/25 uppercase tracking-[0.15em] font-bold">About the Artist</p>
+                                        <p className="text-sm text-white/55 truncate mt-0.5">{decodeHtml(currentSong.primaryArtists)}</p>
                                     </div>
-                                    <ChevronDown size={16} className="text-white/20 -rotate-90" />
+                                    <ChevronDown size={16} className="text-white/15 -rotate-90" />
                                 </div>
                             )}
                         </div>
