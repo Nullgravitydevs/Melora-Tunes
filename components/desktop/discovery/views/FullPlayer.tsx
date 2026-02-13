@@ -28,7 +28,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
         showToast, queue, currentIndex, playIndex,
         isLiked, toggleLike, activeQuality,
         qualityPreference, setQualityPreference,
-        setQueue, downloadSong, isDownloaded
+        setQueue, downloadSong, isDownloaded, activeMixId
     } = usePlayback();
 
     const [viewMode, setViewMode] = useState<'art' | 'queue'>('art');

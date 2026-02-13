@@ -40,6 +40,15 @@ async function generate() {
         .toFile(path.join(PUBLIC, 'favicon.ico'));
     console.log('  ✓ public/favicon.ico (32x32)');
 
+    // Desktop app icon (Electron)
+    fs.copyFileSync(path.join(PUBLIC, 'favicon.ico'), path.join(PUBLIC, 'app-icon.ico'));
+    console.log('  ✓ public/app-icon.ico (32x32)');
+
+    // Next.js app router favicon
+    const APP_DIR = path.join(__dirname, '..', 'app');
+    fs.copyFileSync(path.join(PUBLIC, 'favicon.ico'), path.join(APP_DIR, 'favicon.ico'));
+    console.log('  ✓ app/favicon.ico (32x32)');
+
     // --- Android Adaptive Icons ---
     const androidSizes = [
         { folder: 'mipmap-mdpi', size: 48 },
