@@ -129,7 +129,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                     >
                         <RefreshCcw size={16} />
                         Try Again
-                    </div>
+                    </button>
                 </div>
             </div>
         );
