@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 
 interface SmartHeroProps {
     item: any;
@@ -24,17 +25,7 @@ export function SmartHero({ item, type, greeting, isPlaying, onPlay, onToggle }:
 
     if (!item) return null;
 
-    const getArt = () => {
-        if (!item?.image) return '';
-        if (typeof item.image === 'string') return item.image;
-        if (Array.isArray(item.image)) {
-            // Get highest quality for Hero
-            return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
-        }
-        return '';
-    };
-
-    const artUrl = getArt();
+    const artUrl = getArt(item);
 
     return (
         <div className="relative h-[60vh] min-h-[500px] w-full mb-8 group overflow-hidden">

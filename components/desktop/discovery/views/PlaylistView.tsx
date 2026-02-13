@@ -8,6 +8,7 @@ import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack } from "@/lib/types";
 import { loadSettings } from "@/lib/settings";
 import { cn, decodeHtml, cleanTrackTitle } from "@/lib/utils";
+import { shuffleArray } from "@/lib/helpers";
 import { AddToPlaylistModal } from "@/components/desktop/discovery/modals/AddToPlaylistModal";
 import { Search } from "lucide-react";
 
@@ -173,7 +174,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
     // Play Handlers
     const playAll = (shuffle = false) => {
         if (filteredSongs.length === 0) return;
-        const list = shuffle ? [...filteredSongs].sort(() => Math.random() - 0.5) : filteredSongs;
+        const list = shuffle ? shuffleArray(filteredSongs) : filteredSongs;
         const newMix: Mix = {
             id: PLAYLIST_MIX_ID,
             title: title,

@@ -18,6 +18,7 @@ import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume
 import { StickerLayer, Sticker, StickerType } from './stickers/StickerLayer';
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { shuffleArray } from "@/lib/helpers";
 import { PlayableTrack, PlayableSource } from "@/lib/types";
 import { searchSongs, JioSaavnSong, getAlbumDetails, getLyricsWithFallback } from "@/lib/jiosaavn";
 import { searchUnified } from "@/lib/unified-search";
@@ -1014,7 +1015,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
                 // Shuffle Action
                 const shuffleAll = () => {
-                    const shuffled = [...uniqueSongs].sort(() => Math.random() - 0.5);
+                    const shuffled = shuffleArray(uniqueSongs);
                     // We need a mechanism to play a dynamic queue. 
                     // reusing OTG for now or forcing play
                     playSongNow(shuffled[0]); // Simple "Play first", technically queue should update

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion";
 import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus } from "lucide-react";
 import { AudioQuality } from "@/lib/types";
+import { getArt } from "@/lib/helpers";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
@@ -780,12 +781,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
 
     const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
-    const getArt = () => {
-        if (!currentSong?.image) return '';
-        if (typeof currentSong.image === 'string') return currentSong.image;
-        if (Array.isArray(currentSong.image)) return currentSong.image.find(i => i.quality === '500x500')?.link || currentSong.image[0]?.link || '';
-        return '';
-    };
+    const songArt = getArt(currentSong);
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const r = e.currentTarget.getBoundingClientRect();
@@ -808,8 +804,8 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                     {/* Spinning CD Art */}
                     <div className="relative cursor-pointer flex-shrink-0 group" onClick={onExpand}>
                         <div className={`w-11 h-11 rounded-full overflow-hidden bg-white/5 ring-2 ring-white/[0.06] shadow-[0_0_15px_rgba(0,0,0,0.4)] ${isPlaying ? 'animate-[spin_4s_linear_infinite]' : ''}`}>
-                            {getArt() ? (
-                                <img src={getArt()} className="w-full h-full object-cover" />
+                            {songArt ? (
+                                <img src={songArt} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                     <Music size={16} className="text-white/20" />

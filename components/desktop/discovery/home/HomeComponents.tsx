@@ -159,7 +159,7 @@ export function StandardCard({ item, index, subtitle, onClick, rank }: { item: a
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 group-hover:opacity-80"
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-zinc-800">
+                    <div className="w-full h-full flex items-center justify-center bg-[#000000]">
                         <Music size={32} className="text-white/20" />
                     </div>
                 )}
@@ -256,7 +256,7 @@ export function QuickPickItem({ item, index, onClick }: { item: any; index: numb
             onClick={onClick}
             className="flex items-center gap-3 p-2 pr-4 rounded-lg bg-transparent hover:bg-white/5 transition-colors cursor-pointer group border border-white/5 hover:border-white/10"
         >
-            <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-zinc-800">
+            <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-[#000000]">
                 {getArt() ? (
                     <img
                         src={getArt()}
@@ -317,7 +317,7 @@ export function CompactCard({ item, index, onClick }: { item: any; index: number
     return (
         <div onClick={onClick} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group border-b border-white/5 last:border-0 hover:border-transparent">
             <span className="font-bold text-white/20 w-4 text-center group-hover:text-white/60">{index + 1}</span>
-            <img src={getArt()} className="w-12 h-12 rounded-lg object-cover bg-zinc-800" />
+            <img src={getArt()} className="w-12 h-12 rounded-lg object-cover bg-[#000000]" />
             <div className="flex-1 min-w-0">
                 <h4 className="font-bold text-white truncate">{decodeHtml(item.name)}</h4>
                 <p className="text-sm text-white/40 truncate">{decodeHtml(item.primaryArtists)}</p>

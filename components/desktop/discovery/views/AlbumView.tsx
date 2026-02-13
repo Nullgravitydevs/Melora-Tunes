@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Play, Pause, Shuffle, Heart, ArrowLeft, MoreHorizontal, Clock, Disc3, AlertCircle, RefreshCcw } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getAlbumDetails, getArtistDetails, JioSaavnSong, searchAlbums } from "@/lib/jiosaavn";
+import { shuffleArray, getArt } from "@/lib/helpers";
 import { HorizontalScroll, StandardCard, SectionHeader, VibeAlbumCard } from "../home/HomeComponents";
 import { decodeHtml } from "@/lib/utils";
 
@@ -26,15 +27,8 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
 
     const albumName = albumData?.name || albumData?.title || 'Unknown Album';
     const artistName = albumData?.primaryArtists || albumData?.subtitle || '';
-    const albumImage = getImage(albumData);
+    const albumImage = getArt(albumData);
     const year = albumData?.year || '';
-
-    function getImage(item: any) {
-        if (!item?.image) return '';
-        if (typeof item.image === 'string') return item.image;
-        if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
-        return '';
-    }
 
     useEffect(() => {
         const load = async () => {
@@ -75,7 +69,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
 
     const playAll = (shuffle = false) => {
         if (songs.length === 0) return;
-        const list = shuffle ? [...songs].sort(() => Math.random() - 0.5) : songs;
+        const list = shuffle ? shuffleArray(songs) : songs;
         const newMix: Mix = newMixTemplate(list);
         const added = addMix(newMix);
         if (!added) updateMix(ALBUM_MIX_ID, { songs: list, currentSongIndex: 0 });

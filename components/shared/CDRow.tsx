@@ -2,6 +2,7 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 import { decodeHtml } from '@/lib/utils';
+import { getArtFromTrack } from '@/lib/helpers';
 import { PlayableTrack, PlayableSource } from '@/lib/types';
 import { JioSaavnSong } from '@/lib/jiosaavn';
 
@@ -19,20 +20,7 @@ export function CDRowComponent({ track, onPlay, onAdd }: CDRowProps) {
     else if (sources.some((s: PlayableSource) => s.quality === 'flac')) badge = "FLAC";
     else if (sources.some((s: PlayableSource) => s.quality === '320')) badge = "320kbps";
 
-    // Handle Image Extraction
-    const getImage = (item: any) => {
-        const song = item.song;
-        if (!song) return '';
-        if (typeof song.image === 'string') return song.image;
-        if (Array.isArray(song.image)) {
-            // Get highest quality (500x500) or last
-            const highRes = song.image.find((i: any) => i.quality === '500x500');
-            return highRes?.link || song.image[song.image.length - 1]?.link || '';
-        }
-        return '';
-    };
-
-    const art = getImage(track);
+    const art = getArtFromTrack(track);
 
     return (
         <div

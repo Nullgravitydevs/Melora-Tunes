@@ -10,6 +10,7 @@ import {
 import { getArtistDetails, searchArtists, searchSongs, searchAlbums, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
+import { shuffleArray } from "@/lib/helpers";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 interface Props {
@@ -76,7 +77,7 @@ export function ArtistView({ artist, onBack, onNavigate }: Props) {
     }, [artistId, artistName, retryCount]);
 
     const playSongs = (songs: JioSaavnSong[], index: number, shuffled = false) => {
-        const list = shuffled ? [...songs].sort(() => Math.random() - 0.5) : songs;
+        const list = shuffled ? shuffleArray(songs) : songs;
         const mixId = `artist-${artistId || artistName}`;
         const existing = mixes.find((m) => m.id === mixId);
         if (existing) {

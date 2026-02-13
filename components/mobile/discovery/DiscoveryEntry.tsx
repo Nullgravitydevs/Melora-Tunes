@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { QualityBadge } from "@/components/shared/QualityBadge";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 
 import { HomeTab } from "./tabs/HomeTab";
 import { SearchTab } from "./tabs/SearchTab";
@@ -30,18 +31,8 @@ export interface ViewState {
 }
 
 // ─── Helpers ─────────────────────────────────────────────
-export function getArt(item: any): string {
-    if (!item?.image) return "";
-    if (typeof item.image === "string") return item.image;
-    if (Array.isArray(item.image)) {
-        return (
-            item.image.find((i: any) => i.quality === "500x500")?.link ||
-            item.image[item.image.length - 1]?.link ||
-            ""
-        );
-    }
-    return item.art || "";
-}
+// getArt is now imported from @/lib/helpers and re-exported for backward compat
+export { getArt } from "@/lib/helpers";
 
 // ─── Main Entry ──────────────────────────────────────────
 export function DiscoveryEntry() {

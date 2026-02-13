@@ -6,6 +6,7 @@ import { Play, ChevronRight, Radio, Globe, Sparkles, Headphones, Music } from "l
 import { searchSongs, searchPlaylists, searchAlbums, searchArtists, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
+import { shuffleArray } from "@/lib/helpers";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 interface Props { onNavigate: (v: ViewState) => void }
@@ -100,7 +101,7 @@ export function ExploreTab({ onNavigate }: Props) {
                     id: `radio-${Date.now()}`,
                     title: `${title} Radio`,
                     color: "white",
-                    songs: songs.sort(() => Math.random() - 0.5),
+                    songs: shuffleArray(songs),
                     currentSongIndex: 0,
                 });
             }

@@ -26,12 +26,7 @@ function getGreeting(name?: string) {
     return name ? `${g}, ${name}` : g;
 }
 
-function getArt(item: any, quality = '500x500'): string {
-    if (!item?.image) return '';
-    if (typeof item.image === 'string') return item.image;
-    if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === quality)?.link || item.image[0]?.link || '';
-    return '';
-}
+import { getArt } from "@/lib/helpers";
 
 // ─── SKELETON ─────────────────────────────────────────────────────────────
 function HomeSkeleton() {

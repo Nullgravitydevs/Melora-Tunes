@@ -12,6 +12,7 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { isPlayableTrack, PlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
+import { shuffleArray, getArt, formatDuration } from "@/lib/helpers";
 import { AddToPlaylistModal } from "@/components/desktop/discovery/modals/AddToPlaylistModal";
 import { CDRow } from "@/components/shared/CDRow";
 
@@ -270,23 +271,9 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
         return { label: '320', class: 'quality-320' };
     };
 
-    // Get album art
-    const getArt = (item: JioSaavnSong | PlayableTrack) => {
-        const song = isPlayableTrack(item) ? item.song : item;
-        if (!song?.image) return '';
-        if (typeof song.image === 'string') return song.image;
-        if (Array.isArray(song.image)) {
-            return song.image.find(i => i.quality === '150x150')?.link || song.image[0]?.link || '';
-        }
-        return '';
-    };
-
-    // Format duration
-    const formatDuration = (d: number | string | undefined) => {
-        const dur = typeof d === 'string' ? parseInt(d) : d;
-        if (!dur || isNaN(dur)) return '';
-        return `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`;
-    };
+// Get album art — unwrap PlayableTrack, prefer 150x150 for list thumbnails
+    const getItemArt = (item: JioSaavnSong | PlayableTrack) =>
+        getArt(isPlayableTrack(item) ? item.song : item, '150x150');
 
     // Play song from list
     const playSong = (item: JioSaavnSong | PlayableTrack, allItems: (JioSaavnSong | PlayableTrack)[]) => {
@@ -314,7 +301,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
         if (items.length === 0) return;
 
         let songs = items.map(i => isPlayableTrack(i) ? i : ensurePlayableTrack(i, qualityPreference as AudioQuality));
-        if (shuffle) songs = [...songs].sort(() => Math.random() - 0.5);
+        if (shuffle) songs = shuffleArray(songs);
 
         const newMix: Mix = {
             id: `library-${Date.now()}`,
@@ -390,8 +377,8 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                         }}
                     />
                     <div className={`absolute inset-2 rounded-full overflow-hidden ${isCurrentPlaying && isPlaying ? 'cd-spinning' : ''}`}>
-                        {getArt(item) ? (
-                            <img src={getArt(item)} alt="" className="w-full h-full object-cover" />
+                        {getItemArt(item) ? (
+                            <img src={getItemArt(item)} alt="" className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full bg-white/10 flex items-center justify-center">
                                 <Music size={12} className="text-white/30" />
@@ -450,7 +437,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
     // Render playlist card
     const renderPlaylistCard = (playlist: Mix) => {
         const firstSong = playlist.songs[0];
-        const art = firstSong ? getArt(firstSong) : '';
+        const art = firstSong ? getItemArt(firstSong) : '';
 
         return (
             <motion.div
@@ -762,8 +749,8 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                                             className="glass-card p-3 rounded-xl cursor-pointer group hover:bg-white/10"
                                         >
                                             <div className="relative aspect-square mb-3 rounded-lg overflow-hidden bg-white/5 shadow-lg">
-                                                {getArt(album) ? (
-                                                    <img src={getArt(album)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                {getItemArt(album) ? (
+                                                    <img src={getItemArt(album)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center">
                                                         <Disc size={32} className="text-white/20" />

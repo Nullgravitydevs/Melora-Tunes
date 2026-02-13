@@ -141,7 +141,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
     return (
         <div className="relative min-h-full pb-32">
             {/* HEADER */}
-            <div className="relative z-10 px-8 pt-8 pb-6 flex items-end justify-between bg-gradient-to-b from-black/50 to-transparent sticky top-0 backdrop-blur-xl border-b border-white/5">
+            <div className="relative z-10 px-8 pt-8 pb-6 flex items-end justify-between bg-gradient-to-b from-[#000000] to-transparent sticky top-0 backdrop-blur-xl border-b border-white/5">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors border border-white/5">
                         <ChevronLeft size={20} />
@@ -187,7 +187,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                     </div>
                 ) : isSongList ? (
                     /* === SEXY LIST LAYOUT === */
-                    <div className="bg-white/5 rounded-3xl border border-white/5 overflow-hidden">
+                    <div className="bg-[#000000] rounded-3xl border border-white/5 overflow-hidden">
                         {/* Header Row */}
                         <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 px-6 py-4 border-b border-white/5 text-[10px] font-bold text-white/30 uppercase tracking-widest">
                             <span className="w-8 text-center">#</span>

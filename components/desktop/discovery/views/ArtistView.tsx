@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Play, Pause, Shuffle, Heart, Clock, ArrowLeft, Music, MoreHorizontal, User, AlertCircle, RefreshCcw, BadgeCheck, Info } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getArtistDetails, JioSaavnSong } from "@/lib/jiosaavn";
+import { shuffleArray, getArt } from "@/lib/helpers";
 import { HorizontalScroll, StandardCard, SectionHeader, VibeAlbumCard } from "../home/HomeComponents";
 import { decodeHtml } from "@/lib/utils";
 
@@ -32,14 +33,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
     const [bioExpanded, setBioExpanded] = useState(false);
 
     const artistName = artist?.name || artist?.primaryArtists || 'Unknown Artist';
-    const artistImage = getImage(artist);
-
-    function getImage(item: any) {
-        if (!item?.image) return '';
-        if (typeof item.image === 'string') return item.image;
-        if (Array.isArray(item.image)) return item.image.find((i: any) => i.quality === '500x500')?.link || item.image[0]?.link || '';
-        return '';
-    }
+    const artistImage = getArt(artist);
 
     // Fetch artist profile
     useEffect(() => {
@@ -84,7 +78,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
     // Play all
     const playAll = (shuffle = false) => {
         if (songs.length === 0) return;
-        const list = shuffle ? [...songs].sort(() => Math.random() - 0.5) : songs;
+        const list = shuffle ? shuffleArray(songs) : songs;
         const newMix: Mix = {
             id: ARTIST_MIX_ID,
             title: artistName,

@@ -8,6 +8,7 @@ import {
     Trash2, Search, X, Download, Settings
 } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
+import { shuffleArray } from "@/lib/helpers";
 import { QualityBadge } from "@/components/shared/QualityBadge";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
@@ -53,7 +54,7 @@ export function LibraryTab({ onNavigate }: Props) {
 
     const playAll = (songs: any[], title: string, shuffled = false) => {
         if (songs.length === 0) return;
-        const list = shuffled ? [...songs].sort(() => Math.random() - 0.5) : songs;
+        const list = shuffled ? shuffleArray(songs) : songs;
         playInstantMix({ id: `library-${Date.now()}`, title, color: "white", songs: list, currentSongIndex: 0 });
     };
 

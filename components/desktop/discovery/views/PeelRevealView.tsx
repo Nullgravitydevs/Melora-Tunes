@@ -6,6 +6,7 @@ import { ChevronRight, Play, Disc3, ArrowLeft, AlertCircle, RefreshCcw, Library,
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { usePlayback } from "@/components/providers/playback-context";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 
 interface PeelRevealViewProps {
     album: JioSaavnSong;
@@ -65,20 +66,15 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
         }
     };
 
-    const getArt = () => {
-        if (!album.image) return '';
-        if (typeof album.image === 'string') return album.image;
-        if (Array.isArray(album.image)) return album.image.find(i => i.quality === '500x500')?.link || album.image[album.image.length - 1]?.link || '';
-        return '';
-    };
+    const albumArt = getArt(album);
 
     return (
         <div className="relative w-full h-full flex flex-col overflow-hidden bg-black text-white">
 
             {/* BACKGROUND */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute inset-0 bg-cover bg-center opacity-60 scale-125 blur-[90px] saturate-[1.6]" style={{ backgroundImage: `url(${getArt()})` }} />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/90" />
+                <div className="absolute inset-0 bg-cover bg-center opacity-60 scale-125 blur-[90px] saturate-[1.6]" style={{ backgroundImage: `url(${albumArt})` }} />
+                <div className="absolute inset-0 bg-gradient-to-b from-[#000000]/20 via-[#000000]/40 to-[#000000]/90" />
             </div>
 
             {/* HEADER (Compact) */}
@@ -108,7 +104,7 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
                                     <div className="absolute inset-0 rounded-full opacity-30 mix-blend-overlay" style={{ background: `conic-gradient(from 0deg, transparent 0%, #ff0000 10%, #00ff00 20%, #0000ff 30%, transparent 40%)` }} />
                                     <div className="absolute inset-0 rounded-full opacity-30" style={{ background: 'repeating-radial-gradient(transparent 0, transparent 1.5px, #000 2px)' }} />
                                     <div className="absolute top-[35%] left-[35%] w-[30%] h-[30%] rounded-full overflow-hidden border-2 border-neutral-300/20 shadow-inner">
-                                        <img src={getArt()} className="w-[84px] h-[84px] object-cover" />
+                                        <img src={albumArt} className="w-[84px] h-[84px] object-cover" />
                                     </div>
                                     <div className="absolute top-[46%] left-[46%] w-5 h-5 bg-black rounded-full shadow-[inset_0_1px_3px_rgba(255,255,255,0.4)]" />
                                 </div>
@@ -116,7 +112,7 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
 
                             {/* SLEEVE */}
                             <div className="absolute top-0 left-[30px] rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.6)] z-10 overflow-hidden" style={{ width: sleeveWidth, height: sleeveWidth }}>
-                                <img src={getArt()} alt={album.name} className="w-full h-full object-cover" />
+                                <img src={albumArt} alt={album.name} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.4)] pointer-events-none" />
                             </div>
 
@@ -176,7 +172,7 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
                                     </button>
                                 </div>
                             ) : (
-                                <div className="bg-black/30 backdrop-blur-xl border border-white/5 rounded-2xl p-1 shadow-xl">
+                                <div className="bg-[#000000] backdrop-blur-xl border border-white/5 rounded-2xl p-1 shadow-xl">
                                     {tracks.map((track, i) => {
                                         const isActive = currentSong?.id === track.id;
                                         return (

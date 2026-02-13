@@ -6,16 +6,17 @@
 /**
  * Deterministic Art Fetcher.
  * Extracts the highest quality album art URL from a JioSaavn item.
+ * @param item  Any object with image/coverArt/art fields
+ * @param quality  Preferred image quality (default: '500x500')
  */
-export function getArt(item: any): string {
+export function getArt(item: any, quality: '500x500' | '150x150' = '500x500'): string {
     if (!item) return '';
 
     // Direct image array (most common)
     if (item.image && Array.isArray(item.image)) {
-        // Find highest quality (500x500 or last item usually)
-        const best = item.image.find((img: any) =>
-            img.quality === '500x500' || img.quality === '150x150'
-        ) || item.image[item.image.length - 1];
+        // Prefer requested quality, then fall back to last (highest res)
+        const best = item.image.find((img: any) => img.quality === quality)
+            || item.image[item.image.length - 1];
         return best?.link || best?.url || '';
     }
 
@@ -61,11 +62,49 @@ export function decodeHtml(html: string): string {
  * Duration Formatter.
  * Converts seconds to MM:SS format.
  */
-export function formatDuration(seconds: number): string {
-    if (!seconds || isNaN(seconds)) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+export function formatDuration(seconds: number | string | undefined): string {
+    const s = typeof seconds === 'string' ? parseInt(seconds) : seconds;
+    if (!s || isNaN(s)) return '';
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Human-Readable Duration Formatter.
+ * Converts total seconds to "X hr Y min" or "X min" format.
+ */
+export function formatDurationHuman(totalSeconds: number): string {
+    if (!totalSeconds || isNaN(totalSeconds)) return '';
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    if (hrs > 0) return `${hrs} hr ${mins} min`;
+    return `${mins} min`;
+}
+
+/**
+ * Fisher-Yates Shuffle.
+ * Returns a new array with elements in random order. Unbiased.
+ */
+export function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+/**
+ * Get art URL from a PlayableTrack-shaped object.
+ * Handles both raw JioSaavn items and wrapped PlayableTrack { song: ... } shapes.
+ */
+export function getArtFromTrack(item: any): string {
+    if (!item) return '';
+    // PlayableTrack wrapper: { song: { image: ... }, art: '...' }
+    if (item.song) return getArt(item.song) || item.art || '';
+    // Direct item
+    return getArt(item);
 }
 
 /**

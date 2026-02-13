@@ -11,6 +11,7 @@ import {
 import { usePlayback } from "@/components/providers/playback-context";
 import { useLyrics } from "@/hooks/useLyrics";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AudioQuality } from "@/lib/types";
 
@@ -82,12 +83,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
     const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
-    const getArt = () => {
-        if (!currentSong?.image) return '';
-        if (typeof currentSong.image === 'string') return currentSong.image;
-        if (Array.isArray(currentSong.image)) return currentSong.image.find(i => i.quality === '500x500')?.link || currentSong.image[0]?.link || '';
-        return '';
-    };
+    const songArt = getArt(currentSong);
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const r = e.currentTarget.getBoundingClientRect();
@@ -127,16 +123,16 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                     className="fixed inset-0 z-[100] bg-black"
                 >
                     {/* Multi-layer cinematic BG */}
-                    {getArt() && (
+                    {songArt && (
                         <>
                             <div className="absolute inset-0" style={{
-                                backgroundImage: `url(${getArt()})`,
+                                backgroundImage: `url(${songArt})`,
                                 backgroundSize: 'cover', backgroundPosition: 'center',
-                                filter: 'blur(80px) brightness(0.18) saturate(0.5)',
+                                filter: 'blur(80px) brightness(0.05) saturate(0.5)',
                                 transform: 'scale(1.8)'
                             }} />
-                            <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/40 to-black/80" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-[#000000]/70 via-[#000000]/40 to-[#000000]/80" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-transparent to-[#000000]/60" />
                         </>
                     )}
 
@@ -180,14 +176,14 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                 <>
                                     {/* Album Art - Apple-style large with reflection */}
                                     <div className="relative mb-12">
-                                        {getArt() ? (
+                                        {songArt ? (
                                             <>
                                                 {/* Ambient color glow */}
                                                 <div className="absolute -inset-12 rounded-[2rem] opacity-25 blur-[60px]" style={{
-                                                    backgroundImage: `url(${getArt()})`,
+                                                    backgroundImage: `url(${songArt})`,
                                                     backgroundSize: 'cover', backgroundPosition: 'center'
                                                 }} />
-                                                <img src={getArt()} alt=""
+                                                <img src={songArt} alt=""
                                                     className="relative w-[300px] h-[300px] xl:w-[340px] xl:h-[340px] 2xl:w-[380px] 2xl:h-[380px] rounded-xl object-cover shadow-[0_30px_100px_-10px_rgba(0,0,0,0.7)]"
                                                 />
                                             </>
@@ -385,8 +381,8 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                             {currentSong.primaryArtists && (
                                 <div className="mt-4 flex items-center gap-3 p-3 bg-white/[0.03] rounded-2xl">
                                     <div className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                        {getArt() ? (
-                                            <img src={getArt()} alt="" className="w-full h-full object-cover" />
+                                        {songArt ? (
+                                            <img src={songArt} alt="" className="w-full h-full object-cover" />
                                         ) : (
                                             <Music size={14} className="text-white/20" />
                                         )}

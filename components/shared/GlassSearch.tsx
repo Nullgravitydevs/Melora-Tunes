@@ -288,12 +288,3 @@ export function GlassSearch({ onClose, initialQuery = "", onSongSelect, desktopM
         </div>
     );
 }
-
-// Helpers
-function getArt(item: PlayableTrack): string {
-    if (!item.song) return '';
-    const img = item.song.image;
-    if (typeof img === 'string') return img;
-    if (Array.isArray(img)) return img[img.length - 1]?.link || '';
-    return '';
-}

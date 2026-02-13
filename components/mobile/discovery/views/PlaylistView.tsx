@@ -10,6 +10,7 @@ import {
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { searchUnified } from "@/lib/unified-search";
 import { decodeHtml } from "@/lib/utils";
+import { shuffleArray } from "@/lib/helpers";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 interface Props {
@@ -85,7 +86,7 @@ export function PlaylistView({ playlist, onBack, onNavigate }: Props) {
 
     const playSongs = (index: number, shuffled = false) => {
         if (tracks.length === 0) return;
-        const list = shuffled ? [...tracks].sort(() => Math.random() - 0.5) : tracks;
+        const list = shuffled ? shuffleArray(tracks) : tracks;
         const mixId = playlistId || `playlist-${Date.now()}`;
         const existing = mixes.find((m) => m.id === mixId);
         if (existing) {
