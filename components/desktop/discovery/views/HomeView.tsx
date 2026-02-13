@@ -83,17 +83,9 @@ function Hero({ song, onPlay, userName, isCurrent, isPlaying }: {
             }} />
 
             <div className="relative z-10 h-full flex items-center px-12 gap-12">
-                {/* Album Art with vinyl peek */}
-                <div className="shrink-0 relative hidden md:block">
-                    {/* Vinyl disc behind */}
-                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 w-[260px] h-[260px] rounded-full bg-zinc-900 border border-white/[0.06] translate-x-8 transition-transform duration-700 group-hover:translate-x-20">
-                        <div className="absolute inset-4 rounded-full border border-white/[0.04]" />
-                        <div className="absolute inset-8 rounded-full border border-white/[0.03]" />
-                        <div className="absolute inset-[4.5rem] rounded-full bg-zinc-800 border border-white/5" />
-                        <div className="absolute inset-[5.2rem] rounded-full bg-zinc-900" />
-                    </div>
-                    {/* Cover */}
-                    <div className="relative w-[260px] h-[260px] rounded-2xl overflow-hidden shadow-2xl shadow-black/80 ring-1 ring-white/[0.08] z-10">
+                {/* Album Art */}
+                <div className="shrink-0 hidden md:block">
+                    <div className="w-[260px] h-[260px] rounded-2xl overflow-hidden shadow-2xl shadow-black/80 ring-1 ring-white/[0.08]">
                         {art ? (
                             <img src={art} alt={song.name} className="w-full h-full object-cover" />
                         ) : (

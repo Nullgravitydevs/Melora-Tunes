@@ -15,19 +15,23 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     const isMobile = useIsMobile();
     const [step, setStep] = useState(0);
     const [profile, setProfile] = useState({ name: "", dob: "" });
-    const [isMuted, setIsMuted] = useState(true); // Always muted — background visual only
+    const [isMuted, setIsMuted] = useState(true);
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    // Dynamic Video Source — using intro-mobile.mp4 (3MB) for fast loading
-    const videoSrc = "/assets/intro-mobile.mp4";
+    const videoSrc = isMobile ? '/assets/intro-mobile.mp4' : '/assets/intro.mp4';
 
-    // Initial Load Settings if revisiting? Usually fresh.
     useEffect(() => {
-        // Ensure video plays
         if (videoRef.current) {
             videoRef.current.play().catch(e => console.log("Autoplay blocked", e));
         }
     }, [step]);
+
+    // Toggle mute/unmute on the video element directly
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.muted = isMuted;
+        }
+    }, [isMuted]);
 
     const handleNext = () => setStep(p => p + 1);
 
@@ -46,7 +50,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 <video
                     ref={videoRef}
                     src={videoSrc}
-                    className="absolute inset-0 w-full h-full object-contain opacity-60 transition-opacity duration-1000"
+                    className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-1000"
                     loop
                     muted={isMuted}
                     playsInline

@@ -21,14 +21,21 @@ export function Launcher({ onSelect }: LauncherProps) {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
+    // Toggle mute/unmute on the video element directly
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.muted = isMuted;
+        }
+    }, [isMuted]);
+
     return (
         <div className="relative w-screen h-screen bg-black text-white overflow-hidden flex flex-col font-sans">
             {/* Background Layer */}
             <div className="absolute inset-0 z-0 select-none pointer-events-none">
                 <video
                     ref={videoRef}
-                    src="/assets/intro-mobile.mp4"
-                    className="absolute inset-0 w-full h-full object-contain opacity-60 transition-opacity duration-1000"
+                    src={isMobile ? '/assets/intro-mobile.mp4' : '/assets/intro.mp4'}
+                    className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-1000"
                     loop
                     muted={isMuted}
                     playsInline
