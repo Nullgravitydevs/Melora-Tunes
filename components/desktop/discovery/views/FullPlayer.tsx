@@ -19,9 +19,12 @@ import { TrackContextMenu } from "@/components/ui/track-context-menu";
 interface FullPlayerProps {
     isOpen: boolean;
     onClose: () => void;
+    onGoToArtist?: (artistId: string) => void;
+    onGoToAlbum?: (albumId: string) => void;
+    onAddToPlaylist?: (song: any) => void;
 }
 
-export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
+export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddToPlaylist }: FullPlayerProps) {
     const {
         currentSong, isPlaying, togglePlay, next, prev,
         progress, duration, seek, volume, setVolume,
@@ -29,7 +32,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
         showToast, queue, currentIndex, playIndex,
         isLiked, toggleLike, activeQuality,
         qualityPreference, setQualityPreference,
-        setQueue, downloadSong, isDownloaded, activeMixId
+        setQueue, downloadSong, removeDownload, isDownloaded, activeMixId
     } = usePlayback();
 
     const [viewMode, setViewMode] = useState<'art' | 'queue'>('art');
@@ -181,7 +184,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                 <>
                                     {/* Album Art Container */}
                                     <motion.div
-                                        className="relative w-full aspect-square max-w-[320px] mb-8 group"
+                                        className="relative w-full aspect-square max-w-[260px] mb-8 group"
                                         initial={{ scale: 0.9, opacity: 0 }}
                                         animate={{ scale: 1, opacity: 1 }}
                                         transition={{ duration: 0.5, delay: 0.1 }}
@@ -205,16 +208,31 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                         <div className="flex-1 min-w-0 pr-8">
                                             <motion.h1
                                                 layoutId="player-title"
-                                                className="text-2xl md:text-3xl font-bold text-white tracking-tight leading-tight truncate mb-1"
+                                                className="text-xl md:text-2xl font-bold text-white tracking-tight leading-tight truncate mb-1"
                                             >
                                                 {decodeHtml(currentSong.name)}
                                             </motion.h1>
-                                            <motion.p
-                                                className="text-base text-white/60 font-medium truncate cursor-pointer hover:text-white transition-colors"
-                                                onClick={() => { const artist = currentSong.primaryArtistsId?.split(',')[0]; if (artist) onClose(); /* Logic handled by context menu usually, but this is direct text click */ }}
-                                            >
-                                                {decodeHtml(currentSong.primaryArtists || '')}
-                                            </motion.p>
+                                            <div className="flex items-center gap-2 group/artist">
+                                                <motion.p
+                                                    className="text-sm text-white/60 font-medium truncate cursor-pointer hover:text-white transition-colors"
+                                                    onClick={() => {
+                                                        const artistId = currentSong.primaryArtistsId?.split(',')[0].trim();
+                                                        if (artistId && onGoToArtist) onGoToArtist(artistId);
+                                                    }}
+                                                >
+                                                    {decodeHtml(currentSong.primaryArtists || '')}
+                                                </motion.p>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const artistId = currentSong.primaryArtistsId?.split(',')[0].trim();
+                                                        if (artistId && onGoToArtist) onGoToArtist(artistId);
+                                                    }}
+                                                    className="opacity-0 group-hover/artist:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded-full"
+                                                >
+                                                    <ChevronDown size={14} className="rotate-[-90deg] text-white/40" />
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="flex gap-2">
                                             <div className="relative">
@@ -306,13 +324,94 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                             </button>
                                         </Tooltip>
                                     </div>
+
+                                    {/* Up Next Preview */}
+                                    {queue[currentIndex + 1] && (
+                                        <div className="w-full mt-10 p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4 group/upnext cursor-pointer hover:bg-white/10 transition-all" onClick={next}>
+                                            <div className="flex-shrink-0 relative">
+                                                <img src={getArt(queue[currentIndex + 1])} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/upnext:opacity-100 transition-opacity rounded-lg">
+                                                    <Play size={16} fill="white" />
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-0.5">Up Next</p>
+                                                <p className="text-sm font-bold text-white truncate">{decodeHtml(queue[currentIndex + 1].name)}</p>
+                                                <p className="text-xs text-white/40 truncate">{decodeHtml(queue[currentIndex + 1].primaryArtists || '')}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
 
                         {/* RIGHT: Lyrics / Metadata */}
                         <div className="w-1/2 pl-24 py-20 h-full flex flex-col justify-center">
-                            {/* Removed Tech Badges as per feedback */}
+
+                            {/* Audio Tags & Quality */}
+                            <div className="mb-8 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                {(() => {
+                                    const q = activeQuality || qualityPreference;
+                                    if (q === 'hires') {
+                                        return (
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-tighter">
+                                                    <span>🔥 Hi-Res Studio Quality</span>
+                                                </div>
+                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
+                                                    LOSSLESS · HI-RES · 24-bit / 96kHz
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    if (q === 'flac') {
+                                        return (
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-tighter">
+                                                    <span>💿 CD Quality Lossless</span>
+                                                </div>
+                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
+                                                    LOSSLESS · CD · 16-bit / 44.1kHz
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    if (q === '320') {
+                                        return (
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-white font-black text-xs uppercase tracking-tighter">
+                                                    <span>🎶 High-Quality Streaming</span>
+                                                </div>
+                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
+                                                    HQ · 320 kbps
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    if (q === '160') {
+                                        return (
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-white/80 font-black text-xs uppercase tracking-tighter">
+                                                    <span>🎵 Standard Streaming</span>
+                                                </div>
+                                                <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
+                                                    MQ · 160 kbps
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2 text-white/60 font-black text-xs uppercase tracking-tighter">
+                                                <span>📻 Data Saver</span>
+                                            </div>
+                                            <div className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
+                                                LQ · 96 kbps
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
 
                             <div className="flex-1 overflow-hidden relative" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}>
                                 {isSynced && lyrics.length > 0 ? (
@@ -356,13 +455,13 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                         onClose={() => setMenuProps({ ...menuProps, visible: false })}
                         onPlay={(s: any) => { /* already playing */ }}
                         onAddToQueue={(s: any) => { setQueue([...queue, s]); }}
-                        onGoToArtist={() => { }} // Implement navigation if needed
-                        onGoToAlbum={() => { }}
+                        onGoToArtist={(id) => onGoToArtist?.(id)}
+                        onGoToAlbum={(id) => onGoToAlbum?.(id)}
                         onStartRadio={() => { }}
-                        isDownloaded={false}
-                        onDownload={() => { }}
-                        onRemoveDownload={() => { }}
-                        onAddToPlaylist={() => { }}
+                        isDownloaded={isDownloaded(currentSong.id)}
+                        onDownload={() => downloadSong(currentSong)}
+                        onRemoveDownload={() => removeDownload(currentSong.id)}
+                        onAddToPlaylist={(s) => onAddToPlaylist?.(s)}
                     />
                 </motion.div>
             )}

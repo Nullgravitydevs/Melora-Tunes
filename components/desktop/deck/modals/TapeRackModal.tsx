@@ -152,8 +152,9 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                     {/* Scrollable List */}
                     <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                         <Reorder.Group axis="y" values={userMixes} onReorder={(newOrder) => {
-                            // Reconstruct full list with system mix
-                            const fullList = systemMix ? [systemMix, ...newOrder] : newOrder;
+                            // Reconstruct full list with system mixes
+                            const systemMixes = items.filter(m => systemMixIds.includes(m.id));
+                            const fullList = [...systemMixes, ...newOrder];
                             handleReorder(fullList);
                         }}>
                             {userMixes.map((mix, index) => {

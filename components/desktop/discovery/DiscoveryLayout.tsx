@@ -280,6 +280,18 @@ export function DiscoveryLayout() {
         setContextMenu(prev => ({ ...prev, visible: false }));
     }, []);
 
+    const handleGoToArtist = (artistId: string) => {
+        // Clean ID
+        const id = artistId.split(',')[0].trim();
+        handleNavigate({ id: 'artist', data: { id } });
+        setShowFullPlayer(false);
+    };
+
+    const handleGoToAlbum = (albumId: string) => {
+        handleNavigate({ id: 'peel-reveal', data: { id: albumId } });
+        setShowFullPlayer(false);
+    };
+
     const closeContextMenu = useCallback(() => {
         setContextMenu(prev => ({ ...prev, visible: false }));
         setPlaylistMenu(prev => ({ ...prev, visible: false }));
@@ -368,7 +380,19 @@ export function DiscoveryLayout() {
 
             {/* FULL PLAYER */}
             <AnimatePresence>
-                {showFullPlayer && <FullPlayer isOpen={showFullPlayer} onClose={() => setShowFullPlayer(false)} />}
+                {showFullPlayer && (
+                    <FullPlayer
+                        isOpen={showFullPlayer}
+                        onClose={() => setShowFullPlayer(false)}
+                        onGoToArtist={handleGoToArtist}
+                        onGoToAlbum={handleGoToAlbum}
+                        onAddToPlaylist={(s) => {
+                            setAddToPlaylistSong(s);
+                            // We don't close player here to keep context, 
+                            // ensuring Modal z-index is higher (it is z-[200] vs z-[100])
+                        }}
+                    />
+                )}
             </AnimatePresence>
 
             {/* ADD TO PLAYLIST MODAL */}

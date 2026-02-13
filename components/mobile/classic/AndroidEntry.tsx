@@ -66,6 +66,9 @@ const MUSIC_MENU: MenuItem[] = [
     { label: "Artists", type: 'navigation', target: 'artists' },
     { label: "Albums", type: 'navigation', target: 'albums' },
     { label: "Songs", type: 'navigation', target: 'songs' },
+    { label: "Liked Songs", type: 'navigation', target: 'liked-songs' },
+    { label: "Recently Played", type: 'navigation', target: 'recently-played' },
+    { label: "Queue", type: 'navigation', target: 'queue' },
     { label: "Search", type: 'navigation', target: 'search' }
 ];
 
@@ -101,11 +104,10 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
         shuffle, setShuffle, repeat, setRepeat,
         queue, currentIndex,
         sleepTimer, setSleepTimer,
-        // crossfadeDuration, setCrossfadeDuration, // Not in context - using local shim
         stopAtEndOfSong, setStopAtEndOfSong,
-        // bitrate, setBitrate, // Removed from context
         likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded,
-        playInstantMix, activeQuality, qualityPreference, setQualityPreference
+        playInstantMix, activeQuality, qualityPreference, setQualityPreference,
+        eq, playbackSpeed, setPlaybackSpeed, downloadSong, removeDownload
     } = usePlayback();
 
     const [isLoading, setIsLoading] = useState(false);
@@ -116,6 +118,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
     const [clickSounds, setClickSounds] = useState(true);
     const [ipodTheme, setIpodTheme] = useState<'classic' | 'black' | 'silver' | 'dark' | 'blue' | 'rosegold' | 'blush'>('classic');
     const [controlMode, setControlMode] = useState<'volume' | 'seek'>('volume');
+    const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
+    const volumeOverlayTimer = useRef<NodeJS.Timeout | null>(null);
     // Crossfade removed — feature not connected to audio engine. UI removed to avoid misleading users.
     const [isLocked, setIsLocked] = useState(false); // Hold Switch state
     const inputRef = useRef<HTMLInputElement>(null);
@@ -411,7 +415,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         id: s.id,
                         name: decodeHtml(s.name),
                         duration: s.duration,
-                        image: getImageUrl(s.image),
+                        image: getArt(s),
                         primaryArtists: s.primaryArtists
                     });
                 }
@@ -630,6 +634,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             case 'extras': return [
                 { label: "Clock", type: 'navigation', target: 'clock' },
                 { label: "Calendar", type: 'navigation', target: 'calendar' },
+                { label: "Sleep Timer", type: 'navigation', target: 'sleep-timer' },
                 { label: "Games", type: 'navigation', target: 'games' },
                 { label: "Themes", type: 'navigation', target: 'theme-settings' },
                 { label: "Sticker Collection", type: 'action', data: { id: 'sticker-collection' } },
@@ -638,23 +643,29 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             ];
             case 'games': return GAMES_MENU;
 
-            case 'about':
+            case 'about': {
                 const songCount = mixes.reduce((acc, m) => acc + m.songs.length, 0);
+                const uniqueSongCount = new Set(mixes.flatMap(m => m.songs.map(s => ('song' in s ? (s as any).song : s) as any).map((x: any) => x?.id).filter(Boolean))).size;
+                const playlistCount = mixes.filter(m => m.title !== 'On-the-Go').length;
+                const likedCount = likedSongs.length;
                 return [
-                    { label: "Melora iPod Classic", type: 'action', action: () => { } },
-                    { label: `Songs: ${songCount}`, type: 'action', action: () => { } },
-                    { label: "Capacity: 160 GB", type: 'action', action: () => { } },
-                    { label: "Available: 159 GB", type: 'action', action: () => { } },
-                    { label: "Version: 2.0.1", type: 'action', action: () => { } },
-                    { label: "Serial: A8G9H2J3K4L5", type: 'action', action: () => { } }
+                    { label: "✦ Melora iPod Classic", type: 'action', action: () => { } },
+                    { label: `Songs: ${uniqueSongCount}`, type: 'action', action: () => { } },
+                    { label: `Playlists: ${playlistCount}`, type: 'action', action: () => { } },
+                    { label: `Liked: ${likedCount}`, type: 'action', action: () => { } },
+                    { label: `Quality: ${qualityPreference === 'flac' ? 'Lossless' : qualityPreference + 'kbps'}`, type: 'action', action: () => { } },
+                    { label: "Model: MC293LL", type: 'action', action: () => { } },
+                    { label: "Version: 3.0.0", type: 'action', action: () => { } },
+                    { label: "Serial: MLR-" + navigator.userAgent.slice(-8).replace(/\W/g, '').toUpperCase(), type: 'action', action: () => { } }
                 ] as MenuItem[];
+            }
 
             case 'clock': {
                 // clockTick dependency ensures this refreshes every second
                 const _tick = clockTick; // eslint-disable-line @typescript-eslint/no-unused-vars
                 const now = new Date();
                 return [
-                    { label: now.toLocaleTimeString(), type: 'action', action: () => { } },
+                    { label: `__CLOCK_FACE__`, type: 'action', action: () => { }, data: { isClock: true, time: now } },
                     { label: now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), type: 'action', action: () => { } }
                 ] as MenuItem[];
             }
@@ -671,7 +682,30 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                         type: 'navigation',
                         target: 'quality-settings'
                     },
-
+                    {
+                        label: `Shuffle: ${shuffle ? 'On' : 'Off'}`,
+                        type: 'action',
+                        action: () => setShuffle(!shuffle)
+                    },
+                    {
+                        label: `Repeat: ${repeat === 'off' ? 'Off' : repeat === 'one' ? 'One' : 'All'}`,
+                        type: 'action',
+                        action: () => {
+                            const modes: ('off' | 'one' | 'all')[] = ['off', 'all', 'one'];
+                            const idx = modes.indexOf(repeat);
+                            setRepeat(modes[(idx + 1) % modes.length]);
+                        }
+                    },
+                    {
+                        label: `Playback Speed: ${playbackSpeed}x`,
+                        type: 'navigation',
+                        target: 'speed-settings'
+                    },
+                    {
+                        label: "EQ",
+                        type: 'navigation',
+                        target: 'eq-settings'
+                    },
                     {
                         label: `Click Sounds: ${clickSounds ? 'On' : 'Off'}`,
                         type: 'action',
@@ -818,9 +852,32 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
 
 
 
-            case 'playlists':
-                // Dynamic Playlists List
-                // Filter out "On-the-Go" from the visible list
+            case 'speed-settings':
+                return ([0.5, 0.75, 1, 1.25, 1.5, 2] as const).map(speed => ({
+                    label: `${speed}x${playbackSpeed === speed ? ' ✓' : ''}`,
+                    type: 'action',
+                    action: () => {
+                        setPlaybackSpeed(speed);
+                        showToast(`Speed: ${speed}x`);
+                    }
+                })) as MenuItem[];
+
+            case 'eq-settings': {
+                const presets = eq.presets || ['Off', 'Bass Boost', 'Treble Boost', 'Vocal', 'Electronic', 'Acoustic', 'Late Night'];
+                const currentPreset = eq.currentPreset || 'Off';
+                return presets.map((preset: string) => ({
+                    label: `${preset}${currentPreset === preset ? ' ✓' : ''}`,
+                    type: 'action',
+                    action: () => {
+                        eq.setPreset(preset);
+                        showToast(`EQ: ${preset}`);
+                    }
+                })) as MenuItem[];
+            }
+
+            case 'playlists': {
+                // Dynamic Playlists List — show On-the-Go if it has songs
+                const otgMix = mixes.find(m => m.title === 'On-the-Go');
                 const visibleMixes = mixes.filter(m => m.title !== "On-the-Go");
 
                 const playlistItems: MenuItem[] = visibleMixes.map(mix => ({
@@ -829,12 +886,22 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     target: `mix-${mix.id}`,
                     data: mix.id
                 }));
+                // Show On-the-Go if it exists and has songs
+                if (otgMix && otgMix.songs.length > 0) {
+                    playlistItems.unshift({
+                        label: `On-the-Go (${otgMix.songs.length})`,
+                        type: 'navigation',
+                        target: `mix-${otgMix.id}`,
+                        data: otgMix.id
+                    });
+                }
                 playlistItems.unshift({
                     label: "[Create New Tape]",
                     type: 'action',
                     action: () => createNewPlaylist()
                 });
                 return playlistItems;
+            }
 
             case 'search':
                 return currentView.staticItems || [];
@@ -1226,6 +1293,10 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 const newVol = Math.max(0, Math.min(1, volume + (direction * 0.05)));
                 setVolume(newVol);
                 saveSettings({ volume: newVol });
+                // Flash volume overlay
+                setShowVolumeOverlay(true);
+                if (volumeOverlayTimer.current) clearTimeout(volumeOverlayTimer.current);
+                volumeOverlayTimer.current = setTimeout(() => setShowVolumeOverlay(false), 1500);
             }
         } else if (currentView.viewType === 'cover-flow') {
             // Cover Flow has two scroll modes:
@@ -1273,8 +1344,9 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
             if (maxIndex === 0 && items.length === 0) return;
 
             let newIndex = currentView.selectedIndex + direction;
-            if (newIndex < 0) newIndex = maxIndex;
-            if (newIndex > maxIndex) newIndex = 0;
+            // Clamp at ends (no wrap) for menus
+            if (newIndex < 0) newIndex = 0;
+            if (newIndex > maxIndex) newIndex = maxIndex;
 
             setViewStack(prev => {
                 const newStack = [...prev];
@@ -1396,6 +1468,42 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                     action: () => {
                         handleShowLyrics(song);
                         handleBack(); // Close menu
+                    }
+                },
+                {
+                    label: `Shuffle: ${shuffle ? 'On' : 'Off'}`,
+                    type: 'action',
+                    action: () => {
+                        setShuffle(!shuffle);
+                        handleBack();
+                        showToast(`Shuffle ${!shuffle ? 'On' : 'Off'}`);
+                    }
+                },
+                {
+                    label: `Repeat: ${repeat === 'off' ? 'Off' : repeat === 'one' ? 'One' : 'All'}`,
+                    type: 'action',
+                    action: () => {
+                        const modes: ('off' | 'one' | 'all')[] = ['off', 'all', 'one'];
+                        const idx = modes.indexOf(repeat);
+                        const next = modes[(idx + 1) % modes.length];
+                        setRepeat(next);
+                        handleBack();
+                        showToast(`Repeat: ${next === 'off' ? 'Off' : next === 'one' ? 'One' : 'All'}`);
+                    }
+                },
+                {
+                    label: isDownloaded(song.id) ? "✓ Downloaded" : "Download",
+                    type: 'action',
+                    action: async () => {
+                        if (isDownloaded(song.id)) {
+                            handleBack();
+                            showToast("Already downloaded");
+                            return;
+                        }
+                        handleBack();
+                        showToast("Downloading...");
+                        const ok = await downloadSong(song);
+                        showToast(ok ? "Downloaded!" : "Download failed");
                     }
                 },
                 {
@@ -1860,6 +1968,8 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                             depth={viewStack.length}
                             onAddSticker={handleAddSticker}
                             isDownloaded={(id) => isDownloaded(id)}
+                            volume={volume}
+                            showVolumeOverlay={showVolumeOverlay}
                         />
 
                         {/* Render Game View if Active - Lazy loaded for performance */}

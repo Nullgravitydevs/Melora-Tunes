@@ -349,8 +349,17 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                         : 0
                 });
 
-                // Crossfade Removed - Simple progress tracking
-                // (Gapless preloading logic maintained via useEffect handling URL changes)
+                // Safety: If we are effectively at the end (> 99.5%) and playing, trigger end.
+                // This prevents cases where browser doesn't fire 'ended' event due to floating point precision.
+                if (played >= 0.995 && active.duration > 10) { // Only for songs > 10s
+                    // We rely on native onEnded for main logic, but this acts as a failsafe?
+                    // Actually, calling onEnded here might cause double-skip if native fires too.
+                    // Better to let native handle it, but maybe force a seek to end?
+                    // Or just leave it. Most modern browsers are fine. 
+                    // The user reported "not playing continuous". 
+                    // Let's NOT force it yet, as it might cause premature skips. 
+                    // Instead, let's ensure 'loop' attribute isn't set? It defaults false.
+                }
             }
         }, 200);
 

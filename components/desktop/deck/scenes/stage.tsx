@@ -411,7 +411,6 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                     currentTheme={currentTheme}
                     onThemeChange={handleThemeChange}
                     // Pass isMobileDevice to DeckStage for Guardrails
-                    // @ts-expect-error - Dynamic component prop
                     isMobileDevice={isMobileDevice}
                     onSelectTheme={(theme: ThemeKey) => {
                         setCurrentTheme(theme);

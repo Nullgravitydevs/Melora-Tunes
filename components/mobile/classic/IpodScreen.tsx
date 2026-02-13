@@ -47,6 +47,8 @@ interface IpodScreenProps {
     depth?: number;
     onAddSticker?: (type: StickerType, color: string) => void;
     isDownloaded?: (id: string) => boolean;
+    volume?: number;
+    showVolumeOverlay?: boolean;
 }
 
 // slideVariants removed — was defined but never used (animation uses hardcoded values)
@@ -88,7 +90,9 @@ export const IpodScreen = memo(function IpodScreen({
     depth = 0,
     isDownloaded = () => false,
     backlight,
-    audioQuality // Added missing prop
+    audioQuality, // Added missing prop
+    volume = 1,
+    showVolumeOverlay = false
 }: IpodScreenProps) {
 
     // ... (Existing Hook Logic) ...
@@ -211,6 +215,32 @@ export const IpodScreen = memo(function IpodScreen({
                 )}
             </AnimatePresence>
 
+            {/* Volume Overlay */}
+            <AnimatePresence>
+                {showVolumeOverlay && (variant === 'player' || variant === 'cinema') && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 5 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute bottom-2 left-3 right-3 z-40 pointer-events-none"
+                    >
+                        <div className="bg-black/70 backdrop-blur-md rounded-full px-3 py-1.5 flex items-center gap-2 border border-white/10 shadow-lg">
+                            <Volume2 size={12} className="text-white/70 shrink-0" />
+                            <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                <motion.div
+                                    className="h-full bg-white rounded-full"
+                                    initial={false}
+                                    animate={{ width: `${(volume ?? 1) * 100}%` }}
+                                    transition={{ duration: 0.1 }}
+                                />
+                            </div>
+                            <span className="text-[9px] text-white/50 font-mono w-7 text-right">{Math.round((volume ?? 1) * 100)}</span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Top Bar - Dark Glass */}
             <div className="h-6 bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-zinc-700 flex items-center justify-between px-2 shrink-0 z-20 shadow-sm relative">
 
@@ -263,9 +293,9 @@ export const IpodScreen = memo(function IpodScreen({
                 <AnimatePresence mode="popLayout" custom={direction} initial={false}>
                     <motion.div
                         key={variant + (title || "view")} // Use Variant + Title as ID instead of full hierarchy for smoother/stable transitions
-                        initial={{ x: 300, opacity: 0 }}
+                        initial={{ x: direction >= 0 ? 300 : -300, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: -300, opacity: 0 }}
+                        exit={{ x: direction >= 0 ? -300 : 300, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         className="flex-1 w-full h-full overflow-hidden relative"
                     >
@@ -435,17 +465,78 @@ export const IpodScreen = memo(function IpodScreen({
                                         return visibleItems.map((item, i) => {
                                             const realIndex = start + i;
                                             const isSelected = realIndex === selectedIndex;
+                                            const itemData = itemsData[realIndex];
+                                            // Get thumbnail from item data (songs, liked songs, etc.)
+                                            const thumb = itemData?.image
+                                                ? (Array.isArray(itemData.image) ? itemData.image[0]?.link : itemData.image)
+                                                : (itemData?.song?.image
+                                                    ? (Array.isArray(itemData.song.image) ? itemData.song.image[0]?.link : itemData.song.image)
+                                                    : null);
+                                            const hasThumbnail = !!thumb;
+
+                                            // Analog Clock rendering
+                                            if (item === '__CLOCK_FACE__' && itemData?.isClock) {
+                                                const now = itemData.time as Date;
+                                                const hours = now.getHours() % 12;
+                                                const minutes = now.getMinutes();
+                                                const seconds = now.getSeconds();
+                                                const hourDeg = (hours * 30) + (minutes * 0.5);
+                                                const minDeg = minutes * 6;
+                                                const secDeg = seconds * 6;
+                                                return (
+                                                    <div key="clock-face" className="w-full flex items-center justify-center py-2">
+                                                        <div className="relative w-28 h-28">
+                                                            {/* Clock face */}
+                                                            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-zinc-800 to-zinc-900 border-2 border-zinc-600 shadow-[inset_0_2px_8px_rgba(0,0,0,0.5),0_4px_12px_rgba(0,0,0,0.4)]">
+                                                                {/* Hour markers */}
+                                                                {[...Array(12)].map((_, idx) => (
+                                                                    <div key={idx} className="absolute inset-0 flex justify-center" style={{ transform: `rotate(${idx * 30}deg)` }}>
+                                                                        <div className={`${idx % 3 === 0 ? 'w-0.5 h-3 bg-white' : 'w-px h-2 bg-zinc-400'} rounded-full mt-1.5`} />
+                                                                    </div>
+                                                                ))}
+                                                                {/* Hour hand */}
+                                                                <div className="absolute left-1/2 bottom-1/2 w-1 h-8 origin-bottom -translate-x-1/2 rounded-t-full bg-white shadow-md" style={{ transform: `translateX(-50%) rotate(${hourDeg}deg)` }} />
+                                                                {/* Minute hand */}
+                                                                <div className="absolute left-1/2 bottom-1/2 w-0.5 h-10 origin-bottom -translate-x-1/2 rounded-t-full bg-zinc-300 shadow-sm" style={{ transform: `translateX(-50%) rotate(${minDeg}deg)` }} />
+                                                                {/* Second hand */}
+                                                                <div className="absolute left-1/2 bottom-1/2 w-px h-11 origin-bottom -translate-x-1/2 bg-red-500" style={{ transform: `translateX(-50%) rotate(${secDeg}deg)` }} />
+                                                                {/* Center dot */}
+                                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-red-500 shadow-md z-10" />
+                                                            </div>
+                                                            {/* Digital time below */}
+                                                            <div className="absolute -bottom-5 left-0 right-0 text-center text-[10px] text-zinc-400 font-mono">
+                                                                {now.toLocaleTimeString()}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
                                             return (
                                                 <div
-                                                    key={realIndex} // Use realIndex for stability
+                                                    key={realIndex}
                                                     onClick={() => onItemSelect?.(realIndex)}
-                                                    className={`h-9 flex items-center justify-between px-3 font-medium text-[11px] cursor-pointer active:brightness-110 ${isSelected
+                                                    className={`${hasThumbnail ? 'h-11' : 'h-9'} flex items-center gap-2 px-3 font-medium text-[11px] cursor-pointer active:brightness-110 ${isSelected
                                                         ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md sticky top-0 z-10"
                                                         : "bg-black text-white border-b border-zinc-900"
                                                         }`}
                                                 >
-                                                    <span className="truncate font-semibold">{item}</span>
-                                                    <ChevronRight size={12} className={isSelected ? "text-white" : "text-zinc-600"} />
+                                                    {/* Song thumbnail */}
+                                                    {hasThumbnail && (
+                                                        <div className={`w-8 h-8 rounded shrink-0 overflow-hidden bg-zinc-800 border ${isSelected ? 'border-white/30' : 'border-zinc-700'}`}>
+                                                            <img src={thumb} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0 flex flex-col">
+                                                        <span className="truncate font-semibold">{item.replace('♥ ', '')}</span>
+                                                        {hasThumbnail && (itemData?.primaryArtists || itemData?.song?.primaryArtists) && (
+                                                            <span className={`truncate text-[8px] ${isSelected ? 'text-blue-200' : 'text-zinc-500'}`}>
+                                                                {itemData?.primaryArtists || itemData?.song?.primaryArtists}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {item.startsWith('♥') && <Heart size={10} className="text-red-400 fill-red-400 shrink-0" />}
+                                                    <ChevronRight size={12} className={`shrink-0 ${isSelected ? "text-white" : "text-zinc-600"}`} />
                                                 </div>
                                             );
                                         });
@@ -587,24 +678,45 @@ export const IpodScreen = memo(function IpodScreen({
                                 )}
 
                                 <div className="flex-1 flex flex-row p-3 gap-3 items-center z-10">
-                                    {/* Left: Large Art */}
+                                    {/* Left: Spinning Vinyl Disc */}
                                     <motion.div
-                                        className="w-[48%] aspect-square bg-zinc-900 shadow-2xl relative shrink-0 rounded-md overflow-hidden border border-white/10"
+                                        className="w-[48%] aspect-square relative shrink-0"
                                         initial={{ scale: 0.9, opacity: 0 }}
                                         animate={{ scale: 1, opacity: 1 }}
                                         transition={{ type: "spring", stiffness: 200, damping: 20 }}
                                     >
-                                        {currentSong?.image ? (
-                                            <img
-                                                src={getArt(currentSong)}
-                                                alt="Art"
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-white bg-zinc-800">♪</div>
-                                        )}
-                                        {/* Gloss */}
-                                        <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
+                                        {/* Vinyl Disc */}
+                                        <motion.div
+                                            className="w-full h-full rounded-full overflow-hidden relative shadow-2xl"
+                                            animate={{ rotate: isPlaying ? 360 : 0 }}
+                                            transition={isPlaying ? { duration: 3, repeat: Infinity, ease: "linear" } : { duration: 0 }}
+                                            style={{ willChange: 'transform' }}
+                                        >
+                                            {/* Vinyl grooves background */}
+                                            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900">
+                                                {/* Groove rings */}
+                                                <div className="absolute inset-[8%] rounded-full border border-zinc-700/40" />
+                                                <div className="absolute inset-[15%] rounded-full border border-zinc-700/30" />
+                                                <div className="absolute inset-[22%] rounded-full border border-zinc-700/20" />
+                                                <div className="absolute inset-[29%] rounded-full border border-zinc-600/15" />
+                                                {/* Shine on vinyl */}
+                                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent rounded-full pointer-events-none" />
+                                            </div>
+                                            {/* Center album art (label area) */}
+                                            <div className="absolute inset-[25%] rounded-full overflow-hidden border-2 border-zinc-600 shadow-inner z-10">
+                                                {currentSong?.image ? (
+                                                    <img
+                                                        src={getArt(currentSong)}
+                                                        alt="Art"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-white bg-zinc-800">♪</div>
+                                                )}
+                                            </div>
+                                            {/* Center hole */}
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-zinc-900 border border-zinc-600 z-20" />
+                                        </motion.div>
                                     </motion.div>
 
                                     {/* Right: Metadata & Info */}
