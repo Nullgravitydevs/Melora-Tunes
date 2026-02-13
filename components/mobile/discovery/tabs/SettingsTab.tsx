@@ -175,12 +175,7 @@ export function SettingsTab() {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={saveProfile}
-                                    className="mt-4 w-full py-2.5 bg-white text-black text-[12px] font-bold rounded-xl active:scale-95 transition-transform"
-                                >
-                                    Save Changes
-                                </button>
+
                             </div>
 
                             {/* Stats card */}

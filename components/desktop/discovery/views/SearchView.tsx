@@ -646,6 +646,8 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                                                 src={cat.image}
                                                 alt=""
                                                 className="absolute bottom-0 right-0 w-24 h-24 object-cover translate-x-4 translate-y-4 -rotate-12 opacity-40 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"
+                                                loading="lazy"
+                                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                                             />
                                             <span className="relative z-10 text-xl font-bold text-white tracking-tight">{cat.label}</span>
                                         </motion.button>

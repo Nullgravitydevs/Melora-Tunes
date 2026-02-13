@@ -307,7 +307,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     className="glass-card p-8 rounded-3xl border border-white/5 relative overflow-hidden group cursor-pointer"
-                                    onClick={() => { }} // Could open a full bio modal
+                                    onClick={() => setBioExpanded(!bioExpanded)}
                                 >
                                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
                                         <Info size={120} />

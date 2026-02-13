@@ -70,6 +70,16 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
         return () => document.removeEventListener('mousedown', handle);
     }, [showMenu]);
 
+    // Escape to close
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [isOpen, onClose]);
+
     const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
     const getArt = () => {
@@ -203,11 +213,13 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                 </>
                             )}
 
-                            {/* Progress Bar - Apple Music style thick */}
+                            {/* Progress Bar - Apple Music style with large hit area */}
                             <div className="w-full max-w-sm mb-5">
-                                <div className="h-[6px] bg-white/[0.12] rounded-full cursor-pointer overflow-hidden group" onClick={handleSeek}>
-                                    <div className="h-full bg-white/80 group-hover:bg-white rounded-full relative transition-all" style={{ width: `${progress * 100}%` }}>
-                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-[14px] h-[14px] bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-[0_2px_8px_rgba(0,0,0,0.3)]" />
+                                <div className="py-2 -my-2 cursor-pointer group" onClick={handleSeek}>
+                                    <div className="h-[6px] bg-white/[0.12] rounded-full overflow-hidden">
+                                        <div className="h-full bg-white/80 group-hover:bg-white rounded-full relative transition-all" style={{ width: `${progress * 100}%` }}>
+                                            <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-[14px] h-[14px] bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-[0_2px_8px_rgba(0,0,0,0.3)]" />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex justify-between mt-2 text-[11px] text-white/30 tabular-nums">

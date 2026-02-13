@@ -765,6 +765,13 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                     if (e.metaKey || e.ctrlKey) { e.preventDefault(); prev(); }
                     else if (e.shiftKey) { e.preventDefault(); seek(Math.max(0, progressRef.current - 0.05)); }
                     break;
+                case 'KeyM':
+                    e.preventDefault();
+                    setVolume(volume === 0 ? 1 : 0);
+                    break;
+                case 'KeyL':
+                    if (currentSong) { e.preventDefault(); toggleLike(currentSong); }
+                    break;
             }
         };
         window.addEventListener('keydown', handleKeyDown);

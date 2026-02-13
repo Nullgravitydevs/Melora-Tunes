@@ -90,6 +90,8 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                 <img
                     src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=2070&auto=format&fit=crop"
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    loading="lazy"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
                 <div className="absolute inset-0 p-8 flex flex-col justify-center items-start">
@@ -146,7 +148,7 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                             className="h-40 bg-black rounded-xl flex items-center px-4 gap-4 cursor-pointer hover:border-white/20 transition-colors border border-white/10 group relative overflow-hidden"
                         >
                             {/* Background Image subtle */}
-                            <img src={station.image} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity blur-sm" />
+                            <img src={station.image} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity blur-sm" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
 
                             <div className="relative z-10 w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center border border-white/10">
                                 <Calendar size={20} className="text-white/80" />

@@ -6,7 +6,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from "
 import {
     ChevronDown, Play, Pause, SkipBack, SkipForward,
     Heart, Shuffle, Repeat, Repeat1, Share2, ListMusic,
-    Mic2, Plus
+    Mic2, Plus, Volume2, VolumeX
 } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
 import { QualityBadge } from "@/components/shared/QualityBadge";
@@ -95,6 +95,11 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
         !m.id.startsWith("instant-") && !m.id.startsWith("library-")
     );
 
+    // Swipe-down-to-dismiss
+    const handleDragEnd = useCallback((_: any, info: PanInfo) => {
+        if (info.offset.y > 100 || info.velocity.y > 500) onClose();
+    }, [onClose]);
+
     if (!isOpen || !currentSong) return null;
 
     return (
@@ -105,7 +110,11 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                     animate={{ y: 0 }}
                     exit={{ y: "100%" }}
                     transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                    className="fixed inset-0 z-[150] bg-black flex flex-col"
+                    drag="y"
+                    dragConstraints={{ top: 0, bottom: 0 }}
+                    dragElastic={{ top: 0, bottom: 0.4 }}
+                    onDragEnd={handleDragEnd}
+                    className="fixed inset-0 z-[150] bg-black flex flex-col touch-none"
                 >
                     {/* Background */}
                     {songArt && (
@@ -263,6 +272,18 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                                 <button onClick={cycleRepeat} className={`p-2 relative ${repeat !== "off" ? "text-white" : "text-white/25"}`}>
                                     {repeat === "one" ? <Repeat1 size={18} /> : <Repeat size={18} />}
                                 </button>
+                            </div>
+
+                            {/* Volume slider */}
+                            <div className="flex items-center gap-3 mb-4">
+                                <button onClick={() => setVolume(volume === 0 ? 1 : 0)} className="text-white/30">
+                                    {volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                                </button>
+                                <div className="flex-1 h-[4px] bg-white/[0.08] rounded-full overflow-hidden cursor-pointer"
+                                    onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))); }}>
+                                    <div className="h-full bg-white/40 rounded-full transition-all" style={{ width: `${volume * 100}%` }} />
+                                </div>
+                                <Volume2 size={16} className="text-white/30" />
                             </div>
 
                             {/* Bottom actions */}

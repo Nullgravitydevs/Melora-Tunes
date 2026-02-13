@@ -32,6 +32,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
     const [songToAdd, setSongToAdd] = useState<JioSaavnSong | PlayableTrack | null>(null); // For AddToPlaylistModal
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
     const [playlistData, setPlaylistData] = useState<any>(playlist);
     const [showConfirm, setShowConfirm] = useState<{ message: string; action: () => void } | null>(null);
 
@@ -133,7 +134,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
         };
         setError(null);
         load();
-    }, [playlist?.id, title, mixes]); // Add mixes to dependency, so if we add a song, it updates? No, this is mount logic mostly.
+    }, [playlist?.id, title, mixes, retryCount]);
 
     // Filter Songs by Search & Language
     useEffect(() => {
@@ -488,7 +489,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                             <h2 className="text-xl font-bold text-white mb-2">Failed to load</h2>
                             <p className="text-white/40 text-sm mb-6">{error}</p>
                             <button
-                                onClick={() => { setError(null); setIsLoading(true); }}
+                                onClick={() => { setError(null); setRetryCount(c => c + 1); }}
                                 className="flex items-center gap-2 px-6 py-2.5 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition-colors mx-auto text-sm"
                             >
                                 <RefreshCcw size={16} />

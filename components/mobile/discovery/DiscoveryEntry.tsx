@@ -190,7 +190,7 @@ export function DiscoveryEntry() {
 
 function TabBtn({ icon: Icon, label, active, onClick }: { icon: any; label: string; active: boolean; onClick: () => void }) {
     return (
-        <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all duration-200 min-w-[56px] ${active ? "text-white" : "text-white/30"}`}>
+        <button onClick={onClick} aria-label={label} role="tab" aria-selected={active} className={`flex flex-col items-center gap-1 transition-all duration-200 min-w-[56px] ${active ? "text-white" : "text-white/30"}`}>
             <Icon size={22} strokeWidth={active ? 2.5 : 1.5} />
             <span className={`text-[10px] font-medium tracking-wide ${active ? "opacity-100" : "opacity-60"}`}>{label}</span>
         </button>
