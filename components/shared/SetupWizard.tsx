@@ -46,9 +46,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 <video
                     ref={videoRef}
                     src={videoSrc}
-                    className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-1000"
+                    className="absolute inset-0 w-full h-full object-contain opacity-60 transition-opacity duration-1000"
                     loop
-                    muted
+                    muted={isMuted}
                     playsInline
                     autoPlay
                 />
@@ -79,7 +79,13 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     </div>
 
                     {/* Spacer for layout balance */}
-                    <div className="w-10 h-10" />
+                    <button
+                        onClick={() => setIsMuted(!isMuted)}
+                        className="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors"
+                        aria-label={isMuted ? "Unmute" : "Mute"}
+                    >
+                        {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </button>
                 </header>
 
                 {/* Main Stage */}

@@ -41,7 +41,9 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
         setLoading(true);
         try {
             const data = await getAlbumDetails(album.id);
-            setTracks(data || []);
+            // getAlbumDetails returns { ...albumMeta, songs: [...] } or an array or null
+            const songs = Array.isArray(data) ? data : Array.isArray(data?.songs) ? data.songs : [];
+            setTracks(songs);
         } catch {
             setError("Failed to load album tracks.");
         } finally {

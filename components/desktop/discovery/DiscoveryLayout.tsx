@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2 } from "lucide-react";
+import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus } from "lucide-react";
+import { AudioQuality } from "@/lib/types";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
@@ -725,7 +726,23 @@ function EmptyState() {
 /* === PLAYER === */
 
 function PlayerBar({ onExpand }: { onExpand: () => void }) {
-    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, downloadSong, isDownloaded, setQueue, queue, showToast } = usePlayback();
+
+    const [showBarMenu, setShowBarMenu] = useState(false);
+    const [showBarQuality, setShowBarQuality] = useState(false);
+    const barMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handle = (e: MouseEvent) => {
+            if (barMenuRef.current && !barMenuRef.current.contains(e.target as Node)) {
+                setShowBarMenu(false); setShowBarQuality(false);
+            }
+        };
+        if (showBarMenu) document.addEventListener('mousedown', handle);
+        return () => document.removeEventListener('mousedown', handle);
+    }, [showBarMenu]);
+
+    const qLabel = (q: string) => ({ hires: 'Hi-Res', flac: 'Lossless', '320': '320 kbps', '160': '160 kbps', '96': '96 kbps' }[q] || q);
 
     /* UPGRADE 3: Keyboard Shortcuts */
     const progressRef = useRef(progress);
@@ -941,6 +958,43 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                         <Maximize2 size={18} />
                     </button>
                 </Tooltip>
+
+                {/* 3-dots menu */}
+                <div className="relative" ref={barMenuRef}>
+                    <Tooltip text="More">
+                        <button onClick={() => { setShowBarMenu(!showBarMenu); setShowBarQuality(false); }} className="p-2 text-white/30 hover:text-white transition-colors">
+                            <MoreHorizontal size={18} />
+                        </button>
+                    </Tooltip>
+                    {showBarMenu && (
+                        <div className="absolute bottom-full right-0 mb-2 w-52 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-1.5 z-50">
+                            {!showBarQuality ? (
+                                <>
+                                    <button onClick={() => { if (currentSong) { setQueue([...queue, currentSong]); showToast('Added to queue', 'success'); } setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Plus size={14} /> Add to Queue</button>
+                                    <button onClick={() => { setShowBarMenu(false); showToast('Use right-click on a song', 'info'); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><ListPlus size={14} /> Add to Playlist</button>
+                                    <div className="border-t border-white/[0.06] my-1" />
+                                    <button onClick={() => setShowBarQuality(true)} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Disc3 size={14} /> Quality: {qLabel(qualityPreference)}</button>
+                                    {currentSong && !isDownloaded(currentSong.id) && (
+                                        <button onClick={() => { downloadSong(currentSong); setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Download size={14} /> Download</button>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-white/30">Quality</div>
+                                    {(['hires', 'flac', '320', '160', '96'] as AudioQuality[]).map(q => (
+                                        <button key={q} onClick={() => { setQualityPreference(q); setShowBarQuality(false); setShowBarMenu(false); showToast(`Quality: ${qLabel(q)}`, 'success'); }}
+                                            className={`w-full px-4 py-2.5 text-left text-[13px] hover:bg-white/[0.06] flex items-center justify-between ${qualityPreference === q ? 'text-white font-semibold' : 'text-white/60'}`}>
+                                            <span>{qLabel(q)}</span>
+                                            {qualityPreference === q && <span className="text-white">✓</span>}
+                                        </button>
+                                    ))}
+                                    <div className="border-t border-white/[0.06] my-1" />
+                                    <button onClick={() => setShowBarQuality(false)} className="w-full px-4 py-2 text-left text-[13px] text-white/40 hover:bg-white/[0.06]">← Back</button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </motion.div>
     );

@@ -28,7 +28,7 @@ export function Launcher({ onSelect }: LauncherProps) {
                 <video
                     ref={videoRef}
                     src="/assets/intro-mobile.mp4"
-                    className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-1000"
+                    className="absolute inset-0 w-full h-full object-contain opacity-60 transition-opacity duration-1000"
                     loop
                     muted={isMuted}
                     playsInline
