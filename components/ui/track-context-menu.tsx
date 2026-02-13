@@ -94,22 +94,6 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
                     <MenuItem icon={<Play size={14} />} label="Play Now" onClick={() => { onPlay(song); onClose(); }} />
                     <MenuItem icon={<ListPlus size={14} />} label="Add to Queue" onClick={() => { onAddToQueue(song); onClose(); }} />
                     <MenuItem icon={<ListMusic size={14} />} label="Add to Playlist" onClick={() => { onAddToPlaylist(song); onClose(); }} />
-                    <MenuItem icon={<Radio size={14} />} label="Start Radio" onClick={() => { onStartRadio(song); onClose(); }} highlight />
-
-                    {isDownloaded ? (
-                        <MenuItem
-                            icon={<Trash2 size={14} />}
-                            label="Remove Download"
-                            onClick={() => { onRemoveDownload(song.id); onClose(); }}
-                            variant="danger"
-                        />
-                    ) : (
-                        <MenuItem
-                            icon={<HardDrive size={14} />}
-                            label="Download"
-                            onClick={() => { onDownload(song); onClose(); }}
-                        />
-                    )}
 
                     <div className="h-px bg-white/10 my-0.5" />
 

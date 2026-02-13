@@ -226,7 +226,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                             <section className="px-8">
                                 <SectionHeader title="Popular Songs" subtitle="Top Tracks" />
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-1">
-                                    {songs.slice(0, 10).map((song, i) => {
+                                    {songs.map((song, i) => {
                                         const active = currentSong?.id === song.id;
                                         return (
                                             <motion.div

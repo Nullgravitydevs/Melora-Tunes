@@ -3,6 +3,7 @@ import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume
 import { useEffect, useState, useRef, useMemo, memo } from "react";
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 import { CinemaModeMobile as CinemaMode } from "./cinema-mode-mobile";
 import { CoverFlow3D as CoverFlow } from "./CoverFlow3D";
 import { StickerType } from "./stickers/StickerLayer";
@@ -48,23 +49,7 @@ interface IpodScreenProps {
     isDownloaded?: (id: string) => boolean;
 }
 
-const slideVariants = {
-    enter: (direction: number) => ({
-        x: direction > 0 ? "100%" : "-100%",
-        opacity: 0.5,
-        zIndex: 1 // Entering item on top
-    }),
-    center: {
-        x: 0,
-        opacity: 1,
-        zIndex: 0
-    },
-    exit: (direction: number) => ({
-        x: direction < 0 ? "100%" : "-100%", // Exit opposite to enter
-        opacity: 0.5,
-        zIndex: 0
-    })
-};
+// slideVariants removed — was defined but never used (animation uses hardcoded values)
 
 // [PERF FIX #6] Wrap in React.memo to prevent re-renders when props haven't changed
 export const IpodScreen = memo(function IpodScreen({
@@ -506,7 +491,7 @@ export const IpodScreen = memo(function IpodScreen({
                                                 className="relative w-full aspect-square shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
                                             >
                                                 <img
-                                                    src={Array.isArray(currentSong.image) ? currentSong.image[0]?.link : currentSong.image as string}
+                                                src={getArt(currentSong)}
                                                     alt="Art"
                                                     className="w-full h-full object-cover rounded-md border border-white/10"
                                                 />
@@ -593,7 +578,7 @@ export const IpodScreen = memo(function IpodScreen({
                                 {currentSong?.image && (
                                     <div className="absolute inset-0 z-0 overflow-hidden opacity-40">
                                         <img
-                                            src={Array.isArray(currentSong.image) ? currentSong.image[2]?.link : currentSong.image as string}
+                                            src={getArt(currentSong)}
                                             alt="BG"
                                             className="w-full h-full object-cover blur-xl scale-125"
                                         />
@@ -611,7 +596,7 @@ export const IpodScreen = memo(function IpodScreen({
                                     >
                                         {currentSong?.image ? (
                                             <img
-                                                src={Array.isArray(currentSong.image) ? currentSong.image[0]?.link : currentSong.image as string} // Force Index 0 (Highest Quality)
+                                                src={getArt(currentSong)}
                                                 alt="Art"
                                                 className="w-full h-full object-cover"
                                             />

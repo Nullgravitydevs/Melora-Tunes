@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
-import { useIsMobile } from "@/hooks/use-is-mobile";
+import { getArt } from "@/lib/helpers";
 
 interface CinemaModeMobileProps {
     isOpen: boolean;
@@ -26,18 +26,24 @@ export function CinemaModeMobile({
     currentSong
 }: CinemaModeMobileProps) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const isMobile = useIsMobile();
+
+    // Use current song art if available, otherwise fall back to hero images
+    const images = useMemo(() => {
+        const songArt = currentSong ? getArt(currentSong) : '';
+        if (songArt) return [songArt];
+        return HERO_IMAGES;
+    }, [currentSong]);
 
     // Slideshow effect
     useEffect(() => {
         if (!isOpen) return;
 
         const interval = setInterval(() => {
-            setCurrentImageIndex((prev) => (prev + 1) % HERO_IMAGES.length);
+            setCurrentImageIndex((prev) => (prev + 1) % images.length);
         }, 8000);
 
         return () => clearInterval(interval);
-    }, [isOpen]);
+    }, [isOpen, images]);
 
     if (!isOpen) return null;
 
@@ -52,7 +58,7 @@ export function CinemaModeMobile({
             <AnimatePresence mode="wait">
                 <motion.img
                     key={currentImageIndex}
-                    src={HERO_IMAGES[currentImageIndex]}
+                    src={images[currentImageIndex % images.length]}
                     alt="Cinema"
                     className="absolute inset-0 w-full h-full object-cover"
                     initial={{ opacity: 0, scale: 1.1 }}

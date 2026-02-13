@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { usePlayback } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
+import { getArt } from "@/lib/helpers";
 
 interface MusicQuizProps {
     onBack: () => void;
@@ -31,6 +32,7 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isProcessingRef = useRef(false);
     const questionsRef = useRef<Question[]>([]);
+    const [retryCounter, setRetryCounter] = useState(0);
 
     // Constants
     const POINTS_PER_Q = 5;
@@ -113,7 +115,7 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
         return () => {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [mixes]); // Re-gen if mixes change
+    }, [mixes, retryCounter]); // Re-gen if mixes change or retry requested
 
     // --- 2. Input Handling (Scoped & Safe) ---
     const handleAnswer = useCallback((index: number) => {
@@ -217,25 +219,10 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
 
                 <div className="flex gap-2">
                     <button onClick={() => {
-                        // Reset
-                        setGameState('loading');
-                        setScore(0);
-                        setCurrentQIndex(0);
-                        setSelectionState('idle');
-                        // Trigger re-gen via effect dependency or state
-                        // (Changing gameState to 'loading' won't trigger effect unless we depend on it, 
-                        // or we can just call generateQuestions if we extract it, 
-                        // but forcing a re-mount by key or just resetting state works if effect monitors something.
-                        // Current effect depends on [mixes]. We need to manually trigger logic.)
-                        // Actually, since the effect runs ONCE on mount (deps [mixes]), we need to fix that loop.
-                        // Best toggle: Set a 'retry' counter dependency.
-                        // For now, simpler: Just exit and user enters again? 
-                        // Or better: Reload logic.
-                        // We will force a reload by toggling a state or we can just ignore reloading songs and just replay same questions?
-                        // Ideally shuffle again.
-                        // Let's just go back for now to keep it simple, or implement 'retry' state.
-                        onBack();
-                    }} className="bg-white text-black text-[10px] px-3 py-1 rounded-full font-bold hover:bg-zinc-200">Done</button>
+                        // Trigger re-generation with new shuffle
+                        setRetryCounter(c => c + 1);
+                    }} className="bg-blue-600 text-white text-[10px] px-3 py-1 rounded-full font-bold hover:bg-blue-500">Retry</button>
+                    <button onClick={onBack} className="bg-white text-black text-[10px] px-3 py-1 rounded-full font-bold hover:bg-zinc-200">Done</button>
                 </div>
             </motion.div>
         );
@@ -258,7 +245,7 @@ export function MusicQuiz({ onBack }: MusicQuizProps) {
                 <div className="w-16 h-16 bg-zinc-800 rounded-lg mb-3 shadow-lg flex items-center justify-center overflow-hidden relative">
                     {/* Blurry Hint Image */}
                     <img
-                        src={currentQ.correctSong.image[0]?.link}
+                        src={getArt(currentQ.correctSong)}
                         alt="?"
                         className={`w-full h-full object-cover transition-all duration-500 ${selectionState !== 'idle' ? 'blur-0' : 'blur-md'}`}
                     />

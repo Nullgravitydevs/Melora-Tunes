@@ -31,6 +31,7 @@ export function BrickGame({ onBack }: BrickGameProps) {
     const paddleX = useRef(SCREEN_WIDTH / 2 - PADDLE_WIDTH / 2);
     const targetPaddleX = useRef(SCREEN_WIDTH / 2 - PADDLE_WIDTH / 2);
     const ball = useRef({ x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT - 30, dx: 3, dy: -3 });
+    const lastFrameTime = useRef(0);
     const bricks = useRef<{ x: number, y: number, active: boolean }[]>([]);
     const scoreRef = useRef(0);
     const activeBricksRef = useRef(0);
@@ -55,7 +56,8 @@ export function BrickGame({ onBack }: BrickGameProps) {
         // Reset Stats
         paddleX.current = SCREEN_WIDTH / 2 - PADDLE_WIDTH / 2;
         targetPaddleX.current = SCREEN_WIDTH / 2 - PADDLE_WIDTH / 2;
-        ball.current = { x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT - 30, dx: 3, dy: -3 };
+        ball.current = { x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT - 30, dx: 180, dy: -180 }; // pixels per second
+        lastFrameTime.current = 0;
         scoreRef.current = 0;
         setScore(0);
         setGameState('playing');
@@ -77,8 +79,14 @@ export function BrickGame({ onBack }: BrickGameProps) {
     }, []);
 
     // Game Loop
-    const loop = useCallback(() => {
+    const loop = useCallback((timestamp: number = 0) => {
         if (!canvasRef.current || !gameRunning.current) return;
+
+        // Delta-time for frame-rate independence (target 60fps = 16.67ms)
+        if (!lastFrameTime.current) lastFrameTime.current = timestamp;
+        const deltaMs = Math.min(timestamp - lastFrameTime.current, 33); // Cap at ~30fps to avoid spiral
+        const dt = deltaMs / 1000; // seconds
+        lastFrameTime.current = timestamp;
 
         // Cache Context
         if (!ctxRef.current) {
@@ -92,10 +100,10 @@ export function BrickGame({ onBack }: BrickGameProps) {
         // Paddle Physics
         paddleX.current += (targetPaddleX.current - paddleX.current) * 0.3;
 
-        // Ball Physics
+        // Ball Physics (dt-based)
         let { x, y, dx, dy } = ball.current;
-        x += dx;
-        y += dy;
+        x += dx * dt;
+        y += dy * dt;
 
         // Wall Collisions
         if (x + BALL_SIZE > SCREEN_WIDTH || x < 0) {
@@ -125,8 +133,8 @@ export function BrickGame({ onBack }: BrickGameProps) {
                 dy = -Math.abs(dy); // Ensure up direction
                 // English/Espin
                 const hitPoint = (x + BALL_SIZE / 2) - (paddleX.current + PADDLE_WIDTH / 2);
-                dx += hitPoint * 0.15;
-                dx = Math.max(-5, Math.min(5, dx));
+                dx += hitPoint * 9; // Scale for per-second velocity
+                dx = Math.max(-300, Math.min(300, dx));
                 // Move out of paddle to avoid stuck ball
                 y = SCREEN_HEIGHT - PADDLE_HEIGHT - 5 - BALL_SIZE - 1;
             }
@@ -200,6 +208,7 @@ export function BrickGame({ onBack }: BrickGameProps) {
     // Start Loop
     useEffect(() => {
         initGame();
+        lastFrameTime.current = 0;
         animationFrameId.current = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(animationFrameId.current);
     }, [loop, initGame]);
@@ -229,6 +238,7 @@ export function BrickGame({ onBack }: BrickGameProps) {
                     <div className="flex gap-2">
                         <button onClick={() => {
                             initGame();
+                            lastFrameTime.current = 0;
                             requestAnimationFrame(loop);
                         }} className="bg-white text-black text-[10px] px-3 py-1 rounded-full font-bold hover:bg-zinc-200 transition-colors">Try Again</button>
                         <button onClick={onBack} className="bg-zinc-800 text-white text-[10px] px-3 py-1 rounded-full font-bold hover:bg-zinc-700 transition-colors">Exit</button>
@@ -247,6 +257,7 @@ export function BrickGame({ onBack }: BrickGameProps) {
                     <div className="flex gap-2">
                         <button onClick={() => {
                             initGame();
+                            lastFrameTime.current = 0;
                             requestAnimationFrame(loop);
                         }} className="bg-white text-black text-[10px] px-3 py-1 rounded-full font-bold hover:bg-zinc-200 transition-colors">Play Again</button>
                         <button onClick={onBack} className="bg-zinc-800 text-white text-[10px] px-3 py-1 rounded-full font-bold hover:bg-zinc-700 transition-colors">Exit</button>

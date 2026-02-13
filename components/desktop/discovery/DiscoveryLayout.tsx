@@ -655,8 +655,8 @@ export function DiscoveryLayout() {
                 onClose={closeContextMenu}
                 onPlay={(s) => { playInstantMix({ id: 'quick-play', title: 'Quick Play', color: 'blue', songs: [s], currentSongIndex: 0 }); }}
                 onAddToQueue={(s) => { setQueue([...queue, s]); }}
-                onGoToArtist={(id) => handleNavigate({ id: 'artist', data: id })}
-                onGoToAlbum={(id) => handleNavigate({ id: 'album', data: id })}
+                onGoToArtist={handleGoToArtist}
+                onGoToAlbum={handleGoToAlbum}
                 onStartRadio={(s) => handleNavigate({ id: 'radio', data: s })}
                 isDownloaded={contextMenu.song ? isDownloaded(contextMenu.song.id) : false}
                 onDownload={(s) => downloadSong(s)}
@@ -914,9 +914,6 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                                             <button onClick={() => { setShowBarMenu(false); showToast('Use right-click on a song', 'info'); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><ListPlus size={14} /> Add to Playlist</button>
                                             <div className="border-t border-white/[0.06] my-1" />
                                             <button onClick={() => setShowBarQuality(true)} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Disc3 size={14} /> Quality: {qLabelFull(qualityPreference)}</button>
-                                            {currentSong && !isDownloaded(currentSong.id) && (
-                                                <button onClick={() => { downloadSong(currentSong); setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Download size={14} /> Download</button>
-                                            )}
                                         </>
                                     ) : (
                                         <>

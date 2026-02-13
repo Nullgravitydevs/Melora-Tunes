@@ -14,6 +14,7 @@ import { decodeHtml } from "@/lib/utils";
 import { getArt } from "@/lib/helpers";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AudioQuality } from "@/lib/types";
+import { TrackContextMenu } from "@/components/ui/track-context-menu";
 
 interface FullPlayerProps {
     isOpen: boolean;
@@ -32,9 +33,17 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
     } = usePlayback();
 
     const [viewMode, setViewMode] = useState<'art' | 'queue'>('art');
-    const [showMenu, setShowMenu] = useState(false);
-    const [showQualityPicker, setShowQualityPicker] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
+
+    /* ── Context Menu State ── */
+    const [menuProps, setMenuProps] = useState<{ visible: boolean; x: number; y: number; song: any | null }>({
+        visible: false, x: 0, y: 0, song: null
+    });
+
+    const handleMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setMenuProps({ visible: true, x: e.clientX, y: e.clientY, song: currentSong });
+    };
 
     /* ── Synced Lyrics ── */
     const { lyrics, plainLyrics, isSynced, isLoading: lyricsLoading } = useLyrics(currentSong);
@@ -58,18 +67,6 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
         const el = lyricsRef.current.children[activeLineIdx] as HTMLElement;
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [activeLineIdx]);
-
-    // Close menu on outside click
-    useEffect(() => {
-        const handle = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setShowMenu(false);
-                setShowQualityPicker(false);
-            }
-        };
-        if (showMenu) document.addEventListener('mousedown', handle);
-        return () => document.removeEventListener('mousedown', handle);
-    }, [showMenu]);
 
     // Escape to close
     useEffect(() => {
@@ -99,19 +96,6 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
             try { await navigator.clipboard.writeText(url); showToast("Link copied", "success"); } catch { showToast("Failed to copy", "error"); }
         }
     };
-
-    const handleAddToQueue = () => {
-        if (currentSong) { setQueue([...queue, currentSong]); showToast("Added to queue", "success"); }
-        setShowMenu(false);
-    };
-
-    /* ── Apple-Style Metadata Badge ── */
-    const TechBadge = ({ label, value }: { label: string, value: string }) => (
-        <div className="flex flex-col px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.05]">
-            <span className="text-[9px] text-white/30 uppercase tracking-wider font-bold">{label}</span>
-            <span className="text-[11px] text-white/80 font-medium tabular-nums">{value}</span>
-        </div>
-    );
 
     if (!currentSong) return null;
 
@@ -158,10 +142,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                             <ChevronDown size={22} />
                         </button>
                         <div className="flex flex-col items-center">
-                            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 mb-0.5">Playing From</div>
-                            <div className="text-xs font-semibold text-white/70">
-                                {activeMixId === 'search-results' ? 'Search Results' : 'Library'}
-                            </div>
+                            {/* Removed "Playing From" as per feedback */}
                         </div>
                         <div className="w-10" /> {/* Spacer */}
                     </div>
@@ -190,7 +171,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                                 <img src={getArt(song)} alt="" className="w-10 h-10 rounded-md object-cover bg-white/5" />
                                                 <div className="flex-1 min-w-0">
                                                     <p className={`font-semibold truncate text-sm ${i === currentIndex ? 'text-white' : 'text-white/80'}`}>{decodeHtml(song.name)}</p>
-                                                    <p className="text-xs text-white/40 truncate">{decodeHtml(song.primaryArtists || song.subtitle || '')}</p>
+                                                    <p className="text-xs text-white/40 truncate">{decodeHtml(song.primaryArtists || '')}</p>
                                                 </div>
                                             </div>
                                         ))}
@@ -200,7 +181,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                 <>
                                     {/* Album Art Container */}
                                     <motion.div
-                                        className="relative w-full aspect-square max-w-[420px] mb-12 group"
+                                        className="relative w-full aspect-square max-w-[320px] mb-8 group"
                                         initial={{ scale: 0.9, opacity: 0 }}
                                         animate={{ scale: 1, opacity: 1 }}
                                         transition={{ duration: 0.5, delay: 0.1 }}
@@ -224,25 +205,25 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                         <div className="flex-1 min-w-0 pr-8">
                                             <motion.h1
                                                 layoutId="player-title"
-                                                className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight truncate mb-2"
+                                                className="text-2xl md:text-3xl font-bold text-white tracking-tight leading-tight truncate mb-1"
                                             >
                                                 {decodeHtml(currentSong.name)}
                                             </motion.h1>
                                             <motion.p
-                                                className="text-lg text-white/60 font-medium truncate cursor-pointer hover:text-white transition-colors"
+                                                className="text-base text-white/60 font-medium truncate cursor-pointer hover:text-white transition-colors"
+                                                onClick={() => { const artist = currentSong.primaryArtistsId?.split(',')[0]; if (artist) onClose(); /* Logic handled by context menu usually, but this is direct text click */ }}
                                             >
                                                 {decodeHtml(currentSong.primaryArtists || '')}
                                             </motion.p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <div className="relative" ref={menuRef}>
+                                            <div className="relative">
                                                 <button
-                                                    onClick={() => setShowMenu(!showMenu)}
+                                                    onClick={handleMenu}
                                                     className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
                                                 >
                                                     <MoreHorizontal size={20} />
                                                 </button>
-                                                {/* Menu Dropdown logic handles itself */}
                                             </div>
                                             <button
                                                 onClick={() => toggleLike(currentSong)}
@@ -314,12 +295,12 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                                         <div className="w-px h-6 bg-white/10 mx-2" />
 
-                                        <Tooltip content="Lyrics">
+                                        <Tooltip text="Lyrics">
                                             <button className="text-white/40 hover:text-white transition-colors">
                                                 <Mic2 size={20} />
                                             </button>
                                         </Tooltip>
-                                        <Tooltip content="Queue">
+                                        <Tooltip text="Queue">
                                             <button onClick={() => setViewMode('queue')} className="text-white/40 hover:text-white transition-colors">
                                                 <ListMusic size={20} />
                                             </button>
@@ -331,12 +312,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                         {/* RIGHT: Lyrics / Metadata */}
                         <div className="w-1/2 pl-24 py-20 h-full flex flex-col justify-center">
-                            {/* Technical Details Badge */}
-                            <div className="flex gap-3 mb-8">
-                                <TechBadge label="Format" value={activeQuality === 'hires' || activeQuality === 'flac' ? 'FLAC' : 'AAC'} />
-                                <TechBadge label="Bitrate" value={activeQuality === 'hires' ? '24-bit / 96kHz' : activeQuality === 'flac' ? '16-bit / 44.1kHz' : '320 kbps'} />
-                                <TechBadge label="Source" value={'JioSaavn'} />
-                            </div>
+                            {/* Removed Tech Badges as per feedback */}
 
                             <div className="flex-1 overflow-hidden relative" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}>
                                 {isSynced && lyrics.length > 0 ? (
@@ -353,7 +329,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                                         x: isActive ? 20 : 0
                                                     }}
                                                     onClick={() => seek(line.time / duration)}
-                                                    className={`text-3xl font-bold cursor-pointer transition-colors duration-500 ${isActive ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+                                                    className={`text-2xl font-bold cursor-pointer transition-colors duration-500 ${isActive ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
                                                 >
                                                     {line.text}
                                                 </motion.p>
@@ -369,21 +345,27 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                         <Mic2 size={64} className="mb-4 opacity-50" />
                                         <p className="text-xl font-bold">No Lyrics Available</p>
                                     </div>
-                                )}
+                                )
+                                }
                             </div>
                         </div>
                     </div>
+
+                    <TrackContextMenu
+                        {...menuProps}
+                        onClose={() => setMenuProps({ ...menuProps, visible: false })}
+                        onPlay={(s: any) => { /* already playing */ }}
+                        onAddToQueue={(s: any) => { setQueue([...queue, s]); }}
+                        onGoToArtist={() => { }} // Implement navigation if needed
+                        onGoToAlbum={() => { }}
+                        onStartRadio={() => { }}
+                        isDownloaded={false}
+                        onDownload={() => { }}
+                        onRemoveDownload={() => { }}
+                        onAddToPlaylist={() => { }}
+                    />
                 </motion.div>
             )}
         </AnimatePresence>
-    );
-}
-
-/* ── Menu Button ── */
-function MenuBtn({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
-    return (
-        <button onClick={onClick} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3 transition-colors">
-            {icon} {label}
-        </button>
     );
 }
