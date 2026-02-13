@@ -54,7 +54,7 @@ export function PosterCard({ item, index, subtitle, onClick }: { item: any; inde
             onClick={onClick}
             className="group relative flex-shrink-0 w-48 cursor-pointer"
         >
-            <div className="aspect-[2/3] w-full rounded-xl overflow-hidden mb-3 relative shadow-lg bg-zinc-950 border border-white/5">
+            <div className="aspect-[2/3] w-full rounded-xl overflow-hidden mb-3 relative shadow-lg bg-black border border-white/5">
                 {getArt() ? (
                     <img src={getArt()} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
@@ -150,7 +150,7 @@ export function StandardCard({ item, index, subtitle, onClick, rank }: { item: a
             onClick={onClick}
             className="group w-40 md:w-48 flex-shrink-0 cursor-pointer"
         >
-            <div className="relative aspect-square rounded-xl overflow-hidden mb-3 bg-zinc-950 shadow-md border border-white/5">
+            <div className="relative aspect-square rounded-xl overflow-hidden mb-3 bg-black shadow-md border border-white/5">
                 {getArt() ? (
                     <img
                         src={getArt()}
@@ -222,7 +222,7 @@ export function VibeAlbumCard({ item, onClick }: { item: any; onClick: () => voi
             </div>
 
             {/* The Sleeve (On Top) */}
-            <div className="relative w-full h-full rounded-lg overflow-hidden shadow-2xl z-10 bg-zinc-900 border border-white/5">
+            <div className="relative w-full h-full rounded-lg overflow-hidden shadow-2xl z-10 bg-black border border-white/5">
                 {getArt() && <img src={getArt()} alt={item.title} className="w-full h-full object-cover" onError={() => setImgError(true)} />}
 
                 {/* Glassy Overlay with Title */}

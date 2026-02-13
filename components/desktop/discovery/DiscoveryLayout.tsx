@@ -354,7 +354,7 @@ export function DiscoveryLayout() {
     };
 
     return (
-        <div className="fixed inset-0 bg-zinc-950 text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
+        <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
             <style>{MONO_STYLES}</style>
             <div className="noise" />
 
@@ -794,29 +794,23 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-4xl player-bar"
+            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-3xl player-bar"
         >
-            <div className="relative bg-[#111111]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden">
-                {/* Progress bar - thin line at top */}
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/[0.06]">
-                    <div className="h-full bg-white/50 transition-all duration-150" style={{ width: `${progress * 100}%` }} />
-                </div>
-
-                <div className="flex items-center gap-4 px-4 py-3">
-                    {/* Album Art */}
-                    <div className="relative group cursor-pointer flex-shrink-0" onClick={onExpand}>
-                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/5 ring-1 ring-white/[0.08]">
+            <div className="relative bg-black/90 backdrop-blur-2xl border border-white/[0.06] rounded-[20px] shadow-[0_12px_50px_rgba(0,0,0,0.8)]">
+                <div className="flex items-center gap-3.5 px-4 py-2.5">
+                    {/* Spinning CD Art */}
+                    <div className="relative cursor-pointer flex-shrink-0 group" onClick={onExpand}>
+                        <div className={`w-11 h-11 rounded-full overflow-hidden bg-white/5 ring-2 ring-white/[0.06] shadow-[0_0_15px_rgba(0,0,0,0.4)] ${isPlaying ? 'animate-[spin_4s_linear_infinite]' : ''}`}>
                             {getArt() ? (
                                 <img src={getArt()} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                    <Music size={18} className="text-white/20" />
+                                    <Music size={16} className="text-white/20" />
                                 </div>
                             )}
                         </div>
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                            <Maximize2 size={14} className="text-white" />
-                        </div>
+                        {/* CD center hole */}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-black/80 ring-1 ring-white/10" />
                     </div>
 
                     {/* Song Info */}

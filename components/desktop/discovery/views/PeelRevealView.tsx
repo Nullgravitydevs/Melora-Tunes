@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, useAnimation, useMotionValue, useTransform, PanInfo } from "framer-motion";
-import { ChevronRight, Play, Disc3, ArrowLeft, AlertCircle, RefreshCcw } from "lucide-react";
+import { ChevronRight, Play, Disc3, ArrowLeft, AlertCircle, RefreshCcw, Library, ListPlus } from "lucide-react";
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
 import { usePlayback } from "@/components/providers/playback-context";
 import { decodeHtml } from "@/lib/utils";
@@ -146,6 +146,18 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
                             <p className="text-white/60 mt-1 text-base">{decodeHtml(album.primaryArtists || '')}</p>
                         </motion.div>
                     </motion.div>
+
+                    {/* ACTION BUTTONS (After album opens) */}
+                    {phase === 'opened' && (
+                        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", damping: 20, delay: 0.05 }} className="flex items-center gap-3 mt-2 mb-4">
+                            <button onClick={playAll} className="flex items-center gap-2.5 px-6 py-2.5 bg-white text-black rounded-full font-bold text-sm hover:bg-white/90 active:scale-95 transition-all shadow-[0_4px_20px_rgba(255,255,255,0.15)]">
+                                <Play size={16} fill="currentColor" /> Play All
+                            </button>
+                            <button onClick={() => { playInstantMix({ id: `album-${album.id}`, title: album.name, color: 'blue', songs: tracks, currentSongIndex: 0 }); }} className="flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-md border border-white/10 text-white/80 rounded-full font-semibold text-sm hover:bg-white/15 active:scale-95 transition-all">
+                                <ListPlus size={16} /> Add to Library
+                            </button>
+                        </motion.div>
+                    )}
 
                     {/* TRACKLIST (Appears immediately below) */}
                     {phase === 'opened' && (

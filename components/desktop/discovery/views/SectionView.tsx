@@ -225,7 +225,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
 
                                         {/* Art & Title */}
                                         <div className="flex items-center gap-4 min-w-0">
-                                            <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 shadow-lg bg-zinc-800">
+                                            <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 shadow-lg bg-black">
                                                 <img src={typeof item.image === 'string' ? item.image : (item.image?.[item.image.length - 1]?.link || '')} className="w-full h-full object-cover" />
                                                 <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                                                     {playing ? <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" /> : <Play fill="white" size={16} className="text-white" />}
