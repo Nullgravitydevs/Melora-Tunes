@@ -33,7 +33,7 @@ const SEARCH_STYLES = `
     }
     
     .glass-result {
-        background: black;
+        background: #000000;
         border: 1px solid rgba(255, 255, 255, 0.08);
         transition: all 0.25s ease;
     }
@@ -249,7 +249,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
                             className="absolute top-24 left-1/2 -translate-x-1/2 w-72 p-4 rounded-2xl"
                             style={{
-                                background: '#09090b', // zinc-950
+                                background: '#000000', // pure black
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                                 boxShadow: '0 20px 60px -20px rgba(0, 0, 0, 0.8)'
                             }}
@@ -319,7 +319,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                         <div
                             className="relative flex items-center gap-4 px-6 py-5 rounded-2xl"
                             style={{
-                                background: 'black',
+                                background: '#000000',
                                 border: '1px solid rgba(255, 255, 255, 0.08)',
                                 boxShadow: '0 20px 60px -20px rgba(0, 0, 0, 0.5)'
                             }}

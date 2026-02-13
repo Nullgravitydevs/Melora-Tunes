@@ -72,8 +72,8 @@ function Hero({ song, onPlay, userName, isCurrent, isPlaying }: {
         <div className="relative h-[420px] w-full mb-8 group overflow-hidden rounded-b-[2rem]">
             {/* Ambient BG */}
             <div className="absolute inset-0">
-                {art && <img src={art} alt="" className="w-full h-full object-cover blur-[80px] opacity-15 scale-150 saturate-0" />}
-                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/95 to-black/50" />
+                {art && <img src={art} alt="" className="w-full h-full object-cover blur-[80px] opacity-5 scale-150 saturate-0" />}
+                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/95 to-black" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
             </div>
 
@@ -238,11 +238,10 @@ function QuickPick({ item, onClick, isCurrent, isPlaying }: { item: any; onClick
     return (
         <div
             onClick={onClick}
-            className={`flex items-center gap-3 p-2 pr-4 rounded-xl transition-all duration-200 cursor-pointer group ring-1 ${
-                isCurrent
+            className={`flex items-center gap-3 p-2 pr-4 rounded-xl transition-all duration-200 cursor-pointer group ring-1 ${isCurrent
                     ? 'bg-white/[0.06] ring-white/[0.1]'
                     : 'bg-white/[0.02] ring-white/[0.03] hover:bg-white/[0.05] hover:ring-white/[0.08]'
-            }`}
+                }`}
         >
             <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-white/[0.03]">
                 {art ? <img src={art} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-white/10" /></div>}

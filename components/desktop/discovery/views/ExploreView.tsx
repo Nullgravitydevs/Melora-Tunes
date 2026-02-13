@@ -141,7 +141,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
             {/* VISUAL HERO HEADER */}
             <div className="relative h-[50vh] min-h-[400px] w-full overflow-hidden mb-8 group">
                 {/* Collage Background */}
-                <div className="absolute inset-0 grid grid-cols-3 md:grid-cols-6 opacity-20 group-hover:opacity-30 transition-opacity duration-1000 scale-105">
+                <div className="absolute inset-0 grid grid-cols-3 md:grid-cols-6 opacity-10 group-hover:opacity-20 transition-opacity duration-1000 scale-105">
                     {content.newReleases.slice(0, 18).map((item, i) => (
                         <div key={i} className="relative aspect-square">
                             <img src={getHighQualityImage(item.image)} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
@@ -150,8 +150,8 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                 </div>
 
                 {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-[#09090b]/80 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#09090b] via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-[#000000]/80 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#000000] via-transparent to-transparent" />
 
                 {/* Content */}
                 <div className="absolute bottom-0 left-0 p-8 md:p-16 max-w-4xl z-10 w-full">

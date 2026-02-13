@@ -66,7 +66,7 @@ const MONO_STYLES = `
 
     /* === SIDEBAR === */
     .sidebar {
-        background: black;
+        background: #000000;
         border-right: 1px solid rgba(255, 255, 255, 0.08);
     }
 
@@ -85,7 +85,7 @@ const MONO_STYLES = `
         z-index: -1;
         background-size: cover;
         background-position: center;
-        filter: blur(150px) brightness(0.15) saturate(0) contrast(1.1);
+        filter: blur(20px) brightness(0.05) saturate(0) contrast(1.1);
         transform: scale(1.4);
         transition: all 1s ease;
     }
@@ -354,7 +354,7 @@ export function DiscoveryLayout() {
     };
 
     return (
-        <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
+        <div className="fixed inset-0 bg-[#000000] text-white font-sans overflow-hidden flex flex-col antialiased selection:bg-white/20">
             <style>{MONO_STYLES}</style>
             <div className="noise" />
 
@@ -502,7 +502,7 @@ export function DiscoveryLayout() {
                     </div>
 
                     {/* Settings - Fixed at bottom */}
-                    <div className="px-2.5 py-3 border-t border-white/[0.04] bg-black z-20">
+                    <div className="px-2.5 py-3 border-t border-white/[0.04] bg-[#000000] z-20">
                         <NavItem icon={<Settings size={18} />} label="Settings" onClick={() => setShowSettings(true)} subtle />
                     </div>
 
@@ -510,8 +510,8 @@ export function DiscoveryLayout() {
                 </aside>
 
                 {/* MAIN */}
-                <main className="flex-1 overflow-y-auto scroll pb-24">
-                    <AnimatePresence mode="wait">
+                <main className="flex-1 overflow-y-auto scroll pb-24 bg-[#000000]">
+                    <AnimatePresence mode="popLayout">
                         <motion.div
                             key={currentView.id}
                             initial={{ opacity: 0 }}
