@@ -48,7 +48,7 @@ export function QueueModal({
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
                                     <Music className="text-white" size={20} />
                                 </div>
                                 <div>
@@ -70,7 +70,7 @@ export function QueueModal({
                             {currentSong && (
                                 <div className="p-4 border-b border-zinc-800/50">
                                     <p className="text-xs font-medium text-zinc-500 mb-2 uppercase tracking-wider">Now Playing</p>
-                                    <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-orange-500/20 to-pink-500/20 border border-orange-500/30">
+                                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.06] border border-white/10">
                                         <img
                                             src={currentSong.image[2]?.link || currentSong.image[0]?.link}
                                             alt={currentSong.name}
@@ -81,9 +81,9 @@ export function QueueModal({
                                             <p className="text-xs text-zinc-400 truncate">{decodeHtml(currentSong.primaryArtists)}</p>
                                         </div>
                                         <div className="flex gap-1">
-                                            <div className="w-1 h-4 bg-orange-500 rounded animate-pulse" style={{ animationDelay: '0ms' }}></div>
-                                            <div className="w-1 h-4 bg-orange-500 rounded animate-pulse" style={{ animationDelay: '150ms' }}></div>
-                                            <div className="w-1 h-4 bg-orange-500 rounded animate-pulse" style={{ animationDelay: '300ms' }}></div>
+                                            <div className="w-1 h-4 bg-white rounded animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                                            <div className="w-1 h-4 bg-white rounded animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                                            <div className="w-1 h-4 bg-white rounded animate-pulse" style={{ animationDelay: '300ms' }}></div>
                                         </div>
                                     </div>
                                 </div>

@@ -219,14 +219,14 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
 
     const trendingSearches = ['Arijit Singh', 'Diljit Dosanjh', 'Taylor Swift', 'Atif Aslam', 'Pritam', 'AR Rahman'];
     const categories = [
-        { label: 'Charts', query: 'Top Charts', color: 'from-green-500 to-emerald-700', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745' },
-        { label: 'New Releases', query: 'New Releases', color: 'from-red-500 to-orange-700', image: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9' },
-        { label: 'Chill', query: 'Chill Lo-fi', color: 'from-blue-500 to-indigo-700', image: 'https://images.unsplash.com/photo-1514525253344-981c1cad1295' },
-        { label: 'Bollywood', query: 'Bollywood Hits', color: 'from-purple-500 to-pink-700', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4' },
-        { label: 'Romance', query: 'Romantic Songs', color: 'from-rose-500 to-pink-600', image: 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00' },
-        { label: 'Party', query: 'Party Hits', color: 'from-yellow-400 to-orange-500', image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30' },
-        { label: 'Devotional', query: 'Devotional', color: 'from-orange-400 to-yellow-600', image: 'https://images.unsplash.com/photo-1544124499-58912cbddadf' },
-        { label: 'Classical', query: 'Classical', color: 'from-amber-600 to-orange-800', image: 'https://images.unsplash.com/photo-1507838596373-012ba3aa974e' },
+        { label: 'Charts', query: 'Top Charts', color: 'from-white/20 to-white/5', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745' },
+        { label: 'New Releases', query: 'New Releases', color: 'from-white/15 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9' },
+        { label: 'Chill', query: 'Chill Lo-fi', color: 'from-white/10 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1514525253344-981c1cad1295' },
+        { label: 'Bollywood', query: 'Bollywood Hits', color: 'from-white/15 to-white/5', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4' },
+        { label: 'Romance', query: 'Romantic Songs', color: 'from-white/10 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00' },
+        { label: 'Party', query: 'Party Hits', color: 'from-white/20 to-white/5', image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30' },
+        { label: 'Devotional', query: 'Devotional', color: 'from-white/10 to-white/[0.02]', image: 'https://images.unsplash.com/photo-1544124499-58912cbddadf' },
+        { label: 'Classical', query: 'Classical', color: 'from-white/15 to-white/5', image: 'https://images.unsplash.com/photo-1507838596373-012ba3aa974e' },
     ];
 
     return (
@@ -519,7 +519,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                             animate={{ opacity: 1 }}
                             className="flex flex-col items-center justify-center py-20 text-center"
                         >
-                            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500">
+                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 text-white/60">
                                 <AlertCircle size={32} />
                             </div>
                             <h3 className="text-lg font-bold text-white mb-1">Search Error</h3>
@@ -564,7 +564,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                                         {recentSearches.length > 0 && (
                                             <button
                                                 onClick={clearHistory}
-                                                className="text-white/40 hover:text-red-400 text-xs transition-colors flex items-center gap-1"
+                                                className="text-white/40 hover:text-white text-xs transition-colors flex items-center gap-1"
                                             >
                                                 <X size={12} /> Clear
                                             </button>
@@ -582,7 +582,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                                                 </button>
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); removeSearch(term); }}
-                                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full items-center justify-center hidden group-hover:flex z-10"
+                                                    className="absolute -top-1 -right-1 w-4 h-4 bg-white/30 rounded-full items-center justify-center hidden group-hover:flex z-10"
                                                 >
                                                     <X size={10} className="text-white" />
                                                 </button>
@@ -618,7 +618,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                                             }}
                                             whileTap={{ scale: 0.98 }}
                                         >
-                                            <span className="text-2xl font-black text-white/5 w-6 group-hover:text-blue-500/20 transition-colors">{i + 1}</span>
+                                            <span className="text-2xl font-black text-white/5 w-6 group-hover:text-white/20 transition-colors">{i + 1}</span>
                                             <span className="font-bold text-white/70 group-hover:text-white transition-colors">{term}</span>
                                         </motion.button>
                                     ))}

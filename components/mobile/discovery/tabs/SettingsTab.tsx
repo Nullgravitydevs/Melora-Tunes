@@ -142,7 +142,7 @@ export function SettingsTab() {
                         <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
                             <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-5">
                                 <div className="flex items-center gap-4 mb-5">
-                                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white shadow-lg">
+                                    <div className="w-16 h-16 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-2xl font-bold text-white shadow-lg">
                                         {profileName ? profileName.charAt(0).toUpperCase() : <User size={28} />}
                                     </div>
                                     <div>
@@ -378,16 +378,16 @@ export function SettingsTab() {
                             <SettingsGroup title="Sleep Timer">
                                 <div className="p-4">
                                     {sleepTimer ? (
-                                        <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl flex items-center justify-between">
+                                        <div className="bg-white/[0.06] border border-white/10 p-3 rounded-xl flex items-center justify-between">
                                             <div>
-                                                <p className="text-indigo-400 text-[12px] font-bold">Timer Active</p>
+                                                <p className="text-white text-[12px] font-bold">Timer Active</p>
                                                 <p className="text-[10px] text-white/40">
                                                     Stops in {Math.max(0, Math.round((sleepTimer.endTime - Date.now()) / 60000))}m
                                                 </p>
                                             </div>
                                             <button
                                                 onClick={() => setSleepTimer(null)}
-                                                className="px-3 py-1.5 bg-indigo-500/80 text-white text-[11px] font-bold rounded-lg active:scale-95 transition-transform"
+                                                className="px-3 py-1.5 bg-white/10 text-white text-[11px] font-bold rounded-lg active:scale-95 transition-transform"
                                             >
                                                 Cancel
                                             </button>
@@ -492,12 +492,12 @@ export function SettingsTab() {
                             </button>
 
                             {/* Factory Reset */}
-                            <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-4 mt-6">
-                                <p className="text-red-400/80 text-[11px] font-bold uppercase tracking-wider mb-3">Danger Zone</p>
+                            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 mt-6">
+                                <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mb-3">Danger Zone</p>
                                 {!showResetConfirm ? (
                                     <button
                                         onClick={() => setShowResetConfirm(true)}
-                                        className="w-full py-3 bg-red-500/10 text-red-400/70 rounded-xl text-[12px] font-bold active:bg-red-500/20 transition-colors"
+                                        className="w-full py-3 bg-white/[0.06] text-white/50 rounded-xl text-[12px] font-bold active:bg-white/10 transition-colors"
                                     >
                                         Factory Reset App
                                     </button>
@@ -511,7 +511,7 @@ export function SettingsTab() {
                                         </button>
                                         <button
                                             onClick={() => factoryReset()}
-                                            className="flex-1 py-3 bg-red-600 text-white rounded-xl text-[12px] font-bold active:scale-95 transition-transform"
+                                            className="flex-1 py-3 bg-white/20 text-white rounded-xl text-[12px] font-bold active:scale-95 transition-transform"
                                         >
                                             Confirm Reset
                                         </button>
@@ -548,7 +548,7 @@ export function SettingsTab() {
                     {/* ─── SUPPORT ─── */}
                     {activeTab === "support" && (
                         <motion.div key="support" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-center py-10 space-y-6">
-                            <div className="w-16 h-16 bg-pink-500 rounded-full mx-auto flex items-center justify-center text-white shadow-xl shadow-pink-500/20">
+                            <div className="w-16 h-16 bg-white/10 rounded-full mx-auto flex items-center justify-center text-white shadow-xl">
                                 <Heart size={28} fill="currentColor" />
                             </div>
                             <div>
@@ -622,7 +622,7 @@ export function SettingsTab() {
                                     onClick={showConfirm.action}
                                     className={`flex-1 py-2.5 text-[13px] font-semibold rounded-xl active:scale-95 transition-transform ${
                                         showConfirm.destructive
-                                            ? "bg-red-500/80 text-white"
+                                            ? "bg-white/20 text-white"
                                             : "bg-white text-black"
                                     }`}
                                 >

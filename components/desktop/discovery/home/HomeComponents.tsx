@@ -293,7 +293,7 @@ export function RadioCard({ radio, index, onClick }: { radio: any; index: number
         >
             <div className="absolute inset-0 animate-[spin_10s_linear_infinite] group-hover:animate-[spin_3s_linear_infinite]">
                 {/* Placeholder for radio gradient/art */}
-                <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-80" />
+                <div className="w-full h-full bg-white/10 opacity-80" />
             </div>
             <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm bg-black/20">
                 <Mic size={24} className="text-white drop-shadow-lg" />
@@ -332,12 +332,12 @@ export function CompactCard({ item, index, onClick }: { item: any; index: number
 /* --- DEPRECATED: MoodCard (Will be replaced by VibeAlbumCard) --- */
 export function MoodCard({ title, color, onClick }: { title: string; color: string; onClick: () => void }) {
     const colors: any = {
-        rose: 'from-rose-500 to-red-600',
-        violet: 'from-violet-500 to-purple-600',
-        orange: 'from-orange-500 to-amber-600',
-        emerald: 'from-emerald-500 to-green-600',
-        blue: 'from-blue-500 to-cyan-600',
-        sky: 'from-sky-500 to-blue-600',
+        rose: 'from-white/20 to-white/5',
+        violet: 'from-white/15 to-white/[0.02]',
+        orange: 'from-white/20 to-white/5',
+        emerald: 'from-white/10 to-white/[0.02]',
+        blue: 'from-white/15 to-white/5',
+        sky: 'from-white/10 to-white/[0.02]',
     };
 
     return (

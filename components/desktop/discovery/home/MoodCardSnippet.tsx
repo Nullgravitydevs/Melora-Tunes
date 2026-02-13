@@ -9,12 +9,12 @@ import { Play, Music } from "lucide-react";
 export function MoodCard({ title, color, onClick }: { title: string; color: string; onClick: () => void }) {
     // Dynamic Gradient Maps
     const gradients: Record<string, string> = {
-        'love': 'from-rose-500/80 via-pink-600/60 to-purple-600/40',
-        'party': 'from-violet-600/80 via-fuchsia-600/60 to-indigo-600/40',
-        'workout': 'from-orange-500/80 via-amber-600/60 to-red-600/40',
-        'chill': 'from-teal-500/80 via-emerald-600/60 to-cyan-600/40',
-        'sad': 'from-blue-600/80 via-slate-600/60 to-gray-600/40',
-        'focus': 'from-sky-600/80 via-indigo-600/60 to-blue-600/40',
+        'love': 'from-white/20 via-white/10 to-white/5',
+        'party': 'from-white/15 via-white/8 to-white/[0.02]',
+        'workout': 'from-white/20 via-white/12 to-white/5',
+        'chill': 'from-white/10 via-white/5 to-white/[0.02]',
+        'sad': 'from-white/8 via-white/4 to-white/[0.02]',
+        'focus': 'from-white/12 via-white/6 to-white/[0.02]',
     };
 
     const gradient = gradients[title.toLowerCase()] || 'from-white/20 via-white/10 to-white/5';

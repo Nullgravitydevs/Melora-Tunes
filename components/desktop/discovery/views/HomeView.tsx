@@ -1,9 +1,14 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Play, Music, AlertCircle, RefreshCcw, ChevronRight } from "lucide-react";
+import { Play, Pause, Music, AlertCircle, RefreshCcw, ChevronRight, Disc3 } from "lucide-react";
 import { getStrictLaunchData, LaunchData, JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
+
+/* ==========================================================================
+   HOME VIEW — Premium Discovery Home
+   Zero framer-motion, CSS-only transitions, 5-min cache, self-contained
+   ========================================================================== */
 
 interface HomeViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
@@ -13,15 +18,14 @@ interface HomeViewProps {
     onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
+const CACHE_TTL = 300_000; // 5 minutes
+
 function getGreeting(name?: string) {
-    const hours = new Date().getHours();
-    let g = "Good Morning";
-    if (hours >= 12 && hours < 18) g = "Good Afternoon";
-    if (hours >= 18) g = "Good Evening";
+    const h = new Date().getHours();
+    const g = h < 12 ? "Good Morning" : h < 18 ? "Good Afternoon" : "Good Evening";
     return name ? `${g}, ${name}` : g;
 }
 
-// === HELPER: Extract image URL ===
 function getArt(item: any, quality = '500x500'): string {
     if (!item?.image) return '';
     if (typeof item.image === 'string') return item.image;
@@ -29,181 +33,251 @@ function getArt(item: any, quality = '500x500'): string {
     return '';
 }
 
-// === SKELETON ===
+// ─── SKELETON ─────────────────────────────────────────────────────────────
 function HomeSkeleton() {
     return (
-        <div className="animate-pulse space-y-8 p-8">
-            <div className="h-[340px] bg-white/[0.03] rounded-2xl" />
+        <div className="animate-pulse space-y-10 p-8">
+            <div className="h-[400px] bg-white/[0.02] rounded-3xl" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="h-16 bg-white/[0.03] rounded-xl" />
+                    <div key={i} className="h-[60px] bg-white/[0.02] rounded-xl" />
                 ))}
             </div>
-            <div className="space-y-3">
-                <div className="h-6 w-40 bg-white/[0.03] rounded" />
-                <div className="flex gap-4">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="w-44 h-56 bg-white/[0.03] rounded-xl shrink-0" />
-                    ))}
+            {[1, 2].map(k => (
+                <div key={k} className="space-y-3">
+                    <div className="h-5 w-36 bg-white/[0.02] rounded ml-8" />
+                    <div className="flex gap-4 px-8">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="w-44 h-56 bg-white/[0.02] rounded-2xl shrink-0" />
+                        ))}
+                    </div>
                 </div>
-            </div>
+            ))}
         </div>
     );
 }
 
-// === HERO ===
-function Hero({ song, onPlay, userName }: { song: JioSaavnSong | null; onPlay: (s: JioSaavnSong) => void; userName?: string }) {
+// ─── HERO — Cinematic full-bleed ──────────────────────────────────────────
+function Hero({ song, onPlay, userName, isCurrent, isPlaying }: {
+    song: JioSaavnSong | null;
+    onPlay: (s: JioSaavnSong) => void;
+    userName?: string;
+    isCurrent: boolean;
+    isPlaying: boolean;
+}) {
     if (!song) return null;
     const art = getArt(song);
 
     return (
-        <div className="relative h-[360px] w-full mb-6 group overflow-hidden">
-            {/* Background */}
+        <div className="relative h-[420px] w-full mb-8 group overflow-hidden rounded-b-[2rem]">
+            {/* Ambient BG */}
             <div className="absolute inset-0">
-                {art && <img src={art} alt="" className="w-full h-full object-cover blur-[60px] opacity-20 scale-125" />}
-                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-black/40" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
+                {art && <img src={art} alt="" className="w-full h-full object-cover blur-[80px] opacity-15 scale-150 saturate-0" />}
+                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/95 to-black/50" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
             </div>
 
-            <div className="relative z-10 h-full flex items-center px-10 gap-10">
-                {/* Album Art */}
-                <div className="shrink-0 w-64 h-64 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/10 hidden md:block transition-transform duration-500 group-hover:scale-[1.02]">
-                    {art ? (
-                        <img src={art} alt={song.name} className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full bg-white/5 flex items-center justify-center"><Music size={48} className="text-white/10" /></div>
-                    )}
+            {/* Noise overlay */}
+            <div className="absolute inset-0 opacity-[0.015]" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
+            }} />
+
+            <div className="relative z-10 h-full flex items-center px-12 gap-12">
+                {/* Album Art with vinyl peek */}
+                <div className="shrink-0 relative hidden md:block">
+                    {/* Vinyl disc behind */}
+                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 w-[260px] h-[260px] rounded-full bg-zinc-900 border border-white/[0.06] translate-x-8 transition-transform duration-700 group-hover:translate-x-20">
+                        <div className="absolute inset-4 rounded-full border border-white/[0.04]" />
+                        <div className="absolute inset-8 rounded-full border border-white/[0.03]" />
+                        <div className="absolute inset-[4.5rem] rounded-full bg-zinc-800 border border-white/5" />
+                        <div className="absolute inset-[5.2rem] rounded-full bg-zinc-900" />
+                    </div>
+                    {/* Cover */}
+                    <div className="relative w-[260px] h-[260px] rounded-2xl overflow-hidden shadow-2xl shadow-black/80 ring-1 ring-white/[0.08] z-10">
+                        {art ? (
+                            <img src={art} alt={song.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full bg-white/5 flex items-center justify-center"><Music size={48} className="text-white/10" /></div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Info */}
+                {/* Text Info */}
                 <div className="flex flex-col justify-center flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-5">
-                        <span className="px-3 py-1 bg-white/[0.08] rounded-md text-[10px] font-bold tracking-[0.2em] text-white/60 uppercase">
-                            Pick of the Day
+                    <div className="flex items-center gap-3 mb-6">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/[0.06] backdrop-blur-sm rounded-full text-[10px] font-bold tracking-[0.15em] text-white/50 uppercase border border-white/[0.04]">
+                            <Disc3 size={10} className="opacity-60" /> Featured
                         </span>
-                        <span className="text-white/30 text-sm">·</span>
-                        <span className="text-white/30 text-sm font-medium">{getGreeting(userName)}</span>
+                        <span className="text-white/20 text-xs">·</span>
+                        <span className="text-white/25 text-xs font-medium tracking-wide">{getGreeting(userName)}</span>
                     </div>
 
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1.1] mb-3 tracking-tight line-clamp-2">
+                    <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-black text-white leading-[1.05] mb-3 tracking-[-0.02em] line-clamp-2">
                         {decodeHtml(song.name)}
                     </h1>
 
-                    <p className="text-lg text-white/40 font-medium mb-8 truncate">
+                    <p className="text-base text-white/35 font-medium mb-8 truncate max-w-lg">
                         {decodeHtml(song.primaryArtists || "")} {song.year ? `· ${song.year}` : ''}
                     </p>
 
-                    <button
-                        className="w-max px-8 py-3.5 bg-white text-black rounded-full font-bold text-sm flex items-center gap-2.5 hover:bg-white/90 active:scale-95 transition-all"
-                        onClick={() => onPlay(song)}
-                    >
-                        <Play fill="currentColor" size={18} /> Play Now
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <button
+                            className="px-8 py-3.5 bg-white text-black rounded-full font-bold text-sm flex items-center gap-2.5 hover:bg-white/90 active:scale-[0.97] transition-all shadow-lg shadow-white/5"
+                            onClick={() => onPlay(song)}
+                        >
+                            {isCurrent && isPlaying ? <Pause fill="currentColor" size={16} /> : <Play fill="currentColor" size={16} className="ml-0.5" />}
+                            {isCurrent && isPlaying ? 'Playing' : 'Play Now'}
+                        </button>
+                        <button
+                            onClick={() => onPlay(song)}
+                            className="px-5 py-3.5 bg-white/[0.06] hover:bg-white/10 text-white/70 rounded-full font-semibold text-sm transition-all border border-white/[0.06] backdrop-blur-sm"
+                        >
+                            Add to Queue
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            {/* Bottom fade */}
+            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black to-transparent" />
         </div>
     );
 }
 
-// === SECTION HEADER ===
+// ─── SECTION HEADER ───────────────────────────────────────────────────────
 function SectionHead({ title, subtitle, onSeeAll }: { title: string; subtitle?: string; onSeeAll?: () => void }) {
     return (
-        <div className="flex items-end justify-between mb-4 px-8">
+        <div className="flex items-end justify-between mb-5 px-8">
             <div>
-                {subtitle && <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1">{subtitle}</p>}
-                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">{title}</h2>
+                {subtitle && <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] mb-1">{subtitle}</p>}
+                <h2 className="text-xl font-bold tracking-[-0.01em] text-white">{title}</h2>
             </div>
             {onSeeAll && (
-                <button onClick={onSeeAll} className="text-[11px] font-bold text-white/30 hover:text-white/60 uppercase tracking-wider flex items-center gap-0.5 transition-colors">
-                    See All <ChevronRight size={12} />
+                <button onClick={onSeeAll} className="text-[11px] font-bold text-white/25 hover:text-white/50 uppercase tracking-widest flex items-center gap-0.5 transition-colors group">
+                    See All <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
                 </button>
             )}
         </div>
     );
 }
 
-// === HORIZONTAL SCROLL (CSS only, no framer-motion) ===
+// ─── H-SCROLL ─────────────────────────────────────────────────────────────
 function HScroll({ children }: { children: React.ReactNode }) {
     return (
-        <div className="overflow-x-auto pb-4 px-8 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
+        <div className="overflow-x-auto pb-2 px-8 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
             <div className="flex gap-5 w-max">{children}</div>
         </div>
     );
 }
 
-// === SONG CARD (Square art, minimal) ===
-function SongCard({ item, onClick, rank }: { item: any; onClick: () => void; rank?: number }) {
+// ─── SONG CARD — Hoverable square ─────────────────────────────────────────
+function SongCard({ item, onClick, rank, isCurrent, isPlaying }: {
+    item: any; onClick: () => void; rank?: number; isCurrent?: boolean; isPlaying?: boolean;
+}) {
     const art = getArt(item);
     return (
-        <div onClick={onClick} className="group w-40 md:w-44 shrink-0 cursor-pointer">
-            <div className="relative aspect-square rounded-xl overflow-hidden mb-2.5 bg-white/[0.03] ring-1 ring-white/[0.06]">
+        <div onClick={onClick} className="group w-[172px] shrink-0 cursor-pointer">
+            <div className="relative aspect-square rounded-2xl overflow-hidden mb-3 bg-white/[0.02] ring-1 ring-white/[0.05] hover:ring-white/[0.12] transition-all duration-300">
                 {art ? (
-                    <img src={art} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                    <img src={art} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" loading="lazy" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center"><Music size={28} className="text-white/10" /></div>
                 )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                    <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200">
-                        <Play fill="currentColor" size={16} className="ml-0.5" />
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
+                    <div className={`w-12 h-12 rounded-full bg-white text-black flex items-center justify-center transition-all duration-300 shadow-xl ${isCurrent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0'}`}>
+                        {isCurrent && isPlaying ? <Pause fill="currentColor" size={18} /> : <Play fill="currentColor" size={18} className="ml-0.5" />}
                     </div>
                 </div>
+                {/* Rank */}
                 {rank && (
-                    <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-md">
-                        <span className="text-[10px] font-bold text-white/70">#{rank}</span>
+                    <div className="absolute top-0 left-0 px-3 py-1.5 bg-black/70 backdrop-blur-sm rounded-br-xl rounded-tl-2xl">
+                        <span className="text-[11px] font-black text-white/80 tabular-nums">#{rank}</span>
+                    </div>
+                )}
+                {/* Currently playing indicator */}
+                {isCurrent && (
+                    <div className="absolute bottom-2 right-2 flex gap-[3px] items-end h-4">
+                        <span className="w-[3px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '60%', animationDelay: '0ms' }} />
+                        <span className="w-[3px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '100%', animationDelay: '150ms' }} />
+                        <span className="w-[3px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '40%', animationDelay: '300ms' }} />
                     </div>
                 )}
             </div>
-            <h4 className="font-semibold text-white text-[13px] truncate leading-tight">{decodeHtml(item.name || item.title)}</h4>
-            <p className="text-[11px] text-white/30 truncate mt-0.5">{decodeHtml(item.primaryArtists || item.subtitle || '')}</p>
+            <h4 className={`font-semibold text-[13px] truncate leading-tight ${isCurrent ? 'text-white' : 'text-white/80'}`}>
+                {decodeHtml(item.name || item.title)}
+            </h4>
+            <p className="text-[11px] text-white/25 truncate mt-0.5">{decodeHtml(item.primaryArtists || item.subtitle || '')}</p>
         </div>
     );
 }
 
-// === WIDE CARD (for playlists/charts) ===
+// ─── WIDE CARD (Charts + Playlists) ───────────────────────────────────────
 function WideCard({ item, onClick, label }: { item: any; onClick: () => void; label?: string }) {
     const art = getArt(item);
     return (
-        <div onClick={onClick} className="group relative shrink-0 w-72 h-44 rounded-xl overflow-hidden cursor-pointer bg-white/[0.03] ring-1 ring-white/[0.06]">
+        <div onClick={onClick} className="group relative shrink-0 w-[280px] h-[160px] rounded-2xl overflow-hidden cursor-pointer bg-white/[0.02] ring-1 ring-white/[0.05] hover:ring-white/[0.12] transition-all duration-300">
             {art && (
                 <div className="absolute inset-0">
-                    <img src={art} alt="" className="w-full h-full object-cover opacity-50 transition-all duration-300 group-hover:opacity-40 group-hover:scale-105" loading="lazy" />
-                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent" />
+                    <img src={art} alt="" className="w-full h-full object-cover opacity-40 saturate-[0.3] transition-all duration-500 group-hover:opacity-50 group-hover:scale-105" loading="lazy" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/20" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
                 </div>
             )}
             <div className="relative z-10 p-5 flex flex-col justify-end h-full">
-                {label && <p className="text-[10px] font-bold text-white/40 mb-1.5 uppercase tracking-[0.15em]">{label}</p>}
-                <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">{decodeHtml(item.title || item.name)}</h3>
-                {item.subtitle && <p className="text-xs text-white/30 line-clamp-1 mt-1">{decodeHtml(item.subtitle)}</p>}
+                {label && (
+                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1.5 inline-block">
+                        {label}
+                    </span>
+                )}
+                <h3 className="text-base font-bold text-white leading-snug line-clamp-2">{decodeHtml(item.title || item.name)}</h3>
+                {item.subtitle && <p className="text-[11px] text-white/25 line-clamp-1 mt-1">{decodeHtml(item.subtitle)}</p>}
             </div>
-            <div className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/[0.06] backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 border border-white/[0.06]">
                 <Play fill="currentColor" size={14} className="text-white ml-0.5" />
             </div>
         </div>
     );
 }
 
-// === QUICK PICK ROW ===
-function QuickPick({ item, onClick }: { item: any; onClick: () => void }) {
+// ─── QUICK PICK ROW ───────────────────────────────────────────────────────
+function QuickPick({ item, onClick, isCurrent, isPlaying }: { item: any; onClick: () => void; isCurrent?: boolean; isPlaying?: boolean }) {
     const art = getArt(item, '150x150');
     return (
-        <div onClick={onClick} className="flex items-center gap-3 p-2 pr-4 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group ring-1 ring-white/[0.04] hover:ring-white/[0.08]">
-            <div className="relative w-11 h-11 rounded-md overflow-hidden shrink-0 bg-white/[0.03]">
+        <div
+            onClick={onClick}
+            className={`flex items-center gap-3 p-2 pr-4 rounded-xl transition-all duration-200 cursor-pointer group ring-1 ${
+                isCurrent
+                    ? 'bg-white/[0.06] ring-white/[0.1]'
+                    : 'bg-white/[0.02] ring-white/[0.03] hover:bg-white/[0.05] hover:ring-white/[0.08]'
+            }`}
+        >
+            <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-white/[0.03]">
                 {art ? <img src={art} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-white/10" /></div>}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Play size={12} fill="currentColor" className="text-white" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {isCurrent && isPlaying ? <Pause size={14} fill="currentColor" className="text-white" /> : <Play size={12} fill="currentColor" className="text-white ml-0.5" />}
                 </div>
             </div>
             <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-white text-[13px] truncate">{decodeHtml(item.name || item.title)}</h4>
-                <p className="text-[11px] text-white/30 truncate">{decodeHtml(item.primaryArtists || item.subtitle || '')}</p>
+                <h4 className={`font-semibold text-[13px] truncate ${isCurrent ? 'text-white' : 'text-white/80'}`}>
+                    {decodeHtml(item.name || item.title)}
+                </h4>
+                <p className="text-[11px] text-white/25 truncate">{decodeHtml(item.primaryArtists || item.subtitle || '')}</p>
             </div>
+            {isCurrent && isPlaying && (
+                <div className="flex gap-[2px] items-end h-3.5 mr-1">
+                    <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '50%', animationDelay: '0ms' }} />
+                    <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '100%', animationDelay: '150ms' }} />
+                    <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '60%', animationDelay: '300ms' }} />
+                </div>
+            )}
         </div>
     );
 }
 
-
-
-// === MAIN: HOME VIEW ===
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MAIN: HOME VIEW
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onContextMenu }: HomeViewProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -214,7 +288,6 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
     const cacheRef = useRef<{ data: LaunchData; lang: string; ts: number } | null>(null);
 
     const fetchData = useCallback(async () => {
-        // Read settings
         let storedLangs = ['english'];
         let name = "";
         try {
@@ -234,8 +307,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
         const langString = validLangs.join(',') || 'english';
         setDisplayLangs(validLangs.map(l => l.charAt(0).toUpperCase() + l.slice(1)));
 
-        // Use cache if <5 min old and same language
-        if (cacheRef.current && cacheRef.current.lang === langString && Date.now() - cacheRef.current.ts < 300000) {
+        if (cacheRef.current && cacheRef.current.lang === langString && Date.now() - cacheRef.current.ts < CACHE_TTL) {
             setLaunchData(cacheRef.current.data);
             const pool = [...(cacheRef.current.data.new_trending || []), ...(cacheRef.current.data.new_albums || [])];
             if (pool.length > 0) setHeroSong(pool[Math.floor(Math.random() * Math.min(pool.length, 5))]);
@@ -250,7 +322,6 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
             if (!data) throw new Error("No data returned");
             setLaunchData(data);
             cacheRef.current = { data, lang: langString, ts: Date.now() };
-
             const pool = [...(data.new_trending || []), ...(data.new_albums || [])];
             if (pool.length > 0) setHeroSong(pool[Math.floor(Math.random() * Math.min(pool.length, 5))]);
         } catch {
@@ -272,12 +343,12 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
     if (error || !launchData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
-                <div className="p-12 rounded-2xl max-w-md border border-white/[0.06] bg-white/[0.02]">
-                    <div className="w-16 h-16 bg-white/[0.05] rounded-full flex items-center justify-center mx-auto mb-6">
-                        <AlertCircle size={32} className="text-white/40" />
+                <div className="p-12 rounded-3xl max-w-md border border-white/[0.05] bg-white/[0.02]">
+                    <div className="w-16 h-16 bg-white/[0.04] rounded-full flex items-center justify-center mx-auto mb-6">
+                        <AlertCircle size={28} className="text-white/30" />
                     </div>
-                    <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
-                    <p className="text-white/30 text-sm mb-6">{error || "Couldn't load content. Check your connection."}</p>
+                    <h2 className="text-lg font-bold text-white mb-2">Something went wrong</h2>
+                    <p className="text-white/25 text-sm mb-6">{error || "Couldn't load content."}</p>
                     <button onClick={() => fetchData()} className="flex items-center gap-2 px-6 py-2.5 bg-white text-black rounded-full font-bold text-sm hover:bg-white/90 transition-colors mx-auto">
                         <RefreshCcw size={14} /> Retry
                     </button>
@@ -291,7 +362,13 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
     return (
         <div className="pb-32 w-full overflow-x-hidden">
             {/* HERO */}
-            <Hero song={heroSong} onPlay={onPlaySong} userName={userName} />
+            <Hero
+                song={heroSong}
+                onPlay={onPlaySong}
+                userName={userName}
+                isCurrent={currentSongId === heroSong?.id}
+                isPlaying={isPlaying}
+            />
 
             <div className="space-y-10">
                 {/* QUICK PICKS */}
@@ -300,7 +377,13 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
                         <SectionHead title="Quick Picks" subtitle="Jump right in" />
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 px-8">
                             {quick_picks.slice(0, 8).map(song => (
-                                <QuickPick key={song.id} item={song} onClick={() => onPlaySong(song)} />
+                                <QuickPick
+                                    key={song.id}
+                                    item={song}
+                                    onClick={() => onPlaySong(song)}
+                                    isCurrent={currentSongId === song.id}
+                                    isPlaying={isPlaying}
+                                />
                             ))}
                         </div>
                     </section>
@@ -312,7 +395,14 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
                         <SectionHead title="Trending Now" onSeeAll={() => onNavigate({ id: 'trending', data: { items: new_trending, title: 'Trending Now' } })} />
                         <HScroll>
                             {new_trending.slice(0, 12).map((song, i) => (
-                                <SongCard key={song.id} item={song} onClick={() => onPlaySong(song)} rank={i + 1} />
+                                <SongCard
+                                    key={song.id}
+                                    item={song}
+                                    onClick={() => onPlaySong(song)}
+                                    rank={i + 1}
+                                    isCurrent={currentSongId === song.id}
+                                    isPlaying={isPlaying}
+                                />
                             ))}
                         </HScroll>
                     </section>
@@ -360,7 +450,13 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
                         <SectionHead title="Retro Rewind" subtitle="Timeless classics" />
                         <HScroll>
                             {retro.slice(0, 12).map(song => (
-                                <SongCard key={song.id} item={song} onClick={() => onPlaySong(song)} />
+                                <SongCard
+                                    key={song.id}
+                                    item={song}
+                                    onClick={() => onPlaySong(song)}
+                                    isCurrent={currentSongId === song.id}
+                                    isPlaying={isPlaying}
+                                />
                             ))}
                         </HScroll>
                     </section>

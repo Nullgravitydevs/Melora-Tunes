@@ -103,7 +103,7 @@ function SharePageContent() {
                     {/* Mix Header */}
                     <div className="p-6 border-b border-zinc-700">
                         <div className="flex items-center gap-4">
-                            <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                            <div className="w-20 h-20 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
                                 <Music className="text-white" size={32} />
                             </div>
                             <div>
@@ -136,7 +136,7 @@ function SharePageContent() {
                     <div className="p-6 border-t border-zinc-700 flex gap-3">
                         <button
                             onClick={handleImport}
-                            className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-medium hover:from-blue-400 hover:to-purple-400 transition-all flex items-center justify-center gap-2"
+                            className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 border border-white/10"
                         >
                             <Download size={18} />
                             Add to My Library
@@ -152,7 +152,7 @@ function SharePageContent() {
                     className="text-center mt-8"
                 >
                     <p className="text-zinc-500 text-sm">
-                        Powered by <span className="text-purple-400 font-semibold">Melora</span>
+                        Powered by <span className="text-white font-semibold">Melora</span>
                     </p>
                 </motion.div>
             </div>

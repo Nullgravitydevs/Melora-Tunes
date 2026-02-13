@@ -74,7 +74,7 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
                                     <Share2 className="text-white" size={20} />
                                 </div>
                                 <div>
@@ -137,8 +137,8 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                                     <button
                                         onClick={copyToClipboard}
                                         className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all ${copied
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-blue-500 hover:bg-blue-400 text-white'
+                                            ? 'bg-white/20 text-white'
+                                            : 'bg-white/10 hover:bg-white/20 text-white'
                                             }`}
                                     >
                                         {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -151,7 +151,7 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
                             {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
                                 <button
                                     onClick={shareNative}
-                                    className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-medium hover:from-blue-400 hover:to-purple-400 transition-all flex items-center justify-center gap-2"
+                                    className="w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 border border-white/10"
                                 >
                                     <Share2 size={18} />
                                     Share via...

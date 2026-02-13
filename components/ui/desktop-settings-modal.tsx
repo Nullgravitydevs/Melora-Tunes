@@ -132,7 +132,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
 
                                     <div className="bg-zinc-900/40 p-8 rounded-3xl border border-white/5 space-y-6">
                                         <div className="flex items-center gap-6 mb-8">
-                                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-2xl">
+                                            <div className="w-24 h-24 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-3xl font-bold text-white shadow-2xl">
                                                 {profileName ? profileName.charAt(0).toUpperCase() : <User size={40} />}
                                             </div>
                                             <div>

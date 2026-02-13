@@ -45,13 +45,8 @@ export default function Home() {
     const isSetupDone = localStorage.getItem('melora-setup-complete') === 'true';
 
     if (isSetupDone) {
-      // Restore saved mode if it exists, otherwise show launcher
-      const savedMode = localStorage.getItem('melora-ui-mode') as UIMode | null;
-      if (savedMode && ['CLASSIC', 'DISCOVERY', 'DECK'].includes(savedMode)) {
-        setMode(savedMode);
-      } else {
-        setMode('LAUNCHER');
-      }
+      // Always show the interface chooser on app start
+      setMode('LAUNCHER');
     } else {
       setMode('WELCOME');
     }

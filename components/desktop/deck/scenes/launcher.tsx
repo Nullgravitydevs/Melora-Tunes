@@ -96,7 +96,7 @@ function ModeSelector({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m:
                             desc="Modern, touch-first player."
                             icon={<Disc size={32} />}
                             onClick={() => onSelect('DISCOVERY')}
-                            color="from-blue-500 to-indigo-600"
+                            color="from-white/15 to-white/5"
                         />
                         {/* 2. iPod Classic */}
                         <ModeCard
@@ -104,7 +104,7 @@ function ModeSelector({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m:
                             desc="Zen mode. Pure music."
                             icon={<Smartphone size={32} />}
                             onClick={() => onSelect('CLASSIC')}
-                            color="from-gray-700 to-black"
+                            color="from-white/10 to-white/[0.02]"
                         />
                     </>
                 )}
@@ -118,7 +118,7 @@ function ModeSelector({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m:
                             desc="The ultimate dashboard."
                             icon={<Disc size={32} />}
                             onClick={() => onSelect('DISCOVERY')}
-                            color="from-blue-500 to-indigo-600"
+                            color="from-white/15 to-white/5"
                         />
                         {/* 2. Deck Studio */}
                         <ModeCard
@@ -126,7 +126,7 @@ function ModeSelector({ isMobile, onSelect }: { isMobile: boolean, onSelect: (m:
                             desc="Pro analog workspace."
                             icon={<CassetteTape size={32} />}
                             onClick={() => onSelect('DECK')}
-                            color="from-orange-500 to-amber-600"
+                            color="from-white/10 to-white/[0.02]"
                         />
                     </>
                 )}

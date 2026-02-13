@@ -167,7 +167,7 @@ export function SearchModal({ isOpen, onClose, onAddSong, favorites, onToggleFav
                     {/* Search Input Area */}
                     <div className="p-6 pb-2">
                         <div className="relative group">
-                            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
+                            <div className="absolute inset-0 bg-white/5 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-white transition-colors" size={20} />
                             <input
                                 type="text"

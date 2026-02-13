@@ -93,7 +93,7 @@ export function CategoryHubView({ data, onNavigate, onBack, onContextMenu }: Cat
                 {/* Accent Color Wash */}
                 <div
                     className="absolute inset-0 opacity-40"
-                    style={{ background: `radial-gradient(circle at 20% 40%, ${data.color || '#555'} 0%, transparent 70%)` }}
+                    style={{ background: `radial-gradient(circle at 20% 40%, rgba(255,255,255,0.08) 0%, transparent 70%)` }}
                 />
 
                 {/* Overlays */}
