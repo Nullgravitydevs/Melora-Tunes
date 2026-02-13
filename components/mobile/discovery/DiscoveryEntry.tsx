@@ -46,6 +46,7 @@ export function getArt(item: any): string {
 // ─── Main Entry ──────────────────────────────────────────
 export function DiscoveryEntry() {
     const [activeTab, setActiveTab] = useState<Tab>("HOME");
+    const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(new Set(["HOME"]));
     const [viewStack, setViewStack] = useState<ViewState[]>([]);
     const [showFullPlayer, setShowFullPlayer] = useState(false);
     const {
@@ -63,6 +64,7 @@ export function DiscoveryEntry() {
 
     const switchTab = useCallback((tab: Tab) => {
         setActiveTab(tab);
+        setMountedTabs(prev => { const next = new Set(prev); next.add(tab); return next; });
         setViewStack([]);
     }, []);
 
@@ -124,13 +126,13 @@ export function DiscoveryEntry() {
             {/* Full player */}
             <FullPlayerSheet isOpen={showFullPlayer} onClose={() => setShowFullPlayer(false)} onNavigate={navigate} />
 
-            {/* Tab content */}
+            {/* Tab content — lazy-mounted: tabs only render after first visit */}
             <div className="flex-1 overflow-y-auto pb-40 no-scrollbar z-10">
                 <div className={activeTab === "HOME" ? "" : "hidden"}><HomeTab onNavigate={navigate} /></div>
-                <div className={activeTab === "SEARCH" ? "" : "hidden"}><SearchTab onNavigate={navigate} /></div>
-                <div className={activeTab === "EXPLORE" ? "" : "hidden"}><ExploreTab onNavigate={navigate} /></div>
-                <div className={activeTab === "LIBRARY" ? "" : "hidden"}><LibraryTab onNavigate={navigate} /></div>
-                <div className={activeTab === "SETTINGS" ? "" : "hidden"}><SettingsTab /></div>
+                {mountedTabs.has("SEARCH") && <div className={activeTab === "SEARCH" ? "" : "hidden"}><SearchTab onNavigate={navigate} /></div>}
+                {mountedTabs.has("EXPLORE") && <div className={activeTab === "EXPLORE" ? "" : "hidden"}><ExploreTab onNavigate={navigate} /></div>}
+                {mountedTabs.has("LIBRARY") && <div className={activeTab === "LIBRARY" ? "" : "hidden"}><LibraryTab onNavigate={navigate} /></div>}
+                {mountedTabs.has("SETTINGS") && <div className={activeTab === "SETTINGS" ? "" : "hidden"}><SettingsTab /></div>}
             </div>
 
             {/* Bottom dock */}

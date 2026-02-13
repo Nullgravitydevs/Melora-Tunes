@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
     Heart, Clock, ListMusic, Plus, Play, Pause, MoreHorizontal,
     Shuffle, Music, Trash2, ChevronRight, Disc, User, Pin as PinIcon,
@@ -60,6 +61,49 @@ interface LibraryViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
     initialTab?: 'liked' | 'recent' | 'playlists';
     onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
+}
+
+/* ============================================================================
+   VIRTUALIZED SONG LIST — Renders only visible items for large lists
+   ============================================================================ */
+function VirtualizedSongList({ items, renderRow }: {
+    items: (JioSaavnSong | PlayableTrack)[],
+    renderRow: (item: JioSaavnSong | PlayableTrack, index: number, all: (JioSaavnSong | PlayableTrack)[]) => React.ReactNode
+}) {
+    const parentRef = useRef<HTMLDivElement>(null);
+    const ROW_HEIGHT = 64; // px per row including gap
+
+    const virtualizer = useVirtualizer({
+        count: items.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => ROW_HEIGHT,
+        overscan: 10,
+    });
+
+    // For small lists, render normally (no virtualization overhead)
+    if (items.length <= 50) {
+        return (
+            <div className="space-y-2">
+                {items.map((song, i) => renderRow(song, i, items))}
+            </div>
+        );
+    }
+
+    return (
+        <div ref={parentRef} className="max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-hide">
+            <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+                {virtualizer.getVirtualItems().map((virtualItem) => (
+                    <div
+                        key={virtualItem.key}
+                        className="absolute top-0 left-0 w-full"
+                        style={{ height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }}
+                    >
+                        {renderRow(items[virtualItem.index], virtualItem.index, items)}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 /* ============================================================================
@@ -316,11 +360,8 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
         const quality = getQualityBadge(item);
 
         return (
-            <motion.div
+            <div
                 key={song.id + index}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.02 }}
                 onClick={() => playSong(item, allItems)}
                 className="glass-card flex items-center gap-4 p-3 rounded-xl cursor-pointer group"
             >
@@ -402,7 +443,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                         </motion.button>
                     </div>
                 </div>
-            </motion.div>
+            </div>
         );
     };
 
@@ -602,9 +643,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                                         </motion.button>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        {filteredLikedSongs.map((song, i) => renderSongRow(song, i, filteredLikedSongs))}
-                                    </div>
+                                    <VirtualizedSongList items={filteredLikedSongs} renderRow={renderSongRow} />
                                 </>
                             ) : (
                                 <div className="text-center py-24 glass-card rounded-[2rem] border border-white/5 bg-white/[0.02]">
@@ -655,9 +694,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                                         </motion.button>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        {recentlyPlayed.map((song, i) => renderSongRow(song, i, recentlyPlayed))}
-                                    </div>
+                                    <VirtualizedSongList items={recentlyPlayed} renderRow={renderSongRow} />
                                 </>
                             ) : (
                                 <div className="text-center py-20">

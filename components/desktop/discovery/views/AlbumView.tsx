@@ -117,8 +117,8 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                         <motion.div
                             className="absolute top-1 left-1 w-[180px] h-[180px] rounded-full shadow-xl"
                             style={{ x: 50 }}
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 10, ease: "linear", repeat: Infinity }}
+                            animate={isPlaying && activeMixId === ALBUM_MIX_ID ? { rotate: 360 } : { rotate: 0 }}
+                            transition={isPlaying && activeMixId === ALBUM_MIX_ID ? { duration: 10, ease: "linear", repeat: Infinity } : { duration: 0.3 }}
                         >
                             <div className="w-full h-full rounded-full relative overflow-hidden">
                                 <div className="absolute inset-0 bg-[conic-gradient(from_0deg,#c0c0c0,#e8e8e8,#a0a0a0,#e8e8e8,#c0c0c0)] rounded-full" />

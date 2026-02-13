@@ -22,6 +22,7 @@
     "@ducanh2912/next-pwa": "^10.2.9",
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/typography": "^0.5.19",
+    "@tanstack/react-virtual": "^3.13.18",
     "@types/crypto-js": "^4.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -66,24 +67,36 @@
       {
         "from": ".next/standalone",
         "to": "standalone",
-        "filter": ["**/*", "!**/intro.mp4", "!**/*.webm"]
+        "filter": [
+          "**/*",
+          "!**/intro.mp4",
+          "!**/*.webm"
+        ]
       },
       {
         "from": ".next/standalone/node_modules",
         "to": "standalone/node_modules",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "public",
         "to": "standalone/public",
-        "filter": ["**/*", "!**/intro.mp4", "!**/*.webm"]
+        "filter": [
+          "**/*",
+          "!**/intro.mp4",
+          "!**/*.webm"
+        ]
       }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "public/app-icon.ico",

@@ -214,16 +214,9 @@ export function GlassSearch({ onClose, initialQuery = "", onSongSelect, desktopM
                         results.map((track, i) => (
                             <motion.div
                                 key={track.id}
-                                initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                transition={{ duration: 0.4, delay: i * 0.05 }}
-                                whileHover={{
-                                    scale: 1.02,
-                                    rotateX: 2,
-                                    rotateY: -2,
-                                    zIndex: 10
-                                }}
-                                style={{ perspective: 1000 }}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
                                 className="transform-gpu"
                             >
                                 <CDRow

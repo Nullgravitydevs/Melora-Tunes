@@ -110,11 +110,11 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                     {/* Background */}
                     {songArt && (
                         <div
-                            className="absolute inset-0 bg-cover bg-center"
-                            style={{ backgroundImage: `url(${songArt})`, filter: "blur(100px) brightness(0.12) saturate(0.3)", transform: "scale(1.5)" }}
+                            className="absolute inset-0 bg-cover bg-center will-change-[background-image]"
+                            style={{ backgroundImage: `url(${songArt})`, filter: "blur(60px) brightness(0.1) saturate(0.2)", transform: "scale(1.3) translateZ(0)" }}
                         />
                     )}
-                    <div className="absolute inset-0 bg-black/60" />
+                    <div className="absolute inset-0 bg-black/70" />
 
                     {/* Content */}
                     <div className="relative z-10 flex flex-col h-full safe-area-inset">
