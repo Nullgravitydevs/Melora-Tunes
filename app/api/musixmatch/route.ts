@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
 
     // Failover Strategy: Primary -> Backup
     const endpoints = [
-        `https://apic-desktop.musixmatch.com/ws/1.1/${action}?${query}`,
-        `https://www.musixmatch.com/ws/1.1/${action}?${query}` // Backup
+        `https://www.musixmatch.com/ws/1.1/${action}?${query}`, // Primary (More reliable)
+        `https://apic-desktop.musixmatch.com/ws/1.1/${action}?${query}` // Backup
     ];
 
     let lastError = null;
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
                     }
                 });
 
-                if (res.status === 404 || res.status === 403) {
+                if (res.status === 404 || res.status === 403 || res.status === 401) {
                     lastError = new Error(`Upstream ${res.status}`);
                     continue;
                 }
