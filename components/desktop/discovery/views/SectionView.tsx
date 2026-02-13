@@ -248,7 +248,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                                         <div className="flex items-center gap-3 md:gap-6 pr-2">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); toggleLike(item); }}
-                                                className={`transition-transform active:scale-90 ${liked ? 'text-pink-500' : 'text-white/20 hover:text-white group-hover:text-white/40'}`}
+                                                className={`transition-transform active:scale-90 ${liked ? 'text-white' : 'text-white/20 hover:text-white group-hover:text-white/40'}`}
                                             >
                                                 <Heart size={18} fill={liked ? "currentColor" : "none"} />
                                             </button>

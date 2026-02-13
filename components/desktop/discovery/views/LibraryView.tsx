@@ -390,7 +390,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                     <div className="hidden group-hover:flex items-center gap-2">
                         <motion.button
                             onClick={(e) => { e.stopPropagation(); toggleLike(item); }}
-                            className={`p-1.5 rounded-full hover:bg-white/10 transition-colors ${isLiked(song.id) ? 'text-pink-500' : 'text-white/40 hover:text-white'}`}
+                            className={`p-1.5 rounded-full hover:bg-white/10 transition-colors ${isLiked(song.id) ? 'text-white' : 'text-white/40 hover:text-white'}`}
                         >
                             <Heart size={16} fill={isLiked(song.id) ? "currentColor" : "none"} />
                         </motion.button>
@@ -608,7 +608,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                                 </>
                             ) : (
                                 <div className="text-center py-24 glass-card rounded-[2rem] border border-white/5 bg-white/[0.02]">
-                                    <div className="w-20 h-20 bg-pink-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-pink-500">
+                                    <div className="w-20 h-20 bg-white/[0.05] rounded-full flex items-center justify-center mx-auto mb-6 text-white/40">
                                         <Heart size={32} />
                                     </div>
                                     <h3 className="text-xl font-bold text-white mb-2">Your favorites will live here</h3>

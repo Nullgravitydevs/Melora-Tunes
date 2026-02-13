@@ -126,13 +126,11 @@ export function DiscoveryEntry() {
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto pb-40 no-scrollbar z-10">
-                <AnimatePresence mode="wait">
-                    {activeTab === "HOME" && <HomeTab key="home" onNavigate={navigate} />}
-                    {activeTab === "SEARCH" && <SearchTab key="search" onNavigate={navigate} />}
-                    {activeTab === "EXPLORE" && <ExploreTab key="explore" onNavigate={navigate} />}
-                    {activeTab === "LIBRARY" && <LibraryTab key="library" onNavigate={navigate} />}
-                    {activeTab === "SETTINGS" && <SettingsTab key="settings" />}
-                </AnimatePresence>
+                <div className={activeTab === "HOME" ? "" : "hidden"}><HomeTab onNavigate={navigate} /></div>
+                <div className={activeTab === "SEARCH" ? "" : "hidden"}><SearchTab onNavigate={navigate} /></div>
+                <div className={activeTab === "EXPLORE" ? "" : "hidden"}><ExploreTab onNavigate={navigate} /></div>
+                <div className={activeTab === "LIBRARY" ? "" : "hidden"}><LibraryTab onNavigate={navigate} /></div>
+                <div className={activeTab === "SETTINGS" ? "" : "hidden"}><SettingsTab /></div>
             </div>
 
             {/* Bottom dock */}

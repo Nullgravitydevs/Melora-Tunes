@@ -86,7 +86,7 @@ export function AddToPlaylistModal({ song, onClose }: AddToPlaylistModalProps) {
                 {/* Song Info */}
                 <div className="px-4 py-3 bg-white/[0.02] border-b border-white/5">
                     <p className="text-sm text-white/60">Adding:</p>
-                    <p className="font-medium truncate text-pink-400">{songName}</p>
+                    <p className="font-medium truncate text-white">{songName}</p>
                 </div>
 
                 {/* List */}
@@ -131,7 +131,7 @@ export function AddToPlaylistModal({ song, onClose }: AddToPlaylistModalProps) {
                             <button
                                 type="submit"
                                 disabled={!newPlaylistName.trim()}
-                                className="p-2 bg-pink-500 rounded-lg text-white disabled:opacity-50"
+                                className="p-2 bg-white rounded-lg text-black disabled:opacity-50"
                             >
                                 <Check size={18} />
                             </button>

@@ -119,7 +119,7 @@ export function SilverFrostStage({
 
                     <div className="flex-1 overflow-y-auto pr-2 space-y-3">
                         {mixes
-                            .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                            .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                             .map((mix) => {
                                 const isActive = activeMixId === mix.id && isLoaded;
                                 const albumArt = getMixImage(mix);

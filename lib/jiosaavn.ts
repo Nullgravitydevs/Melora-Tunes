@@ -63,7 +63,7 @@ export interface SearchResponse {
 
 const DES_KEY = process.env.NEXT_PUBLIC_DES_KEY || '38346591';
 
-const isElectron = typeof window !== 'undefined' && /Electron/i.test(window.navigator.userAgent);
+const isElectron = false; // Electron now uses embedded Next.js server with API routes — no direct fetch needed
 
 export async function searchSongs(query: string, page: number = 1, limit: number = 10, language?: string): Promise<JioSaavnSong[]> {
     try {

@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
-import { motion } from "framer-motion";
 import { TrendingUp, Sparkles, Play, Pause, ChevronRight } from "lucide-react";
-import { getStrictLaunchData, searchPlaylists, JioSaavnSong } from "@/lib/jiosaavn";
+import { getStrictLaunchData, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
 import { getArt, type ViewState } from "../DiscoveryEntry";
@@ -13,11 +12,11 @@ interface Props { onNavigate: (v: ViewState) => void }
 
 export function HomeTab({ onNavigate }: Props) {
     const [launchData, setLaunchData] = useState<any>(null);
-    const [vibePlaylists, setVibePlaylists] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const { playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
+    const cacheRef = useRef<{ data: any; lang: string; ts: number } | null>(null);
 
     const greeting = useMemo(() => {
         const h = new Date().getHours();
@@ -33,28 +32,24 @@ export function HomeTab({ onNavigate }: Props) {
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
+            const settings = loadSettings();
+            const langs = settings.languages || ["english", "hindi"];
+            const langStr = langs.join(",");
+
+            // Use cache if <5 min old and same language
+            if (cacheRef.current && cacheRef.current.lang === langStr && Date.now() - cacheRef.current.ts < 300000) {
+                setLaunchData(cacheRef.current.data);
+                setIsLoading(false);
+                return;
+            }
+
             setIsLoading(true);
             setError(false);
             try {
-                const settings = loadSettings();
-                const langs = settings.languages || ["english", "hindi"];
-                const langStr = langs.join(",");
-                const primaryLang = langs[0] || "english";
-
-                const [data, ...vibes] = await Promise.all([
-                    getStrictLaunchData(langStr),
-                    ...["Love", "Party", "Chill", "Workout", "Sad", "Focus"].map((m) =>
-                        searchPlaylists(`${primaryLang} ${m} songs`, 1, 4, langStr).catch(() => [])
-                    ),
-                ]);
-
+                const data = await getStrictLaunchData(langStr);
                 if (cancelled) return;
                 setLaunchData(data);
-                setVibePlaylists(
-                    ["Love", "Party", "Chill", "Workout", "Sad", "Focus"]
-                        .map((mood, i) => ({ mood, items: vibes[i]?.slice(0, 4) || [] }))
-                        .filter((v) => v.items.length > 0)
-                );
+                cacheRef.current = { data, lang: langStr, ts: Date.now() };
             } catch (e) {
                 if (!cancelled) setError(true);
             } finally {
@@ -63,7 +58,7 @@ export function HomeTab({ onNavigate }: Props) {
         };
 
         load();
-        const handler = () => load();
+        const handler = () => { cacheRef.current = null; load(); };
         window.addEventListener("melora-settings-changed", handler);
         return () => { cancelled = true; window.removeEventListener("melora-settings-changed", handler); };
     }, [retryCount]);
@@ -81,7 +76,7 @@ export function HomeTab({ onNavigate }: Props) {
 
     if (isLoading) {
         return (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-5 pt-14">
+            <div className="p-5 pt-14">
                 <div className="h-7 w-48 bg-white/[0.04] rounded-lg mb-8 animate-pulse" />
                 <div className="w-full aspect-[16/9] bg-white/[0.04] rounded-2xl mb-8 animate-pulse" />
                 {[1, 2, 3, 4].map((i) => (
@@ -93,18 +88,18 @@ export function HomeTab({ onNavigate }: Props) {
                         </div>
                     </div>
                 ))}
-            </motion.div>
+            </div>
         );
     }
 
     if (error) {
         return (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-full px-8">
+            <div className="flex flex-col items-center justify-center h-full px-8">
                 <p className="text-white/40 text-sm mb-4">Failed to load. Check your connection.</p>
                 <button onClick={() => setRetryCount(c => c + 1)} className="px-6 py-2.5 bg-white text-black text-sm font-semibold rounded-full active:scale-95 transition-transform">
                     Retry
                 </button>
-            </motion.div>
+            </div>
         );
     }
 
@@ -116,7 +111,7 @@ export function HomeTab({ onNavigate }: Props) {
     const heroSong = trending[0];
 
     return (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-4">
+        <div className="pb-4">
             {/* Header */}
             <div className="px-5 pt-14 pb-2">
                 <h1 className="text-[26px] font-bold text-white tracking-tight">
@@ -186,28 +181,6 @@ export function HomeTab({ onNavigate }: Props) {
                 </Section>
             )}
 
-            {/* Vibe Check */}
-            {vibePlaylists.length > 0 && (
-                <Section title="Vibe Check">
-                    <div className="px-5 grid grid-cols-2 gap-2.5">
-                        {vibePlaylists.map((vibe) => (
-                            <button
-                                key={vibe.mood}
-                                onClick={() => {
-                                    if (vibe.items[0]) onNavigate({ id: "playlist", data: vibe.items[0] });
-                                }}
-                                className="h-16 bg-white/[0.03] border border-white/[0.05] rounded-xl flex items-center px-4 gap-3 active:bg-white/[0.06] transition-colors overflow-hidden relative"
-                            >
-                                {vibe.items[0] && getArt(vibe.items[0]) && (
-                                    <img src={getArt(vibe.items[0])} className="w-10 h-10 rounded-lg object-cover" alt="" />
-                                )}
-                                <span className="text-sm font-semibold text-white/80 truncate">{vibe.mood}</span>
-                            </button>
-                        ))}
-                    </div>
-                </Section>
-            )}
-
             {/* Top Charts */}
             {topCharts.length > 0 && (
                 <Section title="Top Charts" onSeeAll={() => onNavigate({ id: "section", data: { id: "charts", title: "Top Charts" } })}>
@@ -229,7 +202,7 @@ export function HomeTab({ onNavigate }: Props) {
                     </HScroll>
                 </Section>
             )}
-        </motion.div>
+        </div>
     );
 }
 

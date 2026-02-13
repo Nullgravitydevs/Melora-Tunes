@@ -85,7 +85,7 @@ export function QuickGrid({ items, onPlay, currentSongId, isPlaying }: QuickGrid
 
                             {/* Text */}
                             <div className="min-w-0 flex-1 flex flex-col justify-center">
-                                <h3 className={`text-sm font-medium truncate ${isActive ? 'text-pink-400' : 'text-white/90'}`}>
+                                <h3 className={`text-sm font-medium truncate ${isActive ? 'text-white' : 'text-white/90'}`}>
                                     {decodeHtml(song.name)}
                                 </h3>
                                 <p className="text-xs text-white/40 truncate">

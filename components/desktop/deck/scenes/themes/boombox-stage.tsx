@@ -413,7 +413,7 @@ export function BoomboxStage({
 
             {/* DRAGGABLE POLAROIDS - Each manages its own position from persisted state */}
             {mixes
-                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                 .slice(0, 9) // Allow 9 polaroids (Discovery + 8 Pinned)
                 .map((mix) => {
                     const pos = positions[mix.id];

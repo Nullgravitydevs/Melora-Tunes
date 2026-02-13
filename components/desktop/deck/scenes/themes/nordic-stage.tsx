@@ -118,7 +118,7 @@ export function NordicStage({
 
                         <div className="flex-1 overflow-y-auto pr-4 space-y-4 [&::-webkit-scrollbar]:hidden">
                             {mixes
-                                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                                .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                                 .map((mix) => (
                                     <div
                                         key={mix.id}

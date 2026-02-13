@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
-import { motion } from "framer-motion";
 import { Play, ChevronRight, Radio, Globe, Sparkles, Headphones, Music } from "lucide-react";
 import { searchSongs, searchPlaylists, searchAlbums, searchArtists, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
@@ -110,7 +109,7 @@ export function ExploreTab({ onNavigate }: Props) {
 
     if (isLoading) {
         return (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-5 pt-14">
+            <div className="p-5 pt-14">
                 <div className="h-7 w-40 bg-white/[0.04] rounded-lg mb-6 animate-pulse" />
                 <div className="w-full h-40 bg-white/[0.04] rounded-2xl mb-6 animate-pulse" />
                 <div className="grid grid-cols-3 gap-3">
@@ -118,23 +117,23 @@ export function ExploreTab({ onNavigate }: Props) {
                         <div key={i} className="aspect-square bg-white/[0.04] rounded-xl animate-pulse" />
                     ))}
                 </div>
-            </motion.div>
+            </div>
         );
     }
 
     if (error || !data) {
         return (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-full px-8">
+            <div className="flex flex-col items-center justify-center h-full px-8">
                 <p className="text-white/40 text-sm mb-4">Failed to load</p>
                 <button onClick={() => setRetryCount(c => c + 1)} className="px-6 py-2.5 bg-white text-black text-sm font-semibold rounded-full active:scale-95">
                     Retry
                 </button>
-            </motion.div>
+            </div>
         );
     }
 
     return (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-4">
+        <div className="pb-4">
             {/* Header */}
             <div className="px-5 pt-14 pb-4">
                 <h1 className="text-[26px] font-bold text-white tracking-tight">Explore</h1>
@@ -330,7 +329,7 @@ export function ExploreTab({ onNavigate }: Props) {
                     </HScroll>
                 </Section>
             )}
-        </motion.div>
+        </div>
     );
 }
 

@@ -12,9 +12,9 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
-  output: process.env.IS_ELECTRON_BUILD === 'true' ? 'export' : undefined,
+  output: process.env.IS_ELECTRON_BUILD === 'true' ? 'standalone' : undefined,
   // Only use relative paths for Electron build
-  assetPrefix: process.env.IS_ELECTRON_BUILD === 'true' ? './' : undefined,
+  assetPrefix: undefined,
   trailingSlash: true,
   images: {
     unoptimized: true

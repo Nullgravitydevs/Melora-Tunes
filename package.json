@@ -1,6 +1,8 @@
 {
   "name": "melora-tunes",
   "version": "1.0.0-beta.1",
+  "description": "Premium music player with hi-fi streaming",
+  "author": "Null Gravity Devs",
   "private": true,
   "main": "desktop_app/main.js",
   "scripts": {
@@ -9,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "electron": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on tcp:3000 && node scripts/launch-electron.js\"",
-    "electron:build": "cross-env IS_ELECTRON_BUILD=true next build && electron-builder --win --x64"
+    "electron:build": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --win --x64"
   },
   "dependencies": {
     "@capacitor-community/http": "^1.4.1",
@@ -54,16 +56,45 @@
     "appId": "com.melora.music",
     "productName": "Melora",
     "directories": {
-      "output": "dist"
+      "output": "C:/melora-build"
     },
     "files": [
-      "out/**/*",
       "desktop_app/main.js",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "standalone",
+        "filter": ["**/*", "!**/intro.mp4", "!**/*.webm"]
+      },
+      {
+        "from": ".next/standalone/node_modules",
+        "to": "standalone/node_modules",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "public",
+        "to": "standalone/public",
+        "filter": ["**/*", "!**/intro.mp4", "!**/*.webm"]
+      }
+    ],
     "win": {
-      "target": "nsis",
-      "icon": "public/icon.png"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/app-icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/app-icon.ico",
+      "uninstallerIcon": "public/app-icon.ico",
+      "installerHeaderIcon": "public/app-icon.ico"
     },
     "extends": null
   }

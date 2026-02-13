@@ -15,12 +15,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     const isMobile = useIsMobile();
     const [step, setStep] = useState(0);
     const [profile, setProfile] = useState({ name: "", dob: "" });
-    const [isMuted, setIsMuted] = useState(true);
+    const [isMuted, setIsMuted] = useState(true); // Always muted — background visual only
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    // Dynamic Video Source
-    // NOTE: 'intro-mobile.mp4' appears to be silent/compressed (3MB). Using full quality 'intro.mp4' (66MB) to ensure audio works.
-    const videoSrc = "/assets/intro.mp4";
+    // Dynamic Video Source — using intro-mobile.mp4 (3MB) for fast loading
+    const videoSrc = "/assets/intro-mobile.mp4";
 
     // Initial Load Settings if revisiting? Usually fresh.
     useEffect(() => {
@@ -49,7 +48,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     src={videoSrc}
                     className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-1000"
                     loop
-                    muted={isMuted}
+                    muted
                     playsInline
                     autoPlay
                 />
@@ -79,24 +78,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                         ))}
                     </div>
 
-                    {/* Volume Toggle */}
-                    <button
-                        onClick={() => {
-                            const nextState = !isMuted;
-                            setIsMuted(nextState);
-                            if (videoRef.current) {
-                                videoRef.current.muted = nextState;
-                                // Mobile browsers often require explicit play() after interaction
-                                if (!nextState) {
-                                    videoRef.current.play().catch(e => console.error("Play failed", e));
-                                }
-                            }
-                        }}
-                        className="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors z-50"
-                        aria-label={isMuted ? "Unmute" : "Mute"}
-                    >
-                        {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                    </button>
+                    {/* Spacer for layout balance */}
+                    <div className="w-10 h-10" />
                 </header>
 
                 {/* Main Stage */}
@@ -156,6 +139,19 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 
 function StepIdentity({ profile, setProfile, onNext }: { profile: any, setProfile: any, onNext: () => void }) {
     const isValid = profile.name.length > 2;
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const minDate = '1920-01-01';
+    
+    const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        // Validate: must be between 1920 and today
+        if (val) {
+            const year = parseInt(val.split('-')[0], 10);
+            if (year < 1920 || year > new Date().getFullYear()) return;
+        }
+        setProfile({ ...profile, dob: val });
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}
@@ -173,20 +169,26 @@ function StepIdentity({ profile, setProfile, onNext }: { profile: any, setProfil
                     <input
                         type="text"
                         value={profile.name}
-                        onChange={e => setProfile({ ...profile, name: e.target.value })}
-                        maxLength={15}
+                        onChange={e => {
+                            const val = e.target.value.replace(/[^a-zA-Z\s]/g, ''); // Letters and spaces only
+                            if (val.length <= 20) setProfile({ ...profile, name: val });
+                        }}
+                        maxLength={20}
                         className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-lg focus:outline-none focus:border-white transition-colors"
                         placeholder="Enter your name"
                         autoFocus
                     />
+                    <p className="text-white/30 text-xs mt-1">{profile.name.length}/20</p>
                 </div>
                 <div>
                     <label className="text-xs font-bold uppercase tracking-widest text-white/60 mb-2 block">Date of Birth</label>
                     <input
                         type="date"
                         value={profile.dob}
-                        onChange={e => setProfile({ ...profile, dob: e.target.value })}
-                        className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-lg focus:outline-none focus:border-white transition-colors text-white"
+                        onChange={handleDobChange}
+                        min={minDate}
+                        max={today}
+                        className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-lg focus:outline-none focus:border-white transition-colors text-white [color-scheme:dark]"
                     />
                 </div>
 

@@ -296,28 +296,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                         })
                     };
                 }).filter((m: Mix) => {
-                    // Only filter duplicate Discovery Mix entries with wrong ID
-                    if (m.title === 'Discovery Mix' && m.id !== DISCOVERY_MIX_ID) return false;
                     return true;
                 });
 
-                // Enforce Discovery Mix at Top
-                const discIndex = sanitized.findIndex((m: Mix) => m.id === DISCOVERY_MIX_ID);
-                if (discIndex === -1) {
-                    // Create if missing
-                    sanitized.unshift({
-                        id: DISCOVERY_MIX_ID,
-                        title: "Discovery Mix",
-                        color: "blue",
-                        songs: [],
-                        currentSongIndex: 0
-                    });
-                } else if (discIndex > 0) {
-                    // Move to front
-                    const [disc] = sanitized.splice(discIndex, 1);
-                    sanitized.unshift(disc);
-                }
-
+                // No longer enforce Discovery Mix at top — just load user's mixes
                 if (sanitized.length === 0) {
                     setDefaults();
                 } else {
@@ -346,16 +328,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, [mixes, isLoaded, showToast]);
 
     const setDefaults = () => {
-        setMixes([
-            {
-                id: DISCOVERY_MIX_ID,
-                title: "Discovery Mix",
-                color: "blue",
-                songs: [],
-                currentSongIndex: 0,
-                pinned: false
-            }
-        ]);
+        setMixes([]);
     };
 
 
@@ -542,8 +515,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             }
 
             // 2. Check Limit (if not system)
-            const isSystem = mix.id === DISCOVERY_MIX_ID || mix.id === 'quick-play' || mix.id === 'search-results';
-            const userTapeCount = prev.filter(m => m.id !== DISCOVERY_MIX_ID).length;
+            const isSystem = mix.id === 'quick-play' || mix.id === 'search-results';
+            const userTapeCount = prev.filter(m => !['discovery-mix', 'quick-play', 'search-results', 'otg-tape'].includes(m.id)).length;
 
             // Limit Check REMOVED - User allows unlimited Discovery playlists
             // Visual Limit moved to DeckStage
@@ -597,11 +570,6 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // [PERF FIX #4] Wrap in useCallback to stabilize reference
     const deleteMix = useCallback((mixId: string) => {
-        if (mixId === DISCOVERY_MIX_ID) {
-            showToast("Cannot delete the Discovery Mix!", 'error');
-            return;
-        }
-
         // Find the mix and its position before deleting
         const mixIndex = mixes.findIndex(m => m.id === mixId);
         const mixToDelete = mixes[mixIndex];
@@ -801,41 +769,26 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             currentSongIndex: 0
         };
 
-        // 2. Refactor to Single "Discovery Mix" Logic
+        // 2. Use ephemeral "Now Playing" queue instead of Discovery Mix
+        const NOW_PLAYING_ID = 'now-playing-queue';
         setMixes(prev => {
-            // Keep pinned playlist tapes
-            const pinned = prev.filter(m => m.pinned);
+            // Remove old now-playing queue if exists
+            const filtered = prev.filter(m => m.id !== NOW_PLAYING_ID);
 
-            // Find existing Discovery Mix or create fresh
-            const existingDiscovery = prev.find(m => m.id === DISCOVERY_MIX_ID);
-
-            // Merge Songs: New Mix songs + Existing Discovery songs
-            // Deduplicate: If song exists, remove old instance (MRU behavior)
-            const newSongIds = new Set(safeMix.songs.map(s => isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id));
-
-            const oldSongs = existingDiscovery ? existingDiscovery.songs.filter(s => {
-                const id = isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id;
-                return !newSongIds.has(id);
-            }) : [];
-
-            // Combine: New Songs at TOP, followed by history
-            const mergedSongs = [...safeMix.songs, ...oldSongs].slice(0, 100); // Limit queue history?
-
-            const updatedDiscoveryMix: Mix = {
-                id: DISCOVERY_MIX_ID,
-                title: "Discovery Mix", // Always keep this name
+            const nowPlayingMix: Mix = {
+                id: NOW_PLAYING_ID,
+                title: safeMix.title || "Now Playing",
                 color: "blue",
-                songs: mergedSongs,
+                songs: normalizedSongs,
                 currentSongIndex: 0,
                 pinned: false
             };
 
-            // Result: Pinned Tapes + Single Discovery Tape
-            return [...pinned, updatedDiscoveryMix];
+            return [...filtered, nowPlayingMix];
         });
 
         // 3. Set active mix
-        setActiveMixId(DISCOVERY_MIX_ID);
+        setActiveMixId(NOW_PLAYING_ID);
 
         // 4. HARD RESET PLAYER
         setIsPlaying(false);
@@ -868,44 +821,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
-        // [New Feature] Sync Play to Discovery Mix (Recents)
-        // If we are playing from a non-Discovery mix context, should we add it?
-        // User wants "Discovery Mix" to show "Recents".
-        if (trackToPlay) {
-            // Logic: Update Discovery Mix with this track
-            setMixes(prev => {
-                const pinned = prev.filter(m => m.pinned);
-                // Discovery Mix Handling
-                const existing = prev.find(m => m.id === DISCOVERY_MIX_ID) || {
-                    id: DISCOVERY_MIX_ID,
-                    title: "Discovery Mix",
-                    color: "blue",
-                    songs: [],
-                    currentSongIndex: 0,
-                    pinned: false
-                };
-
-                const trackId = trackToPlay.id;
-                // Remove existing instance of this song to move it to top
-                const cleanSongs = existing.songs.filter(s => {
-                    const id = isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id;
-                    return id !== trackId;
-                });
-
-                // Add to TOP
-                const normalizeTrack = isPlayableTrack(trackToPlay) ? trackToPlay : ensurePlayableTrack(trackToPlay);
-                const newSongs = [normalizeTrack, ...cleanSongs].slice(0, 50);
-
-                const updatedDiscovery: Mix = { ...existing, songs: newSongs };
-
-                // Return Logic:
-                // If the current active mix IS Discovery Mix, we just updated it.
-                // If active mix is Playlists, we still update Discovery Mix in background.
-                const otherMixes = prev.filter(m => m.id !== DISCOVERY_MIX_ID && !m.pinned);
-
-                return [...pinned, updatedDiscovery, ...otherMixes.filter(m => m.id !== existing.id)];
-            });
-        }
+        // Track is ready to play — no longer inject into Discovery Mix
+        // Songs stay in their original tape/queue context
 
         setIsPlaying(true);
         audioPlayerRef.current?.play();

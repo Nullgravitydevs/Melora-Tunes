@@ -178,7 +178,7 @@ export function OpenDeckStage({
                     <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="flex flex-col gap-4 pb-4">
                             {mixes
-                                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                                .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                                 .map((mix, index) => {
                                     const style = getStyleForMix(index);
                                     const isInsidePlayer = isLoaded && activeMixId === mix.id;

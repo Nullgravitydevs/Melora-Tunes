@@ -839,7 +839,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                 <Tooltip text={isLiked(currentSong.id) ? "Remove from Library" : "Add to Library"}>
                     <button
                         onClick={() => currentSong && toggleLike(currentSong)}
-                        className={`ml-2 p-2 rounded-full hover:bg-white/10 transition-colors ${isLiked(currentSong.id) ? 'text-green-500' : 'text-white/20 hover:text-white'}`}
+                        className={`ml-2 p-2 rounded-full hover:bg-white/10 transition-colors ${isLiked(currentSong.id) ? 'text-white' : 'text-white/20 hover:text-white'}`}
                     >
                         <Heart size={18} fill={isLiked(currentSong.id) ? "currentColor" : "none"} />
                     </button>
@@ -852,7 +852,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                     <Tooltip text={shuffle ? "Disable Shuffle" : "Enable Shuffle"}>
                         <button
                             onClick={() => setShuffle(!shuffle)}
-                            className={`p-2 rounded-full transition-colors ${shuffle ? 'text-green-500' : 'text-white/30 hover:text-white'}`}
+                            className={`p-2 rounded-full transition-colors ${shuffle ? 'text-white' : 'text-white/30 hover:text-white'}`}
                         >
                             <Shuffle size={16} />
                         </button>
@@ -882,10 +882,10 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                     <Tooltip text={repeat === 'one' ? "Disable Repeat" : repeat === 'all' ? "Repeat One" : "Repeat All"}>
                         <button
                             onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
-                            className={`p-2 rounded-full transition-colors relative ${repeat !== 'off' ? 'text-green-500' : 'text-white/30 hover:text-white'}`}
+                            className={`p-2 rounded-full transition-colors relative ${repeat !== 'off' ? 'text-white' : 'text-white/30 hover:text-white'}`}
                         >
                             <Repeat size={16} />
-                            {repeat === 'one' && <span className="absolute text-[8px] font-bold top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-green-500">1</span>}
+                            {repeat === 'one' && <span className="absolute text-[8px] font-bold top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white">1</span>}
                         </button>
                     </Tooltip>
                 </div>
@@ -897,7 +897,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                         onClick={handleSeek}
                     >
                         <div
-                            className="absolute inset-y-0 left-0 bg-white/40 group-hover:bg-green-500 rounded-full transition-colors"
+                            className="absolute inset-y-0 left-0 bg-white/40 group-hover:bg-white rounded-full transition-colors"
                             style={{ width: `${progress * 100}%` }}
                         />
                         <div

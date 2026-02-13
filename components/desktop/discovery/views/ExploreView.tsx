@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Headphones, Disc, Activity, TrendingUp, Play, Mic2, Globe, Grid, AlertCircle, RefreshCcw } from "lucide-react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { Play, AlertCircle, RefreshCcw } from "lucide-react";
 import { searchPlaylists, searchAlbums, searchSongs, getTopCharts, fixImageUrl, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { usePlayback } from "@/components/providers/playback-context";
@@ -42,12 +41,15 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const cacheRef = useRef<{ data: typeof content; ts: number } | null>(null);
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
+        // Use cache if <5 min old
+        if (cacheRef.current && Date.now() - cacheRef.current.ts < 300000) {
+            setContent(cacheRef.current.data);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             const settings = loadSettings();
@@ -74,7 +76,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                 searchPlaylists("Hollywood Top Hits", 1, 10)
             ]);
 
-            setContent({
+            const newContent = {
                 globalCharts: charts,
                 topPlaylists: playlists,
                 newReleases: newAlbums,
@@ -83,13 +85,18 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                 bollywood: bolly,
                 tollywood: tolly,
                 hollywood: holly
-            });
-
+            };
+            setContent(newContent);
+            cacheRef.current = { data: newContent, ts: Date.now() };
         } catch {
             setError("Failed to load global discovery content.");
         }
         finally { setLoading(false) }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleRetry = () => {
         setError(null);
@@ -110,13 +117,9 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center py-32 text-center px-4">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-10 rounded-[2.5rem] bg-white/[0.03] border border-white/10 max-w-sm w-full"
-                >
-                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
-                        <AlertCircle size={32} />
+                <div className="p-10 rounded-2xl bg-white/[0.03] border border-white/[0.06] max-w-sm w-full">
+                    <div className="w-16 h-16 bg-white/[0.05] rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle size={32} className="text-white/40" />
                     </div>
                     <h2 className="text-xl font-bold text-white mb-2">Failed to load Explore</h2>
                     <p className="text-white/40 text-sm mb-6">{error}</p>
@@ -126,8 +129,8 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                     >
                         <RefreshCcw size={16} />
                         Try Again
-                    </button>
-                </motion.div>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -152,15 +155,15 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
 
                 {/* Content */}
                 <div className="absolute bottom-0 left-0 p-8 md:p-16 max-w-4xl z-10 w-full">
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+                    <div>
                         <div className="flex flex-wrap items-center gap-2 mb-6">
-                            <span className="px-3 py-1 bg-pink-500/20 text-pink-500 border border-pink-500/20 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                                <TrendingUp size={12} /> Live Updates
+                            <span className="px-3 py-1 bg-white/[0.08] text-white/60 border border-white/[0.08] rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                Live Updates
                             </span>
-                            <span className="px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-[10px] font-black uppercase tracking-widest">
+                            <span className="px-3 py-1 bg-white/[0.06] text-white/50 border border-white/[0.06] rounded-full text-[10px] font-black uppercase tracking-widest">
                                 Global Charts
                             </span>
-                            <span className="px-3 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-full text-[10px] font-black uppercase tracking-widest">
+                            <span className="px-3 py-1 bg-white/[0.06] text-white/50 border border-white/[0.06] rounded-full text-[10px] font-black uppercase tracking-widest">
                                 Editor's Choice
                             </span>
                         </div>
@@ -170,7 +173,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                         <p className="text-xl md:text-2xl text-white/40 font-medium leading-relaxed max-w-xl">
                             Dive into the pulse of <span className="text-white/80">global music culture</span>. Hand-picked charts, viral sensations, and fresh discoveries.
                         </p>
-                    </motion.div>
+                    </div>
                 </div>
             </div>
 
@@ -244,7 +247,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                             <img src={getHighQualityImage(album.image)} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-70" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                             <div className="absolute bottom-0 left-0 p-6">
-                                <span className="px-2 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded mb-2 inline-block">Live Audio</span>
+                                <span className="px-2 py-1 bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded mb-2 inline-block">Live Audio</span>
                                 <h3 className="text-xl font-bold text-white leading-tight mb-1 line-clamp-2">{decodeHtml(album.name)}</h3>
                                 <p className="text-white/60 text-sm">{decodeHtml(album.primaryArtists)}</p>
                             </div>
@@ -276,10 +279,9 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
 
             {/* 6. REGIONAL BLOCK (Bollywood, Tollywood, Hollywood) */}
             <div className="bg-black border border-white/10 rounded-[2.5rem] p-8 mx-4 space-y-12 backdrop-blur-md relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-transparent opacity-30" />
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] via-transparent to-transparent opacity-30" />
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-8">
-                        <Headphones className="text-purple-400" size={32} />
                         <h2 className="text-3xl font-bold">Global Sounds</h2>
                     </div>
 

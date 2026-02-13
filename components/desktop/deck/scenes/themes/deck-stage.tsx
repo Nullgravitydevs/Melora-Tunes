@@ -428,13 +428,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             isCompact ? "grid-cols-3 sm:grid-cols-4" : "grid-cols-2 md:grid-cols-3"
                         )}>
                             {[...mixes]
-                                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
-                                .sort((a, b) => {
-                                    if (a.id === 'discovery-mix') return -1; // Discovery always first
-                                    if (b.id === 'discovery-mix') return 1;
-                                    return 0; // Maintain context order (managed by Rack)
-                                }) // Use rack order
-
+                                .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                                 .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
                                 .slice(0, 8) // Visual Guardrail: Only show top 8 tapes in the rack
                                 .map((mix, i) => {

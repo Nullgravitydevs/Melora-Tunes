@@ -256,7 +256,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                 <main className="h-full relative overflow-hidden">
                     {/* Free Floating Tapes */}
                     {mixes
-                        .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                        .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                         .slice(0, 9)
                         .map(mix => {
                             if (!positions[mix.id]) return null;

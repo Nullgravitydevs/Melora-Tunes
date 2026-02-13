@@ -215,7 +215,7 @@ export function ZenStage({
                         )}>Your Mixtapes</motion.h2>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pb-4">
                             {mixes
-                                .filter(m => (m.id === 'discovery-mix' || m.pinned) && !['search-results', 'quick-play', 'otg-tape'].includes(m.id))
+                                .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                                 .map((mix) => {
                                     if (mix.id === activeMixId) return null;
 

@@ -72,9 +72,9 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
         // CRITICAL: We need to update the `pinned` status based on the new order if the user intends "Top 8 = Pinned".
         // Let's strictly enforce: Top 8 User Mixes = Pinned. Rest = Unpinned.
 
-        const systemMixId = 'discovery-mix';
-        const userMixes = newOrder.filter(m => m.id !== systemMixId);
-        const systemMixes = newOrder.filter(m => m.id === systemMixId);
+        const systemMixIds = ['discovery-mix', 'search-results', 'quick-play', 'otg-tape'];
+        const userMixes = newOrder.filter(m => !systemMixIds.includes(m.id));
+        const systemMixes = newOrder.filter(m => systemMixIds.includes(m.id));
 
         const reindexedUserMixes = userMixes.map((m, i) => ({
             ...m,
@@ -87,10 +87,9 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
 
     if (!isOpen) return null;
 
-    // Separate System Mix (Discovery) from User Mixes for reordering
-    // We only want to reorder User Mixes.
-    const systemMix = items.find(m => m.id === 'discovery-mix');
-    const userMixes = items.filter(m => m.id !== 'discovery-mix');
+    // Filter out system mixes - only show user tapes
+    const systemMixIds = ['discovery-mix', 'search-results', 'quick-play', 'otg-tape'];
+    const userMixes = items.filter(m => !systemMixIds.includes(m.id));
 
     return (
         <AnimatePresence>
@@ -123,9 +122,8 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                             {/* Quick Sort Buttons */}
                             <button
                                 onClick={() => {
-                                    const systemMix = items.find(m => m.id === 'discovery-mix');
-                                    const sorted = items.filter(m => m.id !== 'discovery-mix').sort((a, b) => a.title.localeCompare(b.title));
-                                    handleReorder(systemMix ? [systemMix, ...sorted] : sorted);
+                                    const sorted = items.filter(m => !['discovery-mix', 'search-results', 'quick-play', 'otg-tape'].includes(m.id)).sort((a, b) => a.title.localeCompare(b.title));
+                                    handleReorder(sorted);
                                 }}
                                 className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white flex items-center gap-1 text-xs"
                                 title="Sort A-Z"
@@ -134,9 +132,8 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                             </button>
                             <button
                                 onClick={() => {
-                                    const systemMix = items.find(m => m.id === 'discovery-mix');
-                                    const sorted = items.filter(m => m.id !== 'discovery-mix').sort((a, b) => b.songs.length - a.songs.length);
-                                    handleReorder(systemMix ? [systemMix, ...sorted] : sorted);
+                                    const sorted = items.filter(m => !['discovery-mix', 'search-results', 'quick-play', 'otg-tape'].includes(m.id)).sort((a, b) => b.songs.length - a.songs.length);
+                                    handleReorder(sorted);
                                 }}
                                 className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white flex items-center gap-1 text-xs"
                                 title="Sort by Song Count"

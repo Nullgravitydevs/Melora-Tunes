@@ -311,7 +311,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                 </motion.button>
                 <motion.button
                     onClick={() => { songs.forEach(s => { if (!isLiked(s.id)) toggleLike(s); }); showToast('Liked all songs', 'success'); }}
-                    className="p-3 rounded-full bg-white/10 hover:bg-white/15 hover:text-pink-500 transition-colors"
+                    className="p-3 rounded-full bg-white/10 hover:bg-white/15 hover:text-white transition-colors"
                     whileTap={{ scale: 0.9 }}
                 >
                     <Heart size={18} />
@@ -430,7 +430,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                                             {decodeHtml((song as any).name || (song as any).title || 'Unknown Title')}
                                         </p>
                                         {isDownloaded((song as any).id) && (
-                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500" title="Offline" />
+                                            <div className="w-1.5 h-1.5 rounded-full bg-white/60" title="Offline" />
                                         )}
                                     </div>
                                     <p className="text-sm text-white/40 truncate">
@@ -449,7 +449,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <motion.button
                                         onClick={(e) => { e.stopPropagation(); toggleLike(song); }}
-                                        className={`p-2 rounded-full transition-colors ${isLiked((song as any).id) ? 'text-pink-500' : 'text-white/40 hover:text-white'}`}
+                                        className={`p-2 rounded-full transition-colors ${isLiked((song as any).id) ? 'text-white' : 'text-white/40 hover:text-white'}`}
                                     >
                                         <Heart size={16} fill={isLiked((song as any).id) ? "currentColor" : "none"} />
                                     </motion.button>

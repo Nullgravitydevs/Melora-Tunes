@@ -148,7 +148,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                 >
                                     <div className="flex items-center justify-between mb-6">
                                         <h2 className="text-xl font-bold flex items-center gap-2">
-                                            <Mic2 size={20} className="text-pink-500" />
+                                            <Mic2 size={20} className="text-white" />
                                             Lyrics
                                         </h2>
                                         <button
@@ -186,7 +186,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                 >
                                     <div className="flex items-center justify-between mb-6">
                                         <h2 className="text-xl font-bold flex items-center gap-2">
-                                            <ListMusic size={20} className="text-pink-500" />
+                                            <ListMusic size={20} className="text-white" />
                                             Queue
                                         </h2>
                                         <button
@@ -205,10 +205,10 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                                 onClick={() => playIndex(i)}
                                             >
                                                 <div className="w-6 text-center text-sm text-white/30">
-                                                    {i === currentIndex ? <div className="w-2 h-2 rounded-full bg-pink-500 mx-auto" /> : i + 1}
+                                                    {i === currentIndex ? <div className="w-2 h-2 rounded-full bg-white mx-auto" /> : i + 1}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className={`font-medium truncate ${i === currentIndex ? 'text-pink-500' : 'text-white/90'}`}>
+                                                    <p className={`font-medium truncate ${i === currentIndex ? 'text-white' : 'text-white/90'}`}>
                                                         {song.name}
                                                     </p>
                                                     <p className="text-xs text-white/40 truncate">{song.primaryArtists}</p>
@@ -344,7 +344,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                 <div className="flex items-center gap-4">
                                     <motion.button
                                         onClick={() => currentSong && toggleLike(currentSong)}
-                                        className={`p-2 ${currentSong && isLiked((currentSong as any).id) ? 'text-pink-500' : 'text-white/40 hover:text-pink-500'} hover:bg-white/5 rounded-full`}
+                                        className={`p-2 ${currentSong && isLiked((currentSong as any).id) ? 'text-white' : 'text-white/40 hover:text-white'} hover:bg-white/5 rounded-full`}
                                         whileTap={{ scale: 0.9 }}
                                     >
                                         <Heart size={22} fill={currentSong && isLiked((currentSong as any).id) ? 'currentColor' : 'none'} />
@@ -377,7 +377,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
                                     {/* Lyrics Toggle */}
                                     <motion.button
                                         onClick={() => setViewMode(viewMode === 'lyrics' ? 'art' : 'lyrics')}
-                                        className={`p-2 rounded-full hover:bg-white/5 ${viewMode === 'lyrics' ? 'text-pink-500 bg-pink-500/10' : 'text-white/40 hover:text-white'}`}
+                                        className={`p-2 rounded-full hover:bg-white/5 ${viewMode === 'lyrics' ? 'text-white bg-white/10' : 'text-white/40 hover:text-white'}`}
                                         whileTap={{ scale: 0.9 }}
                                     >
                                         <Mic2 size={22} />
@@ -385,7 +385,7 @@ export function FullPlayer({ isOpen, onClose }: FullPlayerProps) {
 
                                     <motion.button
                                         onClick={() => setViewMode(viewMode === 'queue' ? 'art' : 'queue')}
-                                        className={`p-2 rounded-full hover:bg-white/5 ${viewMode === 'queue' ? 'text-pink-500 bg-pink-500/10' : 'text-white/40 hover:text-white'}`}
+                                        className={`p-2 rounded-full hover:bg-white/5 ${viewMode === 'queue' ? 'text-white bg-white/10' : 'text-white/40 hover:text-white'}`}
                                         whileTap={{ scale: 0.9 }}
                                     >
                                         <ListMusic size={22} />

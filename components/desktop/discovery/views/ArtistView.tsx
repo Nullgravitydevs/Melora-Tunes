@@ -272,7 +272,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
 
                                                 <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100">
                                                     <button onClick={(e) => { e.stopPropagation(); toggleLike(song); }} className="transition-colors">
-                                                        <Heart size={16} className={isLiked(song.id) ? 'text-pink-500 fill-pink-500' : 'text-white/20 hover:text-pink-500'} />
+                                                        <Heart size={16} className={isLiked(song.id) ? 'text-white fill-white' : 'text-white/20 hover:text-white'} />
                                                     </button>
                                                     <span className="text-xs font-mono text-white/20">{song.duration ? `${Math.floor(Number(song.duration) / 60)}:${(Number(song.duration) % 60).toString().padStart(2, '0')}` : '--:--'}</span>
                                                 </div>

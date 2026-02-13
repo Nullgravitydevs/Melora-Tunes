@@ -27,7 +27,7 @@ export function Launcher({ onSelect }: LauncherProps) {
             <div className="absolute inset-0 z-0 select-none pointer-events-none">
                 <video
                     ref={videoRef}
-                    src="/assets/intro.mp4"
+                    src="/assets/intro-mobile.mp4"
                     className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-1000"
                     loop
                     muted={isMuted}
