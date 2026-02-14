@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw, ListPlus } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack } from "@/lib/types";
@@ -331,39 +331,34 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                     </motion.button>
                 )}
 
-                {/* Pin Button for Deck Sync */}
-                {/* Pin Button for Deck Sync */}
+                {/* Save to Library / Playlist */}
                 <motion.button
                     onClick={() => {
                         const existingMix = mixes.find(m => m.id === playlist.id);
                         if (existingMix) {
+                            // Already saved - remove it
                             togglePin(playlist.id);
+                            showToast(existingMix.pinned ? `Unpinned "${title}"` : `Pinned "${title}" to Deck`, 'success');
                         } else {
-                            // Convert to Mix before pinning
+                            // Save as playlist to library
                             const newMix: Mix = {
                                 id: playlist.id,
                                 title: title,
-                                color: 'blue', // Default color
+                                color: 'blue',
                                 songs: songs.map(s => ({ ...s, preferredQuality: qualityPreference })),
                                 currentSongIndex: 0,
-                                pinned: true // Explicitly set pinned on creation
+                                pinned: false
                             };
-                            addMix(newMix); // This will add AND likely trigger toast
-                            showToast(`Pinned "${title}" to Deck`, 'success');
+                            addMix(newMix);
+                            showToast(`Saved "${title}" to Library`, 'success');
                         }
                     }}
-                    className={`p-3 rounded-full transition-colors ${mixes.find(m => m.id === playlist.id)?.pinned ? 'bg-blue-500 text-white' : 'bg-white/10 hover:bg-white/15 text-white/50'}`}
+                    className={`p-3 rounded-full transition-colors ${mixes.find(m => m.id === playlist.id) ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/15 text-white/50'}`}
                     whileTap={{ scale: 0.9 }}
-                    title={mixes.find(m => m.id === playlist.id)?.pinned ? "Unpin from Deck" : "Pin to Deck"}
+                    title={mixes.find(m => m.id === playlist.id) ? "Saved to Library" : "Save to Library"}
                 >
                     <div className="relative">
-                        <PinIcon size={18} />
-                        {mixes.find(m => m.id === playlist.id)?.pinned && (
-                            <motion.div
-                                layoutId="pinned-badge"
-                                className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full"
-                            />
-                        )}
+                        <ListPlus size={18} />
                     </div>
                 </motion.button>
 
@@ -429,7 +424,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <p className={`font-medium truncate ${currentSong?.id === (song as any).id ? 'text-blue-400' : 'text-white/80'}`}>
+                                        <p className={`font-medium truncate ${currentSong?.id === (song as any).id && activeMixId === PLAYLIST_MIX_ID ? 'text-white font-bold' : 'text-white/80'}`}>
                                             {decodeHtml((song as any).name || (song as any).title || 'Unknown Title')}
                                         </p>
                                         {isDownloaded((song as any).id) && (

@@ -40,8 +40,15 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
         const load = async () => {
             setIsLoading(true);
             try {
-                // If it's a JioSaavn object, it might have an ID. If string, we search.
                 let id = artist?.id;
+
+                // If id is not numeric (could be a name), search for the artist first
+                if (id && !/^\d+$/.test(id)) {
+                    const search = await import("@/lib/jiosaavn").then(m => m.searchArtists(id, 1, 1));
+                    id = search[0]?.id || id;
+                }
+
+                // If no id at all, search by name 
                 if (!id) {
                     const search = await import("@/lib/jiosaavn").then(m => m.searchArtists(artistName, 1, 1));
                     id = search[0]?.id;
@@ -55,6 +62,11 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                         setAlbums(details.topAlbums || []);
                         setSimilar(details.similarArtists || []);
                         setBio(details.bio || []);
+                    } else {
+                        // API returned null, fallback to search
+                        const { searchSongs } = await import("@/lib/jiosaavn");
+                        const results = await searchSongs(artistName, 30);
+                        setSongs(results);
                     }
                 } else {
                     // Fallback to basic search if no ID found
@@ -251,7 +263,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                                 className={`group flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-white/5 transition-colors ${active ? 'bg-white/5' : ''}`}
                                             >
                                                 <div className="w-6 text-center text-white/20 text-sm font-mono group-hover:hidden">{(i + 1).toString().padStart(2, '0')}</div>
-                                                <div className="w-6 text-center hidden group-hover:block border border-white/40 rounded-full h-6 w-6 flex items-center justify-center">
+                                                <div className="w-6 h-6 hidden group-hover:flex items-center justify-center border border-white/40 rounded-full">
                                                     {active && isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                                                 </div>
 
@@ -260,7 +272,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
-                                                    <p className={`font-bold truncate ${active ? 'text-blue-400' : 'text-white'}`}>{decodeHtml(song.name)}</p>
+                                                <p className={`font-bold truncate ${active ? 'text-white' : 'text-white/80'}`}>{decodeHtml(song.name)}</p>
                                                     <p className="text-xs text-white/40 truncate">{song.album?.name || 'Single'}</p>
                                                 </div>
 

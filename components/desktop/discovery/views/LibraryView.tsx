@@ -286,8 +286,9 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
 
         const songs = allItems.map(i => isPlayableTrack(i) ? i : ensurePlayableTrack(i, qualityPreference as AudioQuality));
 
+        const mixId = activeTab === 'liked' ? 'library-liked' : 'library-recent';
         const newMix: Mix = {
-            id: `library-${Date.now()}`,
+            id: mixId,
             title: activeTab === 'liked' ? 'Liked Songs' : 'Recently Played',
             color: 'pink',
             songs: songs,
@@ -304,8 +305,9 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
         let songs = items.map(i => isPlayableTrack(i) ? i : ensurePlayableTrack(i, qualityPreference as AudioQuality));
         if (shuffle) songs = shuffleArray(songs);
 
+        const mixId = activeTab === 'liked' ? 'library-liked' : 'library-recent';
         const newMix: Mix = {
-            id: `library-${Date.now()}`,
+            id: mixId,
             title: activeTab === 'liked' ? 'Liked Songs' : 'Recently Played',
             color: 'pink',
             songs: songs,
@@ -746,7 +748,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             transition={{ delay: i * 0.05 }}
-                                            onClick={() => onNavigate({ id: 'album', data: album })}
+                                            onClick={() => onNavigate({ id: 'peel-reveal', data: album })}
                                             className="glass-card p-3 rounded-xl cursor-pointer group hover:bg-white/10"
                                         >
                                             <div className="relative aspect-square mb-3 rounded-lg overflow-hidden bg-white/5 shadow-lg">
@@ -769,7 +771,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
                                                 </button>
 
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); onNavigate({ id: 'album', data: album }); }}
+                                                    onClick={(e) => { e.stopPropagation(); onNavigate({ id: 'peel-reveal', data: album }); }}
                                                     className="absolute bottom-2 right-2 p-2.5 rounded-full bg-white text-black opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all shadow-xl"
                                                 >
                                                     <Play size={16} fill="currentColor" className="ml-0.5" />

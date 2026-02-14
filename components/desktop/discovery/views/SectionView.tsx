@@ -232,7 +232,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                                                 </div>
                                             </div>
                                             <div className="min-w-0">
-                                                <h4 className={`font-bold text-base truncate ${active ? 'text-white' : 'text-white'}`}>{decodeHtml(item.name)}</h4>
+                                                <h4 className={`font-bold text-base truncate ${active ? 'text-white font-extrabold' : 'text-white/90'}`}>{decodeHtml(item.name)}</h4>
                                                 <p className="text-white/40 text-xs truncate group-hover:text-white/60 transition-colors">{decodeHtml(item.primaryArtists)}</p>
                                             </div>
                                         </div>

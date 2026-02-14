@@ -15,12 +15,13 @@ interface PeelRevealViewProps {
     onContextMenu?: (e: React.MouseEvent, song: JioSaavnSong) => void;
 }
 
-export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRevealViewProps) {
+export function PeelRevealView({ album: initialAlbum, onBack, onPlay, onContextMenu }: PeelRevealViewProps) {
     const [phase, setPhase] = useState<'sealed' | 'opened'>('sealed');
     const [tracks, setTracks] = useState<JioSaavnSong[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const { playInstantMix, isPlaying, currentSong } = usePlayback();
+    const [album, setAlbum] = useState(initialAlbum); // Allow updating with API data
+    const { playInstantMix, isPlaying, currentSong, toggleSaveAlbum, isAlbumSaved, showToast } = usePlayback();
 
     const dragX = useMotionValue(0);
     const cdControls = useAnimation();
@@ -36,15 +37,24 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
 
     useEffect(() => {
         loadTracks();
-    }, [album.id]);
+    }, [initialAlbum.id]);
 
     const loadTracks = async () => {
         setLoading(true);
         try {
-            const data = await getAlbumDetails(album.id);
+            const data = await getAlbumDetails(initialAlbum.id);
             // getAlbumDetails returns { ...albumMeta, songs: [...] } or an array or null
             const songs = Array.isArray(data) ? data : Array.isArray(data?.songs) ? data.songs : [];
             setTracks(songs);
+            // Update album metadata from API response (fills in name/image for bare {id} navigations)
+            if (data && !Array.isArray(data)) {
+                setAlbum(prev => ({
+                    ...prev,
+                    name: data.name || data.title || prev.name,
+                    image: data.image || prev.image,
+                    primaryArtists: data.primaryArtists || prev.primaryArtists,
+                }));
+            }
         } catch {
             setError("Failed to load album tracks.");
         } finally {
@@ -71,8 +81,8 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
     return (
         <div className="relative w-full h-full flex flex-col overflow-hidden bg-black text-white">
 
-            {/* BACKGROUND */}
-            <div className="fixed inset-0 z-0 pointer-events-none">
+            {/* BACKGROUND — absolute instead of fixed to avoid covering sidebar */}
+            <div className="absolute inset-0 z-0 pointer-events-none">
                 <div className="absolute inset-0 bg-cover bg-center opacity-60 scale-125 blur-[90px] saturate-[1.6]" style={{ backgroundImage: `url(${albumArt})` }} />
                 <div className="absolute inset-0 bg-gradient-to-b from-[#000000]/20 via-[#000000]/40 to-[#000000]/90" />
             </div>
@@ -149,8 +159,14 @@ export function PeelRevealView({ album, onBack, onPlay, onContextMenu }: PeelRev
                             <button onClick={playAll} className="flex items-center gap-2.5 px-6 py-2.5 bg-white text-black rounded-full font-bold text-sm hover:bg-white/90 active:scale-95 transition-all shadow-[0_4px_20px_rgba(255,255,255,0.15)]">
                                 <Play size={16} fill="currentColor" /> Play All
                             </button>
-                            <button onClick={() => { playInstantMix({ id: `album-${album.id}`, title: album.name, color: 'blue', songs: tracks, currentSongIndex: 0 }); }} className="flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-md border border-white/10 text-white/80 rounded-full font-semibold text-sm hover:bg-white/15 active:scale-95 transition-all">
-                                <ListPlus size={16} /> Add to Library
+                            <button
+                                onClick={() => {
+                                    toggleSaveAlbum(album);
+                                    showToast(isAlbumSaved(album.id) ? `Removed "${decodeHtml(album.name)}" from Library` : `Added "${decodeHtml(album.name)}" to Library`, 'success');
+                                }}
+                                className={`flex items-center gap-2 px-5 py-2.5 backdrop-blur-md border rounded-full font-semibold text-sm active:scale-95 transition-all ${isAlbumSaved(album.id) ? 'bg-white text-black border-white' : 'bg-white/10 border-white/10 text-white/80 hover:bg-white/15'}`}
+                            >
+                                <ListPlus size={16} /> {isAlbumSaved(album.id) ? 'Saved' : 'Add to Library'}
                             </button>
                         </motion.div>
                     )}

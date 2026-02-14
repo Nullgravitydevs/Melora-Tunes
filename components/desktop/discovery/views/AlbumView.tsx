@@ -86,8 +86,8 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
     return (
         <div className="relative w-full h-full flex flex-col overflow-hidden bg-black text-white">
 
-            {/* BACKGROUND */}
-            <div className="fixed inset-0 z-0 pointer-events-none">
+            {/* BACKGROUND — absolute instead of fixed to avoid covering sidebar */}
+            <div className="absolute inset-0 z-0 pointer-events-none">
                 <div className="absolute inset-0 bg-cover bg-center opacity-60 scale-125 blur-[80px] saturate-[1.5]" style={{ backgroundImage: `url(${albumImage})` }} />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black" />
             </div>

@@ -555,6 +555,11 @@ export async function getAlbumDetails(albumId: string): Promise<any> {
         if (data && data.songs) {
             return {
                 ...data,
+                id: data.id || data.albumid || albumId, // Ensure album has an id
+                name: decodeHtml(data.name || data.title || ''),
+                image: formatImage(data.image),
+                primaryArtists: data.primary_artists || data.primaryArtists || '',
+                primaryArtistsId: data.primary_artists_id || data.primaryArtistsId || '',
                 songs: data.songs.map(mapToSong)
             };
         }

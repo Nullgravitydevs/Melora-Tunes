@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { motion } from "framer-motion";
 import { Play, Pause, Music, AlertCircle, RefreshCcw, ChevronRight, Disc3 } from "lucide-react";
 import { getStrictLaunchData, LaunchData, JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
+import { usePlayback, Mix } from "@/components/providers/playback-context";
 
 /* ==========================================================================
    HOME VIEW — Premium Discovery Home
-   Zero framer-motion, CSS-only transitions, 5-min cache, self-contained
+   Framer-motion stagger transitions, 5-min cache, self-contained
    ========================================================================== */
 
 interface HomeViewProps {
@@ -115,12 +117,6 @@ function Hero({ song, onPlay, userName, isCurrent, isPlaying }: {
                             {isCurrent && isPlaying ? <Pause fill="currentColor" size={16} /> : <Play fill="currentColor" size={16} className="ml-0.5" />}
                             {isCurrent && isPlaying ? 'Playing' : 'Play Now'}
                         </button>
-                        <button
-                            onClick={() => onPlay(song)}
-                            className="px-5 py-3.5 bg-white/[0.06] hover:bg-white/10 text-white/70 rounded-full font-semibold text-sm transition-all border border-white/[0.06] backdrop-blur-sm"
-                        >
-                            Add to Queue
-                        </button>
                     </div>
                 </div>
             </div>
@@ -151,22 +147,22 @@ function SectionHead({ title, subtitle, onSeeAll }: { title: string; subtitle?: 
 // ─── H-SCROLL ─────────────────────────────────────────────────────────────
 function HScroll({ children }: { children: React.ReactNode }) {
     return (
-        <div className="overflow-x-auto pb-2 px-8 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
+        <div className="overflow-x-auto pb-1 px-8 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
             <div className="flex gap-5 w-max">{children}</div>
         </div>
     );
 }
 
 // ─── SONG CARD — Hoverable square ─────────────────────────────────────────
-function SongCard({ item, onClick, rank, isCurrent, isPlaying }: {
-    item: any; onClick: () => void; rank?: number; isCurrent?: boolean; isPlaying?: boolean;
+function SongCard({ item, onClick, rank, isCurrent, isPlaying, onContextMenu }: {
+    item: any; onClick: () => void; rank?: number; isCurrent?: boolean; isPlaying?: boolean; onContextMenu?: (e: React.MouseEvent) => void;
 }) {
     const art = getArt(item);
     return (
-        <div onClick={onClick} className="group w-[172px] shrink-0 cursor-pointer">
+        <div onClick={onClick} onContextMenu={onContextMenu} className="group w-[172px] shrink-0 cursor-pointer">
             <div className="relative aspect-square rounded-2xl overflow-hidden mb-3 bg-white/[0.02] ring-1 ring-white/[0.05] hover:ring-white/[0.12] transition-all duration-300">
                 {art ? (
-                    <img src={art} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" loading="lazy" />
+                    <img src={art} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center"><Music size={28} className="text-white/10" /></div>
                 )}
@@ -206,7 +202,7 @@ function WideCard({ item, onClick, label }: { item: any; onClick: () => void; la
         <div onClick={onClick} className="group relative shrink-0 w-[280px] h-[160px] rounded-2xl overflow-hidden cursor-pointer bg-white/[0.02] ring-1 ring-white/[0.05] hover:ring-white/[0.12] transition-all duration-300">
             {art && (
                 <div className="absolute inset-0">
-                    <img src={art} alt="" className="w-full h-full object-cover opacity-40 saturate-[0.3] transition-all duration-500 group-hover:opacity-50 group-hover:scale-105" loading="lazy" />
+                    <img src={art} alt="" className="w-full h-full object-cover opacity-40 saturate-[0.3] transition-all duration-500 group-hover:opacity-50 group-hover:scale-105" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/20" />
                     <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
                 </div>
@@ -228,18 +224,19 @@ function WideCard({ item, onClick, label }: { item: any; onClick: () => void; la
 }
 
 // ─── QUICK PICK ROW ───────────────────────────────────────────────────────
-function QuickPick({ item, onClick, isCurrent, isPlaying }: { item: any; onClick: () => void; isCurrent?: boolean; isPlaying?: boolean }) {
+function QuickPick({ item, onClick, isCurrent, isPlaying, onContextMenu }: { item: any; onClick: () => void; isCurrent?: boolean; isPlaying?: boolean; onContextMenu?: (e: React.MouseEvent) => void }) {
     const art = getArt(item, '150x150');
     return (
         <div
             onClick={onClick}
+            onContextMenu={onContextMenu}
             className={`flex items-center gap-3 p-2 pr-4 rounded-xl transition-all duration-200 cursor-pointer group ring-1 ${isCurrent
                     ? 'bg-white/[0.06] ring-white/[0.1]'
                     : 'bg-white/[0.02] ring-white/[0.03] hover:bg-white/[0.05] hover:ring-white/[0.08]'
                 }`}
         >
             <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-white/[0.03]">
-                {art ? <img src={art} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-white/10" /></div>}
+                {art ? <img src={art} alt="" className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} /> : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-white/10" /></div>}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
                     {isCurrent && isPlaying ? <Pause size={14} fill="currentColor" className="text-white" /> : <Play size={12} fill="currentColor" className="text-white ml-0.5" />}
                 </div>
@@ -265,6 +262,7 @@ function QuickPick({ item, onClick, isCurrent, isPlaying }: { item: any; onClick
 // MAIN: HOME VIEW
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onContextMenu }: HomeViewProps) {
+    const { playInstantMix, addMix, updateMix, loadMix } = usePlayback();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [launchData, setLaunchData] = useState<LaunchData | null>(null);
@@ -345,6 +343,20 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
 
     const { new_trending, new_albums, top_playlists, retro, top_charts, quick_picks } = launchData;
 
+    // Helper: play a song within a list context (so clicking plays the right song, not just the first)
+    const playSongInList = (listId: string, listTitle: string, songs: JioSaavnSong[], index: number) => {
+        const mix: Mix = {
+            id: `home-${listId}`,
+            title: listTitle,
+            color: 'blue' as const,
+            songs,
+            currentSongIndex: index
+        };
+        const added = addMix(mix);
+        if (!added) updateMix(`home-${listId}`, { songs, currentSongIndex: index });
+        loadMix(`home-${listId}`);
+    };
+
     return (
         <div className="pb-32 w-full overflow-x-hidden">
             {/* HERO */}
@@ -356,98 +368,101 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
                 isPlaying={isPlaying}
             />
 
-            <div className="space-y-10">
+            <motion.div className="space-y-8" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}>
                 {/* QUICK PICKS */}
                 {quick_picks && quick_picks.length > 0 && (
-                    <section>
+                    <motion.section variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}>
                         <SectionHead title="Quick Picks" subtitle="Jump right in" />
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 px-8">
-                            {quick_picks.slice(0, 8).map(song => (
+                            {quick_picks.slice(0, 8).map((song, i) => (
                                 <QuickPick
                                     key={song.id}
                                     item={song}
-                                    onClick={() => onPlaySong(song)}
+                                    onClick={() => playSongInList('quick-picks', 'Quick Picks', quick_picks.slice(0, 8), i)}
                                     isCurrent={currentSongId === song.id}
                                     isPlaying={isPlaying}
+                                    onContextMenu={onContextMenu ? (e) => onContextMenu(e, song) : undefined}
                                 />
                             ))}
                         </div>
-                    </section>
+                    </motion.section>
                 )}
 
                 {/* TRENDING */}
                 {new_trending.length > 0 && (
-                    <section>
+                    <motion.section variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}>
                         <SectionHead title="Trending Now" onSeeAll={() => onNavigate({ id: 'trending', data: { items: new_trending, title: 'Trending Now' } })} />
                         <HScroll>
                             {new_trending.slice(0, 12).map((song, i) => (
                                 <SongCard
                                     key={song.id}
                                     item={song}
-                                    onClick={() => onPlaySong(song)}
+                                    onClick={() => playSongInList('trending', 'Trending Now', new_trending.slice(0, 12), i)}
                                     rank={i + 1}
                                     isCurrent={currentSongId === song.id}
                                     isPlaying={isPlaying}
+                                    onContextMenu={onContextMenu ? (e) => onContextMenu(e, song) : undefined}
                                 />
                             ))}
                         </HScroll>
-                    </section>
+                    </motion.section>
                 )}
 
                 {/* NEW ALBUMS */}
                 {new_albums.length > 0 && (
-                    <section>
+                    <motion.section variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}>
                         <SectionHead title="New Arrivals" onSeeAll={() => onNavigate({ id: 'albums', data: { items: new_albums, title: 'New Arrivals' } })} />
                         <HScroll>
                             {new_albums.slice(0, 12).map(album => (
                                 <SongCard key={album.id} item={album} onClick={() => onNavigate({ id: 'peel-reveal', data: album })} />
                             ))}
                         </HScroll>
-                    </section>
+                    </motion.section>
                 )}
 
                 {/* TOP CHARTS */}
                 {top_charts && top_charts.length > 0 && (
-                    <section>
+                    <motion.section variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}>
                         <SectionHead title="Top Charts" />
                         <HScroll>
                             {top_charts.map(pl => (
                                 <WideCard key={pl.id} item={pl} label="Chart" onClick={() => onNavigate({ id: 'playlist', data: pl })} />
                             ))}
                         </HScroll>
-                    </section>
+                    </motion.section>
                 )}
 
                 {/* BEST OF LANGUAGE */}
                 {top_playlists && top_playlists.length > 0 && (
-                    <section>
+                    <motion.section variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}>
                         <SectionHead title={`Best of ${displayLangs[0]}`} subtitle="Editor's Picks" />
                         <HScroll>
                             {top_playlists.map(pl => (
                                 <WideCard key={pl.id} item={pl} label="Playlist" onClick={() => onNavigate({ id: 'playlist', data: pl })} />
                             ))}
                         </HScroll>
-                    </section>
+                    </motion.section>
                 )}
 
                 {/* RETRO */}
                 {retro && retro.length > 0 && (
-                    <section>
+                    <motion.section variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}>
                         <SectionHead title="Retro Rewind" subtitle="Timeless classics" />
                         <HScroll>
-                            {retro.slice(0, 12).map(song => (
+                            {retro.slice(0, 12).map((song, i) => (
                                 <SongCard
                                     key={song.id}
                                     item={song}
-                                    onClick={() => onPlaySong(song)}
+                                    onClick={() => playSongInList('retro', 'Retro Rewind', retro.slice(0, 12), i)}
                                     isCurrent={currentSongId === song.id}
                                     isPlaying={isPlaying}
+                                    onContextMenu={onContextMenu ? (e) => onContextMenu(e, song) : undefined}
                                 />
                             ))}
                         </HScroll>
-                    </section>
+                    </motion.section>
                 )}
-            </div>
+            </motion.div>
         </div>
     );
 }

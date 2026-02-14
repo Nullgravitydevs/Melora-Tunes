@@ -280,10 +280,12 @@ export function DiscoveryLayout() {
         setContextMenu(prev => ({ ...prev, visible: false }));
     }, []);
 
-    const handleGoToArtist = (artistId: string) => {
-        // Clean ID
-        const id = artistId.split(',')[0].trim();
-        handleNavigate({ id: 'artist', data: { id } });
+    const handleGoToArtist = (artistIdOrName: string) => {
+        // Clean ID/name
+        const cleaned = artistIdOrName.split(',')[0].trim();
+        // If it looks like an ID (numeric), pass as id; otherwise as name for search
+        const isId = /^\d+$/.test(cleaned);
+        handleNavigate({ id: 'artist', data: isId ? { id: cleaned } : { id: cleaned, name: cleaned } });
         setShowFullPlayer(false);
     };
 

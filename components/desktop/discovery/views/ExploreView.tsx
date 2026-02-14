@@ -227,7 +227,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                             key={album.id}
                             item={album}
                             index={i}
-                            subtitle={album.year || "2025"}
+                            subtitle={album.year || ""}
                             onClick={() => onNavigate({ id: 'peel-reveal', data: album })} // Use PeelReveal for albums
                         />
                     ))}

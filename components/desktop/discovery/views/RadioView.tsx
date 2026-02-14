@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { Radio, Mic2, Calendar, Zap, Play, Signal } from "lucide-react";
+import { Radio, Mic2, Calendar, Zap, Play, Signal, Moon, Dumbbell, Headphones } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { SectionHeader, HorizontalScroll } from "../home/HomeComponents";
 import { JioSaavnSong, searchSongs, searchArtists, fixImageUrl } from "@/lib/jiosaavn";
@@ -15,27 +15,27 @@ interface RadioViewProps {
 }
 
 // === STATION DATA ===
-// Initial set with placeholder images, will be updated dynamically
-const PLACEHOLDER_IMG = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80';
+// Initial set with no external placeholders — uses gradient fallbacks
+const PLACEHOLDER_IMG = '';
 
 const INITIAL_ARTIST_STATIONS = [
-    { id: 'arijit', label: 'Arijit Singh Radio', image: PLACEHOLDER_IMG, query: 'Arijit Singh' },
-    { id: 'weekend', label: 'The Weeknd Radio', image: PLACEHOLDER_IMG, query: 'The Weeknd' },
-    { id: 'taylor', label: 'Taylor Swift Radio', image: PLACEHOLDER_IMG, query: 'Taylor Swift' },
-    { id: 'pritam', label: 'Pritam Radio', image: PLACEHOLDER_IMG, query: 'Pritam' },
-    { id: 'sid', label: 'Sid Sriram Radio', image: PLACEHOLDER_IMG, query: 'Sid Sriram' },
+    { id: 'arijit', label: 'Arijit Singh Radio', image: '', query: 'Arijit Singh' },
+    { id: 'weekend', label: 'The Weeknd Radio', image: '', query: 'The Weeknd' },
+    { id: 'taylor', label: 'Taylor Swift Radio', image: '', query: 'Taylor Swift' },
+    { id: 'pritam', label: 'Pritam Radio', image: '', query: 'Pritam' },
+    { id: 'sid', label: 'Sid Sriram Radio', image: '', query: 'Sid Sriram' },
 ];
 
 const DECADE_STATIONS = [
-    { id: '90s', label: '90s Nostalgia', image: 'https://images.unsplash.com/photo-1542208998-f6dbbb27a72f?q=80&w=2070&auto=format&fit=crop', query: '90s bollywood hits' },
-    { id: '00s', label: '00s Throwback', image: 'https://images.unsplash.com/photo-1596529896799-880620fa9483?q=80&w=1974&auto=format&fit=crop', query: '2000s hits' },
-    { id: '10s', label: '2010s Golden Era', image: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?q=80&w=1974&auto=format&fit=crop', query: '2010s hits' },
+    { id: '90s', label: '90s Nostalgia', image: '', query: '90s bollywood hits', gradient: 'from-amber-900/30 to-transparent' },
+    { id: '00s', label: '00s Throwback', image: '', query: '2000s hits', gradient: 'from-purple-900/30 to-transparent' },
+    { id: '10s', label: '2010s Golden Era', image: '', query: '2010s hits', gradient: 'from-blue-900/30 to-transparent' },
 ];
 
 const VIBE_STATIONS = [
-    { id: 'lofi', label: 'Lo-Fi Beats', color: '#14b8a6', icon: Zap, query: 'lofi hip hop' },
-    { id: 'workout', label: 'Power Workout', color: '#ef4444', icon: Zap, query: 'workout motivation' },
-    { id: 'sleep', label: 'Sleep Station', color: '#6366f1', icon: Zap, query: 'sleep music' },
+    { id: 'lofi', label: 'Lo-Fi Beats', color: '#14b8a6', icon: Headphones, query: 'lofi hip hop' },
+    { id: 'workout', label: 'Power Workout', color: '#ef4444', icon: Dumbbell, query: 'workout motivation' },
+    { id: 'sleep', label: 'Sleep Station', color: '#6366f1', icon: Moon, query: 'sleep music' },
 ];
 
 export function RadioView({ onNavigate }: RadioViewProps) {
@@ -51,12 +51,12 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                     if (results && results.length > 0 && results[0].image) {
                         // Use the highest quality image available
                         const highRes = results[0].image.find((i: any) => i.quality === '500x500')?.link || results[0].image[0]?.link;
-                        return { ...station, image: highRes ? fixImageUrl(highRes, '500x500') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80' };
+                        return { ...station, image: highRes ? fixImageUrl(highRes, '500x500') : '' };
                     }
                 } catch {
                     /* ignored */
                 }
-                return { ...station, image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80' };
+                return { ...station, image: '' };
             }));
             setArtistStations(updated);
         };
@@ -87,12 +87,7 @@ export function RadioView({ onNavigate }: RadioViewProps) {
 
             {/* HERO: ON AIR */}
             <div className="relative h-64 rounded-3xl overflow-hidden group cursor-pointer" onClick={() => startRadio({ label: 'Melora FM', query: `top hits ${new Date().getFullYear()}` })}>
-                <img
-                    src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=2070&auto=format&fit=crop"
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    loading="lazy"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                />
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.04] via-black to-black" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
                 <div className="absolute inset-0 p-8 flex flex-col justify-center items-start">
                     <div className="flex items-center gap-2 text-red-500 font-bold tracking-widest text-xs uppercase mb-2 bg-black/50 px-2 py-1 rounded backdrop-blur-md">
@@ -118,14 +113,17 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                             className="bg-black p-4 rounded-2xl border border-white/10 cursor-pointer group hover:border-white/20 transition-colors w-48 flex-shrink-0"
                         >
                             <div className="aspect-square rounded-full overflow-hidden mb-4 shadow-lg border-2 border-transparent group-hover:border-white transition-colors relative">
-                                <img
-                                    src={station.image}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        // Fallback if the real artist image fails
-                                        e.currentTarget.src = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80";
-                                    }}
-                                />
+                                {station.image ? (
+                                    <img
+                                        src={station.image}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-white/[0.04] flex items-center justify-center">
+                                        <Radio size={28} className="text-white/20" />
+                                    </div>
+                                )}
                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Radio size={24} className="text-white" />
                                 </div>
@@ -147,8 +145,8 @@ export function RadioView({ onNavigate }: RadioViewProps) {
                             onClick={() => startRadio(station)}
                             className="h-40 bg-black rounded-xl flex items-center px-4 gap-4 cursor-pointer hover:border-white/20 transition-colors border border-white/10 group relative overflow-hidden"
                         >
-                            {/* Background Image subtle */}
-                            <img src={station.image} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity blur-sm" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                            {/* Gradient background instead of external image */}
+                            <div className={`absolute inset-0 bg-gradient-to-br ${(station as any).gradient || 'from-white/[0.05] to-transparent'}`} />
 
                             <div className="relative z-10 w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center border border-white/10">
                                 <Calendar size={20} className="text-white/80" />

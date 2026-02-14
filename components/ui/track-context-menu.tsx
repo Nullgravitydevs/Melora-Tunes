@@ -98,11 +98,29 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
                     <div className="h-px bg-white/10 my-0.5" />
 
                     <MenuItem icon={<User size={14} />} label="Go to Artist" onClick={() => {
-                        const artistId = song.primaryArtistsId.split(',')[0].trim();
-                        if (artistId) { onGoToArtist(artistId); onClose(); }
+                        // Try multiple paths for artist ID
+                        let artistId = '';
+                        if (song.primaryArtistsId) {
+                            artistId = song.primaryArtistsId.split(',')[0].trim();
+                        }
+                        if (artistId) {
+                            onGoToArtist(artistId);
+                            onClose();
+                        } else if (song.primaryArtists) {
+                            // Fallback: pass the artist name so ArtistView can search for it
+                            onGoToArtist(song.primaryArtists.split(',')[0].trim());
+                            onClose();
+                        }
                     }} />
                     <MenuItem icon={<Disc size={14} />} label="Go to Album" onClick={() => {
-                        if (song.album?.id) { onGoToAlbum(song.album.id); onClose(); }
+                        if (song.album?.id) {
+                            onGoToAlbum(song.album.id);
+                            onClose();
+                        } else if (song.id) {
+                            // Fallback: use the song itself as album reference
+                            onGoToAlbum(song.id);
+                            onClose();
+                        }
                     }} />
                 </motion.div>
             )}

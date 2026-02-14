@@ -518,7 +518,34 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                             </div>
 
                             {/* Browse Categories */}
-
+                            <div className="mt-8">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <Grid size={20} className="text-white/30" />
+                                    <h2 className="text-lg font-bold text-white/40 tracking-tight">Browse by Mood</h2>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {[
+                                        { label: 'Chill Vibes', query: 'chill vibes', gradient: 'from-teal-900/40 to-teal-950/20' },
+                                        { label: 'Party Hits', query: 'party hits', gradient: 'from-pink-900/40 to-pink-950/20' },
+                                        { label: 'Romantic', query: 'romantic songs', gradient: 'from-rose-900/40 to-rose-950/20' },
+                                        { label: 'Workout', query: 'workout motivation', gradient: 'from-red-900/40 to-red-950/20' },
+                                        { label: 'Focus', query: 'focus study music', gradient: 'from-blue-900/40 to-blue-950/20' },
+                                        { label: 'Sad Songs', query: 'sad emotional songs', gradient: 'from-indigo-900/40 to-indigo-950/20' },
+                                        { label: 'Road Trip', query: 'road trip songs', gradient: 'from-amber-900/40 to-amber-950/20' },
+                                        { label: 'Devotional', query: 'devotional bhajan', gradient: 'from-orange-900/40 to-orange-950/20' },
+                                    ].map((cat) => (
+                                        <motion.button
+                                            key={cat.label}
+                                            onClick={() => { setQuery(cat.query); handleSearch(cat.query); }}
+                                            className={`relative p-5 rounded-2xl text-left overflow-hidden bg-gradient-to-br ${cat.gradient} border border-white/[0.06] hover:border-white/[0.12] transition-all`}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                        >
+                                            <span className="font-bold text-sm text-white/80">{cat.label}</span>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            </div>
                         </motion.div>
                     ) : null}
                 </AnimatePresence>
