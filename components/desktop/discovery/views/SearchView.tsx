@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Play, Pause, Clock, TrendingUp, Grid3x3 as Grid, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
+import { Search, X, Play, Pause, Clock, TrendingUp, Grid3X3 as Grid, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
 
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
@@ -168,21 +168,18 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
         const tracks = allTracks || [track];
         const idx = tracks.findIndex(t => t.id === track.id);
 
-        // Convert PlayableTracks back to songs for the mix
-        const songs = tracks.map(t => t.song).filter(Boolean);
-
         const newMix: Mix = {
             id: SEARCH_MIX_ID,
             title: 'Search Results',
             color: 'white',
-            songs: songs as any[],
+            songs: tracks,
             currentSongIndex: idx >= 0 ? idx : 0
         };
 
         const added = addMix(newMix);
         if (!added) {
             updateMix(SEARCH_MIX_ID, {
-                songs: songs as any[],
+                songs: tracks,
                 currentSongIndex: idx >= 0 ? idx : 0
             });
         }

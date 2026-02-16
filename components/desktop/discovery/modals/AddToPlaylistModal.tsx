@@ -7,6 +7,7 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack, isPlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
+import { isUserPlaylistMix } from "@/lib/mix-id-utils";
 
 interface AddToPlaylistModalProps {
     song: JioSaavnSong | PlayableTrack | null;
@@ -19,12 +20,7 @@ export function AddToPlaylistModal({ song, onClose }: AddToPlaylistModalProps) {
     const [newPlaylistName, setNewPlaylistName] = useState("");
 
     // Filter user playlists
-    const userPlaylists = mixes.filter(m =>
-        m.id !== 'discovery-mix' &&
-        !m.id.startsWith('search-') &&
-        !m.id.startsWith('artist-') &&
-        !m.id.startsWith('album-')
-    );
+    const userPlaylists = mixes.filter(isUserPlaylistMix);
 
     const handleAddToMix = (mixId: string, mixName: string) => {
         if (!song) return;

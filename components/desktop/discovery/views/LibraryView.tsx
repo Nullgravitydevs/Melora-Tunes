@@ -16,6 +16,7 @@ import { shuffleArray, getArt, formatDuration } from "@/lib/helpers";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { AddToPlaylistModal } from "@/components/desktop/discovery/modals/AddToPlaylistModal";
 import { CDRow } from "@/components/shared/CDRow";
+import { isUserPlaylistMix } from "@/lib/mix-id-utils";
 
 /* ============================================================================
    LIBRARY VIEW - Liked Songs, Recently Played, Playlists
@@ -146,7 +147,7 @@ export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryVi
 
     // 1. Playlists
     const userPlaylists = useMemo(() => {
-        let raw = mixes.filter(m => m.id !== 'discovery-mix' && !m.id.startsWith('search-') && !m.id.startsWith('artist-') && !m.id.startsWith('album-'));
+        let raw = mixes.filter(isUserPlaylistMix);
 
         // Search Filter
         if (searchQuery.trim()) {

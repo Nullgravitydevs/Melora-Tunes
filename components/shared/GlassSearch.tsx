@@ -115,13 +115,8 @@ export function GlassSearch({ onClose, initialQuery = "", onSongSelect, desktopM
             if (targetMixId) {
                 const activeMix = mixes.find(m => m.id === targetMixId);
                 if (activeMix) {
-                    const exists = activeMix.songs.some(s => s.id === track.id);
-                    if (!exists) {
-                        updateMix(targetMixId, { songs: [...activeMix.songs, track] });
-                        showToast(`Added to "${activeMix.title}"`, 'success');
-                    } else {
-                        showToast("Already in cassette!", 'error');
-                    }
+                    updateMix(targetMixId, { songs: [...activeMix.songs, track] });
+                    showToast(`Added to "${activeMix.title}"`, 'success');
                 } else {
                     showToast("Cassette not found", 'error');
                 }

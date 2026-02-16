@@ -81,8 +81,8 @@ class PlaylistDB {
         const playlists = this.getAll();
         const playlist = playlists.find(p => p.id === playlistId);
         if (playlist) {
-            // Avoid duplicates
-            if (!playlist.tracks.some(t => t.id === track.id)) {
+            if (playlist) {
+                // Allow duplicates - User requested feature
                 playlist.tracks.push(track);
                 playlist.updatedAt = Date.now();
                 this.saveAll(playlists);

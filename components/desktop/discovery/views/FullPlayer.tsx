@@ -92,7 +92,24 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
 
     const handleShare = async () => {
         if (!currentSong) return;
-        const url = `${window.location.origin}/song/${currentSong.id}`;
+        const sharePayload = {
+            id: `shared-song-${currentSong.id}`,
+            title: currentSong.name,
+            songs: [
+                {
+                    id: currentSong.id,
+                    name: currentSong.name,
+                    artists: currentSong.primaryArtists || ''
+                }
+            ]
+        };
+        const bytes = new TextEncoder().encode(JSON.stringify(sharePayload));
+        let binary = '';
+        bytes.forEach((byte) => {
+            binary += String.fromCharCode(byte);
+        });
+        const encoded = encodeURIComponent(btoa(binary));
+        const url = `${window.location.origin}/share?mix=${encoded}`;
         if (navigator.share) {
             try { await navigator.share({ title: currentSong.name, text: `Check out ${currentSong.name} on Melora`, url }); } catch { /* ignore */ }
         } else {

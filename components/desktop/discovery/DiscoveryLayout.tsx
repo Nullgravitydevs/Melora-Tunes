@@ -24,6 +24,7 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 import { PlaylistItem } from "@/components/shared/PlaylistItem";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AddToPlaylistModal } from "./modals/AddToPlaylistModal";
+import { isUserPlaylistId, isUserPlaylistMix } from "@/lib/mix-id-utils";
 
 
 /* ============================================================================
@@ -230,7 +231,7 @@ export function DiscoveryLayout() {
     const [showFullPlayer, setShowFullPlayer] = useState(false);
     const {
         mixes, currentSong, isPlaying, likedSongs, recentlyPlayed,
-        loadMix, playInstantMix, setQueue, queue,
+        loadMix, playInstantMix,
         downloadSong, removeDownload, isDownloaded,
         activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix, togglePin, addToQueue
     } = usePlayback();
@@ -352,7 +353,7 @@ export function DiscoveryLayout() {
     const confirmCreatePlaylist = () => {
         const name = newPlaylistName.trim();
         if (!name) return;
-        const newId = `user-${Date.now()}`;
+        const newId = `playlist-${Date.now()}`;
         const newMix: Mix = {
             id: newId,
             title: name,
@@ -496,22 +497,8 @@ export function DiscoveryLayout() {
                             </motion.button>
                         </div>
                         <div className="pb-2">
-                            {mixes
-                                .filter(m =>
-                                    !m.id.startsWith('quick-') &&
-                                    !m.id.startsWith('search-') &&
-                                    !m.id.startsWith('album-') &&
-                                    !m.id.startsWith('artist-')
-                                )
-                                .length > 0 ? (
-                                mixes
-                                    .filter(m =>
-                                        !m.id.startsWith('quick-') &&
-                                        !m.id.startsWith('search-') &&
-                                        !m.id.startsWith('album-') &&
-                                        !m.id.startsWith('artist-')
-                                    )
-                                    .map((m, i) => (
+                            {mixes.filter(isUserPlaylistMix).length > 0 ? (
+                                mixes.filter(isUserPlaylistMix).map((m, i) => (
                                         <PlaylistItem
                                             key={m.id}
                                             mix={m}
@@ -689,7 +676,7 @@ export function DiscoveryLayout() {
                 onRemoveDownload={(id) => removeDownload(id)}
                 onAddToPlaylist={(s) => setAddToPlaylistSong(s)}
                 onRemoveFromPlaylist={
-                    contextMenu.sourceMixId && contextMenu.sourceMixId.startsWith('user-')
+                    contextMenu.sourceMixId && isUserPlaylistId(contextMenu.sourceMixId)
                         ? (s) => {
                             const mix = mixes.find(m => m.id === contextMenu.sourceMixId);
                             if (mix && updateMix) {
@@ -753,7 +740,7 @@ function EmptyState() {
 /* === PLAYER === */
 
 function PlayerBar({ onExpand }: { onExpand: () => void }) {
-    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, downloadSong, isDownloaded, setQueue, queue, showToast } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, downloadSong, isDownloaded, addToQueue, showToast } = usePlayback();
 
     const [showBarMenu, setShowBarMenu] = useState(false);
     const [showBarQuality, setShowBarQuality] = useState(false);
@@ -936,7 +923,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                                 <div className="absolute bottom-full right-0 mb-2 w-52 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-1.5 z-50">
                                     {!showBarQuality ? (
                                         <>
-                                            <button onClick={() => { if (currentSong) { setQueue([...queue, currentSong]); showToast('Added to queue', 'success'); } setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Plus size={14} /> Add to Queue</button>
+                                            <button onClick={() => { if (currentSong) { addToQueue(currentSong); showToast('Added to queue', 'success'); } setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Plus size={14} /> Add to Queue</button>
                                             <button onClick={() => { setShowBarMenu(false); showToast('Use right-click on a song', 'info'); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><ListPlus size={14} /> Add to Playlist</button>
                                             <div className="border-t border-white/[0.06] my-1" />
                                             <button onClick={() => setShowBarQuality(true)} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Disc3 size={14} /> Quality: {qLabelFull(qualityPreference)}</button>
