@@ -429,7 +429,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                         )}>
                             {[...mixes]
                                 .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
-                                .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+                                .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                                 .slice(0, 8) // Visual Guardrail: Only show top 8 tapes in the rack
                                 .map((mix, i) => {
                                     if (mix.id === activeMixId) return null;
@@ -565,27 +565,27 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                                                 const node = document.getElementById(`studio-mix-${mix.id}`);
                                                                 if (node) {
                                                                     import('html-to-image').then(({ toPng }) => {
-                                                                    toPng(node, {
-                                                                        filter: (n) => !n.classList?.contains('no-snapshot'),
-                                                                        pixelRatio: 2,
-                                                                        cacheBust: true,
-                                                                        fontEmbedCSS: ''
-                                                                    })
-                                                                        .then((dataUrl) => {
-                                                                            const link = document.createElement('a');
-                                                                            link.download = `melora-studio-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
-                                                                            link.href = dataUrl;
-                                                                            link.click();
-                                                                            navigator.clipboard.writeText(shareUrl);
-                                                                            setToast("Snapshot saved! Link copied 📸");
-                                                                            setTimeout(() => setToast(null), 3000);
+                                                                        toPng(node, {
+                                                                            filter: (n) => !n.classList?.contains('no-snapshot'),
+                                                                            pixelRatio: 2,
+                                                                            cacheBust: true,
+                                                                            fontEmbedCSS: ''
                                                                         })
-                                                                        .catch((err) => {
-                                                                            console.error("Snapshot failed", err);
-                                                                            navigator.clipboard.writeText(shareUrl);
-                                                                            setToast("Snapshot failed. Link copied!");
-                                                                            setTimeout(() => setToast(null), 3000);
-                                                                        });
+                                                                            .then((dataUrl) => {
+                                                                                const link = document.createElement('a');
+                                                                                link.download = `melora-studio-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
+                                                                                link.href = dataUrl;
+                                                                                link.click();
+                                                                                navigator.clipboard.writeText(shareUrl);
+                                                                                setToast("Snapshot saved! Link copied 📸");
+                                                                                setTimeout(() => setToast(null), 3000);
+                                                                            })
+                                                                            .catch((err) => {
+                                                                                console.error("Snapshot failed", err);
+                                                                                navigator.clipboard.writeText(shareUrl);
+                                                                                setToast("Snapshot failed. Link copied!");
+                                                                                setTimeout(() => setToast(null), 3000);
+                                                                            });
                                                                     });
                                                                 }
                                                             }}

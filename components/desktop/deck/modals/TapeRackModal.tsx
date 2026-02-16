@@ -5,6 +5,7 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { X, GripVertical, Pin, Play, Disc, ArrowDownAZ, Hash } from "lucide-react";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
 import { clsx } from "clsx";
+import { isUserPlaylistMix } from "@/lib/mix-id-utils";
 
 interface TapeRackModalProps {
     isOpen: boolean;
@@ -14,34 +15,31 @@ interface TapeRackModalProps {
 export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
     const { mixes, setMixes, activeMixId, togglePin } = usePlayback();
     const [items, setItems] = useState<Mix[]>([]);
-    const systemMixIds = ['discovery-mix', 'search-results', 'quick-play', 'otg-tape'];
 
-    // Sync mixes to local items on open, but filter out system/deleted ones if needed
+    // Sync mixes to local items on open
     useEffect(() => {
         if (isOpen) {
-            // Sort by pinned first, or just keep current order? 
-            // We assume the context order IS the visual order.
-            // Filter out the "Discovery Mix" if we don't want it reorderable? 
-            // User probably wants to reorder EVERYTHING.
             setItems(mixes);
         }
     }, [isOpen, mixes]);
 
     const handleReorder = (newOrder: Mix[]) => {
         setItems(newOrder);
-        // Live sync or save on close? Live sync gives instant feedback on the deck behind.
         setMixes(newOrder);
     };
 
     const rebuildWithSystemMixes = (orderedUserMixes: Mix[]) => {
-        const systemMixes = items.filter(m => systemMixIds.includes(m.id));
+        // Keep system mixes at their current positions or append? 
+        // Strategy: Keep all non-user mixes (system) and append/merge the new user order.
+        // Actually, simplest is: Take all system mixes from current `items` + new `orderedUserMixes`.
+        const systemMixes = items.filter(m => !isUserPlaylistMix(m));
         return [...systemMixes, ...orderedUserMixes];
     };
 
     if (!isOpen) return null;
 
     // Filter out system mixes - only show user tapes
-    const userMixes = items.filter(m => !systemMixIds.includes(m.id));
+    const userMixes = items.filter(isUserPlaylistMix);
 
     return (
         <AnimatePresence>

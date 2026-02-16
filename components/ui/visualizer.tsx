@@ -182,10 +182,22 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                 }
             }
 
-            animationId = requestAnimationFrame(render);
+            if (isPlaying) {
+                animationId = requestAnimationFrame(render);
+            } else {
+                // Decay one last time then stop
+                if (tick < 100) { // arbitrary decay frames
+                    animationId = requestAnimationFrame(render);
+                }
+            }
         };
 
-        render();
+        if (isPlaying) {
+            render();
+        } else {
+            // Draw once to show resting state
+            render();
+        }
 
         return () => cancelAnimationFrame(animationId);
     }, [isPlaying, mode, accentColor]);
