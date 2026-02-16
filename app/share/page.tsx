@@ -31,7 +31,30 @@ function SharePageContent() {
         }
 
         try {
-            const decoded = JSON.parse(atob(decodeURIComponent(mixData)));
+            const decodeURIComponentSafe = (value: string) => {
+                try {
+                    return decodeURIComponent(value);
+                } catch {
+                    return value;
+                }
+            };
+
+            const parseBase64Utf8Json = (encoded: string) => {
+                const normalized = decodeURIComponentSafe(encoded);
+                const binary = atob(normalized);
+                const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+                const text = new TextDecoder().decode(bytes);
+                return JSON.parse(text);
+            };
+
+            let decoded: SharedMix;
+            try {
+                decoded = parseBase64Utf8Json(mixData);
+            } catch {
+                const legacy = decodeURIComponentSafe(mixData);
+                decoded = JSON.parse(atob(legacy));
+            }
+
             setSharedMix(decoded);
         } catch (err) {
             console.error('Failed to decode mix:', err);

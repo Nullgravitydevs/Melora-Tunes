@@ -627,9 +627,25 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }, []);
     // [PERF FIX #4] Wrap in useCallback
     const togglePin = useCallback((mixId: string) => {
+        const MAX_PINNED_MIXES = 8;
+        const SYSTEM_MIX_IDS = new Set(['discovery-mix', 'search-results', 'quick-play', 'otg-tape', 'queue-mix', 'now-playing-queue']);
+
         setMixes(prev => prev.map(m => {
             if (m.id === mixId) {
+                const isSystemMix = SYSTEM_MIX_IDS.has(m.id);
                 const newPinned = !m.pinned;
+
+                if (!isSystemMix && newPinned) {
+                    const currentPinnedCount = prev.filter(
+                        item => item.pinned && !SYSTEM_MIX_IDS.has(item.id)
+                    ).length;
+
+                    if (currentPinnedCount >= MAX_PINNED_MIXES) {
+                        showToast(`Deck rack full (${MAX_PINNED_MIXES}/${MAX_PINNED_MIXES}). Unpin one tape first.`, 'error');
+                        return m;
+                    }
+                }
+
                 showToast(newPinned ? `Pinned "${m.title}" to Deck` : `Unpinned "${m.title}"`, 'success');
                 return { ...m, pinned: newPinned };
             }
@@ -1439,7 +1455,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (!activeMix || index < 0 || index >= activeMix.songs.length) return;
         updateMix(activeMix.id, { currentSongIndex: index });
         setIsPlaying(true);
-    }, [updateMix]);
+    }, [activeMix, updateMix]);
 
     // Lazarus Loop: Simplified (3 Strikes Rule)
     const retryCount = useRef(0);

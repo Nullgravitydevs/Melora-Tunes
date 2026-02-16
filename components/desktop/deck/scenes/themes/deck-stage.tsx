@@ -545,6 +545,23 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                const sharePayload = {
+                                                                    id: mix.id,
+                                                                    title: mix.title,
+                                                                    songs: mix.songs.map((song: any) => ({
+                                                                        id: song.song?.id || song.id,
+                                                                        name: song.song?.name || song.name,
+                                                                        artists: song.song?.primaryArtists || song.primaryArtists
+                                                                    }))
+                                                                };
+                                                                const bytes = new TextEncoder().encode(JSON.stringify(sharePayload));
+                                                                let binary = "";
+                                                                bytes.forEach((byte) => {
+                                                                    binary += String.fromCharCode(byte);
+                                                                });
+                                                                const encoded = encodeURIComponent(btoa(binary));
+                                                                const shareUrl = `${window.location.origin}/share?mix=${encoded}`;
+
                                                                 const node = document.getElementById(`studio-mix-${mix.id}`);
                                                                 if (node) {
                                                                     import('html-to-image').then(({ toPng }) => {
@@ -559,14 +576,12 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                                                             link.download = `melora-studio-${mix.title.replace(/\s+/g, '-').toLowerCase()}.png`;
                                                                             link.href = dataUrl;
                                                                             link.click();
-                                                                            const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                                             navigator.clipboard.writeText(shareUrl);
                                                                             setToast("Snapshot saved! Link copied 📸");
                                                                             setTimeout(() => setToast(null), 3000);
                                                                         })
                                                                         .catch((err) => {
                                                                             console.error("Snapshot failed", err);
-                                                                            const shareUrl = `${window.location.origin}?mix=${mix.id}`;
                                                                             navigator.clipboard.writeText(shareUrl);
                                                                             setToast("Snapshot failed. Link copied!");
                                                                             setTimeout(() => setToast(null), 3000);

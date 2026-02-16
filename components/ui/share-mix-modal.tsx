@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Share2, Copy, Check, Link2, QrCode } from "lucide-react";
+import { X, Share2, Copy, Check, Link2 } from "lucide-react";
 import { useState } from "react";
 import { Mix } from "@/components/providers/playback-context";
 import { decodeHtml } from "@/lib/utils";
@@ -14,7 +14,15 @@ interface ShareMixModalProps {
 
 export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
     const [copied, setCopied] = useState(false);
-    const [shareType, setShareType] = useState<'link' | 'qr'>('link');
+
+    const encodeToBase64Utf8 = (payload: unknown) => {
+        const bytes = new TextEncoder().encode(JSON.stringify(payload));
+        let binary = "";
+        bytes.forEach((byte) => {
+            binary += String.fromCharCode(byte);
+        });
+        return btoa(binary);
+    };
 
     if (!isOpen || !mix) return null;
 
@@ -29,7 +37,7 @@ export function ShareMixModal({ isOpen, onClose, mix }: ShareMixModalProps) {
         }))
     };
 
-    const encodedData = encodeURIComponent(btoa(JSON.stringify(shareData)));
+    const encodedData = encodeURIComponent(encodeToBase64Utf8(shareData));
     const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/share?mix=${encodedData}`;
 
     const copyToClipboard = async () => {

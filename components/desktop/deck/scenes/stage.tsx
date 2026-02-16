@@ -46,6 +46,22 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
     const searchParams = useSearchParams();
     const router = useRouter();
 
+    const encodeToBase64Utf8 = (payload: unknown) => {
+        const bytes = new TextEncoder().encode(JSON.stringify(payload));
+        let binary = "";
+        bytes.forEach((byte) => {
+            binary += String.fromCharCode(byte);
+        });
+        return btoa(binary);
+    };
+
+    const persistTheme = (theme: ThemeKey) => {
+        localStorage.setItem('melora-theme', theme);
+        if (THEMES[theme]?.layout !== 'glass') {
+            localStorage.setItem('melora-deck-theme', theme);
+        }
+    };
+
     // Orientation Logic
     const [showRotateOverlay, setShowRotateOverlay] = useState(false);
 
@@ -92,13 +108,20 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
         setIsMounted(true);
         if (initialTheme && THEMES[initialTheme as ThemeKey]) {
             setCurrentTheme(initialTheme as ThemeKey);
+            if (THEMES[initialTheme as ThemeKey]?.layout !== 'glass') {
+                localStorage.setItem('melora-deck-theme', initialTheme as ThemeKey);
+            }
             return;
         }
 
         // Auto-load last used deck or default to BOOMBOX
         const savedDeckTheme = localStorage.getItem('melora-deck-theme') as ThemeKey;
+        const savedGlobalTheme = localStorage.getItem('melora-theme') as ThemeKey;
         if (savedDeckTheme && THEMES[savedDeckTheme] && THEMES[savedDeckTheme].layout !== 'glass') {
             setCurrentTheme(savedDeckTheme);
+        } else if (savedGlobalTheme && THEMES[savedGlobalTheme] && THEMES[savedGlobalTheme].layout !== 'glass') {
+            setCurrentTheme(savedGlobalTheme);
+            localStorage.setItem('melora-deck-theme', savedGlobalTheme);
         } else {
             setCurrentTheme('BOOMBOX');
             localStorage.setItem('melora-deck-theme', 'BOOMBOX');
@@ -143,12 +166,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
         const nextIndex = (currentIndex + 1) % keys.length;
         const newTheme = keys[nextIndex];
         setCurrentTheme(newTheme);
-        localStorage.setItem('melora-theme', newTheme);
-
-        // Save deck preference if not glass
-        if (THEMES[newTheme]?.layout !== 'glass') {
-            localStorage.setItem('melora-deck-theme', newTheme);
-        }
+        persistTheme(newTheme);
     };
 
     const activeMix = mixes.find(m => m.id === activeMixId);
@@ -190,10 +208,6 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
 
     const createMix = () => {
         if (!newMixTitle.trim()) return;
-        if (mixes.length >= 10) {
-            addToast("Max limit reached (10 cassettes)", "error");
-            return;
-        }
         playClick();
         // [CLEANUP] No more random colors - Theme handles visual, data uses fixed default
         const newMix: Mix = {
@@ -211,7 +225,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
             setIsSearchOpen(true);
             addToast(`Mix Created Successfully: ${newMixTitle}`);
         } else {
-            addToast("Limit Reached: You have 8 tapes already!", "error");
+            addToast("Failed to create mixtape", "error");
         }
     };
 
@@ -220,23 +234,9 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
         if (targetMixId) {
             const current = mixes.find(m => m.id === targetMixId);
             if (current) {
-                // Strict Asset Deduplication: Check ID + Quality
-                const newId = 'id' in song ? song.id : (song as JioSaavnSong).id;
+                // Allowed duplicates - User requested feature
                 const newQuality = isPlayableTrack(song) ? song.preferredQuality : '320';
-                const newAssetId = `${newId}_${newQuality}`;
 
-                const isDuplicate = current.songs.some((s: any) => {
-                    const id = s.id || (s as any).song?.id;
-                    const quality = isPlayableTrack(s) ? s.preferredQuality : '320';
-                    return `${id}_${quality}` === newAssetId;
-                });
-
-                if (isDuplicate) {
-                    const name = isPlayableTrack(song) ? (song.title || song.song?.name || "Unknown Track") : song.name;
-                    // Show WHICH quality is duplicate
-                    addToast(`"${decodeHtml(name)}" (${newQuality}) is already in this mix`, "error");
-                    return;
-                }
 
                 updateMix(targetMixId, { songs: [...current.songs, song] });
                 playClick();
@@ -259,8 +259,8 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
             songIds: songIds
         };
 
-        const encoded = btoa(JSON.stringify(shareData));
-        const url = `${window.location.origin}?mix=${encoded}`;
+        const encoded = encodeToBase64Utf8(shareData);
+        const url = `${window.location.origin}/share?mix=${encodeURIComponent(encoded)}`;
 
         navigator.clipboard.writeText(url).then(() => {
             addToast("Share link copied to clipboard!");
@@ -414,10 +414,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                     isMobileDevice={isMobileDevice}
                     onSelectTheme={(theme: ThemeKey) => {
                         setCurrentTheme(theme);
-                        localStorage.setItem('melora-theme', theme);
-                        if (THEMES[theme]?.layout !== 'glass') {
-                            localStorage.setItem('melora-deck-theme', theme);
-                        }
+                        persistTheme(theme);
                     }}
                     // onSwitchToMobile removed
                     onOpenSettings={() => setIsSettingsOpen(true)}
@@ -475,10 +472,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                 currentTheme={currentTheme}
                 onSelectTheme={(theme) => {
                     setCurrentTheme(theme);
-                    localStorage.setItem('melora-theme', theme);
-                    if (THEMES[theme]?.layout !== 'glass') {
-                        localStorage.setItem('melora-deck-theme', theme);
-                    }
+                    persistTheme(theme);
                 }}
             />
 
@@ -551,7 +545,7 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
                                             setNewMixTitle("");
                                             addToast(`Created mixtape "${newMix.title}"`);
                                         } else {
-                                            addToast("Limit Reached: You have 8 tapes already!", "error");
+                                            addToast("Failed to create mixtape", "error");
                                         }
                                     }}
                                     disabled={!newMixTitle.trim()}

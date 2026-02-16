@@ -12,8 +12,9 @@ interface TapeRackModalProps {
 }
 
 export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
-    const { mixes, setMixes, activeMixId } = usePlayback();
+    const { mixes, setMixes, activeMixId, togglePin } = usePlayback();
     const [items, setItems] = useState<Mix[]>([]);
+    const systemMixIds = ['discovery-mix', 'search-results', 'quick-play', 'otg-tape'];
 
     // Sync mixes to local items on open, but filter out system/deleted ones if needed
     useEffect(() => {
@@ -30,65 +31,16 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
         setItems(newOrder);
         // Live sync or save on close? Live sync gives instant feedback on the deck behind.
         setMixes(newOrder);
+    };
 
-        // Also ensure "Pinned" status is synced if we are using the "Top 8 = Pinned" logic?
-        // Actually, the previous logic was: `mix.pinned` flag. 
-        // If we move to "Top 8 are pinned", we should update the flag too?
-        // Or just let the Deck render the first 8 Pinned items?
-        // The user said: "drag and set in top 8 pinned". 
-        // This implies the Top 8 of THIS LIST become the pinned ones.
-        // So we should update the `pinned` property based on index.
-
-        const updatedMixes = newOrder.map((m, index) => ({
-            ...m,
-            // If it's in top 8, it's pinned. Otherwise unpinned. (Excluding System Mixes?)
-            // This might aggressively unpin things. 
-            // Let's just update the ORDER for now. The Deck renders `mixes.filter(pinned).slice(0,8)`.
-            // Wait, if the Deck filters by `pinned`, then unpinned items WON'T SHOW HERE?
-            // "others stay in rack".
-            // So this view must show ALL mixes.
-            // And dragging one into Top 8 should SET `pinned = true`.
-            // Dragging out should SET `pinned = false`.
-        }));
-
-        // We need a clearer logic.
-        // Let's just reorder the WHOLE list.
-        // And visually show "On Deck" for indices 0-7 OF THE PINNED SUBSET?
-        // Or just show two lists?
-        // "drag and set in top 8 pinned"
-
-        // Let's do this:
-        // 1. We display ONE list of ALL User Mixes.
-        // 2. We sort them so Pinned are at top.
-        // 3. Current State: `items`.
-        // 4. Update: `setMixes(items)`.
-
-        // Actually for V1, let's keep it simple:
-        // This helper just REORDERS the global list. 
-        // The Deck view renders `mixes` as they are, but restricted by the visual rack implementation.
-        // The User said: "pinned have up so we can pin or else drag and set in top 8".
-        // This implies manual reordering.
-
-        // CRITICAL: We need to update the `pinned` status based on the new order if the user intends "Top 8 = Pinned".
-        // Let's strictly enforce: Top 8 User Mixes = Pinned. Rest = Unpinned.
-
-        const systemMixIds = ['discovery-mix', 'search-results', 'quick-play', 'otg-tape'];
-        const userMixes = newOrder.filter(m => !systemMixIds.includes(m.id));
-        const systemMixes = newOrder.filter(m => systemMixIds.includes(m.id));
-
-        const reindexedUserMixes = userMixes.map((m, i) => ({
-            ...m,
-            pinned: i < 8 // Auto-pin top 8
-        }));
-
-        const finalMixes = [...systemMixes, ...reindexedUserMixes];
-        setMixes(finalMixes);
+    const rebuildWithSystemMixes = (orderedUserMixes: Mix[]) => {
+        const systemMixes = items.filter(m => systemMixIds.includes(m.id));
+        return [...systemMixes, ...orderedUserMixes];
     };
 
     if (!isOpen) return null;
 
     // Filter out system mixes - only show user tapes
-    const systemMixIds = ['discovery-mix', 'search-results', 'quick-play', 'otg-tape'];
     const userMixes = items.filter(m => !systemMixIds.includes(m.id));
 
     return (
@@ -115,15 +67,17 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                                 Tape Rack Manager
                             </h2>
                             <p className="text-zinc-400 text-sm mt-1">
-                                Drag your favorite tapes to the top. <span className="text-white font-bold">The first 8 tapes</span> will appear on your Studio Deck.
+                                Drag to reorder. <span className="text-white font-bold">Pinned tapes</span> will appear on your Studio Deck.
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
                             {/* Quick Sort Buttons */}
                             <button
                                 onClick={() => {
-                                    const sorted = items.filter(m => !['discovery-mix', 'search-results', 'quick-play', 'otg-tape'].includes(m.id)).sort((a, b) => a.title.localeCompare(b.title));
-                                    handleReorder(sorted);
+                                    const sortedUsers = userMixes
+                                        .slice()
+                                        .sort((a, b) => a.title.localeCompare(b.title));
+                                    handleReorder(rebuildWithSystemMixes(sortedUsers));
                                 }}
                                 className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white flex items-center gap-1 text-xs"
                                 title="Sort A-Z"
@@ -132,8 +86,10 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                             </button>
                             <button
                                 onClick={() => {
-                                    const sorted = items.filter(m => !['discovery-mix', 'search-results', 'quick-play', 'otg-tape'].includes(m.id)).sort((a, b) => b.songs.length - a.songs.length);
-                                    handleReorder(sorted);
+                                    const sortedUsers = userMixes
+                                        .slice()
+                                        .sort((a, b) => b.songs.length - a.songs.length);
+                                    handleReorder(rebuildWithSystemMixes(sortedUsers));
                                 }}
                                 className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white flex items-center gap-1 text-xs"
                                 title="Sort by Song Count"
@@ -152,13 +108,9 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                     {/* Scrollable List */}
                     <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                         <Reorder.Group axis="y" values={userMixes} onReorder={(newOrder) => {
-                            // Reconstruct full list with system mixes
-                            const systemMixes = items.filter(m => systemMixIds.includes(m.id));
-                            const fullList = [...systemMixes, ...newOrder];
-                            handleReorder(fullList);
+                            handleReorder(rebuildWithSystemMixes(newOrder));
                         }}>
                             {userMixes.map((mix, index) => {
-                                const isPinnedSlot = index < 8;
                                 const isPlaying = activeMixId === mix.id;
 
                                 return (
@@ -168,20 +120,9 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                                         className="relative mb-3"
                                         whileDrag={{ scale: 1.02, zIndex: 50 }}
                                     >
-                                        {/* Divider for "Rack Limit" */}
-                                        {index === 8 && (
-                                            <div className="flex items-center gap-4 my-6 opacity-50">
-                                                <div className="h-px bg-zinc-700 flex-1"></div>
-                                                <span className="text-xs font-mono uppercase tracking-widest text-zinc-500">
-                                                    Storage Archive (Hidden from Deck)
-                                                </span>
-                                                <div className="h-px bg-zinc-700 flex-1"></div>
-                                            </div>
-                                        )}
-
                                         <div className={clsx(
                                             "flex items-center gap-4 p-3 rounded-lg border transition-colors group cursor-grab active:cursor-grabbing",
-                                            isPinnedSlot
+                                            mix.pinned
                                                 ? "bg-zinc-800/50 border-zinc-700 hover:border-purple-500/50"
                                                 : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 opacity-60 hover:opacity-100"
                                         )}>
@@ -196,7 +137,6 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                                             </div>
 
                                             {/* Tape Prep */}
-                                            {/* Tape Prep - Neutralized to match "Decoupled" Logic */}
                                             <div className="w-12 h-8 rounded border border-zinc-700 bg-zinc-800 shadow-sm flex items-center justify-center relative overflow-hidden group-hover:border-zinc-500 transition-colors">
                                                 <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
                                                 <div className="w-full h-1 bg-black/40 absolute top-2 flex items-center justify-center gap-1">
@@ -214,14 +154,23 @@ export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
                                             </div>
 
                                             {/* Pin Indicator */}
-                                            <div className="pr-4">
-                                                <Pin
-                                                    size={18}
-                                                    className={clsx(
-                                                        "transition-transform",
-                                                        isPinnedSlot ? "text-purple-400 fill-purple-400/20" : "text-zinc-700 scale-90"
-                                                    )}
-                                                />
+                                            <div className="pr-4 z-10" onPointerDown={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        togglePin(mix.id);
+                                                    }}
+                                                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                                                    title={mix.pinned ? "Unpin from Deck" : "Pin to Deck"}
+                                                >
+                                                    <Pin
+                                                        size={18}
+                                                        className={clsx(
+                                                            "transition-transform active:scale-95",
+                                                            mix.pinned ? "text-purple-400 fill-purple-400/20" : "text-zinc-700 hover:text-zinc-400"
+                                                        )}
+                                                    />
+                                                </button>
                                             </div>
                                         </div>
                                     </Reorder.Item>
