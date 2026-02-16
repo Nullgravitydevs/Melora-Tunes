@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Play, Pause, SkipBack, SkipForward, Repeat, Shuffle,
@@ -13,7 +13,8 @@ import { useLyrics } from "@/hooks/useLyrics";
 import { decodeHtml } from "@/lib/utils";
 import { getArt } from "@/lib/helpers";
 import { Tooltip } from "@/components/ui/tooltip";
-import { AudioQuality } from "@/lib/types";
+import { PlayableTrack } from "@/lib/types";
+import { JioSaavnSong } from "@/lib/jiosaavn";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
 
 interface FullPlayerProps {
@@ -21,7 +22,7 @@ interface FullPlayerProps {
     onClose: () => void;
     onGoToArtist?: (artistId: string) => void;
     onGoToAlbum?: (albumId: string) => void;
-    onAddToPlaylist?: (song: any) => void;
+    onAddToPlaylist?: (song: JioSaavnSong | PlayableTrack) => void;
 }
 
 export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddToPlaylist }: FullPlayerProps) {
@@ -38,31 +39,28 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
     const [viewMode, setViewMode] = useState<'art' | 'queue'>('art');
 
     /* ── Context Menu State ── */
-    const [menuProps, setMenuProps] = useState<{ visible: boolean; x: number; y: number; song: any | null }>({
+    const [menuProps, setMenuProps] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null }>({
         visible: false, x: 0, y: 0, song: null
     });
 
     const handleMenu = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        setMenuProps({ visible: true, x: e.clientX, y: e.clientY, song: currentSong });
+        setMenuProps({ visible: true, x: e.clientX, y: e.clientY, song: currentSong || null });
     };
 
     /* ── Synced Lyrics ── */
     const { lyrics, plainLyrics, isSynced, isLoading: lyricsLoading } = useLyrics(currentSong);
     const lyricsRef = useRef<HTMLDivElement>(null);
-    const [activeLineIdx, setActiveLineIdx] = useState(-1);
     const currentTime = progress * duration;
 
-    // Find active lyric line
-    useEffect(() => {
-        if (!isSynced || lyrics.length === 0) return;
-        const idx = lyrics.findIndex((line, i) => {
+    const activeLineIdx = useMemo(() => {
+        if (!isSynced || lyrics.length === 0) return -1;
+        return lyrics.findIndex((line, i) => {
             const nextLine = lyrics[i + 1];
             return currentTime >= line.time && (!nextLine || currentTime < nextLine.time);
         });
-        if (idx !== -1 && idx !== activeLineIdx) setActiveLineIdx(idx);
-    }, [currentTime, lyrics, isSynced, activeLineIdx]);
+    }, [currentTime, lyrics, isSynced]);
 
     // Auto-scroll lyrics
     useEffect(() => {
@@ -457,8 +455,8 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                     <TrackContextMenu
                         {...menuProps}
                         onClose={() => setMenuProps({ ...menuProps, visible: false })}
-                        onPlay={(s: any) => { /* already playing */ }}
-                        onAddToQueue={(s: any) => { addToQueue(s); }}
+                        onPlay={() => { /* already playing */ }}
+                        onAddToQueue={(song) => { addToQueue(song); }}
                         onGoToArtist={(id) => onGoToArtist?.(id)}
                         onGoToAlbum={(id) => onGoToAlbum?.(id)}
                         onStartRadio={() => { }}

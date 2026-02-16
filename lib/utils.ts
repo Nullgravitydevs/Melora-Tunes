@@ -6,15 +6,29 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function decodeHtml(html: string) {
-    if (!html) return "";
-    return html
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&#039;/g, "'")
-        .replace(/&apos;/g, "'");
+    if (typeof document === "undefined") return html;
+    const txt = document.createElement("textarea");
+    txt.innerHTML = html;
+    return txt.value;
 }
+
+export const loadScript = (src: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        if (typeof document === 'undefined') {
+            resolve();
+            return;
+        }
+        if (document.querySelector(`script[src="${src}"]`)) {
+            resolve();
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => resolve();
+        script.onerror = (err) => reject(err);
+        document.body.appendChild(script);
+    });
+};
 
 export function parseLrc(lrc: string) {
     const lines = lrc.split('\n');

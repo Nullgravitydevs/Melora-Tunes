@@ -1,12 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server, User } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server, User, Cloud } from "lucide-react";
+import { useState, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { SyncSettingsModal } from "@/components/desktop/deck/modals/SyncSettingsModal";
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -26,19 +27,18 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     // Local State for Performance (Detached from Context)
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
-    const [languages, setLanguages] = useState<string[]>([]);
+    const [showSyncModal, setShowSyncModal] = useState(false);
+    const [initialSettings] = useState(() => loadSettings());
+    const [languages, setLanguages] = useState<string[]>(initialSettings.languages || ['english', 'hindi']);
 
     // Profile State
-    const [profileName, setProfileName] = useState("");
-    const [profileDOB, setProfileDOB] = useState("");
+    const [profileName, setProfileName] = useState(initialSettings.userName || "");
+    const [profileDOB, setProfileDOB] = useState(initialSettings.userDOB || "");
 
-    // Load settings once on mount
-    useEffect(() => {
-        const s = loadSettings();
-        setLanguages(s.languages || ['english', 'hindi']);
-        if (s.userName) setProfileName(s.userName);
-        if (s.userDOB) setProfileDOB(s.userDOB);
-    }, []);
+    const handleClose = useCallback(() => {
+        setShowSyncModal(false);
+        onClose();
+    }, [onClose]);
 
     const updateLanguages = (newLangs: string[]) => {
         setLanguages(newLangs);
@@ -69,7 +69,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6"
-                onClick={onClose}
+                onClick={handleClose}
             >
                 <motion.div
                     initial={{ scale: 0.95, opacity: 0 }}
@@ -115,7 +115,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                     {/* Content */}
                     <div className="flex-1 bg-black/20 p-8 overflow-y-auto relative">
                         <button
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors"
                         >
                             <X size={20} />
@@ -190,10 +190,10 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                     </header>
 
                                     <div className="grid gap-4">
-                                        {[
+                                        {([
                                             { id: 'deck', title: 'Deck Studio', desc: 'Analog cassette physics.', icon: Radio },
                                             { id: 'discovery', title: 'Discovery Glass', desc: 'Modern digital library.', icon: Disc },
-                                        ].map((mode) => (
+                                        ] as const).map((mode) => (
                                             <button
                                                 key={mode.id}
                                                 onClick={() => {
@@ -201,7 +201,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                         // page.tsx expects 'CLASSIC' uppercased
                                                         window.dispatchEvent(new CustomEvent('melora-mode-change', { detail: mode.id.toUpperCase() }));
                                                     }
-                                                    onSwitchLayout?.(mode.id as any);
+                                                    onSwitchLayout?.(mode.id);
                                                 }}
                                                 className={`flex items-center gap-5 p-5 rounded-2xl border transition-all text-left group ${currentLayout === mode.id
                                                     ? 'bg-white/10 border-white/20 ring-1 ring-white/10'
@@ -275,17 +275,19 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                             <Volume2 size={18} /> Streaming Quality
                                         </h3>
                                         <div className="grid grid-cols-2 gap-3">
-                                            {[
+                                            {([
                                                 { id: 'auto', label: 'Auto', sub: 'Adaptive' },
                                                 { id: 'hires', label: 'Hi-Res', sub: '24-bit / 96kHz' },
                                                 { id: 'flac', label: 'Lossless', sub: '16-bit / 44.1kHz' },
                                                 { id: '320', label: 'High', sub: '320 kbps' },
                                                 { id: '160', label: 'Standard', sub: '160 kbps' },
                                                 { id: '96', label: 'Saver', sub: '96 kbps' },
-                                            ].map((q) => (
+                                            ] as const).map((q) => (
                                                 <button
                                                     key={q.id}
-                                                    onClick={() => setQualityPreference(q.id as any)}
+                                                    onClick={() => {
+                                                        if (q.id !== 'auto') setQualityPreference(q.id);
+                                                    }}
                                                     className={`p-4 rounded-xl border text-left transition-all ${qualityPreference === q.id
                                                         ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20'
                                                         : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:bg-zinc-800'
@@ -369,7 +371,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                 <div>
                                                     <div className="text-indigo-400 font-bold mb-1">Timer Active</div>
                                                     <div className="text-sm text-white/60">
-                                                        Stops in {Math.ceil((sleepTimer.endTime - Date.now()) / 60000)} minutes
+                                                        Stops in {Math.ceil(sleepTimer.duration / 60000)} minutes
                                                     </div>
                                                 </div>
                                                 <button
@@ -459,6 +461,21 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                     }}
                                                 />
                                             </label>
+                                        </div>
+
+                                        <div className="p-6 bg-zinc-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-white font-bold flex items-center gap-2">
+                                                    <Cloud size={16} /> Cloud Sync
+                                                </div>
+                                                <div className="text-zinc-500 text-sm">Back up and restore library via Google Drive.</div>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowSyncModal(true)}
+                                                className="px-4 py-2 bg-zinc-800 text-white rounded-lg font-bold text-sm hover:bg-zinc-700"
+                                            >
+                                                Open
+                                            </button>
                                         </div>
 
                                         <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10">
@@ -563,6 +580,11 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                         </div>
                     </div>
                 </motion.div>
+
+                <SyncSettingsModal
+                    isOpen={showSyncModal}
+                    onClose={() => setShowSyncModal(false)}
+                />
             </motion.div>
         </AnimatePresence>
     );

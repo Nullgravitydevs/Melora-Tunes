@@ -210,8 +210,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                                         transition={{ delay: i * 0.02 }}
                                         onClick={() => handlePlay(item, i)}
                                         draggable={true}
-                                        // @ts-expect-error
-                                        onDragStart={(e: React.DragEvent) => {
+                                        onDragStart={(e: any) => {
                                             e.dataTransfer.setData('application/json', JSON.stringify(item));
                                             e.dataTransfer.effectAllowed = 'copy';
                                         }}

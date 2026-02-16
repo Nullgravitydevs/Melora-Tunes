@@ -13,7 +13,7 @@ import { usePlayback, Mix } from "@/components/providers/playback-context";
    ========================================================================== */
 
 interface HomeViewProps {
-    onNavigate: (view: { id: string; data?: any }) => void;
+    onNavigate: (view: { id: string; data?: unknown }) => void;
     onPlaySong: (song: JioSaavnSong) => void;
     currentSongId?: string;
     isPlaying: boolean;
@@ -155,7 +155,7 @@ function HScroll({ children }: { children: React.ReactNode }) {
 
 // ─── SONG CARD — Hoverable square ─────────────────────────────────────────
 function SongCard({ item, onClick, rank, isCurrent, isPlaying, onContextMenu }: {
-    item: any; onClick: () => void; rank?: number; isCurrent?: boolean; isPlaying?: boolean; onContextMenu?: (e: React.MouseEvent) => void;
+    item: JioSaavnSong; onClick: () => void; rank?: number; isCurrent?: boolean; isPlaying?: boolean; onContextMenu?: (e: React.MouseEvent) => void;
 }) {
     const art = getArt(item);
     return (
@@ -188,15 +188,15 @@ function SongCard({ item, onClick, rank, isCurrent, isPlaying, onContextMenu }: 
                 )}
             </div>
             <h4 className={`font-semibold text-[13px] truncate leading-tight ${isCurrent ? 'text-white' : 'text-white/80'}`}>
-                {decodeHtml(item.name || item.title)}
+                {decodeHtml(item.name)}
             </h4>
-            <p className="text-[11px] text-white/25 truncate mt-0.5">{decodeHtml(item.primaryArtists || item.subtitle || '')}</p>
+            <p className="text-[11px] text-white/25 truncate mt-0.5">{decodeHtml(item.primaryArtists || '')}</p>
         </div>
     );
 }
 
 // ─── WIDE CARD (Charts + Playlists) ───────────────────────────────────────
-function WideCard({ item, onClick, label }: { item: any; onClick: () => void; label?: string }) {
+function WideCard({ item, onClick, label }: { item: JioSaavnSong; onClick: () => void; label?: string }) {
     const art = getArt(item);
     return (
         <div onClick={onClick} className="group relative shrink-0 w-[280px] h-[160px] rounded-2xl overflow-hidden cursor-pointer bg-white/[0.02] ring-1 ring-white/[0.05] hover:ring-white/[0.12] transition-all duration-300">
@@ -213,8 +213,8 @@ function WideCard({ item, onClick, label }: { item: any; onClick: () => void; la
                         {label}
                     </span>
                 )}
-                <h3 className="text-base font-bold text-white leading-snug line-clamp-2">{decodeHtml(item.title || item.name)}</h3>
-                {item.subtitle && <p className="text-[11px] text-white/25 line-clamp-1 mt-1">{decodeHtml(item.subtitle)}</p>}
+                <h3 className="text-base font-bold text-white leading-snug line-clamp-2">{decodeHtml(item.name)}</h3>
+                {item.primaryArtists && <p className="text-[11px] text-white/25 line-clamp-1 mt-1">{decodeHtml(item.primaryArtists)}</p>}
             </div>
             <div className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/[0.06] backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 border border-white/[0.06]">
                 <Play fill="currentColor" size={14} className="text-white ml-0.5" />
@@ -224,7 +224,7 @@ function WideCard({ item, onClick, label }: { item: any; onClick: () => void; la
 }
 
 // ─── QUICK PICK ROW ───────────────────────────────────────────────────────
-function QuickPick({ item, onClick, isCurrent, isPlaying, onContextMenu }: { item: any; onClick: () => void; isCurrent?: boolean; isPlaying?: boolean; onContextMenu?: (e: React.MouseEvent) => void }) {
+function QuickPick({ item, onClick, isCurrent, isPlaying, onContextMenu }: { item: JioSaavnSong; onClick: () => void; isCurrent?: boolean; isPlaying?: boolean; onContextMenu?: (e: React.MouseEvent) => void }) {
     const art = getArt(item, '150x150');
     return (
         <div
@@ -243,9 +243,9 @@ function QuickPick({ item, onClick, isCurrent, isPlaying, onContextMenu }: { ite
             </div>
             <div className="flex-1 min-w-0">
                 <h4 className={`font-semibold text-[13px] truncate ${isCurrent ? 'text-white' : 'text-white/80'}`}>
-                    {decodeHtml(item.name || item.title)}
+                    {decodeHtml(item.name)}
                 </h4>
-                <p className="text-[11px] text-white/25 truncate">{decodeHtml(item.primaryArtists || item.subtitle || '')}</p>
+                <p className="text-[11px] text-white/25 truncate">{decodeHtml(item.primaryArtists || '')}</p>
             </div>
             {isCurrent && isPlaying && (
                 <div className="flex gap-[2px] items-end h-3.5 mr-1">

@@ -51,8 +51,8 @@ export function OpenDeckStage({
     const playerRef = useRef<HTMLDivElement>(null);
     const ghostRef = useRef<HTMLDivElement>(null);
 
-    // Drag State (Refs for High Perf)
-    const dragPositionRef = useRef<{ x: number, y: number } | null>(null);
+    // Drag State
+    const [dragPosition, setDragPosition] = useState<{ x: number, y: number } | null>(null);
     const [draggingMix, setDraggingMix] = useState<{ mix: Mix, index: number } | null>(null);
     const [isOverPlayer, setIsOverPlayer] = useState(false);
 
@@ -93,7 +93,7 @@ export function OpenDeckStage({
 
     const handleDragStart = useCallback((mix: Mix, index: number, e: React.PointerEvent) => {
         setDraggingMix({ mix, index });
-        dragPositionRef.current = { x: e.clientX, y: e.clientY };
+        setDragPosition({ x: e.clientX, y: e.clientY });
 
         // Capture pointer to ensure we receive move events even if cursor leaves
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -106,6 +106,8 @@ export function OpenDeckStage({
 
     const handleDragMove = useCallback((e: React.PointerEvent) => {
         if (!draggingMix) return;
+
+        setDragPosition({ x: e.clientX, y: e.clientY });
 
         // Update Ghost Position directly via DOM
         if (ghostRef.current) {
@@ -132,7 +134,7 @@ export function OpenDeckStage({
         }
 
         setDraggingMix(null);
-        dragPositionRef.current = null;
+        setDragPosition(null);
         setIsOverPlayer(false);
     }, [draggingMix, isOverPlayer, playInsert, loadMix]);
 
@@ -359,8 +361,8 @@ export function OpenDeckStage({
                     ref={ghostRef}
                     className="fixed pointer-events-none top-0 left-0 z-[99999]"
                     style={{
-                        transform: dragPositionRef.current
-                            ? `translate(${dragPositionRef.current.x - 72}px, ${dragPositionRef.current.y - 48}px) rotate(5deg) scale(1.1)`
+                        transform: dragPosition
+                            ? `translate(${dragPosition.x - 72}px, ${dragPosition.y - 48}px) rotate(5deg) scale(1.1)`
                             : 'none'
                     }}
                 >

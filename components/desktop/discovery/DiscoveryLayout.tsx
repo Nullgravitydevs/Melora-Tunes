@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus } from "lucide-react";
+import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus, LayoutGrid, Menu, User, LogOut, Minimize2, ArrowLeft, ArrowRight, X, Cloud } from "lucide-react";
 import { AudioQuality } from "@/lib/types";
 import { getArt } from "@/lib/helpers";
 import { usePlayback, Mix } from "@/components/providers/playback-context";
@@ -25,6 +25,7 @@ import { PlaylistItem } from "@/components/shared/PlaylistItem";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AddToPlaylistModal } from "./modals/AddToPlaylistModal";
 import { isUserPlaylistId, isUserPlaylistMix } from "@/lib/mix-id-utils";
+import { PlayableTrack } from "@/lib/types";
 
 
 /* ============================================================================
@@ -233,7 +234,8 @@ export function DiscoveryLayout() {
         mixes, currentSong, isPlaying, likedSongs, recentlyPlayed,
         loadMix, playInstantMix,
         downloadSong, removeDownload, isDownloaded,
-        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix, togglePin, addToQueue
+        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix, togglePin, addToQueue,
+        isLiked, toggleLike
     } = usePlayback();
 
     // Context Menu State
@@ -245,7 +247,7 @@ export function DiscoveryLayout() {
     });
 
     // Add to Playlist Modal State
-    const [addToPlaylistSong, setAddToPlaylistSong] = useState<JioSaavnSong | null>(null);
+    const [addToPlaylistSong, setAddToPlaylistSong] = useState<JioSaavnSong | PlayableTrack | null>(null);
     const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState("New Playlist");
 
@@ -499,18 +501,18 @@ export function DiscoveryLayout() {
                         <div className="pb-2">
                             {mixes.filter(isUserPlaylistMix).length > 0 ? (
                                 mixes.filter(isUserPlaylistMix).map((m, i) => (
-                                        <PlaylistItem
-                                            key={m.id}
-                                            mix={m}
-                                            index={i}
-                                            onClick={() => { handleNavigate({ id: 'library', data: { tab: 'playlists', playlistId: m.id } }); loadMix(m.id); }}
-                                            onContextMenu={handlePlaylistContextMenu}
-                                            onDropSong={(song) => {
-                                                addSongToMix(m.id, song);
-                                                showToast(`Added to ${m.title}`, 'success');
-                                            }}
-                                        />
-                                    ))
+                                    <PlaylistItem
+                                        key={m.id}
+                                        mix={m}
+                                        index={i}
+                                        onClick={() => { handleNavigate({ id: 'library', data: { tab: 'playlists', playlistId: m.id } }); loadMix(m.id); }}
+                                        onContextMenu={handlePlaylistContextMenu}
+                                        onDropSong={(song) => {
+                                            addSongToMix(m.id, song);
+                                            showToast(`Added to ${m.title}`, 'success');
+                                        }}
+                                    />
+                                ))
                             ) : <EmptyState />}
                         </div>
                     </div>
@@ -626,7 +628,7 @@ export function DiscoveryLayout() {
             </div>
 
             {/* PLAYER */}
-            <PlayerBar onExpand={() => setShowFullPlayer(true)} />
+            <PlayerBar onExpand={() => setShowFullPlayer(true)} onAddToPlaylist={(s) => setAddToPlaylistSong(s)} />
 
             {/* Global Context Menu */}
             {/* Playlist Context Menu */}
@@ -739,7 +741,9 @@ function EmptyState() {
 
 /* === PLAYER === */
 
-function PlayerBar({ onExpand }: { onExpand: () => void }) {
+/* === PLAYER === */
+
+function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddToPlaylist: (song: any) => void }) {
     const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, downloadSong, isDownloaded, addToQueue, showToast } = usePlayback();
 
     const [showBarMenu, setShowBarMenu] = useState(false);
@@ -761,7 +765,9 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
 
     /* Keyboard Shortcuts */
     const progressRef = useRef(progress);
-    progressRef.current = progress;
+    useEffect(() => {
+        progressRef.current = progress;
+    }, [progress]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -924,7 +930,7 @@ function PlayerBar({ onExpand }: { onExpand: () => void }) {
                                     {!showBarQuality ? (
                                         <>
                                             <button onClick={() => { if (currentSong) { addToQueue(currentSong); showToast('Added to queue', 'success'); } setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Plus size={14} /> Add to Queue</button>
-                                            <button onClick={() => { setShowBarMenu(false); showToast('Use right-click on a song', 'info'); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><ListPlus size={14} /> Add to Playlist</button>
+                                            <button onClick={() => { if (currentSong) onAddToPlaylist(currentSong); setShowBarMenu(false); }} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><ListPlus size={14} /> Add to Playlist</button>
                                             <div className="border-t border-white/[0.06] my-1" />
                                             <button onClick={() => setShowBarQuality(true)} className="w-full px-4 py-2.5 text-left text-[13px] text-white/70 hover:bg-white/[0.06] flex items-center gap-3"><Disc3 size={14} /> Quality: {qLabelFull(qualityPreference)}</button>
                                         </>

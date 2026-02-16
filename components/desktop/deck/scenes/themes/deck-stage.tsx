@@ -427,8 +427,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                             "grid gap-4 pb-12",
                             isCompact ? "grid-cols-3 sm:grid-cols-4" : "grid-cols-2 md:grid-cols-3"
                         )}>
-                            {[...mixes]
-                                .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
+                            {mixes
                                 .filter(m => m.pinned && !['search-results', 'quick-play', 'otg-tape', 'discovery-mix'].includes(m.id))
                                 .slice(0, 8) // Visual Guardrail: Only show top 8 tapes in the rack
                                 .map((mix, i) => {
