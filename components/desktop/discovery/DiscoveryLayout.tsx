@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus, LayoutGrid, Menu, User, LogOut, Minimize2, ArrowLeft, ArrowRight, X, Cloud } from "lucide-react";
+import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus, LayoutGrid, Menu, User, LogOut, Minimize2, ArrowLeft, ArrowRight, X } from "lucide-react";
 import { AudioQuality } from "@/lib/types";
 import { getArt } from "@/lib/helpers";
 import { usePlayback, Mix } from "@/components/providers/playback-context";

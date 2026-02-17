@@ -276,7 +276,6 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         </h3>
                                         <div className="grid grid-cols-2 gap-3">
                                             {([
-                                                { id: 'auto', label: 'Auto', sub: 'Adaptive' },
                                                 { id: 'hires', label: 'Hi-Res', sub: '24-bit / 96kHz' },
                                                 { id: 'flac', label: 'Lossless', sub: '16-bit / 44.1kHz' },
                                                 { id: '320', label: 'High', sub: '320 kbps' },
@@ -285,9 +284,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                             ] as const).map((q) => (
                                                 <button
                                                     key={q.id}
-                                                    onClick={() => {
-                                                        if (q.id !== 'auto') setQualityPreference(q.id);
-                                                    }}
+                                                    onClick={() => setQualityPreference(q.id)}
                                                     className={`p-4 rounded-xl border text-left transition-all ${qualityPreference === q.id
                                                         ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20'
                                                         : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:bg-zinc-800'
