@@ -21,7 +21,8 @@ type SettingsTab = 'profile' | 'experience' | 'audio' | 'library' | 'stats' | 's
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const {
         qualityPreference, setQualityPreference,
-        mixes, setMixes, eq, sleepTimer, setSleepTimer
+        mixes, setMixes, eq, sleepTimer, setSleepTimer,
+        likedSongs, recentlyPlayed, savedAlbums, savedArtists
     } = usePlayback();
 
     // Local State for Performance (Detached from Context)
@@ -508,10 +509,14 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         <p className="text-zinc-500">Your listening DNA.</p>
                                     </header>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                         {[
                                             { label: 'Total Mixes', value: mixes.length },
                                             { label: 'Total Songs', value: mixes.reduce((acc, m) => acc + m.songs.length, 0) },
+                                            { label: 'Liked Songs', value: likedSongs.length },
+                                            { label: 'Recently Played', value: recentlyPlayed.length },
+                                            { label: 'Saved Albums', value: savedAlbums.length },
+                                            { label: 'Followed Artists', value: savedArtists.length },
                                         ].map(s => (
                                             <div key={s.label} className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5">
                                                 <div className="text-4xl font-extrabold text-white mb-1">{s.value}</div>
@@ -519,8 +524,13 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="p-10 text-center border border-dashed border-zinc-800 rounded-2xl text-zinc-600">
-                                        More insights coming soon.
+
+                                    <div className="p-6 bg-zinc-900/30 border border-white/5 rounded-2xl">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">Quick Insight</div>
+                                        <p className="text-sm text-zinc-300 leading-relaxed">
+                                            You have {mixes.length} mixes with {mixes.reduce((acc, m) => acc + m.songs.length, 0)} total songs.
+                                            {likedSongs.length > 0 ? ` ${likedSongs.length} songs are liked.` : ' Start liking tracks to train your taste profile.'}
+                                        </p>
                                     </div>
                                 </div>
                             )}

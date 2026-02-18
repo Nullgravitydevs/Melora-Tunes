@@ -15,7 +15,6 @@ import { OfflineStore } from "@/lib/offline-store";
 import { HistoryStore } from "@/lib/history-store";
 import { SignalStore } from "@/lib/signal-store";
 import { DiscoveryEngine } from '@/lib/discovery-engine';
-import { GoogleDriveService } from "@/lib/gdrive";
 
 // --- Audio Quality Abstraction ---
 import { AudioQuality, PlayableSource, PlayableTrack, isPlayableTrack } from "@/lib/types";
@@ -413,40 +412,6 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             }
         }
     }, [savedArtists, isLoaded, showToast]);
-
-    // Auto-Sync Logic
-    useEffect(() => {
-        const syncData = async () => {
-            // Check if connected (lite check via localStorage meta)
-            const storedSync = localStorage.getItem('melora-sync-meta');
-            if (storedSync) {
-                // We are "connected". 
-                // Throttle: Only sync if changes are significant or timed (Debounced by 10s here)
-                // In a real app, we might check lastSynced time to avoid spamming.
-                // For now, simple debounce on data change.
-                try {
-                    const backup = {
-                        mixes,
-                        likedSongs,
-                        history: recentlyPlayed,
-                        settings: loadSettings(),
-                        timestamp: Date.now(),
-                        deviceId: 'web-client-auto'
-                    };
-                    // Silent background upload
-                    // Note: This might prompt for token if expired, so we should be careful.
-                    // Ideally GoogleDriveService handles silent token refresh.
-                    await GoogleDriveService.uploadBackup(backup);
-                    console.log("[Auto-Sync] Data synced to Drive");
-                } catch (e) {
-                    console.error("[Auto-Sync] Failed", e);
-                }
-            }
-        };
-
-        const timer = setTimeout(syncData, 10000); // 10s debounce
-        return () => clearTimeout(timer);
-    }, [mixes, likedSongs, recentlyPlayed]); // Dependencies
 
     // Toggle like function
     // Toggle like function
