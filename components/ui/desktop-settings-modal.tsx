@@ -33,6 +33,8 @@ type PendingImport = {
     payload: ImportBackupPayload;
 };
 
+type RestoreMode = 'mixes-only' | 'full';
+
 type ParseImportResult = {
     pending: PendingImport | null;
     error: string | null;
@@ -172,6 +174,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
     const [importError, setImportError] = useState<string | null>(null);
+    const [restoreMode, setRestoreMode] = useState<RestoreMode>('mixes-only');
     const [initialSettings] = useState(() => loadSettings());
     const [languages, setLanguages] = useState<string[]>(initialSettings.languages || ['english', 'hindi']);
 
@@ -222,17 +225,22 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
         const { payload, source } = pendingImport;
 
         localStorage.setItem('melora-mixes', JSON.stringify(payload.mixes));
-        localStorage.setItem('melora-liked-songs', JSON.stringify(payload.likedSongs));
-        localStorage.setItem('melora-recently-played', JSON.stringify(payload.recentlyPlayed));
-        localStorage.setItem('melora-saved-albums', JSON.stringify(payload.savedAlbums));
-        localStorage.setItem('melora-saved-artists', JSON.stringify(payload.savedArtists));
-        saveSettings(payload.settings);
+
+        if (restoreMode === 'full') {
+            localStorage.setItem('melora-liked-songs', JSON.stringify(payload.likedSongs));
+            localStorage.setItem('melora-recently-played', JSON.stringify(payload.recentlyPlayed));
+            localStorage.setItem('melora-saved-albums', JSON.stringify(payload.savedAlbums));
+            localStorage.setItem('melora-saved-artists', JSON.stringify(payload.savedArtists));
+            saveSettings(payload.settings);
+        }
 
         window.dispatchEvent(new CustomEvent('melora-library-updated'));
-        showToast(source === 'legacy' ? "Legacy backup restored. Reloading..." : "Backup restored. Reloading...", "success");
+        const restoreLabel = restoreMode === 'full' ? 'Full restore' : 'Mixes-only restore';
+        showToast(source === 'legacy' ? `${restoreLabel} complete (legacy backup). Reloading...` : `${restoreLabel} complete. Reloading...`, "success");
 
         setPendingImport(null);
         setImportError(null);
+        setRestoreMode('mixes-only');
         setTimeout(() => window.location.reload(), 800);
     };
 
@@ -251,11 +259,13 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
 
             setImportError(null);
             setPendingImport(result.pending);
+            setRestoreMode(result.pending.source === 'legacy' ? 'mixes-only' : 'full');
             showToast("Backup loaded. Confirm restore.", "info");
         } catch (error) {
             console.error(error);
             setPendingImport(null);
             setImportError("Invalid JSON file");
+            setRestoreMode('mixes-only');
             showToast("Invalid JSON file", "error");
         }
     };
@@ -663,8 +673,8 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                 <div className="text-amber-300 font-bold">Confirm Restore</div>
                                                 <div className="text-sm text-amber-100/80">
                                                     {pendingImport.source === 'legacy'
-                                                        ? 'Legacy backup detected. Only mixes are included; other library data will be reset to empty.'
-                                                        : 'This backup will overwrite current local library data.'}
+                                                        ? 'Legacy backup detected. Full restore is unavailable because it only contains mixes.'
+                                                        : 'Choose whether to restore only mixes or the full library + settings.'}
                                                 </div>
                                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-amber-100/80">
                                                     <div>Mixes: {pendingImport.payload.mixes.length}</div>
@@ -673,11 +683,35 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                     <div>Albums: {pendingImport.payload.savedAlbums.length}</div>
                                                     <div>Artists: {pendingImport.payload.savedArtists.length}</div>
                                                 </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={() => setRestoreMode('mixes-only')}
+                                                        className={`p-3 rounded-lg border text-left text-sm transition-colors ${restoreMode === 'mixes-only'
+                                                            ? 'bg-amber-500 text-black border-amber-400'
+                                                            : 'bg-zinc-900/50 text-amber-100 border-amber-500/20 hover:border-amber-400/50'
+                                                            }`}
+                                                    >
+                                                        <div className="font-bold">Restore mixes only</div>
+                                                        <div className="text-xs opacity-80">Safest option; keeps likes/history/library/settings unchanged.</div>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setRestoreMode('full')}
+                                                        disabled={pendingImport.source === 'legacy'}
+                                                        className={`p-3 rounded-lg border text-left text-sm transition-colors ${restoreMode === 'full'
+                                                            ? 'bg-amber-500 text-black border-amber-400'
+                                                            : 'bg-zinc-900/50 text-amber-100 border-amber-500/20 hover:border-amber-400/50'
+                                                            } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                                    >
+                                                        <div className="font-bold">Restore full library + settings</div>
+                                                        <div className="text-xs opacity-80">Overwrites likes, history, albums, artists, and settings.</div>
+                                                    </button>
+                                                </div>
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => {
                                                             setPendingImport(null);
                                                             setImportError(null);
+                                                            setRestoreMode('mixes-only');
                                                         }}
                                                         className="flex-1 py-2 bg-zinc-800 text-white rounded-lg font-bold text-sm hover:bg-zinc-700"
                                                     >
