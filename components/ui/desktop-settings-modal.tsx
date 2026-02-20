@@ -1,13 +1,12 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Music, Database, Info, Layout, Smartphone, Disc, Radio, Monitor, Zap, Volume2, Moon, Sparkles, Heart, Coffee, Github, MessageCircle, Server, User, Cloud } from "lucide-react";
+import { X, Check, Database, Info, Layout, Disc, Radio, Monitor, Zap, Volume2, Moon, Heart, Coffee, Github, MessageCircle, Server, User } from "lucide-react";
 import { useState, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
 import { loadSettings, saveSettings } from "@/lib/settings";
-import { SyncSettingsModal } from "@/components/desktop/deck/modals/SyncSettingsModal";
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -28,7 +27,6 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     // Local State for Performance (Detached from Context)
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
-    const [showSyncModal, setShowSyncModal] = useState(false);
     const [initialSettings] = useState(() => loadSettings());
     const [languages, setLanguages] = useState<string[]>(initialSettings.languages || ['english', 'hindi']);
 
@@ -37,7 +35,6 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     const [profileDOB, setProfileDOB] = useState(initialSettings.userDOB || "");
 
     const handleClose = useCallback(() => {
-        setShowSyncModal(false);
         onClose();
     }, [onClose]);
 
@@ -461,21 +458,6 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                             </label>
                                         </div>
 
-                                        <div className="p-6 bg-zinc-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
-                                            <div>
-                                                <div className="text-white font-bold flex items-center gap-2">
-                                                    <Cloud size={16} /> Cloud Sync
-                                                </div>
-                                                <div className="text-zinc-500 text-sm">Back up and restore library via Google Drive.</div>
-                                            </div>
-                                            <button
-                                                onClick={() => setShowSyncModal(true)}
-                                                className="px-4 py-2 bg-zinc-800 text-white rounded-lg font-bold text-sm hover:bg-zinc-700"
-                                            >
-                                                Open
-                                            </button>
-                                        </div>
-
                                         <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10">
                                             <div className="text-red-500 font-bold mb-4">Danger Zone</div>
                                             {!showResetConfirm ? (
@@ -587,11 +569,6 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                         </div>
                     </div>
                 </motion.div>
-
-                <SyncSettingsModal
-                    isOpen={showSyncModal}
-                    onClose={() => setShowSyncModal(false)}
-                />
             </motion.div>
         </AnimatePresence>
     );

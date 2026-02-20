@@ -21,8 +21,6 @@ const eslintConfig = defineConfig([
       "components/desktop/discovery/views/PlaylistView.tsx",
       "components/desktop/discovery/views/LibraryView.tsx",
       "components/desktop/discovery/views/PeelRevealView.tsx",
-      "components/desktop/deck/modals/SyncSettingsModal.tsx",
-      "lib/gdrive.ts",
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",

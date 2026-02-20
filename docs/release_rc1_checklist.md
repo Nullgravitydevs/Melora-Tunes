@@ -2,18 +2,12 @@
 
 ## 1) What I need from you
 
-Please share these 4 things so I can finish end-to-end production validation:
+Please share these 2 things so I can finish end-to-end production validation:
 
-1. **Runtime env values**
-   - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
-   - `NEXT_PUBLIC_GOOGLE_API_KEY`
-2. **Google Cloud OAuth config confirmation**
-   - Authorized JavaScript origins include your test origin(s)
-   - Drive API enabled
-3. **One real Google account for testing**
-   - Non-dev account preferred for realistic consent flow
-4. **Target test runtime**
+1. **Target test runtime**
    - Where you want final sign-off: local desktop build, Electron package, or web deployment URL
+2. **One production-like test profile**
+   - A realistic local library state (mixes, likes, history) for backup/restore validation
 
 ---
 
@@ -66,26 +60,18 @@ Please share these 4 things so I can finish end-to-end production validation:
 
 ---
 
-## 5) GDrive Sync QA (critical)
+## 5) Local Backup Parity QA (critical)
 
-### Connection
-- [ ] Open Settings → Library → Cloud Sync
-- [ ] Connect Google Drive succeeds
-- [ ] `melora-sync-meta` appears in localStorage
-
-### Backup / restore
-- [ ] Trigger Force Backup
-- [ ] Confirm backup exists in Drive `appDataFolder` (`melora_backup.json`)
+### Export / import
+- [ ] Open Settings → Library
+- [ ] Trigger Export and save `melora-backup.json`
 - [ ] Mutate local data (mixes/likes/history)
-- [ ] Trigger Restore Data
-- [ ] Confirm local state restored and app reload behavior works
+- [ ] Trigger Import with the exported JSON
+- [ ] Confirm local state restored and library UI refresh works
 
-### Disconnect
-- [ ] Disconnect removes sync metadata and revokes token state
-
-### Autosync
-- [ ] With `melora-sync-meta` present, mutate mixes/likes/history
-- [ ] Wait ~10s and confirm silent upload path is hit
+### Negative-path safety
+- [ ] Import invalid JSON and verify app does not crash
+- [ ] Import malformed array/object and verify current library is not corrupted
 
 ---
 
@@ -98,7 +84,6 @@ Please share these 4 things so I can finish end-to-end production validation:
 - `melora-recently-played`
 - `melora-saved-albums`
 - `melora-saved-artists`
-- `melora-sync-meta`
 - `melora-theme`
 - `melora-deck-theme`
 - `melora-metal-mode`
@@ -110,13 +95,8 @@ Please share these 4 things so I can finish end-to-end production validation:
 - `pwa-install-dismissed`
 - `music-language`
 
-### GDrive backup payload (`melora_backup.json`)
-- `mixes`
-- `likedSongs`
-- `history`
-- `settings`
-- `timestamp`
-- `deviceId`
+### Local export payload (`melora-backup.json`)
+- `mixes` (current implementation)
 
 ---
 
@@ -125,12 +105,11 @@ Please share these 4 things so I can finish end-to-end production validation:
 ### GO if all true
 - [ ] Build + lint gates remain green
 - [ ] Deck and Discovery smoke tests pass
-- [ ] GDrive connect/backup/restore passes with real account
+- [ ] Local export/import parity passes with production-like data
 - [ ] No P0/P1 UX blockers found in testing
 
 ### NO-GO if any true
-- [ ] GDrive auth fails in target runtime
-- [ ] Restore corrupts user library state
+- [ ] Import/export corrupts user library state
 - [ ] Core playback (play/pause/next/seek) fails in Deck or Discovery
 
 ---
@@ -139,5 +118,5 @@ Please share these 4 things so I can finish end-to-end production validation:
 
 - Improve settings visual hierarchy (section headers, density, spacing rhythm)
 - Refine discovery hover/focus states and control affordances
-- Add richer “trust” cues in sync UI (last backup status, result chip, failure reason)
+- Add richer “trust” cues in local backup UI (payload preview, result chip, failure reason)
 - Add deeper stats module (beyond placeholder text)
