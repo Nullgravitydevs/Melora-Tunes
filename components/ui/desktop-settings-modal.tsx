@@ -33,6 +33,15 @@ type PendingImport = {
     payload: ImportBackupPayload;
 };
 
+type ParseImportResult = {
+    pending: PendingImport | null;
+    error: string | null;
+};
+
+const VALID_MIX_COLORS = new Set([
+    'orange', 'purple', 'white', 'green', 'red', 'blue', 'cyan', 'pink', 'teal', 'yellow', 'black'
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
 }
@@ -41,37 +50,113 @@ function toArray(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [];
 }
 
-function parseImportData(raw: unknown): PendingImport | null {
+function hasString(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidSongLike(value: unknown): boolean {
+    if (!isRecord(value)) return false;
+    return hasString(value.id) && (hasString(value.name) || hasString(value.title));
+}
+
+function isValidMix(value: unknown): boolean {
+    if (!isRecord(value)) return false;
+
+    if (!hasString(value.id)) return false;
+    if (!hasString(value.title)) return false;
+    if (!hasString(value.color) || !VALID_MIX_COLORS.has(value.color)) return false;
+    if (typeof value.currentSongIndex !== 'number') return false;
+    if (!Array.isArray(value.songs)) return false;
+
+    return value.songs.every(isValidSongLike);
+}
+
+function isValidEntity(value: unknown): boolean {
+    if (!isRecord(value)) return false;
+    return hasString(value.id) || hasString(value.token) || hasString(value.browseId);
+}
+
+function sanitizeSettings(value: unknown): Partial<AppSettings> {
+    if (!isRecord(value)) return {};
+
+    const out: Partial<AppSettings> = {};
+
+    if (typeof value.volume === 'number') out.volume = value.volume;
+    if (typeof value.clickSounds === 'boolean') out.clickSounds = value.clickSounds;
+    if (hasString(value.theme)) out.theme = value.theme as AppSettings['theme'];
+    if (hasString(value.qualityPreference)) out.qualityPreference = value.qualityPreference as AppSettings['qualityPreference'];
+    if (typeof value.lastPlayedSongId === 'string' || value.lastPlayedSongId === null) out.lastPlayedSongId = value.lastPlayedSongId;
+    if (hasString(value.version)) out.version = value.version;
+    if (hasString(value.userName)) out.userName = value.userName;
+    if (hasString(value.userDOB)) out.userDOB = value.userDOB;
+    if (Array.isArray(value.languages) && value.languages.every((l) => typeof l === 'string')) out.languages = value.languages;
+    if (typeof value.stopAtEndOfSong === 'boolean') out.stopAtEndOfSong = value.stopAtEndOfSong;
+    if (typeof value.notificationsEnabled === 'boolean') out.notificationsEnabled = value.notificationsEnabled;
+
+    return out;
+}
+
+function validateArray(name: string, arr: unknown[], validator: (value: unknown) => boolean): string | null {
+    const invalidIndex = arr.findIndex((item) => !validator(item));
+    if (invalidIndex >= 0) return `${name} has invalid item at index ${invalidIndex}`;
+    return null;
+}
+
+function parseImportData(raw: unknown): ParseImportResult {
     if (Array.isArray(raw)) {
+        const err = validateArray('mixes', raw, isValidMix);
+        if (err) return { pending: null, error: err };
+
         return {
-            source: 'legacy',
-            payload: {
-                mixes: raw,
-                likedSongs: [],
-                recentlyPlayed: [],
-                savedAlbums: [],
-                savedArtists: [],
-                settings: {}
-            }
+            pending: {
+                source: 'legacy',
+                payload: {
+                    mixes: raw,
+                    likedSongs: [],
+                    recentlyPlayed: [],
+                    savedAlbums: [],
+                    savedArtists: [],
+                    settings: {}
+                }
+            },
+            error: null
         };
     }
 
-    if (!isRecord(raw)) return null;
+    if (!isRecord(raw)) return { pending: null, error: 'Backup must be an object or legacy mixes array' };
 
-    if (raw.schemaVersion !== BACKUP_SCHEMA_VERSION) return null;
+    if (raw.schemaVersion !== BACKUP_SCHEMA_VERSION) {
+        return { pending: null, error: `Unsupported schema version: ${String(raw.schemaVersion ?? 'missing')}` };
+    }
 
-    const settings = isRecord(raw.settings) ? (raw.settings as Partial<AppSettings>) : {};
+    const mixes = toArray(raw.mixes);
+    const liked = toArray(raw.likedSongs);
+    const recent = toArray(raw.recentlyPlayed);
+    const albums = toArray(raw.savedAlbums);
+    const artists = toArray(raw.savedArtists);
+
+    const validationError =
+        validateArray('mixes', mixes, isValidMix) ||
+        validateArray('likedSongs', liked, isValidSongLike) ||
+        validateArray('recentlyPlayed', recent, isValidSongLike) ||
+        validateArray('savedAlbums', albums, isValidEntity) ||
+        validateArray('savedArtists', artists, isValidEntity);
+
+    if (validationError) return { pending: null, error: validationError };
 
     return {
-        source: 'v2',
-        payload: {
-            mixes: toArray(raw.mixes),
-            likedSongs: toArray(raw.likedSongs),
-            recentlyPlayed: toArray(raw.recentlyPlayed),
-            savedAlbums: toArray(raw.savedAlbums),
-            savedArtists: toArray(raw.savedArtists),
-            settings
-        }
+        pending: {
+            source: 'v2',
+            payload: {
+                mixes,
+                likedSongs: liked,
+                recentlyPlayed: recent,
+                savedAlbums: albums,
+                savedArtists: artists,
+                settings: sanitizeSettings(raw.settings)
+            }
+        },
+        error: null
     };
 }
 
@@ -86,6 +171,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+    const [importError, setImportError] = useState<string | null>(null);
     const [initialSettings] = useState(() => loadSettings());
     const [languages, setLanguages] = useState<string[]>(initialSettings.languages || ['english', 'hindi']);
 
@@ -146,6 +232,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
         showToast(source === 'legacy' ? "Legacy backup restored. Reloading..." : "Backup restored. Reloading...", "success");
 
         setPendingImport(null);
+        setImportError(null);
         setTimeout(() => window.location.reload(), 800);
     };
 
@@ -153,17 +240,22 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
         try {
             const fileText = await file.text();
             const parsed = JSON.parse(fileText) as unknown;
-            const pending = parseImportData(parsed);
+            const result = parseImportData(parsed);
 
-            if (!pending) {
-                showToast("Invalid backup format", "error");
+            if (!result.pending) {
+                setPendingImport(null);
+                setImportError(result.error || "Invalid backup format");
+                showToast("Backup validation failed", "error");
                 return;
             }
 
-            setPendingImport(pending);
+            setImportError(null);
+            setPendingImport(result.pending);
             showToast("Backup loaded. Confirm restore.", "info");
         } catch (error) {
             console.error(error);
+            setPendingImport(null);
+            setImportError("Invalid JSON file");
             showToast("Invalid JSON file", "error");
         }
     };
@@ -560,6 +652,12 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                             </label>
                                         </div>
 
+                                        {importError && (
+                                            <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20 text-sm text-red-300">
+                                                Import blocked: {importError}
+                                            </div>
+                                        )}
+
                                         {pendingImport && (
                                             <div className="p-6 bg-amber-500/10 rounded-2xl border border-amber-500/20 space-y-4">
                                                 <div className="text-amber-300 font-bold">Confirm Restore</div>
@@ -577,7 +675,10 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                 </div>
                                                 <div className="flex gap-2">
                                                     <button
-                                                        onClick={() => setPendingImport(null)}
+                                                        onClick={() => {
+                                                            setPendingImport(null);
+                                                            setImportError(null);
+                                                        }}
                                                         className="flex-1 py-2 bg-zinc-800 text-white rounded-lg font-bold text-sm hover:bg-zinc-700"
                                                     >
                                                         Cancel
