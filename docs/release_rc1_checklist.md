@@ -68,6 +68,7 @@ Please share these 2 things so I can finish end-to-end production validation:
 - [ ] Confirm exported file has `schemaVersion: 2`
 - [ ] Mutate local data (mixes/likes/history)
 - [ ] Trigger Import with the exported JSON
+- [ ] Verify Restore Impact Preview shows current → incoming counts with deltas
 - [ ] Verify restore mode selector shows `Restore mixes only` and `Restore full library + settings`
 - [ ] Run `Restore mixes only` and confirm likes/history/library/settings remain unchanged
 - [ ] Run `Restore full library + settings` and confirm all fields are restored

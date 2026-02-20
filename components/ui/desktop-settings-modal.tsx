@@ -35,6 +35,12 @@ type PendingImport = {
 
 type RestoreMode = 'mixes-only' | 'full';
 
+function formatDelta(nextValue: number, currentValue: number): string {
+    const delta = nextValue - currentValue;
+    if (delta === 0) return '±0';
+    return delta > 0 ? `+${delta}` : `${delta}`;
+}
+
 type ParseImportResult = {
     pending: PendingImport | null;
     error: string | null;
@@ -181,6 +187,24 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     // Profile State
     const [profileName, setProfileName] = useState(initialSettings.userName || "");
     const [profileDOB, setProfileDOB] = useState(initialSettings.userDOB || "");
+
+    const currentCounts = {
+        mixes: mixes.length,
+        likedSongs: likedSongs.length,
+        recentlyPlayed: recentlyPlayed.length,
+        savedAlbums: savedAlbums.length,
+        savedArtists: savedArtists.length,
+    };
+
+    const incomingCounts = pendingImport
+        ? {
+            mixes: pendingImport.payload.mixes.length,
+            likedSongs: pendingImport.payload.likedSongs.length,
+            recentlyPlayed: pendingImport.payload.recentlyPlayed.length,
+            savedAlbums: pendingImport.payload.savedAlbums.length,
+            savedArtists: pendingImport.payload.savedArtists.length,
+        }
+        : null;
 
     const handleClose = useCallback(() => {
         onClose();
@@ -683,6 +707,19 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                     <div>Albums: {pendingImport.payload.savedAlbums.length}</div>
                                                     <div>Artists: {pendingImport.payload.savedArtists.length}</div>
                                                 </div>
+
+                                                <div className="p-3 rounded-lg bg-black/30 border border-amber-500/20">
+                                                    <div className="text-xs font-bold uppercase tracking-wide text-amber-200 mb-2">Restore Impact Preview</div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-amber-100/90">
+                                                        <div>Mixes: {currentCounts.mixes} → {incomingCounts?.mixes ?? 0} ({formatDelta(incomingCounts?.mixes ?? 0, currentCounts.mixes)})</div>
+                                                        <div>Liked: {currentCounts.likedSongs} → {restoreMode === 'full' ? (incomingCounts?.likedSongs ?? 0) : currentCounts.likedSongs} ({restoreMode === 'full' ? formatDelta(incomingCounts?.likedSongs ?? 0, currentCounts.likedSongs) : 'unchanged'})</div>
+                                                        <div>Recent: {currentCounts.recentlyPlayed} → {restoreMode === 'full' ? (incomingCounts?.recentlyPlayed ?? 0) : currentCounts.recentlyPlayed} ({restoreMode === 'full' ? formatDelta(incomingCounts?.recentlyPlayed ?? 0, currentCounts.recentlyPlayed) : 'unchanged'})</div>
+                                                        <div>Albums: {currentCounts.savedAlbums} → {restoreMode === 'full' ? (incomingCounts?.savedAlbums ?? 0) : currentCounts.savedAlbums} ({restoreMode === 'full' ? formatDelta(incomingCounts?.savedAlbums ?? 0, currentCounts.savedAlbums) : 'unchanged'})</div>
+                                                        <div>Artists: {currentCounts.savedArtists} → {restoreMode === 'full' ? (incomingCounts?.savedArtists ?? 0) : currentCounts.savedArtists} ({restoreMode === 'full' ? formatDelta(incomingCounts?.savedArtists ?? 0, currentCounts.savedArtists) : 'unchanged'})</div>
+                                                        <div>Settings: {restoreMode === 'full' ? 'will be overwritten' : 'unchanged'}</div>
+                                                    </div>
+                                                </div>
+
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                     <button
                                                         onClick={() => setRestoreMode('mixes-only')}
