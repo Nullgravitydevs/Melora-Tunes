@@ -6,7 +6,7 @@ import { useState, useCallback } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
-import { loadSettings, saveSettings } from "@/lib/settings";
+import { AppSettings, loadSettings, saveSettings } from "@/lib/settings";
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -17,16 +17,75 @@ interface DesktopSettingsModalProps {
 
 type SettingsTab = 'profile' | 'experience' | 'audio' | 'library' | 'stats' | 'support' | 'about';
 
+const BACKUP_SCHEMA_VERSION = 2;
+
+type ImportBackupPayload = {
+    mixes: unknown[];
+    likedSongs: unknown[];
+    recentlyPlayed: unknown[];
+    savedAlbums: unknown[];
+    savedArtists: unknown[];
+    settings: Partial<AppSettings>;
+};
+
+type PendingImport = {
+    source: 'legacy' | 'v2';
+    payload: ImportBackupPayload;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function toArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
+}
+
+function parseImportData(raw: unknown): PendingImport | null {
+    if (Array.isArray(raw)) {
+        return {
+            source: 'legacy',
+            payload: {
+                mixes: raw,
+                likedSongs: [],
+                recentlyPlayed: [],
+                savedAlbums: [],
+                savedArtists: [],
+                settings: {}
+            }
+        };
+    }
+
+    if (!isRecord(raw)) return null;
+
+    if (raw.schemaVersion !== BACKUP_SCHEMA_VERSION) return null;
+
+    const settings = isRecord(raw.settings) ? (raw.settings as Partial<AppSettings>) : {};
+
+    return {
+        source: 'v2',
+        payload: {
+            mixes: toArray(raw.mixes),
+            likedSongs: toArray(raw.likedSongs),
+            recentlyPlayed: toArray(raw.recentlyPlayed),
+            savedAlbums: toArray(raw.savedAlbums),
+            savedArtists: toArray(raw.savedArtists),
+            settings
+        }
+    };
+}
+
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const {
         qualityPreference, setQualityPreference,
-        mixes, setMixes, eq, sleepTimer, setSleepTimer,
-        likedSongs, recentlyPlayed, savedAlbums, savedArtists
+        mixes, eq, sleepTimer, setSleepTimer,
+        likedSongs, recentlyPlayed, savedAlbums, savedArtists, showToast
     } = usePlayback();
 
     // Local State for Performance (Detached from Context)
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
     const [initialSettings] = useState(() => loadSettings());
     const [languages, setLanguages] = useState<string[]>(initialSettings.languages || ['english', 'hindi']);
 
@@ -46,6 +105,67 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
 
     const saveProfile = () => {
         saveSettings({ userName: profileName, userDOB: profileDOB });
+    };
+
+    const handleExportBackup = () => {
+        const backupPayload = {
+            schemaVersion: BACKUP_SCHEMA_VERSION,
+            exportedAt: Date.now(),
+            mixes,
+            likedSongs,
+            recentlyPlayed,
+            savedAlbums,
+            savedArtists,
+            settings: loadSettings()
+        };
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "melora-backup.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+
+        showToast("Backup exported", "success");
+    };
+
+    const applyImport = () => {
+        if (!pendingImport) return;
+
+        const { payload, source } = pendingImport;
+
+        localStorage.setItem('melora-mixes', JSON.stringify(payload.mixes));
+        localStorage.setItem('melora-liked-songs', JSON.stringify(payload.likedSongs));
+        localStorage.setItem('melora-recently-played', JSON.stringify(payload.recentlyPlayed));
+        localStorage.setItem('melora-saved-albums', JSON.stringify(payload.savedAlbums));
+        localStorage.setItem('melora-saved-artists', JSON.stringify(payload.savedArtists));
+        saveSettings(payload.settings);
+
+        window.dispatchEvent(new CustomEvent('melora-library-updated'));
+        showToast(source === 'legacy' ? "Legacy backup restored. Reloading..." : "Backup restored. Reloading...", "success");
+
+        setPendingImport(null);
+        setTimeout(() => window.location.reload(), 800);
+    };
+
+    const handleImportFile = async (file: File) => {
+        try {
+            const fileText = await file.text();
+            const parsed = JSON.parse(fileText) as unknown;
+            const pending = parseImportData(parsed);
+
+            if (!pending) {
+                showToast("Invalid backup format", "error");
+                return;
+            }
+
+            setPendingImport(pending);
+            showToast("Backup loaded. Confirm restore.", "info");
+        } catch (error) {
+            console.error(error);
+            showToast("Invalid JSON file", "error");
+        }
     };
 
     if (!isOpen) return null;
@@ -410,18 +530,10 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         <div className="p-6 bg-zinc-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
                                             <div>
                                                 <div className="text-white font-bold">Export Data</div>
-                                                <div className="text-zinc-500 text-sm">Save your mixes as JSON.</div>
+                                                <div className="text-zinc-500 text-sm">Save mixes, likes, history, library, and settings.</div>
                                             </div>
                                             <button
-                                                onClick={() => {
-                                                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mixes));
-                                                    const downloadAnchorNode = document.createElement('a');
-                                                    downloadAnchorNode.setAttribute("href", dataStr);
-                                                    downloadAnchorNode.setAttribute("download", "melora-backup.json");
-                                                    document.body.appendChild(downloadAnchorNode);
-                                                    downloadAnchorNode.click();
-                                                    downloadAnchorNode.remove();
-                                                }}
+                                                onClick={handleExportBackup}
                                                 className="px-4 py-2 bg-white text-black rounded-lg font-bold text-sm hover:bg-zinc-200"
                                             >
                                                 Export
@@ -431,7 +543,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         <div className="p-6 bg-zinc-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
                                             <div>
                                                 <div className="text-white font-bold">Import Data</div>
-                                                <div className="text-zinc-500 text-sm">Restore mixes from backup.</div>
+                                                <div className="text-zinc-500 text-sm">Validate backup file before restoring data.</div>
                                             </div>
                                             <label className="px-4 py-2 bg-zinc-800 text-white rounded-lg font-bold text-sm hover:bg-zinc-700 cursor-pointer">
                                                 Import
@@ -439,24 +551,46 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                                     type="file"
                                                     accept=".json"
                                                     className="hidden"
-                                                    onChange={(e) => {
+                                                    onChange={async (e) => {
                                                         const file = e.target.files?.[0];
-                                                        if (!file) return;
-                                                        const reader = new FileReader();
-                                                        reader.onload = (event) => {
-                                                            try {
-                                                                const importedMixes = JSON.parse(event.target?.result as string);
-                                                                if (Array.isArray(importedMixes)) {
-                                                                    setMixes(importedMixes);
-                                                                    window.dispatchEvent(new CustomEvent('melora-library-updated'));
-                                                                }
-                                                            } catch (err) { console.error(err); }
-                                                        };
-                                                        reader.readAsText(file);
+                                                        if (file) await handleImportFile(file);
+                                                        e.target.value = '';
                                                     }}
                                                 />
                                             </label>
                                         </div>
+
+                                        {pendingImport && (
+                                            <div className="p-6 bg-amber-500/10 rounded-2xl border border-amber-500/20 space-y-4">
+                                                <div className="text-amber-300 font-bold">Confirm Restore</div>
+                                                <div className="text-sm text-amber-100/80">
+                                                    {pendingImport.source === 'legacy'
+                                                        ? 'Legacy backup detected. Only mixes are included; other library data will be reset to empty.'
+                                                        : 'This backup will overwrite current local library data.'}
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-amber-100/80">
+                                                    <div>Mixes: {pendingImport.payload.mixes.length}</div>
+                                                    <div>Liked: {pendingImport.payload.likedSongs.length}</div>
+                                                    <div>Recent: {pendingImport.payload.recentlyPlayed.length}</div>
+                                                    <div>Albums: {pendingImport.payload.savedAlbums.length}</div>
+                                                    <div>Artists: {pendingImport.payload.savedArtists.length}</div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setPendingImport(null)}
+                                                        className="flex-1 py-2 bg-zinc-800 text-white rounded-lg font-bold text-sm hover:bg-zinc-700"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={applyImport}
+                                                        className="flex-1 py-2 bg-amber-500 text-black rounded-lg font-bold text-sm hover:bg-amber-400"
+                                                    >
+                                                        Confirm Restore
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10">
                                             <div className="text-red-500 font-bold mb-4">Danger Zone</div>

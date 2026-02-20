@@ -65,6 +65,7 @@ Please share these 2 things so I can finish end-to-end production validation:
 ### Export / import
 - [ ] Open Settings → Library
 - [ ] Trigger Export and save `melora-backup.json`
+- [ ] Confirm exported file has `schemaVersion: 2`
 - [ ] Mutate local data (mixes/likes/history)
 - [ ] Trigger Import with the exported JSON
 - [ ] Confirm local state restored and library UI refresh works
@@ -96,7 +97,14 @@ Please share these 2 things so I can finish end-to-end production validation:
 - `music-language`
 
 ### Local export payload (`melora-backup.json`)
-- `mixes` (current implementation)
+- `schemaVersion` (= 2)
+- `exportedAt`
+- `mixes`
+- `likedSongs`
+- `recentlyPlayed`
+- `savedAlbums`
+- `savedArtists`
+- `settings`
 
 ---
 
