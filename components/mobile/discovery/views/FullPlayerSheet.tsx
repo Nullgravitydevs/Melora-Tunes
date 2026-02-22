@@ -24,7 +24,7 @@ interface Props {
 type ViewMode = "art" | "lyrics" | "queue";
 
 export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
-    const { currentSong, isPlaying, togglePlay, next, prev, seek, duration, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, activeQuality, queue, currentIndex, playIndex, currentTrackMetadata } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, seek, duration, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, activeQuality, queue, currentIndex, playIndex, currentTrackMetadata, playbackState } = usePlayback();
     const { toggleLike, isLiked, addSongToMix, mixes } = useLibrary();
     const { progress } = useAudioProgress();
 
@@ -157,12 +157,19 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                                 {viewMode === "art" && (
                                     <motion.div key="art" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center h-full px-10">
                                         {/* Album art */}
-                                        <div className={`w-[280px] h-[280px] rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/[0.06] transition-transform duration-700 ${isPlaying ? "scale-100" : "scale-95"}`}>
+                                        <div className={`w-[280px] h-[280px] relative rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/[0.06] transition-transform duration-700 ${isPlaying ? "scale-100" : "scale-95"}`}>
                                             {songArt ? (
                                                 <img src={songArt} className="w-full h-full object-cover" alt="" />
                                             ) : (
                                                 <div className="w-full h-full bg-white/[0.04] flex items-center justify-center">
                                                     <Mic2 size={48} className="text-white/10" />
+                                                </div>
+                                            )}
+
+                                            {/* Buffering Overlay */}
+                                            {(playbackState === 'buffering' || playbackState === 'loading' || playbackState === 'stalled') && (
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[2px]">
+                                                    <div className="w-10 h-10 border-[3px] border-white/20 border-t-white rounded-full animate-spin shadow-lg" />
                                                 </div>
                                             )}
                                         </div>

@@ -65,10 +65,8 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                             // Scale 0-255 to canvas height
                             targetH = Math.max(2, (avg / 255) * height);
                         } else {
-                            // Fallback simulation if no audio node
-                            const noise = Math.random() * height * 0.5;
-                            const wave = Math.sin(tick * 0.1 + i) * height * 0.3;
-                            targetH = Math.max(5, Math.abs(wave + noise));
+                            // Keep it flat if no visualizer data is available yet
+                            targetH = 2;
                         }
                     } else {
                         targetH = 2; // Resting state
@@ -116,9 +114,7 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                             const avg = sum / binSize;
                             targetH = Math.max(2, (avg / 255) * height);
                         } else {
-                            const noise = Math.random() * height * 0.5;
-                            const wave = Math.sin(tick * 0.15 + i) * height * 0.35;
-                            targetH = Math.max(5, Math.abs(wave + noise));
+                            targetH = 2;
                         }
                     } else {
                         targetH = 2;
@@ -164,11 +160,7 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                             const percent = (val / 128) - 1; // -1 to 1
                             y += percent * (height / 2);
                         } else {
-                            // Complex wave: sum of sines
-                            const f1 = Math.sin(x * 0.05 + tick * 0.2);
-                            const f2 = Math.sin(x * 0.1 - tick * 0.1);
-                            const f3 = Math.sin(x * 0.02 + tick * 0.05);
-                            y += (f1 + f2 + f3) * (height * 0.15);
+                            y += Math.sin(x * 0.1 + tick * 0.1) * 2;
                         }
                     } else {
                         // Flatline with slight hum
@@ -203,9 +195,7 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                             const val = dataArray[binIndex];
                             offset = (val / 255) * (radius * 0.5); // Max extrude is 50% of radius
                         } else {
-                            const noise = Math.random() * 10;
-                            const wave = Math.sin(tick * 0.1 + (i / 10)) * 10;
-                            offset = Math.abs(wave + noise);
+                            offset = 0;
                         }
                     }
 

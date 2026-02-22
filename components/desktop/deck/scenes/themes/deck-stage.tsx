@@ -108,7 +108,7 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     const [showEq, setShowEq] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const { currentSong, currentTrack, currentTrackMetadata, isPlaying, togglePlay, next, prev, seek, volume, setVolume, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, activeMixId, play, eq, activeQuality } = usePlayback();
+    const { currentSong, currentTrack, currentTrackMetadata, isPlaying, togglePlay, next, prev, seek, volume, setVolume, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, activeMixId, play, eq, activeQuality, playbackState } = usePlayback();
     const { mixes, addMix, updateMix, deleteMix, likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded, downloadSong, removeDownload } = useLibrary();
     const { progress } = useAudioProgress();
     const { playClick, playClunk, playEject, playInsert } = useAudio();
@@ -792,7 +792,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     {currentSong ? (
                                         <>
                                             {isDownloaded(currentTrack?.id || currentSong.id) && <span className="bg-black/10 px-1 rounded text-[10px]">OFFLINE</span>}
-                                            <span className="truncate">▶ {decodeHtml(currentSong.name)}</span>
+                                            <span className={`truncate ${(playbackState === 'buffering' || playbackState === 'stalled' || playbackState === 'loading') ? 'animate-pulse text-gray-700' : ''}`}>
+                                                {(playbackState === 'buffering' || playbackState === 'loading') ? 'BUFFERING...' : playbackState === 'stalled' ? 'STALLED...' : `▶ ${decodeHtml(currentSong.name)}`}
+                                            </span>
                                         </>
                                     ) : (
                                         "READY"
