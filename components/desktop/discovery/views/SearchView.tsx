@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Play, Pause, Clock, TrendingUp, LayoutGrid as Grid, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
+import { Search, X, Play, Pause, Clock, TrendingUp, LayoutGrid, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
 
 import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
@@ -518,7 +518,7 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
                             {/* Browse Categories */}
                             <div className="mt-8">
                                 <div className="flex items-center gap-2 mb-6">
-                                    <Grid size={20} className="text-white/30" />
+                                    <LayoutGrid size={20} className="text-white/30" />
                                     <h2 className="text-lg font-bold text-white/40 tracking-tight">Browse by Mood</h2>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
