@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Disc, Play } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack } from "@/lib/types";
 import { decodeHtml } from "@/lib/utils";
@@ -26,7 +26,8 @@ interface GlassSearchProps {
 /* -------------------------------------------------------------------------- */
 
 export function GlassSearch({ onClose, initialQuery = "", onSongSelect, desktopMode = true }: GlassSearchProps) {
-    const { playInstantMix, activeMixId, mixes, updateMix } = usePlayback();
+    const { playInstantMix, activeMixId } = usePlayback();
+    const { mixes, updateMix } = useLibrary();
     const [query, setQuery] = useState(initialQuery);
     const [results, setResults] = useState<PlayableTrack[]>([]);
     const [isLoading, setIsLoading] = useState(false);

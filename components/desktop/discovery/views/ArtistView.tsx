@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, Pause, Shuffle, Heart, Clock, ArrowLeft, Music, MoreHorizontal, User, AlertCircle, RefreshCcw, BadgeCheck, Info } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { getArtistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { shuffleArray, getArt } from "@/lib/helpers";
 import { HorizontalScroll, StandardCard, SectionHeader, VibeAlbumCard } from "../home/HomeComponents";
@@ -21,7 +21,9 @@ interface ArtistViewProps {
 }
 
 export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: ArtistViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, isLiked, toggleLike, showToast, isArtistFollowed, toggleFollowArtist } = usePlayback();
+    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId } = usePlayback();
+    const { addMix, updateMix, isLiked, toggleLike, isArtistFollowed, toggleFollowArtist } = useLibrary();
+    const { showToast } = useUI();
     const [bio, setBio] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

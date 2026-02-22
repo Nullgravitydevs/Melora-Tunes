@@ -22,7 +22,7 @@ import { DiscoveryLayout } from "@/components/desktop/discovery/DiscoveryLayout"
 
 import { DesktopPlayer, THEMES, ThemeKey } from "@/components/ui/desktop-player";
 import { useSearchParams, useRouter } from "next/navigation";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { PlayableTrack, isPlayableTrack } from "@/lib/types";
 import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { EditMixModal } from "@/components/ui/edit-mix-modal";
@@ -32,7 +32,8 @@ import { CinemaModeDesktop } from "../cinema-mode-desktop";
 import { QueueModal } from "@/components/ui/queue-modal";
 import { ShareMixModal } from "@/components/ui/share-mix-modal";
 import { DesktopThemeSelector } from "@/components/ui/desktop-theme-selector";
-import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { ErrorBoundary } from "@/components/ui/error-boundary";import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 
 interface StageProps {
@@ -76,15 +77,9 @@ export function WindowsStage({ onSwitchToMobile, initialTheme, isMobileDevice }:
         return () => window.removeEventListener('resize', checkOrientation);
     }, [isMobileDevice]);
 
-    const {
-        mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        setMixes, loadMix, play, pause, togglePlay, next, prev, seek, setVolume,
-        addMix, updateMix, deleteMix, isLoaded,
-        shuffle, setShuffle, repeat, setRepeat,
-        queue, currentIndex,
-        notificationsEnabled,
-        likedSongs, toggleLike
-    } = usePlayback();
+    const { activeMixId, isPlaying, currentSong, volume, duration, loadMix, play, pause, togglePlay, next, prev, seek, setVolume, isLoaded, shuffle, setShuffle, repeat, setRepeat, queue, currentIndex, notificationsEnabled } = usePlayback();
+    const { mixes, setMixes, addMix, updateMix, deleteMix, likedSongs, toggleLike } = useLibrary();
+    const { progress } = useAudioProgress();
 
     // UI State (Local)
     const [isModalOpen, setIsModalOpen] = useState(false);

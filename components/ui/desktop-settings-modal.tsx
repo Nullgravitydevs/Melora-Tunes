@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Database, Info, Layout, Disc, Radio, Monitor, Zap, Volume2, Moon, Heart, Coffee, Github, MessageCircle, Server, User } from "lucide-react";
 import { useState, useCallback } from "react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI } from "@/components/providers/playback-context";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
 import { AppSettings, loadSettings, saveSettings } from "@/lib/settings";
@@ -169,11 +169,9 @@ function parseImportData(raw: unknown): ParseImportResult {
 }
 
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
-    const {
-        qualityPreference, setQualityPreference,
-        mixes, eq, sleepTimer, setSleepTimer,
-        likedSongs, recentlyPlayed, savedAlbums, savedArtists, showToast
-    } = usePlayback();
+    const { qualityPreference, setQualityPreference, eq, sleepTimer, setSleepTimer } = usePlayback();
+    const { mixes, likedSongs, recentlyPlayed, savedAlbums, savedArtists } = useLibrary();
+    const { showToast } = useUI();
 
     // Local State for Performance (Detached from Context)
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');

@@ -76,6 +76,11 @@ export const EqualizerView: React.FC<EqualizerViewProps> = ({
                                 onChange={(e) => setBand(i, parseFloat(e.target.value))}
                                 className="z-10 absolute inset-0 w-full h-full opacity-0 cursor-ns-resize appearance-none"
                                 style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }} // Hacky HTML range rotation often easier with custom div
+                                role="slider"
+                                aria-label={`EQ Band ${FREQUENCIES[i] >= 1000 ? FREQUENCIES[i] / 1000 + 'k' : FREQUENCIES[i]} Hertz`}
+                                aria-valuenow={gain}
+                                aria-valuemin={-12}
+                                aria-valuemax={12}
                             />
 
                             {/* Custom Thumb/Bar Visual */}

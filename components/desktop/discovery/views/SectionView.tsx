@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Disc3, Play, Heart, MoreHorizontal, Clock, Shuffle, PlusCircle, Check, AlertCircle, RefreshCcw } from "lucide-react";
 import { StandardCard, FeatureCard, PosterCard, QuickPickItem } from "../home/HomeComponents";
 import { getTrending, getNewReleases, getTopCharts, searchPlaylists, searchSongs, JioSaavnSong } from "@/lib/jiosaavn";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
 import { AddToPlaylistModal } from "../modals/AddToPlaylistModal";
 import { decodeHtml } from "@/lib/utils";
@@ -24,7 +24,8 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
     const [items, setItems] = useState<JioSaavnSong[]>(initialData || []);
     const [loading, setLoading] = useState(!initialData);
     const [error, setError] = useState<string | null>(null);
-    const { playInstantMix, isPlaying, currentSong, activeMixId, togglePlay, toggleLike, isLiked, addMix, updateMix, loadMix, addSongToMix } = usePlayback();
+    const { playInstantMix, isPlaying, currentSong, activeMixId, togglePlay, loadMix } = usePlayback();
+    const { toggleLike, isLiked, addMix, updateMix, addSongToMix } = useLibrary();
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null }>({ visible: false, x: 0, y: 0, song: null });

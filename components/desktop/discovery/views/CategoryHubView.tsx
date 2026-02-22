@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Play, Disc3, Heart, MoreHorizontal, ChevronLeft, Radio, Music } from "lucide-react";
 import { JioSaavnSong, searchSongs, searchPlaylists, searchAlbums, searchArtists } from "@/lib/jiosaavn";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { decodeHtml } from "@/lib/utils";
 import { SectionHeader, HorizontalScroll, StandardCard, FeatureCard, VibeAlbumCard } from "../home/HomeComponents";
 import { loadSettings } from "@/lib/settings";
@@ -22,7 +22,8 @@ interface CategoryHubProps {
 }
 
 export function CategoryHubView({ data, onNavigate, onBack, onContextMenu }: CategoryHubProps) {
-    const { playInstantMix, isPlaying, currentSong, activeMixId, toggleLike, isLiked, addSongToMix } = usePlayback();
+    const { playInstantMix, isPlaying, currentSong, activeMixId } = usePlayback();
+    const { toggleLike, isLiked, addSongToMix } = useLibrary();
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [playlists, setPlaylists] = useState<JioSaavnSong[]>([]);
     const [albums, setAlbums] = useState<JioSaavnSong[]>([]);

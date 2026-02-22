@@ -7,6 +7,8 @@ import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { useLyrics, LyricLine } from "@/hooks/useLyrics";
 import { usePlayback } from "../providers/playback-context";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 interface LyricsModalProps {
     isOpen: boolean;
@@ -16,18 +18,22 @@ interface LyricsModalProps {
 
 export function LyricsModal({ isOpen, onClose, song }: LyricsModalProps) {
     // Use the smart hook that combines 3 sources (Musixmatch, Lrclib, JioSaavn)
-    const { lyrics, plainLyrics, isSynced, isLoading, error } = useLyrics(isOpen ? (song || undefined) : undefined);
-    const { progress, seek } = usePlayback();
+    const { lyrics, plainLyrics, isSynced, isLoading, error, offset, setOffset } = useLyrics(isOpen ? (song || undefined) : undefined);
+    const { seek, duration } = usePlayback();
+    const { progress } = useAudioProgress();
 
     // Auto-scroll logic
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const activeLineRef = useRef<HTMLDivElement>(null);
 
     // Find active line index
+    const currentTime = progress * (duration || 0);
+    const adjustedTime = currentTime - offset;
+
     const activeIndex = isSynced
         ? lyrics.findIndex((line, i) => {
             const nextLine = lyrics[i + 1];
-            return progress >= line.time && (!nextLine || progress < nextLine.time);
+            return adjustedTime >= line.time && (!nextLine || adjustedTime < nextLine.time);
         })
         : -1;
 
@@ -89,11 +95,25 @@ export function LyricsModal({ isOpen, onClose, song }: LyricsModalProps) {
 
                         {/* Tag */}
                         {(isSynced || isLoading) && (
-                            <div className="relative z-20 px-6 mt-2 mb-4">
+                            <div className="relative z-20 px-6 mt-2 mb-4 flex items-center justify-between">
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isSynced ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/40'}`}>
                                     {isLoading ? <Loader2 size={10} className="animate-spin" /> : <Mic2 size={10} />}
                                     {isLoading ? "Syncing..." : isSynced ? "Synced Lyrics" : "Plain Lyrics"}
                                 </span>
+
+                                {isSynced && (
+                                    <div className="flex items-center gap-2 bg-white/5 opacity-50 hover:opacity-100 transition-opacity px-3 py-1.5 rounded-full border border-white/10">
+                                        <span className="text-[9px] text-white/60 font-bold tracking-widest uppercase">Sync</span>
+                                        <input
+                                            type="range"
+                                            min="-5" max="5" step="0.1"
+                                            value={offset}
+                                            onChange={e => setOffset(parseFloat(e.target.value))}
+                                            className="w-16 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <span className="text-[10px] text-white font-mono tabular-nums w-8 text-right">{offset > 0 ? '+' : ''}{offset.toFixed(1)}s</span>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -138,7 +158,7 @@ export function LyricsModal({ isOpen, onClose, song }: LyricsModalProps) {
                                                 }}
                                                 className={`text-2xl md:text-3xl font-bold leading-tight transition-all duration-500 cursor-pointer origin-left
                                                     ${isActive ? 'text-white' : 'text-white/80'}`}
-                                                onClick={() => seek(line.time)}
+                                                onClick={() => seek(line.time / (duration || 1))}
                                             >
                                                 {decodeHtml(line.text)}
                                             </motion.p>

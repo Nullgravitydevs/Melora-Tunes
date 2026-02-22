@@ -1,0 +1,2 @@
+﻿components/desktop/discovery/views/FullPlayer.tsx(31,61): error TS2339: Property 'progress' does not exist on type 'PlaybackContextType'.
+components/mobile/discovery/views/FullPlayerSheet.tsx(27,67): error TS2339: Property 'progress' does not exist on type 'PlaybackContextType'.

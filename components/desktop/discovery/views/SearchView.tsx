@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Play, Pause, Clock, TrendingUp, Grid3X3 as Grid, Loader2, Disc, Sparkles, Headphones, Settings, Music, Check, ChevronDown, Download, SearchX, AlertCircle, RefreshCcw } from "lucide-react";
 
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { searchUnified } from "@/lib/unified-search";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
 import { loadSettings, saveSettings } from "@/lib/settings";
@@ -78,7 +78,8 @@ interface SearchViewProps {
 }
 
 export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality, isDownloaded, playInstantMix } = usePlayback();
+    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId, activeQuality, playInstantMix } = usePlayback();
+    const { addMix, updateMix, isDownloaded } = useLibrary();
 
     // FIX 1: Stable search mix ID to prevent memory leak
     const SEARCH_MIX_ID = 'search-results';

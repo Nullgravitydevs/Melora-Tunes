@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { ChevronLeft, Play, Disc3 } from "lucide-react";
 import {
     getTrending, getNewReleases, getTopCharts,
@@ -34,10 +34,8 @@ export function SectionView({ section, onBack, onNavigate }: Props) {
     const [isLoading, setIsLoading] = useState(!section.songs?.length);
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
-    const {
-        addMix, updateMix, loadMix, mixes, playInstantMix,
-        currentSong, isPlaying, togglePlay
-    } = usePlayback();
+    const { loadMix, playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
+    const { addMix, updateMix, mixes } = useLibrary();
 
     const sectionId = section.id;
     const sectionTitle = section.title;

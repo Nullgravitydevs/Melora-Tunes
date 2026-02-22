@@ -43,6 +43,7 @@ export const viewport: Viewport = {
 import { PwaRegister } from "@/components/pwa-register";
 import { RotatePrompt } from "@/components/ui/rotate-prompt";
 import { PlaybackProvider } from "@/components/providers/playback-context";
+import { MotionProvider } from "@/components/providers/motion-provider";
 
 export default function RootLayout({
   children,
@@ -59,8 +60,10 @@ export default function RootLayout({
         className={`${inter.variable} ${pressStart2P.variable} font-sans bg-black text-white`}
       >
         <PlaybackProvider>
-          <PwaRegister />
-          {children}
+          <MotionProvider>
+            <PwaRegister />
+            {children}
+          </MotionProvider>
         </PlaybackProvider>
       </body>
     </html>

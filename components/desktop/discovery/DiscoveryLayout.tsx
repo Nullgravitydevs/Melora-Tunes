@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus, LayoutGrid, Menu, User, LogOut, Minimize2, ArrowLeft, ArrowRight, X } from "lucide-react";
 import { AudioQuality } from "@/lib/types";
 import { getArt } from "@/lib/helpers";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
 import { ArtistView } from "./views/ArtistView";
@@ -25,7 +25,8 @@ import { PlaylistItem } from "@/components/shared/PlaylistItem";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AddToPlaylistModal } from "./modals/AddToPlaylistModal";
 import { isUserPlaylistId, isUserPlaylistMix } from "@/lib/mix-id-utils";
-import { PlayableTrack } from "@/lib/types";
+import { PlayableTrack } from "@/lib/types";import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 
 /* ============================================================================
@@ -230,13 +231,9 @@ export function DiscoveryLayout() {
     const [mounted, setMounted] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showFullPlayer, setShowFullPlayer] = useState(false);
-    const {
-        mixes, currentSong, isPlaying, likedSongs, recentlyPlayed,
-        loadMix, playInstantMix,
-        downloadSong, removeDownload, isDownloaded,
-        activeMixId, play, addSongToMix, showToast, addMix, deleteMix, updateMix, togglePin, addToQueue,
-        isLiked, toggleLike
-    } = usePlayback();
+    const { currentSong, isPlaying, loadMix, playInstantMix, activeMixId, play, togglePin, addToQueue } = usePlayback();
+    const { mixes, likedSongs, recentlyPlayed, downloadSong, removeDownload, isDownloaded, addSongToMix, addMix, deleteMix, updateMix, isLiked, toggleLike } = useLibrary();
+    const { showToast } = useUI();
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null; sourceMixId?: string }>({
@@ -743,8 +740,10 @@ function EmptyState() {
 
 /* === PLAYER === */
 
-function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddToPlaylist: (song: any) => void }) {
-    const { currentSong, isPlaying, togglePlay, next, prev, progress, duration, seek, volume, setVolume, toggleLike, isLiked, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, downloadSong, isDownloaded, addToQueue, showToast } = usePlayback();
+function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddToPlaylist: (song: any) => void }) { const { currentSong, isPlaying, togglePlay, next, prev, duration, seek, volume, setVolume, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, addToQueue } = usePlayback();
+    const { toggleLike, isLiked, downloadSong, isDownloaded } = useLibrary();
+    const { showToast } = useUI();
+    const { progress } = useAudioProgress();
 
     const [showBarMenu, setShowBarMenu] = useState(false);
     const [showBarQuality, setShowBarQuality] = useState(false);

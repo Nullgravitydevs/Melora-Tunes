@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLyrics, LyricLine } from '@/hooks/useLyrics';
 import { JioSaavnSong } from '@/lib/jiosaavn';
+import { usePlayback } from '@/components/providers/playback-context';
 
 interface LyricsViewProps {
     currentSong: JioSaavnSong | undefined;
@@ -10,7 +11,8 @@ interface LyricsViewProps {
 }
 
 export const LyricsView: React.FC<LyricsViewProps> = ({ currentSong, currentTime, onClose }) => {
-    const { lyrics, plainLyrics, isSynced, isLoading, error } = useLyrics(currentSong);
+    const { lyrics, plainLyrics, isSynced, isLoading, error, offset, setOffset } = useLyrics(currentSong);
+    const { seek, duration } = usePlayback();
     const scrollRef = useRef<HTMLDivElement>(null);
     const [activeIndex, setActiveIndex] = useState(-1);
 
@@ -18,10 +20,10 @@ export const LyricsView: React.FC<LyricsViewProps> = ({ currentSong, currentTime
     useEffect(() => {
         if (!isSynced || lyrics.length === 0) return;
 
-        // Find the last line that has a time less than current time
+        const adjustedTime = currentTime - offset;
         const index = lyrics.findIndex((line, i) => {
             const nextLine = lyrics[i + 1];
-            return currentTime >= line.time && (!nextLine || currentTime < nextLine.time);
+            return adjustedTime >= line.time && (!nextLine || adjustedTime < nextLine.time);
         });
 
         if (index !== -1 && index !== activeIndex) {
@@ -62,7 +64,20 @@ export const LyricsView: React.FC<LyricsViewProps> = ({ currentSong, currentTime
 
             <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold text-white mb-1">{currentSong?.name || "No Song Playing"}</h2>
-                <p className="text-white/60 text-sm">{currentSong?.primaryArtists}</p>
+                <div className="flex items-center justify-center gap-4">
+                    <p className="text-white/60 text-sm">{currentSong?.primaryArtists}</p>
+                    {isSynced && (
+                        <div className="flex items-center gap-2 bg-white/5 opacity-50 hover:opacity-100 transition-opacity px-3 py-1 rounded-full border border-white/10">
+                            <span className="text-[9px] text-white/60 font-bold tracking-widest uppercase">Sync</span>
+                            <input
+                                type="range" min="-5" max="5" step="0.1"
+                                value={offset} onChange={e => setOffset(parseFloat(e.target.value))}
+                                className="w-16 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <span className="text-[10px] text-white font-mono tabular-nums w-8 text-right">{offset > 0 ? '+' : ''}{offset.toFixed(1)}s</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Content */}
@@ -90,8 +105,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({ currentSong, currentTime
                                 className={`text-2xl md:text-4xl font-bold text-center transition-all duration-300 cursor-pointer ${i === activeIndex ? 'text-white' : 'text-white/40'
                                     }`}
                                 onClick={() => {
-                                    // Optional: Seek to timestamp feature?
-                                    // For now just visual
+                                    seek(line.time / (duration || 1));
                                 }}
                             >
                                 {line.text}

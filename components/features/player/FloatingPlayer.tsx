@@ -3,7 +3,8 @@
 import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, Mic2 } from 'lucide-react';
 import { usePlayback } from '@/components/providers/playback-context';
 import { decodeHtml } from '@/lib/utils';
-import Image from 'next/image';
+import Image from 'next/image';import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 interface FloatingPlayerProps {
     onExpandClick?: () => void;
@@ -17,20 +18,8 @@ export function FloatingPlayer({
     onLyricsClick,
     className = "",
     theme = 'glass'
-}: FloatingPlayerProps) {
-    const {
-        currentSong,
-        isPlaying,
-        togglePlay,
-        next,
-        prev,
-        progress,
-        duration,
-        volume,
-        setVolume,
-        seek,
-        activeQuality
-    } = usePlayback();
+}: FloatingPlayerProps) { const { currentSong, isPlaying, togglePlay, next, prev, duration, volume, setVolume, seek, activeQuality } = usePlayback();
+    const { progress } = useAudioProgress();
 
     if (!currentSong) return null;
 

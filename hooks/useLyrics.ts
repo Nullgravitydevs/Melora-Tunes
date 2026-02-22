@@ -12,6 +12,7 @@ export function useLyrics(currentSong: JioSaavnSong | undefined) {
     const [isLoading, setIsLoading] = useState(false);
     const [isSynced, setIsSynced] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [offset, setOffset] = useState<number>(0); // Sync offset in seconds
 
     useEffect(() => {
         if (!currentSong) {
@@ -56,7 +57,7 @@ export function useLyrics(currentSong: JioSaavnSong | undefined) {
         return () => { cancelled = true; };
     }, [currentSong?.id]);
 
-    return { lyrics, plainLyrics, isSynced, isLoading, error };
+    return { lyrics, plainLyrics, isSynced, isLoading, error, offset, setOffset };
 }
 
 function parseLRC(lrc: string): LyricLine[] {

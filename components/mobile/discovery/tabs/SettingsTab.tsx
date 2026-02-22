@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Disc, ChevronRight, Volume2, Moon, Gauge, Globe,
@@ -33,12 +33,8 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 ];
 
 export function SettingsTab() {
-    const {
-        volume, setVolume, qualityPreference, setQualityPreference,
-        sleepTimer, setSleepTimer, notificationsEnabled, setNotificationsEnabled,
-        playbackSpeed, setPlaybackSpeed, stopAtEndOfSong, setStopAtEndOfSong,
-        likedSongs, mixes, setMixes, recentlyPlayed, eq,
-    } = usePlayback();
+    const { volume, setVolume, qualityPreference, setQualityPreference, sleepTimer, setSleepTimer, notificationsEnabled, setNotificationsEnabled, playbackSpeed, setPlaybackSpeed, stopAtEndOfSong, setStopAtEndOfSong, eq } = usePlayback();
+    const { likedSongs, mixes, setMixes, recentlyPlayed } = useLibrary();
 
     const [activeTab, setActiveTab] = useState<Tab>("profile");
     const settings = useMemo(() => loadSettings(), []);

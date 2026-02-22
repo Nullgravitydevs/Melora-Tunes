@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePlayback } from "@/components/providers/playback-context";
 
 interface VisualizerProps {
     isPlaying: boolean;
@@ -13,6 +14,7 @@ type VisualizerMode = 'SPECTRUM' | 'SCOPE' | 'CIRCLE' | 'LED';
 export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: VisualizerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [mode, setMode] = useState<VisualizerMode>('SPECTRUM');
+    const { getAnalyser } = usePlayback();
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -20,6 +22,10 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
 
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
+
+        const analyser = getAnalyser();
+        const dataArray = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
+        const timeDataArray = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
 
         let animationId: number;
         let tick = 0;
@@ -41,17 +47,29 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
             ctx.fillRect(0, 0, width, height);
 
             if (mode === 'SPECTRUM') {
+                if (analyser && dataArray) analyser.getByteFrequencyData(dataArray);
+
                 const barWidth = width / barCount;
                 const gap = 2;
 
                 bars.forEach((currentHeight, i) => {
-                    // Simulation Logic
                     let targetH = 0;
                     if (isPlaying) {
-                        // Create some "dancing" randomness based on sine waves + noise
-                        const noise = Math.random() * height * 0.5;
-                        const wave = Math.sin(tick * 0.1 + i) * height * 0.3;
-                        targetH = Math.max(5, Math.abs(wave + noise));
+                        if (analyser && dataArray) {
+                            // Map 20 bars to the 128 bins (roughly 6 bins per bar)
+                            const binSize = Math.floor(dataArray.length / barCount);
+                            const start = i * binSize;
+                            let sum = 0;
+                            for (let b = 0; b < binSize; b++) sum += dataArray[start + b];
+                            const avg = sum / binSize;
+                            // Scale 0-255 to canvas height
+                            targetH = Math.max(2, (avg / 255) * height);
+                        } else {
+                            // Fallback simulation if no audio node
+                            const noise = Math.random() * height * 0.5;
+                            const wave = Math.sin(tick * 0.1 + i) * height * 0.3;
+                            targetH = Math.max(5, Math.abs(wave + noise));
+                        }
                     } else {
                         targetH = 2; // Resting state
                     }
@@ -79,6 +97,8 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                 });
             }
             else if (mode === 'LED') {
+                if (analyser && dataArray) analyser.getByteFrequencyData(dataArray);
+
                 // Segmented LED Bars
                 const barWidth = width / barCount;
                 const gap = 2;
@@ -86,12 +106,20 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                 const segmentGap = 1;
 
                 bars.forEach((currentHeight, i) => {
-                    // Simulation Logic (Reuse)
                     let targetH = 0;
                     if (isPlaying) {
-                        const noise = Math.random() * height * 0.5;
-                        const wave = Math.sin(tick * 0.15 + i) * height * 0.35;
-                        targetH = Math.max(5, Math.abs(wave + noise));
+                        if (analyser && dataArray) {
+                            const binSize = Math.floor(dataArray.length / barCount);
+                            const start = i * binSize;
+                            let sum = 0;
+                            for (let b = 0; b < binSize; b++) sum += dataArray[start + b];
+                            const avg = sum / binSize;
+                            targetH = Math.max(2, (avg / 255) * height);
+                        } else {
+                            const noise = Math.random() * height * 0.5;
+                            const wave = Math.sin(tick * 0.15 + i) * height * 0.35;
+                            targetH = Math.max(5, Math.abs(wave + noise));
+                        }
                     } else {
                         targetH = 2;
                     }
@@ -117,6 +145,8 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                 });
             }
             else if (mode === 'SCOPE') {
+                if (analyser && timeDataArray) analyser.getByteTimeDomainData(timeDataArray);
+
                 // Oscilloscope
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = accentColor;
@@ -127,11 +157,19 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                 for (let x = 0; x < width; x++) {
                     let y = height / 2;
                     if (isPlaying) {
-                        // Complex wave: sum of sines
-                        const f1 = Math.sin(x * 0.05 + tick * 0.2);
-                        const f2 = Math.sin(x * 0.1 - tick * 0.1);
-                        const f3 = Math.sin(x * 0.02 + tick * 0.05);
-                        y += (f1 + f2 + f3) * (height * 0.15);
+                        if (analyser && timeDataArray) {
+                            // Map canvas width to dataArray length
+                            const index = Math.floor((x / width) * timeDataArray.length);
+                            const val = timeDataArray[index]; // 0-255
+                            const percent = (val / 128) - 1; // -1 to 1
+                            y += percent * (height / 2);
+                        } else {
+                            // Complex wave: sum of sines
+                            const f1 = Math.sin(x * 0.05 + tick * 0.2);
+                            const f2 = Math.sin(x * 0.1 - tick * 0.1);
+                            const f3 = Math.sin(x * 0.02 + tick * 0.05);
+                            y += (f1 + f2 + f3) * (height * 0.15);
+                        }
                     } else {
                         // Flatline with slight hum
                         y += Math.sin(x * 0.1 + tick * 0.1) * 2;
@@ -144,6 +182,8 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                 ctx.shadowBlur = 0; // Reset
             }
             else if (mode === 'CIRCLE') {
+                if (analyser && dataArray) analyser.getByteFrequencyData(dataArray);
+
                 // Circular Spectrum
                 const centerX = width / 2;
                 const centerY = height / 2;
@@ -157,9 +197,16 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                     const rad = (i * Math.PI) / 180;
                     let offset = 0;
                     if (isPlaying) {
-                        const noise = Math.random() * 10;
-                        const wave = Math.sin(tick * 0.1 + (i / 10)) * 10;
-                        offset = Math.abs(wave + noise);
+                        if (analyser && dataArray) {
+                            // map 360 degrees to frequency bins
+                            const binIndex = Math.floor((i / 360) * (dataArray.length / 2)); // Use lower half of frequencies (bass/mids)
+                            const val = dataArray[binIndex];
+                            offset = (val / 255) * (radius * 0.5); // Max extrude is 50% of radius
+                        } else {
+                            const noise = Math.random() * 10;
+                            const wave = Math.sin(tick * 0.1 + (i / 10)) * 10;
+                            offset = Math.abs(wave + noise);
+                        }
                     }
 
                     const r = radius + offset;
@@ -176,7 +223,15 @@ export function Visualizer({ isPlaying, className, accentColor = "#06b6d4" }: Vi
                 if (isPlaying) {
                     ctx.fillStyle = accentColor + '40'; // Low opacity
                     ctx.beginPath();
-                    const pulse = radius * 0.8 + Math.sin(tick * 0.2) * 5;
+
+                    let pulseStr = 5;
+                    if (analyser && dataArray) {
+                        // Bass is usually in the first few bins
+                        const bassSum = dataArray.slice(0, 4).reduce((a, b) => a + b, 0);
+                        pulseStr = (bassSum / (4 * 255)) * 10; // 0-10px extra radius based on bass
+                    }
+
+                    const pulse = radius * 0.8 + Math.sin(tick * 0.2) * 5 + pulseStr;
                     ctx.arc(centerX, centerY, pulse, 0, Math.PI * 2);
                     ctx.fill();
                 }

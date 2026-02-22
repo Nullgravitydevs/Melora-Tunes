@@ -8,7 +8,7 @@ import {
     Mic2, Share2, Plus, MoreHorizontal, Disc3, Radio,
     ListPlus, Download
 } from "lucide-react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI } from "@/components/providers/playback-context";
 import { useLyrics } from "@/hooks/useLyrics";
 import { decodeHtml } from "@/lib/utils";
 import { getArt } from "@/lib/helpers";
@@ -16,6 +16,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { PlayableTrack } from "@/lib/types";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface FullPlayerProps {
     isOpen: boolean;
@@ -26,17 +28,21 @@ interface FullPlayerProps {
 }
 
 export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddToPlaylist }: FullPlayerProps) {
-    const {
-        currentSong, isPlaying, togglePlay, next, prev,
-        progress, duration, seek, volume, setVolume,
-        shuffle, setShuffle, repeat, setRepeat,
-        showToast, queue, currentIndex, playIndex,
-        isLiked, toggleLike, activeQuality,
-        qualityPreference, setQualityPreference,
-        setQueue, addToQueue, downloadSong, removeDownload, isDownloaded, activeMixId
-    } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, queue, currentIndex, playIndex, activeQuality, qualityPreference, setQualityPreference, setQueue, addToQueue, activeMixId } = usePlayback();
+    const { progress } = useAudioProgress();
+    const { isLiked, toggleLike, downloadSong, removeDownload, isDownloaded } = useLibrary();
+    const { showToast } = useUI();
 
     const [viewMode, setViewMode] = useState<'art' | 'queue'>('art');
+
+    /* ── Queue Virtualization ── */
+    const queueParentRef = useRef<HTMLDivElement>(null);
+    const queueVirtualizer = useVirtualizer({
+        count: queue.length,
+        getScrollElement: () => queueParentRef.current,
+        estimateSize: () => 64, // ~64px per row
+        overscan: 10,
+    });
 
     /* ── Context Menu State ── */
     const [menuProps, setMenuProps] = useState<{ visible: boolean; x: number; y: number; song: JioSaavnSong | null }>({
@@ -176,24 +182,41 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                         <h2 className="text-xl font-bold flex items-center gap-3"><ListMusic size={20} /> Play Queue</h2>
                                         <button onClick={() => setViewMode('art')} className="px-3 py-1 rounded-full bg-white/10 text-xs font-semibold hover:bg-white/20 transition-colors">Done</button>
                                     </div>
-                                    <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar pr-2">
-                                        {queue.map((song, i) => (
-                                            <div key={song.id + i} onClick={() => playIndex(i)}
-                                                className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all group ${i === currentIndex ? 'bg-white/10' : 'hover:bg-white/5'}`}>
-                                                <div className="w-8 flex justify-center">
-                                                    {i === currentIndex ? (
-                                                        <Disc3 size={16} className="animate-spin text-white" />
-                                                    ) : (
-                                                        <span className="text-sm text-white/30 group-hover:text-white/60 font-mono">{i + 1}</span>
-                                                    )}
-                                                </div>
-                                                <img src={getArt(song)} alt="" className="w-10 h-10 rounded-md object-cover bg-white/5" />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className={`font-semibold truncate text-sm ${i === currentIndex ? 'text-white' : 'text-white/80'}`}>{decodeHtml(song.name)}</p>
-                                                    <p className="text-xs text-white/40 truncate">{decodeHtml(song.primaryArtists || '')}</p>
-                                                </div>
-                                            </div>
-                                        ))}
+                                    <div ref={queueParentRef} className="flex-1 overflow-y-auto custom-scrollbar pr-2 relative">
+                                        <div style={{ height: `${queueVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                                            {queueVirtualizer.getVirtualItems().map((virtualItem) => {
+                                                const i = virtualItem.index;
+                                                const song = queue[i];
+                                                return (
+                                                    <div key={virtualItem.key}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: 0,
+                                                            left: 0,
+                                                            width: '100%',
+                                                            height: `${virtualItem.size}px`,
+                                                            transform: `translateY(${virtualItem.start}px)`
+                                                        }}
+                                                    >
+                                                        <div onClick={() => playIndex(i)}
+                                                            className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all group ${i === currentIndex ? 'bg-white/10' : 'hover:bg-white/5'} h-[60px] mx-1`}>
+                                                            <div className="w-8 flex justify-center">
+                                                                {i === currentIndex ? (
+                                                                    <Disc3 size={16} className="animate-spin text-white" />
+                                                                ) : (
+                                                                    <span className="text-sm text-white/30 group-hover:text-white/60 font-mono">{i + 1}</span>
+                                                                )}
+                                                            </div>
+                                                            <img src={getArt(song)} alt="" className="w-10 h-10 rounded-md object-cover bg-white/5" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className={`font-semibold truncate text-sm ${i === currentIndex ? 'text-white' : 'text-white/80'}`}>{decodeHtml(song.name)}</p>
+                                                                <p className="text-xs text-white/40 truncate">{decodeHtml(song.primaryArtists || '')}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (

@@ -10,13 +10,14 @@ import {
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
-import { Mix, usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { getThumbnailUrl } from "@/lib/jiosaavn";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
-import { QualityBadge } from "@/components/shared/QualityBadge";
+import { QualityBadge } from "@/components/shared/QualityBadge";import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 interface SilverFrostStageProps {
     currentTheme: ThemeKey;
@@ -38,12 +39,9 @@ interface SilverFrostStageProps {
 export function SilverFrostStage({
     currentTheme, onThemeChange, onSelectTheme, onOpenSettings,
     onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onSnapshotMix, onShowLyrics, onShowQueue, onShareMix
-}: SilverFrostStageProps) {
-    const {
-        mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, togglePlay, next, prev, setVolume, isLoaded, seek,
-        shuffle, setShuffle, repeat, setRepeat, eq, activeQuality
-    } = usePlayback();
+}: SilverFrostStageProps) { const { activeMixId, isPlaying, currentSong, volume, duration, loadMix, togglePlay, next, prev, setVolume, isLoaded, seek, shuffle, setShuffle, repeat, setRepeat, eq, activeQuality } = usePlayback();
+    const { mixes } = useLibrary();
+    const { progress } = useAudioProgress();
 
     const { playClick, playClunk } = useAudio();
     const activeMix = mixes.find(m => m.id === activeMixId) || null;

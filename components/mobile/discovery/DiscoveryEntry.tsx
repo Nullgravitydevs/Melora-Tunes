@@ -20,7 +20,8 @@ import { FullPlayerSheet } from "./views/FullPlayerSheet";
 import { ArtistView } from "./views/ArtistView";
 import { AlbumView } from "./views/AlbumView";
 import { PlaylistView } from "./views/PlaylistView";
-import { SectionView } from "./views/SectionView";
+import { SectionView } from "./views/SectionView";import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 // ─── Types ───────────────────────────────────────────────
 type Tab = "HOME" | "SEARCH" | "EXPLORE" | "LIBRARY" | "SETTINGS";
@@ -35,15 +36,12 @@ export interface ViewState {
 export { getArt } from "@/lib/helpers";
 
 // ─── Main Entry ──────────────────────────────────────────
-export function DiscoveryEntry() {
-    const [activeTab, setActiveTab] = useState<Tab>("HOME");
+export function DiscoveryEntry() { const [activeTab, setActiveTab] = useState<Tab>("HOME");
     const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(new Set(["HOME"]));
     const [viewStack, setViewStack] = useState<ViewState[]>([]);
     const [showFullPlayer, setShowFullPlayer] = useState(false);
-    const {
-        currentSong, isPlaying, togglePlay,
-        next, prev, progress, activeQuality
-    } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, activeQuality } = usePlayback();
+    const { progress } = useAudioProgress();
 
     const navigate = useCallback((view: ViewState) => {
         setViewStack((s) => [...s, view]);

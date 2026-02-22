@@ -703,12 +703,35 @@ export async function getNewReleases(limit: number = 10, language?: string): Pro
 
 export async function getSyncedLyrics(song: JioSaavnSong): Promise<{ synced: boolean; text: string | null }> {
     try {
+        if (!song || !song.id) return { synced: false, text: null };
+        const CACHE_KEY = `lyrics_${song.id}`;
+
+        if (typeof window !== 'undefined') {
+            try {
+                const { get } = await import('idb-keyval');
+                const cached = await get(CACHE_KEY);
+                if (cached) {
+                    console.log('Returned cached lyrics for', song.id);
+                    return cached;
+                }
+            } catch (e) { }
+        }
+
         const text = await getLyricsWithFallback(song);
         if (!text) return { synced: false, text: null };
 
         // Check if it looks like LRC
         const isSynced = /\[\d{2}:\d{2}\.\d{2,3}\]/.test(text);
-        return { synced: isSynced, text };
+        const result = { synced: isSynced, text };
+
+        if (typeof window !== 'undefined') {
+            try {
+                const { set } = await import('idb-keyval');
+                await set(CACHE_KEY, result);
+            } catch (e) { }
+        }
+
+        return result;
     } catch (e) {
         return { synced: false, text: null };
     }

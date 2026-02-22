@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, Pause, Shuffle, Heart, ArrowLeft, MoreHorizontal, Clock, Disc3, AlertCircle, RefreshCcw } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { getAlbumDetails, getArtistDetails, JioSaavnSong, searchAlbums } from "@/lib/jiosaavn";
 import { shuffleArray, getArt } from "@/lib/helpers";
 import { HorizontalScroll, StandardCard, SectionHeader, VibeAlbumCard } from "../home/HomeComponents";
@@ -17,7 +17,9 @@ interface AlbumViewProps {
 }
 
 export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumViewProps) {
-    const { addMix, updateMix, loadMix, currentSong, isPlaying, togglePlay, activeMixId, toggleSaveAlbum, isAlbumSaved, togglePin, mixes, showToast } = usePlayback();
+    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin } = usePlayback();
+    const { addMix, updateMix, toggleSaveAlbum, isAlbumSaved, mixes } = useLibrary();
+    const { showToast } = useUI();
 
     const [songs, setSongs] = useState<JioSaavnSong[]>([]);
     const [moreFromArtist, setMoreFromArtist] = useState<any[]>([]);

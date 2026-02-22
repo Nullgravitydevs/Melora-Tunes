@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw, ListPlus } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack } from "@/lib/types";
 import { loadSettings } from "@/lib/settings";
@@ -21,12 +21,9 @@ interface PlaylistViewProps {
 }
 
 export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: PlaylistViewProps) {
-    const {
-        addMix, updateMix, loadMix, deleteMix,
-        currentSong, isPlaying, togglePlay, activeMixId,
-        togglePin, mixes, qualityPreference, showToast,
-        toggleLike, isLiked, isDownloaded // Added missing handlers
-    } = usePlayback();
+    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin, qualityPreference } = usePlayback();
+    const { addMix, updateMix, deleteMix, mixes, toggleLike, isLiked, isDownloaded } = useLibrary();
+    const { showToast } = useUI();
 
     const [songs, setSongs] = useState<(JioSaavnSong | PlayableTrack)[]>([]);
     const [searchQuery, setSearchQuery] = useState(""); // Add search state

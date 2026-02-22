@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Play, Pause, Music, AlertCircle, RefreshCcw, ChevronRight, Disc3 } from "lucide-react";
 import { getStrictLaunchData, LaunchData, JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 
 /* ==========================================================================
    HOME VIEW — Premium Discovery Home
@@ -262,7 +262,8 @@ function QuickPick({ item, onClick, isCurrent, isPlaying, onContextMenu }: { ite
 // MAIN: HOME VIEW
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onContextMenu }: HomeViewProps) {
-    const { playInstantMix, addMix, updateMix, loadMix } = usePlayback();
+    const { playInstantMix, loadMix } = usePlayback();
+    const { addMix, updateMix } = useLibrary();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [launchData, setLaunchData] = useState<LaunchData | null>(null);

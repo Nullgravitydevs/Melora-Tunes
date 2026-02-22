@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Play, Pause, Clock, TrendingUp } from "lucide-react";
 import { searchUnified } from "@/lib/unified-search";
@@ -34,10 +34,8 @@ export function SearchTab({ onNavigate }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
     const abortRef = useRef<AbortController | null>(null);
     const { history, addSearch, removeSearch, clearHistory } = useSearchHistory();
-    const {
-        playInstantMix, addMix, updateMix, loadMix, mixes, activeMixId,
-        currentSong, isPlaying, togglePlay, addSongToMix
-    } = usePlayback();
+    const { playInstantMix, loadMix, activeMixId, currentSong, isPlaying, togglePlay } = usePlayback();
+    const { addMix, updateMix, mixes, addSongToMix } = useLibrary();
 
     // Load quality preference
     useEffect(() => {

@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { clsx } from "clsx";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { useAudio } from "@/hooks/use-audio";
 import { ThemeConfig, ThemeKey, THEMES } from "@/components/ui/desktop-player";
 import { QualityBadge } from "@/components/shared/QualityBadge";
@@ -15,6 +15,7 @@ import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 interface DeckStageProps {
     currentTheme: ThemeKey;
@@ -107,15 +108,52 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     const [showEq, setShowEq] = useState(false);
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const {
-        currentSong, currentTrack, isPlaying, togglePlay, next, prev, seek, volume, setVolume,
-        progress, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, mixes, addMix,
-        updateMix, deleteMix, activeMixId, play,
-        likedSongs, toggleLike, isLiked, recentlyPlayed, eq, isDownloaded,
-        downloadSong, removeDownload, activeQuality
-    } = usePlayback();
+    const { currentSong, currentTrack, currentTrackMetadata, isPlaying, togglePlay, next, prev, seek, volume, setVolume, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, activeMixId, play, eq, activeQuality } = usePlayback();
+    const { mixes, addMix, updateMix, deleteMix, likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded, downloadSong, removeDownload } = useLibrary();
+    const { progress } = useAudioProgress();
+    const { playClick, playClunk, playEject, playInsert } = useAudio();
 
     const isDraggingRef = useRef(false);
+
+    // Global Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if user is typing in an input
+            if (['INPUT', 'TEXTAREA'].includes((document.activeElement as HTMLElement)?.tagName)) return;
+
+            switch (e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    playClick();
+                    togglePlay();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    seek(Math.max(0, progress - 0.05));
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    seek(Math.min(1, progress + 0.05));
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    setVolume(Math.min(1, volume + 0.05));
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    setVolume(Math.max(0, volume - 0.05));
+                    break;
+                case 'KeyM':
+                    e.preventDefault();
+                    // Toggle mute (restore to 0.7 if muted)
+                    setVolume(volume === 0 ? 0.7 : 0);
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [togglePlay, seek, progress, volume, setVolume, playClick]);
 
     const handleDragStart = () => {
         isDraggingRef.current = true;
@@ -133,7 +171,6 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
         }
     };
 
-    const { playClick, playClunk, playEject, playInsert } = useAudio();
     const theme = THEMES[currentTheme];
 
     const activeMix = useMemo(() => mixes.find(m => m.id === activeMixId), [mixes, activeMixId]);
@@ -761,8 +798,18 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                         "READY"
                                     )}
                                 </span>
-                                {/* LCD Quality Badge */}
-                                <div className="ml-2 scale-90 origin-right">
+                                {/* LCD Metadata & Quality Badge */}
+                                <div className="ml-2 scale-90 origin-right flex items-center gap-1.5 flex-shrink-0">
+                                    {currentTrackMetadata && (
+                                        <div className="flex gap-1 mr-1">
+                                            <span className="bg-black/20 text-black/80 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border border-black/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] tracking-widest">
+                                                {currentTrackMetadata.bpm} BPM
+                                            </span>
+                                            <span className="bg-black/20 text-black/80 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border border-black/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] tracking-widest">
+                                                {currentTrackMetadata.key}
+                                            </span>
+                                        </div>
+                                    )}
                                     <QualityBadge quality={activeQuality} variant="full" />
                                 </div>
                             </div>

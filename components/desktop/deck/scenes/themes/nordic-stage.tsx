@@ -10,12 +10,13 @@ import {
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
-import { Mix, usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
-import { QualityBadge } from "@/components/shared/QualityBadge";
+import { QualityBadge } from "@/components/shared/QualityBadge";import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 interface NordicStageProps {
     currentTheme: ThemeKey;
@@ -49,14 +50,10 @@ export function NordicStage({
     onShowLyrics,
     onShowQueue,
     onShareMix
-}: NordicStageProps) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const {
-        mixes, activeMixId, isPlaying, currentSong, volume, progress, duration,
-        loadMix, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq, activeQuality,
-        shuffle, setShuffle, repeat, setRepeat
-    } = usePlayback();
+}: NordicStageProps) { const containerRef = useRef<HTMLDivElement>(null);
+    const { activeMixId, isPlaying, currentSong, volume, duration, loadMix, togglePlay, next, prev, seek, setVolume, isLoaded, eq, activeQuality, shuffle, setShuffle, repeat, setRepeat } = usePlayback();
+    const { mixes } = useLibrary();
+    const { progress } = useAudioProgress();
 
     const { playClick, playEject } = useAudio();
     const [showLyrics, setShowLyrics] = useState(false);

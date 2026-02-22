@@ -3,7 +3,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Radio, Mic2, Calendar, Zap, Play, Signal, Moon, Dumbbell, Headphones } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useUI } from "@/components/providers/playback-context";
 import { SectionHeader, HorizontalScroll } from "../home/HomeComponents";
 import { JioSaavnSong, searchSongs, searchArtists, fixImageUrl } from "@/lib/jiosaavn";
 import { PlayableTrack, AudioQuality } from "@/lib/types";
@@ -39,7 +39,8 @@ const VIBE_STATIONS = [
 ];
 
 export function RadioView({ onNavigate }: RadioViewProps) {
-    const { playInstantMix, showToast, qualityPreference } = usePlayback();
+    const { playInstantMix, qualityPreference } = usePlayback();
+    const { showToast } = useUI();
     const [artistStations, setArtistStations] = React.useState(INITIAL_ARTIST_STATIONS);
 
     React.useEffect(() => {

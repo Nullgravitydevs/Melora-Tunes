@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, useAnimation, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import { ChevronRight, Play, Disc3, ArrowLeft, AlertCircle, RefreshCcw, Library, ListPlus } from "lucide-react";
 import { JioSaavnSong, getAlbumDetails } from "@/lib/jiosaavn";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI } from "@/components/providers/playback-context";
 import { decodeHtml } from "@/lib/utils";
 import { getArt } from "@/lib/helpers";
 
@@ -21,7 +21,9 @@ export function PeelRevealView({ album: initialAlbum, onBack, onPlay, onContextM
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [album, setAlbum] = useState(initialAlbum); // Allow updating with API data
-    const { playInstantMix, isPlaying, currentSong, toggleSaveAlbum, isAlbumSaved, showToast } = usePlayback();
+    const { playInstantMix, isPlaying, currentSong } = usePlayback();
+    const { toggleSaveAlbum, isAlbumSaved } = useLibrary();
+    const { showToast } = useUI();
 
     const dragX = useMotionValue(0);
     const cdControls = useAnimation();

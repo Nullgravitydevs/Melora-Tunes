@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Play, AlertCircle, RefreshCcw } from "lucide-react";
 import { searchPlaylists, searchAlbums, searchSongs, getTopCharts, fixImageUrl, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useUI } from "@/components/providers/playback-context";
 import { StandardCard, FeatureCard, HorizontalScroll, SectionHeader } from "../home/HomeComponents";
 import { decodeHtml } from "@/lib/utils";
 
@@ -16,7 +16,8 @@ interface ExploreViewProps {
 
 export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu }: ExploreViewProps) {
 
-    const { playInstantMix, showToast } = usePlayback();
+    const { playInstantMix } = usePlayback();
+    const { showToast } = useUI();
 
     // State for all sections
     const [content, setContent] = useState<{

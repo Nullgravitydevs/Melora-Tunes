@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion } from "framer-motion";
 import {
     ChevronLeft, Play, Pause, Shuffle, Heart, UserPlus, UserCheck,
@@ -29,10 +29,8 @@ export function ArtistView({ artist, onBack, onNavigate }: Props) {
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const [showFullBio, setShowFullBio] = useState(false);
-    const {
-        playInstantMix, addMix, updateMix, loadMix, mixes,
-        currentSong, isPlaying, togglePlay, toggleFollowArtist, isArtistFollowed
-    } = usePlayback();
+    const { playInstantMix, loadMix, currentSong, isPlaying, togglePlay } = usePlayback();
+    const { addMix, updateMix, mixes, toggleFollowArtist, isArtistFollowed } = useLibrary();
 
     const artistId = artist?.id || artist?.artistId || "";
     const artistName = decodeHtml(artist?.name || artist?.title || "");

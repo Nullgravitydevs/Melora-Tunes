@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     ChevronLeft, Play, Pause, Shuffle, Heart, Search, X,
@@ -13,6 +13,8 @@ import { decodeHtml } from "@/lib/utils";
 import { shuffleArray } from "@/lib/helpers";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { getArt, type ViewState } from "../DiscoveryEntry";
+import { MetadataStore } from "@/lib/metadata-store";
+import { AudioAnalysisResult } from "@/lib/audio-analysis";
 
 interface Props {
     playlist: any;
@@ -26,11 +28,9 @@ export function PlaylistView({ playlist, onBack, onNavigate }: Props) {
     const [search, setSearch] = useState("");
     const [showSearch, setShowSearch] = useState(false);
     const [showConfirm, setShowConfirm] = useState<{ message: string; action: () => void } | null>(null);
-    const {
-        addMix, updateMix, loadMix, mixes, playInstantMix,
-        currentSong, isPlaying, togglePlay, toggleLike, isLiked,
-        deleteMix
-    } = usePlayback();
+    const [trackMetadataMap, setTrackMetadataMap] = useState<Record<string, AudioAnalysisResult>>({});
+    const { loadMix, playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
+    const { addMix, updateMix, mixes, toggleLike, isLiked, deleteMix } = useLibrary();
 
     const playlistId = playlist?.id || playlist?.listid || "";
     const playlistName = decodeHtml(playlist?.name || playlist?.title || "");
@@ -75,6 +75,30 @@ export function PlaylistView({ playlist, onBack, onNavigate }: Props) {
         load();
         return () => { cancelled = true; };
     }, [playlistId, playlistName]);
+
+    useEffect(() => {
+        let active = true;
+        const fetchMeta = async () => {
+            if (tracks.length === 0) return;
+            const newMeta: Record<string, AudioAnalysisResult> = {};
+            let hasChanges = false;
+            for (const t of tracks) {
+                const id = (t as any).id || (t as any).song?.id;
+                if (id && !trackMetadataMap[id]) {
+                    const meta = await MetadataStore.getMetadata(id);
+                    if (meta && active) {
+                        newMeta[id] = meta as AudioAnalysisResult;
+                        hasChanges = true;
+                    }
+                }
+            }
+            if (hasChanges && active) {
+                setTrackMetadataMap(prev => ({ ...prev, ...newMeta }));
+            }
+        };
+        fetchMeta();
+        return () => { active = false; };
+    }, [tracks]);
 
     const filteredTracks = search.trim()
         ? tracks.filter((t) => {
@@ -233,7 +257,19 @@ export function PlaylistView({ playlist, onBack, onNavigate }: Props) {
                                         </div>
                                         <div className="flex-1 min-w-0 text-left">
                                             <p className={`text-[13px] font-medium truncate ${current ? "text-white" : "text-white/70"}`}>{name}</p>
-                                            <p className="text-[10px] text-white/25 truncate">{artist}</p>
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <p className="text-[10px] text-white/25 truncate">{artist}</p>
+                                                {trackMetadataMap[((song as any).id || (song as any).song?.id)] && (
+                                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                                        <span className="text-[8px] bg-white/10 text-white/60 px-1 py-0.5 rounded uppercase font-bold tracking-widest leading-none border border-white/5">
+                                                            {trackMetadataMap[((song as any).id || (song as any).song?.id)].bpm} BPM
+                                                        </span>
+                                                        <span className="text-[8px] bg-white/10 text-white/60 px-1 py-0.5 rounded uppercase font-bold tracking-widest leading-none border border-white/5">
+                                                            {trackMetadataMap[((song as any).id || (song as any).song?.id)].key}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </button>
                                     <span className="text-[10px] text-white/15 font-mono flex-shrink-0">

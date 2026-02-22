@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, ListMusic, Check } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack, isPlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
@@ -15,7 +15,9 @@ interface AddToPlaylistModalProps {
 }
 
 export function AddToPlaylistModal({ song, onClose }: AddToPlaylistModalProps) {
-    const { mixes, addMix, addSongToMix, showToast, qualityPreference } = usePlayback();
+    const { qualityPreference } = usePlayback();
+    const { mixes, addMix, addSongToMix } = useLibrary();
+    const { showToast } = useUI();
     const [showCreateInput, setShowCreateInput] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState("");
 

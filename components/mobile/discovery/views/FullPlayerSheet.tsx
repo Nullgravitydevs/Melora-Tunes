@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import {
     ChevronDown, Play, Pause, SkipBack, SkipForward,
@@ -12,6 +12,8 @@ import { decodeHtml } from "@/lib/utils";
 import { QualityBadge } from "@/components/shared/QualityBadge";
 import { useLyrics } from "@/hooks/useLyrics";
 import { getArt, type ViewState } from "../DiscoveryEntry";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface Props {
     isOpen: boolean;
@@ -22,20 +24,26 @@ interface Props {
 type ViewMode = "art" | "lyrics" | "queue";
 
 export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
-    const {
-        currentSong, isPlaying, togglePlay, next, prev, seek,
-        progress, duration, volume, setVolume, shuffle, setShuffle,
-        repeat, setRepeat, activeQuality, toggleLike, isLiked,
-        queue, currentIndex, playIndex, addSongToMix, mixes
-    } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, seek, duration, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, activeQuality, queue, currentIndex, playIndex, currentTrackMetadata } = usePlayback();
+    const { toggleLike, isLiked, addSongToMix, mixes } = useLibrary();
+    const { progress } = useAudioProgress();
 
     const [viewMode, setViewMode] = useState<ViewMode>("art");
     const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
     const [addTarget, setAddTarget] = useState<any>(null);
     const lyricsRef = useRef<HTMLDivElement>(null);
 
+    /* ── Queue Virtualization ── */
+    const queueParentRef = useRef<HTMLDivElement>(null);
+    const queueVirtualizer = useVirtualizer({
+        count: queue.length,
+        getScrollElement: () => queueParentRef.current,
+        estimateSize: () => 60, // ~60px height per item
+        overscan: 10,
+    });
+
     const songId = (currentSong as any)?.id || "";
-    const { lyrics, plainLyrics, isSynced, isLoading: lyricsLoading } = useLyrics(currentSong as any);
+    const { lyrics, plainLyrics, isSynced, isLoading: lyricsLoading, offset, setOffset } = useLyrics(currentSong as any);
 
     // Format time
     const fmt = (s: number) => {
@@ -164,76 +172,117 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                                             <h2 className="text-xl font-bold text-white truncate">{songName}</h2>
                                             <p className="text-[13px] text-white/40 mt-1 truncate">{songArtist}</p>
                                             {songAlbum && <p className="text-[11px] text-white/20 mt-0.5 truncate">{songAlbum}</p>}
-                                            {activeQuality && (
-                                                <div className="flex justify-center mt-2">
+                                            <div className="flex justify-center items-center gap-2 mt-2">
+                                                {activeQuality && (
                                                     <QualityBadge quality={activeQuality} variant="full" />
+                                                )}
+                                                {currentTrackMetadata && (
+                                                    <div className="flex gap-1">
+                                                        <span className="bg-white/10 text-white/70 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-white/5 tracking-wider backdrop-blur-md">
+                                                            {currentTrackMetadata.bpm} BPM
+                                                        </span>
+                                                        <span className="bg-white/10 text-white/70 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-white/5 tracking-wider backdrop-blur-md">
+                                                            {currentTrackMetadata.key}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {viewMode === "lyrics" && (
+                                    <motion.div key="lyrics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col pt-2 pb-8">
+                                        {isSynced && (
+                                            <div className="flex items-center justify-center mb-2 px-8 shrink-0">
+                                                <div className="flex items-center gap-2 bg-white/5 opacity-50 hover:opacity-100 transition-opacity px-3 py-1.5 rounded-full border border-white/10">
+                                                    <span className="text-[9px] text-white/60 font-bold tracking-widest uppercase">Sync</span>
+                                                    <input
+                                                        type="range" min="-5" max="5" step="0.1"
+                                                        value={offset} onChange={e => setOffset(parseFloat(e.target.value))}
+                                                        className="w-24 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                    />
+                                                    <span className="text-[10px] text-white font-mono tabular-nums w-8 text-right">{offset > 0 ? '+' : ''}{offset.toFixed(1)}s</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="flex-1 overflow-y-auto no-scrollbar px-8" ref={lyricsRef}>
+                                            {lyricsLoading ? (
+                                                <div className="flex items-center justify-center h-full">
+                                                    <div className="w-6 h-6 border-2 border-white/10 border-t-white rounded-full animate-spin" />
+                                                </div>
+                                            ) : lyrics.length > 0 ? (
+                                                lyrics.map((line, i) => {
+                                                    const adjustedTime = elapsed - offset;
+                                                    const nextLine = lyrics[i + 1];
+                                                    const isActive = isSynced && adjustedTime >= line.time && (!nextLine || adjustedTime < nextLine.time);
+                                                    return (
+                                                        <p
+                                                            key={i}
+                                                            onClick={() => isSynced && seek(line.time / (duration || 1))}
+                                                            className={`py-2 text-lg font-semibold transition-all duration-300 cursor-pointer
+                                                                ${isActive ? "text-white scale-105 origin-left" : "text-white/20"}`}
+                                                        >
+                                                            {line.text || "♪"}
+                                                        </p>
+                                                    );
+                                                })
+                                            ) : plainLyrics ? (
+                                                <p className="text-white/40 text-sm whitespace-pre-line leading-7">{plainLyrics}</p>
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full">
+                                                    <p className="text-white/20 text-sm">No lyrics available</p>
                                                 </div>
                                             )}
                                         </div>
                                     </motion.div>
                                 )}
 
-                                {viewMode === "lyrics" && (
-                                    <motion.div key="lyrics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full overflow-y-auto no-scrollbar px-8 pt-4 pb-8" ref={lyricsRef}>
-                                        {lyricsLoading ? (
-                                            <div className="flex items-center justify-center h-full">
-                                                <div className="w-6 h-6 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-                                            </div>
-                                        ) : lyrics.length > 0 ? (
-                                            lyrics.map((line, i) => {
-                                                const currentTime = elapsed;
-                                                const nextLine = lyrics[i + 1];
-                                                const isActive = isSynced && currentTime >= line.time && (!nextLine || currentTime < nextLine.time);
-                                                return (
-                                                    <p
-                                                        key={i}
-                                                        onClick={() => isSynced && seek(line.time / (duration || 1))}
-                                                        className={`py-2 text-lg font-semibold transition-all duration-300 cursor-pointer
-                                                            ${isActive ? "text-white scale-105 origin-left" : "text-white/20"}`}
-                                                    >
-                                                        {line.text || "♪"}
-                                                    </p>
-                                                );
-                                            })
-                                        ) : plainLyrics ? (
-                                            <p className="text-white/40 text-sm whitespace-pre-line leading-7">{plainLyrics}</p>
-                                        ) : (
-                                            <div className="flex items-center justify-center h-full">
-                                                <p className="text-white/20 text-sm">No lyrics available</p>
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                )}
-
                                 {viewMode === "queue" && (
-                                    <motion.div key="queue" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full overflow-y-auto no-scrollbar px-5 pt-2 pb-8">
-                                        <h3 className="text-[11px] font-bold uppercase text-white/25 tracking-[0.15em] mb-3 px-1">Queue</h3>
-                                        {queue.map((song: any, i: number) => {
-                                            const isActive = i === currentIndex;
-                                            const art = getArt(song);
-                                            return (
-                                                <button
-                                                    key={(song.id || i) + "-q-" + i}
-                                                    onClick={() => playIndex(i)}
-                                                    className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-colors ${isActive ? "bg-white/[0.05]" : "active:bg-white/[0.03]"}`}
-                                                >
-                                                    <span className={`w-5 text-right text-[11px] font-medium flex-shrink-0 ${isActive ? "text-white" : "text-white/15"}`}>
-                                                        {isActive ? "▶" : i + 1}
-                                                    </span>
-                                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/[0.04] flex-shrink-0">
-                                                        {art && <img src={art} className="w-full h-full object-cover" alt="" />}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0 text-left">
-                                                        <p className={`text-[12px] font-medium truncate ${isActive ? "text-white" : "text-white/60"}`}>
-                                                            {decodeHtml(song.name || song.title || "")}
-                                                        </p>
-                                                        <p className="text-[10px] text-white/25 truncate">
-                                                            {decodeHtml(song.primaryArtists || song.artist || "")}
-                                                        </p>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
+                                    <motion.div key="queue" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full px-5 pt-2 pb-8 flex flex-col">
+                                        <h3 className="text-[11px] font-bold uppercase text-white/25 tracking-[0.15em] mb-3 px-1 flex-shrink-0">Queue</h3>
+                                        <div ref={queueParentRef} className="flex-1 overflow-y-auto no-scrollbar relative">
+                                            <div style={{ height: `${queueVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                                                {queueVirtualizer.getVirtualItems().map((virtualItem) => {
+                                                    const i = virtualItem.index;
+                                                    const song = queue[i] as any;
+                                                    const isActive = i === currentIndex;
+                                                    const art = getArt(song);
+                                                    return (
+                                                        <div key={virtualItem.key}
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: 0,
+                                                                left: 0,
+                                                                width: '100%',
+                                                                height: `${virtualItem.size}px`,
+                                                                transform: `translateY(${virtualItem.start}px)`
+                                                            }}
+                                                        >
+                                                            <button
+                                                                onClick={() => playIndex(i)}
+                                                                className={`w-full h-full flex items-center gap-3 p-2.5 rounded-xl transition-colors ${isActive ? "bg-white/[0.05]" : "active:bg-white/[0.03]"}`}
+                                                            >
+                                                                <span className={`w-5 text-right text-[11px] font-medium flex-shrink-0 ${isActive ? "text-white" : "text-white/15"}`}>
+                                                                    {isActive ? "▶" : i + 1}
+                                                                </span>
+                                                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/[0.04] flex-shrink-0">
+                                                                    {art && <img src={art} className="w-full h-full object-cover" alt="" />}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0 text-left">
+                                                                    <p className={`text-[12px] font-medium truncate ${isActive ? "text-white" : "text-white/60"}`}>
+                                                                        {decodeHtml(song.name || song.title || "")}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-white/25 truncate">
+                                                                        {decodeHtml(song.primaryArtists || song.artist || "")}
+                                                                    </p>
+                                                                </div>
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
                                     </motion.div>
                                 )}
                             </AnimatePresence>

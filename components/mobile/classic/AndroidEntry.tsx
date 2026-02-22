@@ -17,7 +17,7 @@ import { IpodScreen } from "./IpodScreen";
 import { ChevronRight, Battery, Wifi, Play, Pause, SkipForward, SkipBack, Volume2, Search, ArrowRight, Star, Heart, Music, Zap, Smile, Ghost, Skull, Trash2, ShoppingBag, MessageSquare } from "lucide-react";
 import { StickerLayer, Sticker, StickerType } from './stickers/StickerLayer';
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { shuffleArray, getArt } from "@/lib/helpers";
 import { PlayableTrack, PlayableSource } from "@/lib/types";
 import { searchSongs, JioSaavnSong, getAlbumDetails, getLyricsWithFallback } from "@/lib/jiosaavn";
@@ -26,7 +26,8 @@ import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useIpodAudio } from "@/hooks/use-ipod-audio";
-import { useIsMobile } from "@/hooks/use-is-mobile";
+import { useIsMobile } from "@/hooks/use-is-mobile";import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 interface MenuItem {
     label: string;
@@ -94,21 +95,9 @@ export function AndroidEntry({ onSwitchToDesktop }: AndroidEntryProps) {
     );
 }
 
-function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
-    const {
-        play, pause, togglePlay, next, prev,
-        volume, setVolume,
-        currentSong, isPlaying, progress, duration, seek,
-        activeMixId, loadMix, updateMix, activeMix,
-        mixes, addMix, deleteMix,
-        shuffle, setShuffle, repeat, setRepeat,
-        queue, currentIndex,
-        sleepTimer, setSleepTimer,
-        stopAtEndOfSong, setStopAtEndOfSong,
-        likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded,
-        playInstantMix, activeQuality, qualityPreference, setQualityPreference,
-        eq, playbackSpeed, setPlaybackSpeed, downloadSong, removeDownload
-    } = usePlayback();
+function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) { const { play, pause, togglePlay, next, prev, volume, setVolume, currentSong, isPlaying, duration, seek, activeMixId, loadMix, activeMix, shuffle, setShuffle, repeat, setRepeat, queue, currentIndex, sleepTimer, setSleepTimer, stopAtEndOfSong, setStopAtEndOfSong, playInstantMix, activeQuality, qualityPreference, setQualityPreference, eq, playbackSpeed, setPlaybackSpeed } = usePlayback();
+    const { updateMix, mixes, addMix, deleteMix, likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded, downloadSong, removeDownload } = useLibrary();
+    const { progress } = useAudioProgress();
 
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");

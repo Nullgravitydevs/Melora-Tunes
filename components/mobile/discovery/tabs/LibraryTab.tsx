@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Heart, Disc3, Users, Clock, ListMusic, Plus, Play, Shuffle,
@@ -32,11 +32,8 @@ export function LibraryTab({ onNavigate }: Props) {
     const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
     const [showConfirm, setShowConfirm] = useState<{ message: string; action: () => void } | null>(null);
     const [newPlaylistName, setNewPlaylistName] = useState("");
-    const {
-        likedSongs, savedAlbums, savedArtists, recentlyPlayed, mixes,
-        playInstantMix, toggleLike, isLiked, toggleSaveAlbum, toggleFollowArtist,
-        addMix, deleteMix, loadMix, isDownloaded
-    } = usePlayback();
+    const { playInstantMix, loadMix } = usePlayback();
+    const { likedSongs, savedAlbums, savedArtists, recentlyPlayed, mixes, toggleLike, isLiked, toggleSaveAlbum, toggleFollowArtist, addMix, deleteMix, isDownloaded } = useLibrary();
 
     const userPlaylists = useMemo(() =>
         mixes.filter((m) => !m.id.startsWith("quick-") && !m.id.startsWith("search-") && !m.id.startsWith("album-") && !m.id.startsWith("artist-") && !m.id.startsWith("radio-") && !m.id.startsWith("explore-") && !m.id.startsWith("home-") && !m.id.startsWith("region-") && !m.id.startsWith("section-") && !m.id.startsWith("instant-")),

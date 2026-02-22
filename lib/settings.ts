@@ -11,6 +11,7 @@ export interface AppSettings {
     languages?: string[];
     stopAtEndOfSong?: boolean;
     notificationsEnabled?: boolean;
+    crossfadeDuration?: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -22,10 +23,14 @@ const DEFAULT_SETTINGS: AppSettings = {
     version: '1.0.0-beta.1',
     languages: ['english', 'hindi'],
     stopAtEndOfSong: false,
-    notificationsEnabled: true
+    notificationsEnabled: true,
+    crossfadeDuration: 0
 };
 
 const STORAGE_KEY = 'melora-settings';
+
+let cachedSettings: AppSettings | null = null;
+let lastStoredString: string | null = null;
 
 export function loadSettings(): AppSettings {
     if (typeof window === 'undefined') return DEFAULT_SETTINGS;
@@ -34,8 +39,15 @@ export function loadSettings(): AppSettings {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (!stored) return DEFAULT_SETTINGS;
 
+        if (cachedSettings && stored === lastStoredString) {
+            return cachedSettings;
+        }
+
         const parsed = JSON.parse(stored);
-        return { ...DEFAULT_SETTINGS, ...parsed };
+        cachedSettings = { ...DEFAULT_SETTINGS, ...parsed };
+        lastStoredString = stored;
+
+        return cachedSettings as AppSettings;
     } catch (error) {
         console.error('Failed to load settings:', error);
         return DEFAULT_SETTINGS;
@@ -48,7 +60,13 @@ export function saveSettings(settings: Partial<AppSettings>): void {
     try {
         const current = loadSettings();
         const updated = { ...current, ...settings };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        const serialized = JSON.stringify(updated);
+
+        localStorage.setItem(STORAGE_KEY, serialized);
+
+        // Update Cache
+        cachedSettings = updated;
+        lastStoredString = serialized;
 
         // Dispatch custom event for cross-component reactivity
         console.log('[Settings] 📤 Dispatching melora-settings-changed event with:', updated);
@@ -62,7 +80,11 @@ export function resetSettings(): void {
     if (typeof window === 'undefined') return;
 
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
+        const serialized = JSON.stringify(DEFAULT_SETTINGS);
+        localStorage.setItem(STORAGE_KEY, serialized);
+
+        cachedSettings = DEFAULT_SETTINGS;
+        lastStoredString = serialized;
     } catch (error) {
         console.error('Failed to reset settings:', error);
     }

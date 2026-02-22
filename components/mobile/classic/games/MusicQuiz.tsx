@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { usePlayback } from "@/components/providers/playback-context";
+import { useLibrary } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { decodeHtml } from "@/lib/utils";
 import { getArt } from "@/lib/helpers";
@@ -18,7 +18,7 @@ interface Question {
 }
 
 export function MusicQuiz({ onBack }: MusicQuizProps) {
-    const { mixes } = usePlayback(); // Only depend on mixes to generate questions once
+    const { mixes } = useLibrary(); // Only depend on mixes to generate questions once
     const [gameState, setGameState] = useState<'loading' | 'playing' | 'gameover' | 'error'>('loading');
 
     // Quiz State

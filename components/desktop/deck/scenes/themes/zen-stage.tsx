@@ -8,11 +8,12 @@ import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { ThemeKey } from "@/components/ui/desktop-player";
 import { useAudio } from "@/hooks/use-audio";
 import { decodeHtml } from "@/lib/utils";
-import { Mix, usePlayback } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { Visualizer } from "@/components/ui/visualizer";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { QualityBadge } from "@/components/shared/QualityBadge";
+import { QualityBadge } from "@/components/shared/QualityBadge";import { useAudioProgress } from "@/hooks/use-audio-progress";
+
 
 interface ZenStageProps {
     currentTheme?: ThemeKey; // Made optional as unused
@@ -42,19 +43,15 @@ export function ZenStage({
     // onShowQueue, // Unused
     onShareMix,
     onSnapshotMix
-}: ZenStageProps) {
-    const playerRef = useRef<HTMLDivElement>(null);
+}: ZenStageProps) { const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Cache player rect for drag target detection
     const playerRectRef = useRef<DOMRect | null>(null);
 
-    const {
-        mixes, activeMixId, isPlaying, currentSong, currentTrack, volume, progress, duration,
-        loadMix, togglePlay, next, prev, seek, setVolume,
-        isLoaded, eq, isDownloaded, activeQuality,
-        shuffle, setShuffle, repeat, setRepeat
-    } = usePlayback();
+    const { activeMixId, isPlaying, currentSong, currentTrack, volume, duration, loadMix, togglePlay, next, prev, seek, setVolume, isLoaded, eq, activeQuality, shuffle, setShuffle, repeat, setRepeat } = usePlayback();
+    const { mixes, isDownloaded } = useLibrary();
+    const { progress } = useAudioProgress();
 
     const { playClick, playClunk, playEject } = useAudio();
 

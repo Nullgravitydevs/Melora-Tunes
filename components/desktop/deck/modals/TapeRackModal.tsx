@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { X, GripVertical, Pin, Play, Disc, ArrowDownAZ, Hash } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-context";
 import { clsx } from "clsx";
 import { isUserPlaylistMix } from "@/lib/mix-id-utils";
 
@@ -13,7 +13,8 @@ interface TapeRackModalProps {
 }
 
 export function TapeRackModal({ isOpen, onClose }: TapeRackModalProps) {
-    const { mixes, setMixes, activeMixId, togglePin } = usePlayback();
+    const { activeMixId, togglePin } = usePlayback();
+    const { mixes, setMixes } = useLibrary();
     const [items, setItems] = useState<Mix[]>([]);
 
     // Sync mixes to local items on open

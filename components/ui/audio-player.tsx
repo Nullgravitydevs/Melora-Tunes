@@ -17,6 +17,9 @@ interface AudioPlayerProps {
     onProgress: (state: { played: number; playedSeconds: number; loaded: number; loadedSeconds: number }) => void;
     onDuration: (duration: number) => void;
     onError?: (message: string) => void;
+    onPlaying?: () => void; // Fires when audio element actually starts playing
+    onWaiting?: () => void; // Buffering
+    onStalled?: () => void; // Network stalled
     onNext?: () => void;
     onPrev?: () => void;
     onPlayToggle?: () => void;
@@ -30,7 +33,7 @@ export interface AudioPlayerRef {
     play: () => void;
     pause: () => void;
     setVolume: (vol: number) => void;
-    // initAudioContext: () => void; // Call on first interaction
+    getAnalyser: () => AnalyserNode | null;
 }
 
 export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
@@ -48,6 +51,9 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     onProgress,
     onDuration,
     onError,
+    onPlaying,
+    onWaiting,
+    onStalled,
     onNext,
     onPrev,
     onPlayToggle: onPlayPause,
@@ -63,6 +69,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const filtersRef = useRef<BiquadFilterNode[]>([]);
     const sourceRefs = useRef<Map<HTMLAudioElement, MediaElementAudioSourceNode>>(new Map());
     const gainNodeRef = useRef<GainNode | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
 
     const getActive = useCallback(() => activeId === 'primary' ? primaryRef.current : secondaryRef.current, [activeId]);
     const getInactive = useCallback(() => activeId === 'primary' ? secondaryRef.current : primaryRef.current, [activeId]);
@@ -94,11 +101,20 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                 return filter;
             });
 
+            // Analyser Node
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256; // 128 frequency bins
+            analyser.smoothingTimeConstant = 0.8;
+            analyserRef.current = analyser;
+
             // Connect chain
             for (let i = 0; i < filters.length - 1; i++) {
                 filters[i].connect(filters[i + 1]);
             }
-            filters[filters.length - 1].connect(ctx.destination);
+            // Connect last filter to analyser, then to destination
+            filters[filters.length - 1].connect(analyser);
+            analyser.connect(ctx.destination);
+
             filtersRef.current = filters;
 
             // Connect Elements if they exist
@@ -240,7 +256,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         setVolume: (vol: number) => {
             const active = getActive();
             if (active) active.volume = vol;
-        }
+        },
+        getAnalyser: () => analyserRef.current
     }));
 
     // Handle URL changes (The core Gapless Logic)
@@ -255,31 +272,85 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         const isPreloaded = inactive.src === url || (url && inactive.src.endsWith(url));
 
         if (isPreloaded && url) {
-            console.log("⚡ Gapless Switch!");
-            // Swap roles
+            console.log("⚡ Gapless Switch!", crossfadeDuration > 0 ? `(Crossfading ${crossfadeDuration}s)` : "");
             setActiveId(prev => prev === 'primary' ? 'secondary' : 'primary');
-            // Play immediately if supposed to be playing
+
+            const oldActive = active;
+            const newActive = inactive;
+
             if (playing) {
-                inactive.play().catch(e => console.error(e));
+                if (crossfadeDuration > 0) {
+                    newActive.volume = 0;
+                    newActive.play().catch(e => console.error(e));
+
+                    const durationMs = crossfadeDuration * 1000;
+                    const startTime = performance.now();
+
+                    const fade = (time: number) => {
+                        const elapsed = time - startTime;
+
+                        if (elapsed >= durationMs) {
+                            newActive.volume = volume;
+                            oldActive.pause();
+                            oldActive.currentTime = 0;
+                            if (oldActive.src.startsWith('blob:')) {
+                                URL.revokeObjectURL(oldActive.src);
+                            }
+                        } else {
+                            const progress = elapsed / durationMs;
+                            newActive.volume = Math.min(volume, volume * progress);
+                            oldActive.volume = Math.max(0, volume * (1 - progress));
+                            requestAnimationFrame(fade);
+                        }
+                    };
+                    requestAnimationFrame(fade);
+                } else {
+                    newActive.volume = volume;
+                    newActive.play().catch(e => console.error(e));
+                    oldActive.pause();
+                    oldActive.currentTime = 0;
+                    if (oldActive.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(oldActive.src);
+                    }
+                }
+            } else {
+                newActive.volume = volume;
+                oldActive.pause();
+                oldActive.currentTime = 0;
+                if (oldActive.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(oldActive.src);
+                }
             }
-            // Reset old active
-            active.pause();
-            active.currentTime = 0;
         } else {
             // Standard load
             if (url) {
+                // Cleanup current active blob before replacing
+                if (active.src.startsWith('blob:') && active.src !== url) {
+                    URL.revokeObjectURL(active.src);
+                }
                 active.src = url;
                 active.load();
                 if (playing) active.play().catch(e => console.error(e));
             } else {
                 // Unload content
                 active.pause();
+                if (active.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(active.src);
+                }
                 active.removeAttribute('src');
-                active.src = ""; // Explicitly clear
-                active.load();   // Force unload buffer
+                active.src = "";
+                active.load();
             }
         }
-    }, [url]); // Intentionally not including deps that would trigger unnecessary re-runs
+    }, [url]);
+
+    // Handle Component Unmount Cleanup
+    useEffect(() => {
+        return () => {
+            if (primaryRef.current?.src.startsWith('blob:')) URL.revokeObjectURL(primaryRef.current.src);
+            if (secondaryRef.current?.src.startsWith('blob:')) URL.revokeObjectURL(secondaryRef.current.src);
+        };
+    }, []); // Intentionally not including deps that would trigger unnecessary re-runs
 
     // Handle Next URL (Preloading)
     useEffect(() => {
@@ -288,6 +359,11 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
         // Prevent reloading if already loaded
         if (inactive.src === nextUrl || inactive.src.endsWith(nextUrl)) return;
+
+        // Cleanup inactive blob before preloading new one
+        if (inactive.src.startsWith('blob:') && inactive.src !== nextUrl) {
+            URL.revokeObjectURL(inactive.src);
+        }
 
         console.log("Preloading next:", nextUrl);
         inactive.src = nextUrl;
@@ -325,7 +401,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         if (inactive) inactive.playbackRate = speed;
     }, [speed, activeId]);
 
-    // Progress Tracking + Crossfade Logic
+    // Progress Tracking
     useEffect(() => {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 
@@ -369,7 +445,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     }, [playing, onProgress, activeId, nextUrl]);
 
     // Event Handlers helper
-    const handleEvent = (e: React.SyntheticEvent<HTMLAudioElement>, type: 'ended' | 'duration' | 'error') => {
+    const handleEvent = (e: React.SyntheticEvent<HTMLAudioElement>, type: 'ended' | 'duration' | 'error' | 'playing') => {
         const target = e.currentTarget;
         // Verify this event comes from the ACTIVE player
         // We use refs comparison
@@ -379,6 +455,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         if (isPrimary !== isActivePrimary) return; // Ignore events from inactive player
 
         if (type === 'ended') onEnded();
+        if (type === 'playing') onPlaying?.();
         if (type === 'duration') onDuration(target.duration);
         if (type === 'error') {
             const error = target.error;
@@ -391,8 +468,11 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         preload: "auto",
         style: { display: 'none' },
         onEnded: (e: any) => handleEvent(e, 'ended'),
+        onPlaying: (e: any) => handleEvent(e, 'playing'),
         onLoadedMetadata: (e: any) => handleEvent(e, 'duration'),
         onError: (e: any) => handleEvent(e, 'error'),
+        onWaiting: () => onWaiting?.(),
+        onStalled: () => onStalled?.(),
     };
 
     return (

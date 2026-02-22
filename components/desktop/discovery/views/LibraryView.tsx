@@ -8,7 +8,7 @@ import {
     Shuffle, Music, Trash2, ChevronRight, Disc, User, Pin as PinIcon,
     Download
 } from "lucide-react";
-import { usePlayback, Mix } from "@/components/providers/playback-context";
+import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { isPlayableTrack, PlayableTrack, AudioQuality } from "@/lib/types";
 import { ensurePlayableTrack } from "@/lib/track-utils";
@@ -114,14 +114,9 @@ function VirtualizedSongList({ items, renderRow }: {
    Muzza-inspired "Best Search" & Sort Features
    ============================================================================ */
 export function LibraryView({ onNavigate, initialTab, onContextMenu }: LibraryViewProps) {
-    const {
-        likedSongs, recentlyPlayed, mixes,
-        currentSong, isPlaying, togglePlay,
-        addMix, loadMix, deleteMix, playInstantMix,
-        qualityPreference, showToast, togglePin,
-        savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist,
-        isDownloaded, toggleLike, isLiked
-    } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, loadMix, playInstantMix, qualityPreference, togglePin } = usePlayback();
+    const { likedSongs, recentlyPlayed, mixes, addMix, deleteMix, savedAlbums, savedArtists, toggleSaveAlbum, toggleFollowArtist, isDownloaded, toggleLike, isLiked } = useLibrary();
+    const { showToast } = useUI();
 
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'liked');
     const [showCreateModal, setShowCreateModal] = useState(false);
