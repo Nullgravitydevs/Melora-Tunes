@@ -57,11 +57,14 @@
     "wait-on": "^9.0.3"
   },
   "build": {
-    "appId": "com.melora.music",
-    "productName": "Melora",
+    "appId": "com.meloratunes.music",
+    "productName": "Melora Tunes",
     "directories": {
       "output": "C:/melora-build"
     },
+    "asarUnpack": [
+      "**/*.node"
+    ],
     "files": [
       "desktop_app/main.js",
       "package.json"
@@ -71,9 +74,7 @@
         "from": ".next/standalone",
         "to": "standalone",
         "filter": [
-          "**/*",
-          "!**/intro.mp4",
-          "!**/*.webm"
+          "**/*"
         ]
       },
       {
@@ -81,15 +82,6 @@
         "to": "standalone/node_modules",
         "filter": [
           "**/*"
-        ]
-      },
-      {
-        "from": "public",
-        "to": "standalone/public",
-        "filter": [
-          "**/*",
-          "!**/intro.mp4",
-          "!**/*.webm"
         ]
       }
     ],
@@ -107,10 +99,7 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "public/app-icon.ico",
-      "uninstallerIcon": "public/app-icon.ico",
-      "installerHeaderIcon": "public/app-icon.ico"
+      "allowToChangeInstallationDirectory": true
     },
     "extends": null
   }

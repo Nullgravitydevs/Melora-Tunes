@@ -33,3 +33,12 @@ export interface PlayableTrack {
 export function isPlayableTrack(obj: any): obj is PlayableTrack {
     return obj && typeof obj === 'object' && 'sources' in obj && 'title' in obj;
 }
+
+export interface Mix {
+    id: string;
+    title: string;
+    color: "orange" | "purple" | "white" | "green" | "red" | "blue" | "cyan" | "pink" | "teal" | "yellow" | "black";
+    songs: (JioSaavnSong | PlayableTrack)[];
+    currentSongIndex: number;
+    pinned?: boolean; // New: Sync with Deck
+}

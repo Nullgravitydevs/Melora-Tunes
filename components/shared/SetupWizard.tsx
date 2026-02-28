@@ -151,15 +151,9 @@ function StepIdentity({ profile, setProfile, onNext }: { profile: any, setProfil
     const isValid = profile.name.length > 2;
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const minDate = '1920-01-01';
-    
+
     const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        // Validate: must be between 1920 and today
-        if (val) {
-            const year = parseInt(val.split('-')[0], 10);
-            if (year < 1920 || year > new Date().getFullYear()) return;
-        }
-        setProfile({ ...profile, dob: val });
+        setProfile({ ...profile, dob: e.target.value });
     };
 
     return (

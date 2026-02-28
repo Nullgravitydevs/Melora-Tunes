@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Database, Info, Layout, Disc, Radio, Monitor, Zap, Volume2, Moon, Heart, Coffee, Github, MessageCircle, Server, User } from "lucide-react";
 import { useState, useCallback } from "react";
 import { usePlayback, useLibrary, useUI } from "@/components/providers/playback-context";
+import { useSettings } from "@/components/providers/settings-provider";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
 import { AppSettings, loadSettings, saveSettings } from "@/lib/settings";
@@ -170,6 +171,7 @@ function parseImportData(raw: unknown): ParseImportResult {
 
 export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentLayout = 'deck' }: DesktopSettingsModalProps) {
     const { qualityPreference, setQualityPreference, eq, sleepTimer, setSleepTimer } = usePlayback();
+    const { crossfadeDuration, setCrossfadeDuration, stopAtEndOfSong, setStopAtEndOfSong } = useSettings();
     const { mixes, likedSongs, recentlyPlayed, savedAlbums, savedArtists } = useLibrary();
     const { showToast } = useUI();
 
@@ -638,6 +640,47 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                         )}
                                     </section>
 
+                                    {/* Crossfade */}
+                                    <section>
+                                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                                            <Radio size={18} /> Crossfade
+                                        </h3>
+                                        <div className="bg-zinc-900/40 border border-white/5 p-5 rounded-2xl">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="text-zinc-400 text-sm font-bold">Overlap duration</div>
+                                                <div className="text-white font-mono">{crossfadeDuration}s</div>
+                                            </div>
+                                            <input
+                                                type="range" min="0" max="12" step="1" value={crossfadeDuration}
+                                                onChange={(e) => setCrossfadeDuration(parseInt(e.target.value))}
+                                                className="w-full accent-blue-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                                            />
+                                            <p className="text-xs text-zinc-500 mt-4 leading-relaxed">
+                                                Smoothly crossfade between songs. Set to 0s to play songs gapless.
+                                            </p>
+                                        </div>
+                                    </section>
+
+                                    {/* Playback Configuration */}
+                                    <section>
+                                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                                            <Layout size={18} /> Playback Behavior
+                                        </h3>
+                                        <div className="grid gap-2">
+                                            <button
+                                                onClick={() => setStopAtEndOfSong(!stopAtEndOfSong)}
+                                                className="flex items-center justify-between p-4 bg-zinc-900/40 border border-white/5 rounded-xl hover:bg-zinc-800 transition-colors text-left"
+                                            >
+                                                <div>
+                                                    <div className="font-bold text-white text-sm">Stop at end of song</div>
+                                                    <div className="text-xs text-zinc-500 mt-0.5">Pause playback instead of auto-playing the next track</div>
+                                                </div>
+                                                <div className={`w-10 h-6 rounded-full transition-colors relative ${stopAtEndOfSong ? 'bg-blue-500' : 'bg-white/10'}`}>
+                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${stopAtEndOfSong ? 'left-5' : 'left-1'}`} />
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </section>
 
                                 </div>
                             )}

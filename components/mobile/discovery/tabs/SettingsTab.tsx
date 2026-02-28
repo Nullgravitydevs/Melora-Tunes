@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { usePlayback, useLibrary } from "@/components/providers/playback-context";
+import { useSettings } from "@/components/providers/settings-provider";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Disc, ChevronRight, Volume2, Moon, Gauge, Globe,
@@ -34,6 +35,7 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 
 export function SettingsTab() {
     const { volume, setVolume, qualityPreference, setQualityPreference, sleepTimer, setSleepTimer, notificationsEnabled, setNotificationsEnabled, playbackSpeed, setPlaybackSpeed, stopAtEndOfSong, setStopAtEndOfSong, eq } = usePlayback();
+    const { crossfadeDuration, setCrossfadeDuration } = useSettings();
     const { likedSongs, mixes, setMixes, recentlyPlayed } = useLibrary();
 
     const [activeTab, setActiveTab] = useState<Tab>("profile");
@@ -411,6 +413,24 @@ export function SettingsTab() {
                             <SettingsGroup title="Playback Options">
                                 <ToggleRow label="Stop at end of song" value={stopAtEndOfSong} onChange={setStopAtEndOfSong} />
                                 <ToggleRow label="Push notifications" value={notificationsEnabled} onChange={setNotificationsEnabled} />
+                            </SettingsGroup>
+
+                            {/* Crossfade */}
+                            <SettingsGroup title="Crossfade">
+                                <div className="p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[11px] font-bold text-white/50">Overlap duration</span>
+                                        <span className="text-[11px] text-white/30 font-mono">{crossfadeDuration}s</span>
+                                    </div>
+                                    <input
+                                        type="range" min="0" max="12" step="1" value={crossfadeDuration}
+                                        onChange={(e) => setCrossfadeDuration(parseInt(e.target.value))}
+                                        className="w-full accent-white h-1"
+                                    />
+                                    <p className="text-[9px] text-white/30 mt-3 leading-relaxed">
+                                        Smoothly fade between songs. Set to 0s to disable.
+                                    </p>
+                                </div>
                             </SettingsGroup>
                         </motion.div>
                     )}

@@ -26,7 +26,8 @@ import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
 import { loadSettings, saveSettings, resetSettings, clearCache } from "@/lib/settings";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useIpodAudio } from "@/hooks/use-ipod-audio";
-import { useIsMobile } from "@/hooks/use-is-mobile";import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
 interface MenuItem {
@@ -95,8 +96,10 @@ export function AndroidEntry({ onSwitchToDesktop }: AndroidEntryProps) {
     );
 }
 
-function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) { const { play, pause, togglePlay, next, prev, volume, setVolume, currentSong, isPlaying, duration, seek, activeMixId, loadMix, activeMix, shuffle, setShuffle, repeat, setRepeat, queue, currentIndex, sleepTimer, setSleepTimer, stopAtEndOfSong, setStopAtEndOfSong, playInstantMix, activeQuality, qualityPreference, setQualityPreference, eq, playbackSpeed, setPlaybackSpeed } = usePlayback();
-    const { updateMix, mixes, addMix, deleteMix, likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded, downloadSong, removeDownload } = useLibrary();
+function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
+    const { play, pause, togglePlay, next, prev, volume, setVolume, currentSong, isPlaying, duration, seek, activeMixId, loadMix, activeMix, shuffle, setShuffle, repeat, setRepeat, queue, currentIndex, sleepTimer, setSleepTimer, stopAtEndOfSong, setStopAtEndOfSong, playInstantMix, activeQuality, qualityPreference, setQualityPreference, eq, playbackSpeed, setPlaybackSpeed } = usePlayback();
+    const { updateMix, mixes, addMix, deleteMix, likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded, removeDownload } = useLibrary();
+    const { downloadSong } = usePlayback();
     const { progress } = useAudioProgress();
 
     const [isLoading, setIsLoading] = useState(false);
@@ -1674,7 +1677,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) { const {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, [handleBack]); // handleBack is stable (useCallback with [])
-    
+
 
 
     // Keyboard handling

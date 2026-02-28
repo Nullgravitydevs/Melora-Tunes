@@ -10,6 +10,7 @@ import {
 import { decodeHtml } from "@/lib/utils";
 import { getArt } from "@/lib/helpers";
 import { JioSaavnSong } from "@/lib/jiosaavn";
+import { usePlayback } from "@/components/providers/playback-context";
 
 interface ArtistViewProps {
     artist: any; // Initial artist object
@@ -18,7 +19,6 @@ interface ArtistViewProps {
     onToggleFollow: () => void;
     onPlaySong: (song: JioSaavnSong) => void;
     onPlayAll: () => void;
-    onStartRadio: () => void;
     onShare: () => void;
     isLoading?: boolean;
 }
@@ -32,9 +32,10 @@ const formatTime = (seconds: number) => {
 
 export function ArtistView({
     artist, details, isFollowed, onToggleFollow,
-    onPlaySong, onPlayAll, onStartRadio, onShare, isLoading
+    onPlaySong, onPlayAll, onShare, isLoading
 }: ArtistViewProps) {
     const [activeTab, setActiveTab] = useState<'popular' | 'albums' | 'singles'>('popular');
+    const { startRadio } = usePlayback();
 
     const heroImage = getArt(details || artist);
     const name = decodeHtml(details?.name || artist?.name || "Artist");
@@ -105,7 +106,7 @@ export function ArtistView({
                             </button>
 
                             <button
-                                onClick={onStartRadio}
+                                onClick={() => startRadio(artist)}
                                 className="h-14 w-14 rounded-full border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                                 title="Start Radio"
                             >

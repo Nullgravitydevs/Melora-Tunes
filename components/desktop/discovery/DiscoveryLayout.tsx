@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus, LayoutGrid, Menu, User, LogOut, Minimize2, ArrowLeft, ArrowRight, X } from "lucide-react";
+import { Home, Search, Library, Compass, Settings, Plus, Music, Heart, Clock, Volume2, SkipBack, SkipForward, Pause, Play, Maximize2, ListMusic, Disc3, Radio, Shuffle, Repeat, Trash2, MoreHorizontal, Download, ListPlus, LayoutGrid, Menu, User, LogOut, Minimize2, ArrowLeft, ArrowRight, X, Globe } from "lucide-react";
 import { AudioQuality } from "@/lib/types";
 import { getArt } from "@/lib/helpers";
 import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
@@ -20,12 +20,14 @@ import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { SectionView } from "./views/SectionView";
 import { PeelRevealView } from "./views/PeelRevealView";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
+import { LanguageModal } from "@/components/desktop/deck/scenes/language-modal";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { PlaylistItem } from "@/components/shared/PlaylistItem";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AddToPlaylistModal } from "./modals/AddToPlaylistModal";
 import { isUserPlaylistId, isUserPlaylistMix } from "@/lib/mix-id-utils";
-import { PlayableTrack } from "@/lib/types";import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { PlayableTrack } from "@/lib/types";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
 
@@ -230,9 +232,11 @@ export function DiscoveryLayout() {
 
     const [mounted, setMounted] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [showFullPlayer, setShowFullPlayer] = useState(false);
     const { currentSong, isPlaying, loadMix, playInstantMix, activeMixId, play, togglePin, addToQueue } = usePlayback();
-    const { mixes, likedSongs, recentlyPlayed, downloadSong, removeDownload, isDownloaded, addSongToMix, addMix, deleteMix, updateMix, isLiked, toggleLike } = useLibrary();
+    const { mixes, likedSongs, recentlyPlayed, removeDownload, isDownloaded, addSongToMix, addMix, deleteMix, updateMix, isLiked, toggleLike } = useLibrary();
+    const { downloadSong } = usePlayback();
     const { showToast } = useUI();
 
     // Context Menu State
@@ -380,6 +384,9 @@ export function DiscoveryLayout() {
                 currentLayout="discovery"
             />
 
+            {/* Language Modal */}
+            <LanguageModal isOpen={showLanguageModal} onClose={() => setShowLanguageModal(false)} />
+
             {/* FULL PLAYER */}
             <AnimatePresence>
                 {showFullPlayer && (
@@ -515,7 +522,8 @@ export function DiscoveryLayout() {
                     </div>
 
                     {/* Settings - Fixed at bottom */}
-                    <div className="px-2.5 py-3 border-t border-white/[0.04] bg-[#000000] z-20">
+                    <div className="px-2.5 py-3 border-t border-white/[0.04] bg-[#000000] z-20 space-y-0.5">
+                        <NavItem icon={<Globe size={18} />} label="Languages" onClick={() => setShowLanguageModal(true)} subtle />
                         <NavItem icon={<Settings size={18} />} label="Settings" onClick={() => setShowSettings(true)} subtle />
                     </div>
 
@@ -524,103 +532,98 @@ export function DiscoveryLayout() {
 
                 {/* MAIN */}
                 <main className="flex-1 overflow-y-auto scroll pb-24 bg-[#000000]">
-                    <AnimatePresence mode="popLayout">
-                        <motion.div
-                            key={currentView.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="min-h-full"
-                        >
-                            {currentView.id === 'home' && (
-                                <HomeView
-                                    onNavigate={handleNavigate}
-                                    onPlaySong={handlePlaySong}
-                                    currentSongId={currentSong?.id}
-                                    isPlaying={isPlaying}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
 
-                            {currentView.id === 'search' && (
-                                <SearchView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
-                            )}
+                    <div
+                        key={currentView.id}
+                        className="min-h-full animate-in fade-in duration-200"
+                    >
+                        {currentView.id === 'home' && (
+                            <HomeView
+                                onNavigate={handleNavigate}
+                                onPlaySong={handlePlaySong}
+                                currentSongId={currentSong?.id}
+                                isPlaying={isPlaying}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
 
-                            {currentView.id === 'artist' && currentView.data && (
-                                <ArtistView
-                                    artist={currentView.data}
-                                    onBack={handleBack}
-                                    onNavigate={handleNavigate}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
+                        {currentView.id === 'search' && (
+                            <SearchView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
+                        )}
 
-                            {currentView.id === 'album' && currentView.data && (
-                                <AlbumView
-                                    album={currentView.data}
-                                    onBack={handleBack}
-                                    onNavigate={handleNavigate}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
+                        {currentView.id === 'artist' && currentView.data && (
+                            <ArtistView
+                                artist={currentView.data}
+                                onBack={handleBack}
+                                onNavigate={handleNavigate}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
 
-                            {currentView.id === 'playlist' && currentView.data && (
-                                <PlaylistView
-                                    playlist={currentView.data}
-                                    onBack={handleBack}
-                                    onNavigate={handleNavigate}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
+                        {currentView.id === 'album' && currentView.data && (
+                            <AlbumView
+                                album={currentView.data}
+                                onBack={handleBack}
+                                onNavigate={handleNavigate}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
 
-                            {/* PEEL TO OPEN ALBUM */}
-                            {currentView.id === 'peel-reveal' && currentView.data && (
-                                <PeelRevealView
-                                    album={currentView.data}
-                                    onBack={handleBack}
-                                    onPlay={handlePlaySong}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
+                        {currentView.id === 'playlist' && currentView.data && (
+                            <PlaylistView
+                                playlist={currentView.data}
+                                onBack={handleBack}
+                                onNavigate={handleNavigate}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
 
-                            {currentView.id === 'library' && (
-                                <LibraryView
-                                    onNavigate={handleNavigate}
-                                    initialTab={currentView.data?.tab}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
+                        {/* PEEL TO OPEN ALBUM */}
+                        {currentView.id === 'peel-reveal' && currentView.data && (
+                            <PeelRevealView
+                                album={currentView.data}
+                                onBack={handleBack}
+                                onPlay={handlePlaySong}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
 
-                            {currentView.id === 'explore' && (
-                                <ExploreView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
-                            )}
+                        {currentView.id === 'library' && (
+                            <LibraryView
+                                onNavigate={handleNavigate}
+                                initialTab={currentView.data?.tab}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
 
-                            {currentView.id === 'radio' && (
-                                <RadioView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
-                            )}
+                        {currentView.id === 'explore' && (
+                            <ExploreView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
+                        )}
 
-                            {currentView.id === 'category-hub' && currentView.data && (
-                                <CategoryHubView
-                                    data={currentView.data}
-                                    onBack={handleBack}
-                                    onNavigate={handleNavigate}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
+                        {currentView.id === 'radio' && (
+                            <RadioView onNavigate={handleNavigate} onContextMenu={handleContextMenu} />
+                        )}
 
-                            {(['trending', 'albums', 'charts', 'retro', 'editors_picks'].includes(String(currentView.id)) || String(currentView.id).startsWith('mood-')) && (
-                                <SectionView
-                                    sectionId={String(currentView.id)}
-                                    sectionTitle={currentView.data?.title}
-                                    initialData={currentView.data?.items}
-                                    onNavigate={handleNavigate}
-                                    onBack={handleBack}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
-                        </motion.div>
-                    </AnimatePresence>
+                        {currentView.id === 'category-hub' && currentView.data && (
+                            <CategoryHubView
+                                data={currentView.data}
+                                onBack={handleBack}
+                                onNavigate={handleNavigate}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
+
+                        {(['trending', 'albums', 'charts', 'retro', 'editors_picks', 'recently-played', 'best-of', 'indie-mixes', 'featured-playlists'].includes(String(currentView.id)) || String(currentView.id).startsWith('mood-')) && (
+                            <SectionView
+                                sectionId={String(currentView.id)}
+                                sectionTitle={currentView.data?.title}
+                                initialData={currentView.data?.items}
+                                onNavigate={handleNavigate}
+                                onBack={handleBack}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
+                    </div>
                 </main>
             </div>
 
@@ -691,7 +694,7 @@ export function DiscoveryLayout() {
                         : undefined
                 }
             />
-        </div>
+        </div >
     );
 }
 
@@ -740,10 +743,40 @@ function EmptyState() {
 
 /* === PLAYER === */
 
-function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddToPlaylist: (song: any) => void }) { const { currentSong, isPlaying, togglePlay, next, prev, duration, seek, volume, setVolume, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, addToQueue } = usePlayback();
-    const { toggleLike, isLiked, downloadSong, isDownloaded } = useLibrary();
-    const { showToast } = useUI();
+function PlayerBarProgress({ duration, seek }: { duration: number, seek: (val: number) => void }) {
     const { progress } = useAudioProgress();
+    const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+
+    const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
+    };
+
+    return (
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] text-white/25 tabular-nums font-mono w-8 text-right flex-shrink-0">{fmt(progress * duration)}</span>
+            <div
+                className="flex-1 h-1 bg-white/[0.08] rounded-full cursor-pointer relative group"
+                onClick={handleSeek}
+            >
+                <div
+                    className="absolute inset-y-0 left-0 bg-white/40 group-hover:bg-white/70 rounded-full transition-colors"
+                    style={{ width: `${progress * 100}%` }}
+                />
+                <div
+                    className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ left: `${progress * 100}%`, transform: `translate(-50%, -50%)` }}
+                />
+            </div>
+            <span className="text-[10px] text-white/25 tabular-nums font-mono w-8 flex-shrink-0">{fmt(duration)}</span>
+        </div>
+    );
+}
+function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddToPlaylist: (song: any) => void }) {
+    const { currentSong, isPlaying, togglePlay, next, prev, duration, seek, volume, setVolume, activeQuality, shuffle, setShuffle, repeat, setRepeat, qualityPreference, setQualityPreference, addToQueue } = usePlayback();
+    const { toggleLike, isLiked, isDownloaded } = useLibrary();
+    const { downloadSong } = usePlayback();
+    const { showToast } = useUI();
 
     const [showBarMenu, setShowBarMenu] = useState(false);
     const [showBarQuality, setShowBarQuality] = useState(false);
@@ -762,12 +795,6 @@ function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddT
     const qLabel = (q: string) => ({ hires: 'Hi-Res', flac: 'FLAC', '320': '320k', '160': '160k', '96': '96k' }[q] || q);
     const qLabelFull = (q: string) => ({ hires: 'Hi-Res', flac: 'Lossless', '320': '320 kbps', '160': '160 kbps', '96': '96 kbps' }[q] || q);
 
-    /* Keyboard Shortcuts */
-    const progressRef = useRef(progress);
-    useEffect(() => {
-        progressRef.current = progress;
-    }, [progress]);
-
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
@@ -778,11 +805,9 @@ function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddT
                     break;
                 case 'ArrowRight':
                     if (e.metaKey || e.ctrlKey) { e.preventDefault(); next(); }
-                    else if (e.shiftKey) { e.preventDefault(); seek(Math.min(1, progressRef.current + 0.05)); }
                     break;
                 case 'ArrowLeft':
                     if (e.metaKey || e.ctrlKey) { e.preventDefault(); prev(); }
-                    else if (e.shiftKey) { e.preventDefault(); seek(Math.max(0, progressRef.current - 0.05)); }
                     break;
                 case 'KeyM':
                     e.preventDefault();
@@ -795,16 +820,8 @@ function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddT
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [togglePlay, next, prev, seek]);
-
-    const fmt = (s: number) => isNaN(s) || !isFinite(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
-
+    }, [togglePlay, next, prev, volume, currentSong, toggleLike, setVolume]);
     const songArt = getArt(currentSong);
-
-    const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
-    };
 
     if (!currentSong) return null;
 
@@ -866,23 +883,7 @@ function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddT
                     </div>
 
                     {/* Progress */}
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-[10px] text-white/25 tabular-nums font-mono w-8 text-right flex-shrink-0">{fmt(progress * duration)}</span>
-                        <div
-                            className="flex-1 h-1 bg-white/[0.08] rounded-full cursor-pointer relative group"
-                            onClick={handleSeek}
-                        >
-                            <div
-                                className="absolute inset-y-0 left-0 bg-white/40 group-hover:bg-white/70 rounded-full transition-colors"
-                                style={{ width: `${progress * 100}%` }}
-                            />
-                            <div
-                                className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ left: `${progress * 100}%`, transform: `translate(-50%, -50%)` }}
-                            />
-                        </div>
-                        <span className="text-[10px] text-white/25 tabular-nums font-mono w-8 flex-shrink-0">{fmt(duration)}</span>
-                    </div>
+                    <PlayerBarProgress duration={duration} seek={seek} />
 
                     {/* Volume */}
                     <div className="flex items-center gap-1.5 group w-20 flex-shrink-0">

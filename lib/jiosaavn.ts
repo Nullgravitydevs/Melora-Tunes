@@ -39,14 +39,13 @@ export interface JioSaavnSong {
 
 export interface LaunchData {
     new_trending: JioSaavnSong[];
-    top_playlists: JioSaavnSong[];
+    top_playlists: JioSaavnSong[];  // Legacy compat — kept empty
     new_albums: JioSaavnSong[];
     browse_discover: JioSaavnSong[];
     charts: JioSaavnSong[];
     radio: JioSaavnSong[];
     artist_recos: JioSaavnSong[];
-    quick_picks: JioSaavnSong[]; // NEW: Quick Picks
-    // NEW SECTIONS
+    quick_picks: JioSaavnSong[];
     moods: {
         love: JioSaavnSong[];
         party: JioSaavnSong[];
@@ -55,6 +54,10 @@ export interface LaunchData {
     };
     retro: JioSaavnSong[];
     top_charts: JioSaavnSong[];
+    tag_mixes: JioSaavnSong[];
+    promo: JioSaavnSong[];
+    // Multi-language: one "Best of" per language
+    bestOf: { lang: string; items: JioSaavnSong[] }[];
 }
 
 export interface SearchResponse {
@@ -812,48 +815,118 @@ async function getStrictLanguageAlbums(lang: string): Promise<JioSaavnSong[]> {
     }
 }
 
+// ─── MULTI-LANGUAGE INTERLEAVE HELPER ──────────────────────────────────────
+function roundRobinInterleave<T extends { id: string; name?: string }>(
+    perLangResults: T[][],
+    maxTotal: number = 20
+): T[] {
+    const result: T[] = [];
+    const seen = new Set<string>();
+    const seenNames = new Set<string>();
+    const maxRounds = Math.max(...perLangResults.map(r => r.length), 0);
+
+    for (let round = 0; round < maxRounds && result.length < maxTotal; round++) {
+        for (const langResults of perLangResults) {
+            if (round >= langResults.length) continue;
+            const item = langResults[round];
+            // Deduplicate by ID and name
+            if (seen.has(item.id)) continue;
+            if (item.name) {
+                const lower = (item.name || '').toLowerCase().trim();
+                if (seenNames.has(lower)) continue;
+                seenNames.add(lower);
+            }
+            seen.add(item.id);
+            result.push(item);
+            if (result.length >= maxTotal) break;
+        }
+    }
+    return result;
+}
+
 export async function getStrictLaunchData(language?: string): Promise<LaunchData> {
     try {
         const lang = normalizeLanguage(language);
-        const primaryLang = lang.split(',')[0].trim().toLowerCase();
-        const displayLang = primaryLang.charAt(0).toUpperCase() + primaryLang.slice(1);
-        console.log('[getLaunchData] Fetching Ultimate Content for:', lang);
+        const allLangs = lang.split(',').map(l => l.trim().toLowerCase()).filter(Boolean);
+        const primaryLang = allLangs[0] || 'english';
 
-        // EXPANDED PARALLEL FETCHING
-        // We use Promise.all to execute refined searches for every section.
-        // This guarantees data presence and language relevance unlike the legacy launch API.
+        // Rule 1: Max 3 languages for mixed sections (to prevent API overload)
+        const mixLangs = allLangs.slice(0, 3);
+        // Rule 2: Max 4 languages for "Best of" sections
+        const bestOfLangs = allLangs.slice(0, 4);
 
-        const [
-            // 1. Trending & Albums (Existing)
-            trending,
-            albums,
-            // 2. Moods (Existing)
-            moodLove, moodParty, moodWorkout, moodChill,
-            // 3. Retro (Existing)
-            retro,
-            // 4. Charts (Existing)
-            charts,
-            // 5. NEW: Quick Picks (Radio Proxy replaced with Songs)
-            quickPicks,
-            // 6. NEW: Language Playlists (Best of...)
-            langPlaylists
-        ] = await Promise.all([
-            getStrictLanguageTrending(lang),
-            getStrictLanguageAlbums(lang),
-            // Moods
-            searchPlaylists(`${primaryLang} Love Songs`, 1, 5, lang),
-            searchPlaylists(`${primaryLang} Party`, 1, 5, lang),
-            searchPlaylists(`${primaryLang} Workout`, 1, 5, lang),
-            searchPlaylists(`${primaryLang} Chill`, 1, 5, lang),
-            // Retro
-            searchSongs(`${primaryLang} 90s hits`, 1, 15, lang),
-            // Charts
-            searchPlaylists(`${primaryLang} Top 50`, 1, 10, lang),
-            // Quick Picks: Fetch songs for the "Quick Picks" section
-            searchSongs(`${primaryLang} songs`, 1, 16, lang),
-            // Language Playlists
-            searchPlaylists(`Best of ${primaryLang}`, 1, 10, lang)
+        console.log(`[getLaunchData] Languages: ${allLangs.join(', ')} | Mix: ${mixLangs.join(', ')} | BestOf: ${bestOfLangs.join(', ')}`);
+
+        // ─── PER-LANGUAGE PARALLEL FETCH ─────────────────────────────────
+        // For each mixed section, we fetch for each language separately then interleave.
+        // All calls run in parallel via Promise.all.
+
+        const perLangPromises = mixLangs.map(ml => {
+            const langParam = ml;
+            return Promise.all([
+                // Trending
+                getStrictLanguageTrending(langParam),
+                // Albums
+                getStrictLanguageAlbums(langParam),
+                // Quick Picks
+                searchSongs(`${ml} songs`, 1, 16, langParam),
+                // Retro
+                searchSongs(`${ml} 90s hits`, 1, 15, langParam),
+                // Charts
+                searchPlaylists(`${ml} Top 50`, 1, 10, langParam),
+                // Tag Mixes (Indie/Acoustic)
+                searchPlaylists(`${ml} Acoustic Indie`, 1, 10, langParam),
+                // Promo (Trending playlists)
+                searchPlaylists(`${ml} trending playlist`, 1, 10, langParam),
+            ]);
+        });
+
+        // Mood fetches — only use primary language (moods are universal enough)
+        const moodPromise = Promise.all([
+            searchPlaylists(`${primaryLang} Love Songs`, 1, 5, primaryLang),
+            searchPlaylists(`${primaryLang} Party`, 1, 5, primaryLang),
+            searchPlaylists(`${primaryLang} Workout`, 1, 5, primaryLang),
+            searchPlaylists(`${primaryLang} Chill`, 1, 5, primaryLang),
         ]);
+
+        // Best of (Hero Carousel) — changed to Trending/Featured per user request
+        const getHeroQuery = (lang: string) => {
+            const lower = lang.toLowerCase();
+            if (lower === 'english') return "Top English";
+            if (lower === 'hindi') return "Hindi Top 50";
+            return `${lang} trending playlist`;
+        };
+
+        const bestOfPromises = bestOfLangs.map(bl =>
+            searchPlaylists(getHeroQuery(bl), 1, 10, bl).then(items => ({
+                lang: bl.charAt(0).toUpperCase() + bl.slice(1),
+                items
+            }))
+        );
+
+        // Fire everything in parallel
+        const [perLangResults, moodResults, bestOfResults] = await Promise.all([
+            Promise.all(perLangPromises),
+            moodPromise,
+            Promise.all(bestOfPromises)
+        ]);
+
+        // ─── INTERLEAVE RESULTS ──────────────────────────────────────────
+        // perLangResults[langIndex][sectionIndex] => JioSaavnSong[]
+        // Section indices: 0=trending, 1=albums, 2=quickPicks, 3=retro, 4=charts, 5=tagMixes, 6=promo
+
+        const trending = roundRobinInterleave(perLangResults.map(r => r[0]), 20);
+        const albums = roundRobinInterleave(perLangResults.map(r => r[1]), 15);
+        const quickPicks = roundRobinInterleave(perLangResults.map(r => r[2]), 12);
+        const retro = roundRobinInterleave(perLangResults.map(r => r[3]), 15);
+        const charts = roundRobinInterleave(perLangResults.map(r => r[4]), 10);
+        const tagMixes = roundRobinInterleave(perLangResults.map(r => r[5]), 10);
+        const promo = roundRobinInterleave(perLangResults.map(r => r[6]), 10);
+
+        const [moodLove, moodParty, moodWorkout, moodChill] = moodResults;
+
+        // Filter out empty bestOf sections
+        const bestOf = bestOfResults.filter(b => b.items.length >= 2);
 
         return {
             new_trending: trending,
@@ -864,15 +937,16 @@ export async function getStrictLaunchData(language?: string): Promise<LaunchData
                 workout: moodWorkout,
                 chill: moodChill,
             },
-            retro: retro,
+            retro,
             top_charts: charts,
+            top_playlists: [], // Legacy — replaced by bestOf
+            radio: [],
+            quick_picks: quickPicks,
+            tag_mixes: tagMixes,
+            promo,
+            bestOf,
 
-            // Search-based replacements for reliability
-            top_playlists: langPlaylists.length > 0 ? langPlaylists : [],
-            radio: [], // Deprecated in favor of quick_picks for now
-            quick_picks: quickPicks.length > 0 ? quickPicks : [],
-
-            // Legacy fallbacks (empty)
+            // Legacy
             browse_discover: [],
             charts: [],
             artist_recos: []
@@ -881,7 +955,8 @@ export async function getStrictLaunchData(language?: string): Promise<LaunchData
         console.error("Error fetching launch data", e);
         return {
             new_trending: [], top_playlists: [], new_albums: [], browse_discover: [], charts: [], radio: [], artist_recos: [], quick_picks: [],
-            moods: { love: [], party: [], workout: [], chill: [] }, retro: [], top_charts: []
+            moods: { love: [], party: [], workout: [], chill: [] }, retro: [], top_charts: [],
+            tag_mixes: [], promo: [], bestOf: []
         };
     }
 }

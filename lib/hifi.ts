@@ -55,7 +55,7 @@ function getTidalCoverUrl(coverId: string | undefined | null, size: number = 320
 // Tidal Search
 // ============================================================================
 
-export async function searchTidal(query: string): Promise<HiFiSearchResult | null> {
+export async function searchTidal(query: string, signal?: AbortSignal): Promise<HiFiSearchResult | null> {
     console.log('[Tidal] Searching for:', query);
 
     // Get Healthy Endpoints sorted by reliability/speed
@@ -71,6 +71,11 @@ export async function searchTidal(query: string): Promise<HiFiSearchResult | nul
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s God Speed Timeout
+
+            if (signal) {
+                signal.addEventListener('abort', () => controller.abort());
+                if (signal.aborted) controller.abort();
+            }
 
             const response = await fetch(`${endpoint.url}/search/?s=${encodeURIComponent(query)}`, {
                 method: 'GET',
@@ -138,9 +143,9 @@ export async function searchTidal(query: string): Promise<HiFiSearchResult | nul
 
             return { tracks, albums, source: 'tidal' };
         } catch (error: any) {
-            KeyVault.reportFailure(endpoint.name);
+            if (error.name !== 'AbortError') KeyVault.reportFailure(endpoint.name);
             if (error.name === 'AbortError') {
-                console.log(`[Tidal] ${endpoint.name} timed out`);
+                console.log(`[Tidal] ${endpoint.name} timed out or aborted`);
             } else {
                 console.log(`[Tidal] Search failed for ${endpoint.name}`);
             }
@@ -154,7 +159,7 @@ export async function searchTidal(query: string): Promise<HiFiSearchResult | nul
 // Tidal Stream URL
 // ============================================================================
 
-export async function getTidalStreamUrl(trackId: string, targetQuality: 'LOSSLESS' | 'HI_RES_LOSSLESS' | 'HIGH' = 'LOSSLESS'): Promise<{ url: string; quality: string; keyName: string } | null> {
+export async function getTidalStreamUrl(trackId: string, targetQuality: 'LOSSLESS' | 'HI_RES_LOSSLESS' | 'HIGH' = 'LOSSLESS', signal?: AbortSignal): Promise<{ url: string; quality: string; keyName: string } | null> {
     console.log(`[Tidal] Getting stream URL for track: ${trackId} (Target: ${targetQuality})`);
 
     const endpoints = KeyVault.getHealthyEndpoints('tidal');
@@ -165,6 +170,11 @@ export async function getTidalStreamUrl(trackId: string, targetQuality: 'LOSSLES
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s God Speed Timeout
+
+            if (signal) {
+                signal.addEventListener('abort', () => controller.abort());
+                if (signal.aborted) controller.abort();
+            }
 
             const response = await fetch(`${endpoint.url}/track/?id=${trackId}&quality=${targetQuality}`, {
                 method: 'GET',
@@ -246,9 +256,9 @@ export async function getTidalStreamUrl(trackId: string, targetQuality: 'LOSSLES
             }
 
         } catch (error: any) {
-            KeyVault.reportFailure(endpoint.name);
+            if (error.name !== 'AbortError') KeyVault.reportFailure(endpoint.name);
             if (error.name === 'AbortError') {
-                console.log(`[Tidal] ${endpoint.name} timed out`);
+                console.log(`[Tidal] ${endpoint.name} timed out or aborted`);
             }
         }
     }
@@ -261,7 +271,7 @@ export async function getTidalStreamUrl(trackId: string, targetQuality: 'LOSSLES
 // Qobuz Search
 // ============================================================================
 
-export async function searchQobuz(query: string): Promise<HiFiSearchResult | null> {
+export async function searchQobuz(query: string, signal?: AbortSignal): Promise<HiFiSearchResult | null> {
     console.log('[Qobuz] Searching for:', query);
 
     // Qobuz Search is tricky. Only 'squid' (qobuz.squid.wtf) supports robust searching usually.
@@ -280,6 +290,11 @@ export async function searchQobuz(query: string): Promise<HiFiSearchResult | nul
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        if (signal) {
+            signal.addEventListener('abort', () => controller.abort());
+            if (signal.aborted) controller.abort();
+        }
 
         const response = await fetch(`${searchEndpoint}?query=${encodeURIComponent(query)}`, {
             method: 'GET',
@@ -321,7 +336,7 @@ export async function searchQobuz(query: string): Promise<HiFiSearchResult | nul
         return { tracks, albums: [], source: 'qobuz' };
     } catch (error: any) {
         if (error.name === 'AbortError') {
-            console.log('[Qobuz] Search timed out');
+            console.log('[Qobuz] Search timed out or aborted');
         } else {
             console.warn('[Qobuz] Search warning:', error.message); // Warn instead of Error for network glitches
         }
@@ -333,7 +348,7 @@ export async function searchQobuz(query: string): Promise<HiFiSearchResult | nul
 // Qobuz Stream URL
 // ============================================================================
 
-export async function getQobuzStreamUrl(trackId: string): Promise<{ url: string; quality: string; keyName: string } | null> {
+export async function getQobuzStreamUrl(trackId: string, signal?: AbortSignal): Promise<{ url: string; quality: string; keyName: string } | null> {
     console.log('[Qobuz] Getting stream URL for track:', trackId);
 
     const endpoints = KeyVault.getHealthyEndpoints('qobuz');
@@ -345,6 +360,11 @@ export async function getQobuzStreamUrl(trackId: string): Promise<{ url: string;
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+            if (signal) {
+                signal.addEventListener('abort', () => controller.abort());
+                if (signal.aborted) controller.abort();
+            }
 
             let url = `${ep.url}?${ep.paramName}=${trackId}`;
             if (ep.qualityParam) url += `&quality=${ep.qualityParam}`;
@@ -371,9 +391,9 @@ export async function getQobuzStreamUrl(trackId: string): Promise<{ url: string;
                 return { url: streamUrl, quality: 'HI_RES_LOSSLESS', keyName: ep.name };
             }
         } catch (error: any) {
-            KeyVault.reportFailure(ep.name);
+            if (error.name !== 'AbortError') KeyVault.reportFailure(ep.name);
             if (error.name === 'AbortError') {
-                console.log(`[Qobuz] ${ep.name} timed out`);
+                console.log(`[Qobuz] ${ep.name} timed out or aborted`);
             }
         }
     }
@@ -386,18 +406,18 @@ export async function getQobuzStreamUrl(trackId: string): Promise<{ url: string;
 // Unified Search (Tidal + Qobuz)
 // ============================================================================
 
-export async function searchHiFi(query: string): Promise<HiFiSearchResult | null> {
+export async function searchHiFi(query: string, signal?: AbortSignal): Promise<HiFiSearchResult | null> {
     if (!query.trim()) return null;
 
     console.log('[HiFi] Starting Unified Parallel Search (God Mode)...');
 
     // Run BOTH engines in parallel for maximum redundancy
     const [qobuzResult, tidalResult] = await Promise.all([
-        searchQobuz(query).catch(e => {
+        searchQobuz(query, signal).catch(e => {
             console.error('[HiFi] Qobuz Search Error:', e);
             return null;
         }),
-        searchTidal(query).catch(e => {
+        searchTidal(query, signal).catch(e => {
             console.error('[HiFi] Tidal Search Error:', e);
             return null;
         })
@@ -431,17 +451,17 @@ export async function searchHiFi(query: string): Promise<HiFiSearchResult | null
 // Unified Stream URL
 // ============================================================================
 
-export async function getHiFiStreamUrl(trackId: string, source: 'tidal' | 'qobuz'): Promise<{ url: string; quality: string; keyName: string } | null> {
+export async function getHiFiStreamUrl(trackId: string, source: 'tidal' | 'qobuz', signal?: AbortSignal): Promise<{ url: string; quality: string; keyName: string } | null> {
     if (source === 'qobuz') {
-        return await getQobuzStreamUrl(trackId);
+        return await getQobuzStreamUrl(trackId, signal);
     } else {
         // Try LOSSLESS first
-        let result = await getTidalStreamUrl(trackId, 'LOSSLESS');
+        let result = await getTidalStreamUrl(trackId, 'LOSSLESS', signal);
         if (result) return result;
 
         // Fallback to HIGH (320kbps AAC) if Lossless fails - "Best Effort"
         console.log('[HiFi] Lossless failed, trying HIGH fallback...');
-        result = await getTidalStreamUrl(trackId, 'HIGH');
+        result = await getTidalStreamUrl(trackId, 'HIGH', signal);
         if (result) return { ...result, quality: 'HIGH', keyName: result.keyName }; // Explicitly mark as 320 equivalent
 
         return null;

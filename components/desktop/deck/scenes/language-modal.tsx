@@ -49,7 +49,7 @@ export function LanguageModal({ isOpen, onClose }: LanguageModalProps) {
 
     const handleSave = () => {
         saveSettings({ languages: selected });
-        window.location.reload();
+        onClose();
     };
 
     return (

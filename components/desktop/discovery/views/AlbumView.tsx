@@ -75,14 +75,14 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
         const newMix: Mix = newMixTemplate(list);
         const added = addMix(newMix);
         if (!added) updateMix(ALBUM_MIX_ID, { songs: list, currentSongIndex: 0 });
-        loadMix(ALBUM_MIX_ID);
+        loadMix(ALBUM_MIX_ID, 0);
     };
 
     const playSong = (index: number) => {
         const newMix: Mix = { id: ALBUM_MIX_ID, title: albumName, color: 'white', songs: songs, currentSongIndex: index };
         const added = addMix(newMix);
         if (!added) updateMix(ALBUM_MIX_ID, { songs, currentSongIndex: index });
-        loadMix(ALBUM_MIX_ID);
+        loadMix(ALBUM_MIX_ID, index);
     };
 
     return (
@@ -212,7 +212,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                         ) : (
                             <div className="divide-y divide-white/5">
                                 {songs.map((song, i) => {
-                                    const isActive = currentSong?.id === song.id && activeMixId === ALBUM_MIX_ID;
+                                    const isActive = (currentSong as any)?.song?.id ? ((currentSong as any).song.id === (song as any)?.song?.id && activeMixId === ALBUM_MIX_ID) : (currentSong?.id === song.id && activeMixId === ALBUM_MIX_ID);
                                     return (
                                         <motion.div key={song.id + i} initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.01 }}
                                             onClick={() => isActive ? togglePlay() : playSong(i)}

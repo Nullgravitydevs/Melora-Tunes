@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol } = require('electron');
+const { app, BrowserWindow, protocol, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const net = require('net');
@@ -7,6 +7,8 @@ const isDev = !app.isPackaged;
 let serverProcess = null;
 let mainWindow = null;
 let serverPort = 17730; // Fixed port for consistent localStorage persistence
+
+app.setName('Melora Tunes');
 
 // Find a free port
 function findFreePort() {
@@ -65,10 +67,10 @@ async function startServer() {
     } catch {
         serverPort = await findFreePort();
     }
-    
+
     // The standalone server.js is at .next/standalone/server.js
     const serverScript = path.join(process.resourcesPath, 'standalone', 'server.js');
-    
+
     const env = {
         ...process.env,
         PORT: String(serverPort),
@@ -85,11 +87,11 @@ async function startServer() {
     serverProcess.stdout.on('data', (data) => {
         console.log(`[Next.js] ${data.toString().trim()}`);
     });
-    
+
     serverProcess.stderr.on('data', (data) => {
         console.error(`[Next.js] ${data.toString().trim()}`);
     });
-    
+
     serverProcess.on('error', (err) => {
         console.error('Failed to start Next.js server:', err);
     });
@@ -104,7 +106,8 @@ function createWindow() {
         height: 800,
         minWidth: 800,
         minHeight: 600,
-        title: "Melora",
+        title: "Melora Tunes",
+        icon: path.join(__dirname, '..', 'public', 'app-icon.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -127,6 +130,12 @@ function createWindow() {
     // Grant all permissions
     mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
         callback(true);
+    });
+
+    // Handle external links natively (Bug 3)
+    mainWindow.webContents.setWindowOpenHandler((details) => {
+        shell.openExternal(details.url);
+        return { action: 'deny' };
     });
 
     mainWindow.loadURL(`http://127.0.0.1:${serverPort}`);

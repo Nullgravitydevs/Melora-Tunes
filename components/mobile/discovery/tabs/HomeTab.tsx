@@ -127,29 +127,29 @@ export function HomeTab({ onNavigate }: Props) {
 
             {/* ─── HERO ─── */}
             {heroSong && (
-                <div className="px-5 mb-7">
+                <div className="px-5 mb-8">
                     <div
-                        className="w-full aspect-[16/9] rounded-2xl border border-white/[0.06] overflow-hidden relative active:scale-[0.98] transition-transform"
+                        className="w-full aspect-[4/3] rounded-3xl overflow-hidden relative active:scale-[0.98] transition-transform shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.05]"
                         onClick={() => playSong(heroSong)}
                     >
                         {getArt(heroSong) && (
                             <img src={getArt(heroSong)} className="absolute inset-0 w-full h-full object-cover" alt="" />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent pointer-events-none" />
 
-                        <div className="absolute bottom-4 left-4 right-16">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/[0.08] backdrop-blur-sm rounded-full text-[9px] font-bold uppercase tracking-[0.12em] text-white/70 mb-2">
-                                <Disc3 size={8} /> Featured
+                        <div className="absolute bottom-5 left-5 right-20">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/[0.08] backdrop-blur-md rounded-full text-[9px] font-bold uppercase tracking-[0.2em] text-white/80 mb-3 border border-white/10 shadow-sm">
+                                <Disc3 size={10} className="opacity-70" /> Featured
                             </span>
-                            <h3 className="text-lg font-bold text-white leading-tight truncate">{decodeHtml(heroSong.name)}</h3>
-                            <p className="text-[11px] text-white/40 truncate mt-0.5">{decodeHtml(heroSong.primaryArtists)}</p>
+                            <h3 className="text-[22px] font-bold text-white leading-tight truncate tracking-tight drop-shadow-md">{decodeHtml(heroSong.name)}</h3>
+                            <p className="text-[13px] font-medium text-white/60 truncate mt-1 drop-shadow-md">{decodeHtml(heroSong.primaryArtists)}</p>
                         </div>
-                        <div className="absolute bottom-4 right-4 w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-xl">
+                        <div className="absolute bottom-5 right-5 w-14 h-14 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center shadow-2xl hover:bg-white hover:text-black transition-colors">
                             {isCurrent(heroSong) && isPlaying ? (
-                                <Pause size={18} fill="black" className="text-black" />
+                                <Pause size={20} fill="currentColor" className="text-white hover:text-black" />
                             ) : (
-                                <Play size={18} fill="black" className="text-black ml-0.5" />
+                                <Play size={20} fill="currentColor" className="text-white hover:text-black ml-1" />
                             )}
                         </div>
                     </div>
@@ -220,15 +220,15 @@ export function HomeTab({ onNavigate }: Props) {
 
 function Section({ title, icon, onSeeAll, children }: { title: string; icon?: React.ReactNode; onSeeAll?: () => void; children: React.ReactNode }) {
     return (
-        <div className="mb-7">
-            <div className="flex items-center justify-between px-5 mb-3">
+        <div className="mb-8">
+            <div className="flex items-end justify-between px-5 mb-4">
                 <div className="flex items-center gap-2">
-                    {icon && <span className="text-white/30">{icon}</span>}
-                    <h2 className="text-base font-bold text-white tracking-tight">{title}</h2>
+                    {icon && <span className="text-white/20">{icon}</span>}
+                    <h2 className="text-[18px] font-bold text-white/90 tracking-tight">{title}</h2>
                 </div>
                 {onSeeAll && (
-                    <button onClick={onSeeAll} className="text-[11px] font-semibold text-white/25 uppercase tracking-wider active:text-white/50 flex items-center gap-0.5">
-                        See All <ChevronRight size={12} />
+                    <button onClick={onSeeAll} className="text-[11px] font-bold text-white/30 uppercase tracking-[0.15em] active:text-white/50 flex items-center gap-0.5 transition-colors">
+                        See All <ChevronRight size={14} className="opacity-50" />
                     </button>
                 )}
             </div>
@@ -250,34 +250,38 @@ function SongCard({ item, onPlay, rank, isCurrent, isPlaying }: {
 }) {
     const art = getArt(item);
     return (
-        <button onClick={onPlay} className="flex-shrink-0 w-[140px] active:scale-[0.96] transition-transform text-left">
-            <div className="w-[140px] h-[140px] rounded-2xl overflow-hidden bg-white/[0.02] border border-white/[0.04] relative ring-1 ring-white/[0.03]">
-                {art && <img src={art} className="w-full h-full object-cover" alt="" loading="lazy" />}
+        <button onClick={onPlay} className="flex-shrink-0 w-[140px] active:scale-[0.96] transition-transform text-left group">
+            <div className={`w-[140px] h-[140px] rounded-[20px] overflow-hidden bg-zinc-900 border mb-3 relative shadow-md transition-colors ${isCurrent ? 'border-white/20' : 'border-white/[0.03]'}`}>
+                {art && <img src={art} className="w-full h-full object-cover transition-transform duration-500 group-active:scale-105" alt="" loading="lazy" />}
                 {rank && (
-                    <span className="absolute top-0 left-0 px-2.5 py-1 bg-black/70 backdrop-blur-sm rounded-br-xl rounded-tl-2xl text-[10px] font-black text-white/80 tabular-nums">
+                    <span className="absolute top-0 left-0 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-br-[14px] text-[10px] font-black text-white/90 tabular-nums shadow-sm">
                         #{rank}
                     </span>
                 )}
-                <div className="absolute bottom-2 right-2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                    {isCurrent && isPlaying ? (
-                        <Pause size={12} fill="black" className="text-black" />
-                    ) : (
-                        <Play size={12} fill="black" className="text-black ml-0.5" />
-                    )}
+
+                <div className="absolute inset-0 bg-black/0 group-active:bg-black/20 transition-colors flex items-center justify-center pointer-events-none">
+                    <div className={`w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center shadow-xl transition-all ${isCurrent ? 'opacity-100 scale-100' : 'opacity-0 scale-75 group-active:opacity-100 group-active:scale-100'}`}>
+                        {isCurrent && isPlaying ? (
+                            <Pause size={16} fill="currentColor" className="text-white" />
+                        ) : (
+                            <Play size={16} fill="currentColor" className="text-white ml-0.5" />
+                        )}
+                    </div>
                 </div>
-                {/* Currently playing glow */}
+
+                {/* Currently playing indicator */}
                 {isCurrent && (
-                    <div className="absolute bottom-2 left-2 flex gap-[2px] items-end h-3">
-                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '50%', animationDelay: '0ms' }} />
+                    <div className="absolute bottom-3 right-3 flex gap-[2px] items-end h-3">
+                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '60%', animationDelay: '0ms' }} />
                         <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '100%', animationDelay: '150ms' }} />
-                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '60%', animationDelay: '300ms' }} />
+                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '40%', animationDelay: '300ms' }} />
                     </div>
                 )}
             </div>
-            <p className={`mt-2 text-[12px] font-semibold truncate leading-tight ${isCurrent ? 'text-white' : 'text-white/80'}`}>
+            <p className={`text-[13px] font-semibold truncate leading-tight tracking-tight ${isCurrent ? 'text-white' : 'text-white/80'}`}>
                 {decodeHtml(item.name || item.title || "")}
             </p>
-            <p className="text-[10px] text-white/25 truncate mt-0.5">{decodeHtml(item.primaryArtists || item.subtitle || "")}</p>
+            <p className="text-[11px] font-medium text-white/40 truncate mt-0.5">{decodeHtml(item.primaryArtists || item.subtitle || "")}</p>
         </button>
     );
 }
@@ -285,12 +289,12 @@ function SongCard({ item, onPlay, rank, isCurrent, isPlaying }: {
 function AlbumCard({ item, onTap }: { item: any; onTap: () => void }) {
     const art = getArt(item);
     return (
-        <button onClick={onTap} className="flex-shrink-0 w-[130px] active:scale-[0.96] transition-transform text-left">
-            <div className="w-[130px] h-[130px] rounded-2xl overflow-hidden bg-white/[0.02] border border-white/[0.04] ring-1 ring-white/[0.03]">
-                {art && <img src={art} className="w-full h-full object-cover" alt="" loading="lazy" />}
+        <button onClick={onTap} className="flex-shrink-0 w-[140px] active:scale-[0.96] transition-transform text-left group">
+            <div className="w-[140px] h-[140px] rounded-[20px] overflow-hidden bg-zinc-900 border border-white/[0.03] shadow-md mb-3 relative">
+                {art && <img src={art} className="w-full h-full object-cover transition-transform duration-500 group-active:scale-105" alt="" loading="lazy" />}
             </div>
-            <p className="mt-2 text-[12px] font-semibold text-white/80 truncate">{decodeHtml(item.name || item.title || "")}</p>
-            <p className="text-[10px] text-white/25 truncate mt-0.5">{decodeHtml(item.primaryArtists || "Album")}</p>
+            <p className="text-[13px] font-semibold text-white/80 truncate tracking-tight">{decodeHtml(item.name || item.title || "")}</p>
+            <p className="text-[11px] font-medium text-white/40 truncate mt-0.5">{decodeHtml(item.primaryArtists || "Album")}</p>
         </button>
     );
 }
@@ -298,12 +302,12 @@ function AlbumCard({ item, onTap }: { item: any; onTap: () => void }) {
 function PlaylistCard({ item, onTap }: { item: any; onTap: () => void }) {
     const art = getArt(item);
     return (
-        <button onClick={onTap} className="flex-shrink-0 w-[150px] active:scale-[0.96] transition-transform text-left">
-            <div className="w-[150px] h-[150px] rounded-2xl overflow-hidden bg-white/[0.02] border border-white/[0.04] ring-1 ring-white/[0.03] relative">
-                {art && <img src={art} className="w-full h-full object-cover" alt="" loading="lazy" />}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <button onClick={onTap} className="flex-shrink-0 w-[150px] active:scale-[0.96] transition-transform text-left group">
+            <div className="w-[150px] h-[150px] rounded-[24px] overflow-hidden bg-zinc-900 border border-white/[0.03] shadow-md relative">
+                {art && <img src={art} className="w-full h-full object-cover opacity-80" alt="" loading="lazy" />}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                <h3 className="absolute bottom-4 left-4 right-4 text-[13px] font-bold text-white tracking-tight drop-shadow-md line-clamp-2">{decodeHtml(item.name || item.title || "")}</h3>
             </div>
-            <p className="mt-2 text-[12px] font-bold text-white/80 truncate">{decodeHtml(item.name || item.title || "")}</p>
         </button>
     );
 }
@@ -312,33 +316,39 @@ function TrackRow({ song, index, onPlay, isCurrent, isPlaying, onToggle }: {
     song: JioSaavnSong; index: number; onPlay: () => void;
     isCurrent: boolean; isPlaying: boolean; onToggle: () => void;
 }) {
-    const art = getArt(song);
+    const art = getArt(song, '150x150');
     return (
         <button
             onClick={isCurrent ? onToggle : onPlay}
-            className={`w-full flex items-center gap-3 p-2.5 rounded-xl active:bg-white/[0.05] transition-colors ${isCurrent ? "bg-white/[0.04] ring-1 ring-white/[0.06]" : ""}`}
+            className={`w-full flex items-center gap-4 p-2.5 rounded-[16px] active:bg-white/[0.05] transition-colors group ${isCurrent ? "bg-white/[0.05] ring-1 ring-white/[0.08]" : ""}`}
         >
-            <span className={`w-5 text-right text-[11px] font-medium flex-shrink-0 tabular-nums ${isCurrent ? "text-white" : "text-white/20"}`}>
-                {isCurrent && isPlaying ? (
-                    <span className="flex gap-[2px] justify-end items-end h-3.5">
-                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '50%', animationDelay: '0ms' }} />
-                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '100%', animationDelay: '150ms' }} />
-                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '60%', animationDelay: '300ms' }} />
-                    </span>
-                ) : index}
-            </span>
-            <div className="w-11 h-11 rounded-lg overflow-hidden bg-white/[0.03] flex-shrink-0 ring-1 ring-white/[0.04]">
+            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-zinc-900 border border-white/[0.02] shrink-0 shadow-sm">
                 {art && <img src={art} className="w-full h-full object-cover" alt="" loading="lazy" />}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px] opacity-0 group-active:opacity-100 transition-opacity">
+                    {isCurrent && isPlaying ? <Pause size={14} fill="currentColor" className="text-white" /> : <Play size={14} fill="currentColor" className="text-white ml-0.5" />}
+                </div>
             </div>
+
             <div className="flex-1 min-w-0 text-left">
-                <p className={`text-[13px] font-semibold truncate ${isCurrent ? "text-white" : "text-white/80"}`}>
+                <p className={`text-[14px] font-bold tracking-tight truncate ${isCurrent ? "text-white" : "text-white/90"}`}>
                     {decodeHtml(song.name)}
                 </p>
-                <p className="text-[11px] text-white/25 truncate">{decodeHtml(song.primaryArtists)}</p>
+                <p className="text-[12px] font-medium text-white/40 truncate tracking-tight">{decodeHtml(song.primaryArtists)}</p>
             </div>
-            <span className="text-[10px] text-white/15 font-mono flex-shrink-0 tabular-nums">
-                {song.duration ? `${Math.floor(song.duration / 60)}:${String(Math.floor(song.duration % 60)).padStart(2, "0")}` : ""}
-            </span>
+
+            <div className="w-8 flex items-center justify-end">
+                {isCurrent && isPlaying ? (
+                    <div className="flex gap-[3px] items-end h-[10px]">
+                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '60%', animationDelay: '0ms' }} />
+                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '100%', animationDelay: '150ms' }} />
+                        <span className="w-[2px] bg-white rounded-full animate-[bounce_1s_ease-in-out_infinite]" style={{ height: '40%', animationDelay: '300ms' }} />
+                    </div>
+                ) : (
+                    <span className="text-[11px] text-white/20 font-medium tabular-nums group-active:opacity-0 transition-opacity">
+                        {song.duration ? `${Math.floor(song.duration / 60)}:${String(Math.floor(song.duration % 60)).padStart(2, "0")}` : ""}
+                    </span>
+                )}
+            </div>
         </button>
     );
 }

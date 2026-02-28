@@ -3,7 +3,7 @@ import { SignalStore } from './signal-store';
 import { HistoryStore } from './history-store';
 import { getTrending, searchSongs, getSongDetails } from './jiosaavn';
 import { searchUnified } from './unified-search';
-import { Mix } from '@/components/providers/playback-context';
+import { Mix } from '@/lib/types';
 import { ensurePlayableTrack } from '@/lib/track-utils';
 
 // --- STRICT NORMALIZATION ---

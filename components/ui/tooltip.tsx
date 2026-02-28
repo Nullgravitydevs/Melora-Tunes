@@ -7,11 +7,13 @@ interface TooltipProps {
     children: React.ReactNode;
     position?: 'top' | 'bottom' | 'left' | 'right';
     delay?: number;
+    delayDuration?: number; // Alias for delay for Radix-ui/shadcn compatibility
     className?: string;
 }
 
-export function Tooltip({ text, children, position = 'top', delay = 0.2, className = '' }: TooltipProps) {
+export function Tooltip({ text, children, position = 'top', delay = 0.2, delayDuration, className = '' }: TooltipProps) {
     const [isVisible, setIsVisible] = useState(false);
+    const targetDelay = delayDuration !== undefined ? delayDuration / 1000 : delay;
 
     const getPositionStyles = () => {
         switch (position) {
@@ -38,7 +40,7 @@ export function Tooltip({ text, children, position = 'top', delay = 0.2, classNa
                         initial={{ opacity: 0, scale: 0.9, ...pos }}
                         animate={{ opacity: 1, scale: 1, ...pos }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ duration: 0.15, delay }}
+                        transition={{ duration: 0.15, delay: targetDelay }}
                         style={{
                             position: 'absolute',
                             [position === 'top' ? 'marginBottom' : position === 'bottom' ? 'marginTop' : position === 'left' ? 'marginRight' : 'marginLeft']: '8px',

@@ -12,6 +12,7 @@ export interface AppSettings {
     stopAtEndOfSong?: boolean;
     notificationsEnabled?: boolean;
     crossfadeDuration?: number;
+    playbackSpeed?: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -24,7 +25,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     languages: ['english', 'hindi'],
     stopAtEndOfSong: false,
     notificationsEnabled: true,
-    crossfadeDuration: 0
+    crossfadeDuration: 0,
+    playbackSpeed: 1
 };
 
 const STORAGE_KEY = 'melora-settings';

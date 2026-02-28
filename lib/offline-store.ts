@@ -55,7 +55,19 @@ class OfflineDB {
 
     async saveSong(song: JioSaavnSong, url: string, quality: AudioQuality): Promise<void> {
         try {
-            // Fetch blob
+            // 1. Quota Check
+            if (navigator.storage && navigator.storage.estimate) {
+                const { quota, usage } = await navigator.storage.estimate();
+                if (quota !== undefined && usage !== undefined) {
+                    const remaining = quota - usage;
+                    const estimatedSize = (quality === 'flac' || quality === 'hires') ? 40 * 1024 * 1024 : 10 * 1024 * 1024;
+                    if (remaining < estimatedSize) {
+                        throw new DOMException('Not enough free space to download track.', 'QuotaExceededError');
+                    }
+                }
+            }
+
+            // 2. Fetch blob
             const response = await fetch(url);
             const blob = await response.blob();
 

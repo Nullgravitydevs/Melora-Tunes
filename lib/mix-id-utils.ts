@@ -16,7 +16,10 @@ const SYSTEM_MIX_PREFIXES = [
     'search-',
     'album-',
     'artist-',
-    'now-playing-'
+    'now-playing-',
+    'jiosaavn-playlist-',
+    'section-',
+    'library-'
 ];
 
 export function isSystemMixId(mixId: string): boolean {

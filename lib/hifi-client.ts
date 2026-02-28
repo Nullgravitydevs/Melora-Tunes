@@ -92,13 +92,14 @@ export async function searchHiFi(query: string, source?: 'tidal' | 'qobuz'): Pro
  * STRICT: CLIENT-SIDE ONLY via Mirror Scraper
  * NEVER calls /api/hifi?type=stream
  */
-export async function getHiFiStream(trackId: string, source: 'tidal' | 'qobuz'): Promise<{ url: string; quality: string; keyName: string } | null> {
+export async function getHiFiStream(trackId: string, source: 'tidal' | 'qobuz', signal?: AbortSignal): Promise<{ url: string; quality: string; keyName: string } | null> {
     return HiFiLimiter.add(async () => {
         try {
+            if (signal?.aborted) return null;
             console.log(`[HiFi Client] Resolving stream CLIENT-SIDE for ${source}:${trackId}`);
             // Use the client-side mirror scraper directly
             // This avoids the server proxy ban risk
-            return await getHiFiStreamUrl(trackId, source);
+            return await getHiFiStreamUrl(trackId, source, signal);
         } catch (error) {
             console.error('[HiFi Client] Stream error:', error);
             return null;

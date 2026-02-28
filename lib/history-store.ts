@@ -20,11 +20,19 @@ export interface HistoryItem {
 class HistoryStoreClass {
     private cache: HistoryItem[] = [];
     private initialized = false;
+    private initPromise: Promise<void> | null = null;
 
     constructor() { }
 
     async init() {
         if (this.initialized) return;
+        if (!this.initPromise) {
+            this.initPromise = this._doInit();
+        }
+        return this.initPromise;
+    }
+
+    private async _doInit() {
         try {
             if (typeof window === 'undefined') return;
 
@@ -48,6 +56,7 @@ class HistoryStoreClass {
         } catch (e) {
             console.error("Failed to init history", e);
             // Fallback: Cache is empty
+            this.initialized = true; // Still mark initialized to prevent endless retries
         }
     }
 
@@ -55,8 +64,11 @@ class HistoryStoreClass {
         return this.cache;
     }
 
-    addToHistory(track: PlayableTrack, context: HistoryItem['context'] = { source: 'discovery' }) {
+    async addToHistory(track: PlayableTrack, context: HistoryItem['context'] = { source: 'discovery' }) {
         if (typeof window === 'undefined') return;
+
+        // Ensure we are hydrated before mutating
+        await this.init();
 
         // Optimistic Update (RAM)
         const newItem: HistoryItem = {
@@ -96,7 +108,8 @@ class HistoryStoreClass {
         db.clear(STORE_NAME).catch(console.error);
     }
 
-    updatePosition(trackId: string, position: number) {
+    async updatePosition(trackId: string, position: number) {
+        await this.init();
         const item = this.cache.find(h => h.id === trackId);
         if (item) {
             item.lastPosition = Math.floor(position);

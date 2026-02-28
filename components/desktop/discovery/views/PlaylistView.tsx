@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw, ListPlus } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, Disc3, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw, ListPlus } from "lucide-react";
 import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack } from "@/lib/types";
@@ -167,7 +167,8 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
     };
 
     // Mix ID
-    const PLAYLIST_MIX_ID = `playlist-${playlistData?.id || 'unknown'}`;
+    // [BUG 1 FIX] Use jiosaavn-playlist- prefix so it bypasses isUserPlaylistId check
+    const PLAYLIST_MIX_ID = `jiosaavn-playlist-${playlistData?.id || 'unknown'}`;
 
     // Play Handlers
     const playAll = (shuffle = false) => {
@@ -185,7 +186,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
         if (!added) {
             updateMix(PLAYLIST_MIX_ID, { songs: list, currentSongIndex: 0 });
         }
-        loadMix(PLAYLIST_MIX_ID);
+        loadMix(PLAYLIST_MIX_ID, 0);
     };
 
     // Delete Playlist
@@ -233,7 +234,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
         if (!added) {
             updateMix(PLAYLIST_MIX_ID, { songs: filteredSongs, currentSongIndex: index });
         }
-        loadMix(PLAYLIST_MIX_ID);
+        loadMix(PLAYLIST_MIX_ID, index);
     };
 
 
@@ -373,7 +374,7 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
             </div>
 
             {/* Track List */}
-            <div className="px-8 pb-32">
+            <div className="px-8 pb-24">
                 <div className="flex items-center gap-4 px-3 py-2 text-xs text-white/30 uppercase tracking-wider border-b border-white/5 mb-2">
                     <span className="w-6 text-center">#</span>
                     <span className="flex-1">Title</span>
@@ -388,87 +389,100 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                     </div>
                 ) : filteredSongs.length > 0 ? (
                     <div className="space-y-0.5">
-                        {filteredSongs.map((song, i) => (
-                            <motion.div
-                                key={song.id + i}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ delay: i * 0.01 }}
-                                onClick={() => {
-                                    if (currentSong?.id === song.id && activeMixId === PLAYLIST_MIX_ID) {
-                                        togglePlay();
-                                    } else {
-                                        playSong(i);
-                                    }
-                                }}
-                                draggable={true}
-                                // @ts-expect-error
-                                onDragStart={(e: React.DragEvent) => {
-                                    e.dataTransfer.setData('application/json', JSON.stringify(song));
-                                    e.dataTransfer.effectAllowed = 'copy';
-                                }}
-                                onContextMenu={(e) => onContextMenu && onContextMenu(e, (song as any).song || song, playlist.id)}
-                                className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-white/[0.04] cursor-pointer group transition-all"
-                            >
-                                <span className="w-6 text-center text-sm text-white/30 group-hover:hidden">{i + 1}</span>
-                                <span className="w-6 text-center hidden group-hover:block">
-                                    {currentSong?.id === song.id && activeMixId === PLAYLIST_MIX_ID && isPlaying ? (
-                                        <Pause size={14} className="text-white mx-auto" />
-                                    ) : (
-                                        <Play size={14} className="text-white mx-auto" fill="currentColor" />
-                                    )}
-                                </span>
+                        {filteredSongs.map((song, i) => {
+                            // Helper to accurately match nested track IDs
+                            const isCurrentTrackMatch = () => {
+                                if (!currentSong) return false;
+                                const csId = (currentSong as any).song?.id || currentSong.id;
+                                const sId = (song as any).song?.id || song.id;
+                                return csId === sId;
+                            };
+                            const isActive = isCurrentTrackMatch() && activeMixId === PLAYLIST_MIX_ID;
 
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <p className={`font-medium truncate ${currentSong?.id === (song as any).id && activeMixId === PLAYLIST_MIX_ID ? 'text-white font-bold' : 'text-white/80'}`}>
-                                            {decodeHtml((song as any).name || (song as any).title || 'Unknown Title')}
+                            return (
+                                <motion.div
+                                    key={song.id + i}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: i * 0.01 }}
+                                    onClick={() => {
+                                        if (isActive) {
+                                            togglePlay();
+                                        } else {
+                                            playSong(i);
+                                        }
+                                    }}
+                                    draggable={true}
+                                    // @ts-expect-error
+                                    onDragStart={(e: React.DragEvent) => {
+                                        e.dataTransfer.setData('application/json', JSON.stringify(song));
+                                        e.dataTransfer.effectAllowed = 'copy';
+                                    }}
+                                    onContextMenu={(e) => onContextMenu && onContextMenu(e, (song as any).song || song, playlist.id)}
+                                    className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-white/[0.04] cursor-pointer group transition-all"
+                                >
+                                    <span className="w-6 text-center text-sm group-hover:hidden">
+                                        {isActive && isPlaying ? <Disc3 className="animate-spin text-white mx-auto" size={14} /> : <span className={isActive ? 'text-white font-bold' : 'text-white/30'}>{i + 1}</span>}
+                                    </span>
+                                    <span className="w-6 text-center hidden group-hover:block">
+                                        {isActive && isPlaying ? (
+                                            <Pause size={14} className="text-white mx-auto" />
+                                        ) : (
+                                            <Play size={14} className="text-white mx-auto" fill="currentColor" />
+                                        )}
+                                    </span>
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className={`font-medium truncate ${isActive ? 'text-white font-bold' : 'text-white/80'}`}>
+                                                {decodeHtml((song as any).name || (song as any).title || 'Unknown Title')}
+                                            </p>
+                                            {isDownloaded((song as any).id) && (
+                                                <div className="w-1.5 h-1.5 rounded-full bg-white/60" title="Offline" />
+                                            )}
+                                        </div>
+                                        <p className="text-sm text-white/40 truncate">
+                                            {decodeHtml((song as any).primaryArtists || (song as any).artist || 'Unknown Artist')}
                                         </p>
-                                        {isDownloaded((song as any).id) && (
-                                            <div className="w-1.5 h-1.5 rounded-full bg-white/60" title="Offline" />
+                                    </div>
+
+                                    <span className="text-sm text-white/25 tabular-nums">
+                                        {(() => {
+                                            const d = typeof song.duration === 'string' ? parseInt(song.duration) : song.duration;
+                                            if (!d) return '--:--';
+                                            return `${Math.floor(d / 60)}:${(d % 60).toString().padStart(2, '0')}`;
+                                        })()}
+                                    </span>
+
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <motion.button
+                                            onClick={(e) => { e.stopPropagation(); toggleLike(song); }}
+                                            className={`p-2 rounded-full transition-colors ${isLiked((song as any).id) ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                                        >
+                                            <Heart size={16} fill={isLiked((song as any).id) ? "currentColor" : "none"} />
+                                        </motion.button>
+
+                                        <motion.button
+                                            onClick={(e) => { e.stopPropagation(); setSongToAdd(song); }}
+                                            className="p-2 rounded-full text-white/40 hover:text-white transition-colors"
+                                            title="Add to Playlist"
+                                        >
+                                            <MoreHorizontal size={16} />
+                                        </motion.button>
+
+                                        {isUserMix && (
+                                            <motion.button
+                                                onClick={(e) => removeSong(e, i)}
+                                                className="p-2 rounded-full text-white/40 hover:text-red-500 transition-colors"
+                                                title="Remove from Playlist"
+                                            >
+                                                <Trash2 size={16} />
+                                            </motion.button>
                                         )}
                                     </div>
-                                    <p className="text-sm text-white/40 truncate">
-                                        {decodeHtml((song as any).primaryArtists || (song as any).artist || 'Unknown Artist')}
-                                    </p>
-                                </div>
-
-                                <span className="text-sm text-white/25 tabular-nums">
-                                    {(() => {
-                                        const d = typeof song.duration === 'string' ? parseInt(song.duration) : song.duration;
-                                        if (!d) return '--:--';
-                                        return `${Math.floor(d / 60)}:${(d % 60).toString().padStart(2, '0')}`;
-                                    })()}
-                                </span>
-
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <motion.button
-                                        onClick={(e) => { e.stopPropagation(); toggleLike(song); }}
-                                        className={`p-2 rounded-full transition-colors ${isLiked((song as any).id) ? 'text-white' : 'text-white/40 hover:text-white'}`}
-                                    >
-                                        <Heart size={16} fill={isLiked((song as any).id) ? "currentColor" : "none"} />
-                                    </motion.button>
-
-                                    <motion.button
-                                        onClick={(e) => { e.stopPropagation(); setSongToAdd(song); }}
-                                        className="p-2 rounded-full text-white/40 hover:text-white transition-colors"
-                                        title="Add to Playlist"
-                                    >
-                                        <MoreHorizontal size={16} />
-                                    </motion.button>
-
-                                    {isUserMix && (
-                                        <motion.button
-                                            onClick={(e) => removeSong(e, i)}
-                                            className="p-2 rounded-full text-white/40 hover:text-red-500 transition-colors"
-                                            title="Remove from Playlist"
-                                        >
-                                            <Trash2 size={16} />
-                                        </motion.button>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))}
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 ) : error ? (
                     <div className="flex flex-col items-center justify-center py-24 text-center px-4">

@@ -84,7 +84,7 @@ export function RadioView({ onNavigate }: RadioViewProps) {
     };
 
     return (
-        <div className="min-h-full p-8 pb-32 space-y-12">
+        <div className="min-h-full p-8 pb-24 space-y-12">
 
             {/* HERO: ON AIR */}
             <div className="relative h-64 rounded-3xl overflow-hidden group cursor-pointer" onClick={() => startRadio({ label: 'Melora FM', query: `top hits ${new Date().getFullYear()}` })}>

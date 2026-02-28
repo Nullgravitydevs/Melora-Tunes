@@ -42,18 +42,17 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
         const load = async () => {
             setIsLoading(true);
             try {
-                let id = artist?.id;
+                let id = artist?.id || artist?.primaryArtistsId;
 
-                // If id is not numeric (could be a name), search for the artist first
-                if (id && !/^\d+$/.test(id)) {
-                    const search = await import("@/lib/jiosaavn").then(m => m.searchArtists(id, 1, 1));
-                    id = search[0]?.id || id;
+                // Handle comma-separated IDs (e.g., "1234, 5678")
+                if (id && typeof id === 'string' && id.includes(',')) {
+                    id = id.split(',')[0].trim();
                 }
 
-                // If no id at all, search by name 
-                if (!id) {
+                // If id is not present or seems to actually be a name (contains spaces), search by name
+                if (!id || (typeof id === 'string' && id.includes(' '))) {
                     const search = await import("@/lib/jiosaavn").then(m => m.searchArtists(artistName, 1, 1));
-                    id = search[0]?.id;
+                    id = search[0]?.id || id;
                 }
 
                 if (id) {

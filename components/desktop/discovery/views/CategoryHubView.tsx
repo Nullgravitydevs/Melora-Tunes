@@ -82,7 +82,7 @@ export function CategoryHubView({ data, onNavigate, onBack, onContextMenu }: Cat
     };
 
     return (
-        <div className="min-h-full pb-32 bg-black">
+        <div className="min-h-full pb-24 bg-black">
             {/* EPIC HERO HEADER */}
             <div className="relative h-[60vh] min-h-[450px] overflow-hidden group">
                 {/* Background Image (Deep Blur) */}

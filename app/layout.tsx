@@ -41,9 +41,11 @@ export const viewport: Viewport = {
 };
 
 import { PwaRegister } from "@/components/pwa-register";
-import { RotatePrompt } from "@/components/ui/rotate-prompt";
 import { PlaybackProvider } from "@/components/providers/playback-context";
 import { MotionProvider } from "@/components/providers/motion-provider";
+import { SettingsProvider } from "@/components/providers/settings-provider";
+import { LibraryProvider } from "@/components/providers/library-provider";
+import { UIProvider } from "@/components/providers/ui-context";
 
 export default function RootLayout({
   children,
@@ -59,12 +61,18 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${pressStart2P.variable} font-sans bg-black text-white`}
       >
-        <PlaybackProvider>
-          <MotionProvider>
-            <PwaRegister />
-            {children}
-          </MotionProvider>
-        </PlaybackProvider>
+        <SettingsProvider>
+          <UIProvider>
+            <LibraryProvider>
+              <PlaybackProvider>
+                <MotionProvider>
+                  <PwaRegister />
+                  {children}
+                </MotionProvider>
+              </PlaybackProvider>
+            </LibraryProvider>
+          </UIProvider>
+        </SettingsProvider>
       </body>
     </html>
   );

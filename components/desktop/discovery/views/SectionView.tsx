@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
@@ -126,7 +127,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
 
             const added = addMix(mix);
             if (!added) updateMix(mixId, { songs: items, currentSongIndex: index });
-            loadMix(mixId);
+            loadMix(mixId, index);
         }
     };
 
@@ -140,7 +141,7 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
     const isSongList = sectionId === 'trending' || sectionId === 'retro' || (sectionId as string).startsWith('mood-');
 
     return (
-        <div className="relative min-h-full pb-32">
+        <div className="relative min-h-full pb-24">
             {/* HEADER */}
             <div className="relative z-10 px-8 pt-8 pb-6 flex items-end justify-between bg-gradient-to-b from-[#000000] to-transparent sticky top-0 backdrop-blur-xl border-b border-white/5">
                 <div className="flex items-center gap-4">
@@ -319,7 +320,6 @@ export function SectionView({ sectionId, sectionTitle, initialData, onNavigate, 
                 }}
                 onGoToArtist={(id) => onNavigate({ id: 'artist', data: { id } })}
                 onGoToAlbum={(id) => onNavigate({ id: 'peel-reveal', data: { id } })}
-                onStartRadio={() => onNavigate({ id: 'radio' })}
                 isDownloaded={false}
                 onDownload={() => { }}
                 onRemoveDownload={() => { }}

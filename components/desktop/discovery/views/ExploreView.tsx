@@ -137,7 +137,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
     }
 
     return (
-        <div className="min-h-full pb-32 space-y-12">
+        <div className="min-h-full pb-24 space-y-12">
 
             {/* VISUAL HERO HEADER */}
             <div className="relative h-[50vh] min-h-[400px] w-full overflow-hidden mb-8 group">

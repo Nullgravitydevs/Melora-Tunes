@@ -109,7 +109,8 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
     const playerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const { currentSong, currentTrack, currentTrackMetadata, isPlaying, togglePlay, next, prev, seek, volume, setVolume, duration, shuffle, setShuffle, repeat, setRepeat, loadMix, activeMixId, play, eq, activeQuality, playbackState } = usePlayback();
-    const { mixes, addMix, updateMix, deleteMix, likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded, downloadSong, removeDownload } = useLibrary();
+    const { mixes, addMix, updateMix, deleteMix, likedSongs, toggleLike, isLiked, recentlyPlayed, isDownloaded, removeDownload } = useLibrary();
+    const { downloadSong } = usePlayback();
     const { progress } = useAudioProgress();
     const { playClick, playClunk, playEject, playInsert } = useAudio();
 

@@ -68,7 +68,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const audioContextRef = useRef<AudioContext | null>(null);
     const filtersRef = useRef<BiquadFilterNode[]>([]);
     const sourceRefs = useRef<Map<HTMLAudioElement, MediaElementAudioSourceNode>>(new Map());
-    const gainNodeRef = useRef<GainNode | null>(null);
+    const gainRefs = useRef<Map<HTMLAudioElement, GainNode>>(new Map());
     const analyserRef = useRef<AnalyserNode | null>(null);
 
     const getActive = useCallback(() => activeId === 'primary' ? primaryRef.current : secondaryRef.current, [activeId]);
@@ -122,8 +122,13 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                 if (el && !sourceRefs.current.has(el)) {
                     try {
                         const source = ctx.createMediaElementSource(el);
-                        source.connect(filters[0]);
+                        const fadeGain = ctx.createGain();
+
+                        source.connect(fadeGain);
+                        fadeGain.connect(filters[0]);
+
                         sourceRefs.current.set(el, source);
+                        gainRefs.current.set(el, fadeGain);
                     } catch (err) {
                         console.warn("Source creation failed (maybe already connected):", err);
                     }
@@ -218,6 +223,26 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
     }, [playing]);
 
+    // Synchronize HTML Audio Element with React `playing` prop
+    // This catches edge cases where URL resolves before playback is un-paused
+    useEffect(() => {
+        const active = getActive();
+        // Browser sometimes resolves empty `src` to `window.location.href`, so we check the raw attribute.
+        if (!active || !active.getAttribute('src') || active.getAttribute('src') === "") return;
+
+        if (playing && active.paused) {
+            // Guard against AbortError when rapidly switching
+            const playPromise = active.play();
+            if (playPromise) {
+                playPromise.catch((e) => {
+                    if (e.name !== 'AbortError') console.warn('Sync play() error:', e);
+                });
+            }
+        } else if (!playing && !active.paused) {
+            active.pause();
+        }
+    }, [playing, getActive]);
+
     // Update MediaSession position state
     useEffect(() => {
         if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
@@ -251,7 +276,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
             }
         },
         getCurrentTime: () => getActive()?.currentTime || 0,
-        play: () => getActive()?.play().catch(() => { }),
+        play: () => { const el = getActive(); if (el && el.getAttribute('src') && el.getAttribute('src') !== "") el.play().catch(e => { if (e.name !== 'AbortError') console.warn('play() error:', e); }); },
         pause: () => getActive()?.pause(),
         setVolume: (vol: number) => {
             const active = getActive();
@@ -280,30 +305,42 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
             if (playing) {
                 if (crossfadeDuration > 0) {
-                    newActive.volume = 0;
-                    newActive.play().catch(e => console.error(e));
-
+                    const ctx = audioContextRef.current;
+                    const oldGain = gainRefs.current.get(oldActive);
+                    const newGain = gainRefs.current.get(newActive);
                     const durationMs = crossfadeDuration * 1000;
-                    const startTime = performance.now();
 
-                    const fade = (time: number) => {
-                        const elapsed = time - startTime;
+                    if (ctx && oldGain && newGain && ctx.state === 'running') {
+                        // Web Audio API Ramping (Runs beautifully in background tabs)
+                        newActive.volume = 1.0;
+                        oldActive.volume = 1.0;
 
-                        if (elapsed >= durationMs) {
-                            newActive.volume = volume;
+                        const now = ctx.currentTime;
+
+                        oldGain.gain.cancelScheduledValues(now);
+                        newGain.gain.cancelScheduledValues(now);
+
+                        oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+                        newGain.gain.setValueAtTime(0, now);
+
+                        oldGain.gain.linearRampToValueAtTime(0, now + durationMs / 1000);
+                        newGain.gain.linearRampToValueAtTime(volume, now + durationMs / 1000);
+
+                        newActive.play().catch(e => console.error(e));
+
+                        setTimeout(() => {
                             oldActive.pause();
                             oldActive.currentTime = 0;
-                            if (oldActive.src.startsWith('blob:')) {
-                                URL.revokeObjectURL(oldActive.src);
-                            }
-                        } else {
-                            const progress = elapsed / durationMs;
-                            newActive.volume = Math.min(volume, volume * progress);
-                            oldActive.volume = Math.max(0, volume * (1 - progress));
-                            requestAnimationFrame(fade);
-                        }
-                    };
-                    requestAnimationFrame(fade);
+                            if (oldActive.src.startsWith('blob:')) URL.revokeObjectURL(oldActive.src);
+                        }, durationMs + 100);
+                    } else {
+                        // Fallback if Context isn't ready
+                        newActive.volume = volume;
+                        newActive.play().catch(e => console.error(e));
+                        oldActive.pause();
+                        oldActive.currentTime = 0;
+                        if (oldActive.src.startsWith('blob:')) URL.revokeObjectURL(oldActive.src);
+                    }
                 } else {
                     newActive.volume = volume;
                     newActive.play().catch(e => console.error(e));
@@ -328,9 +365,14 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                 if (active.src.startsWith('blob:') && active.src !== url) {
                     URL.revokeObjectURL(active.src);
                 }
+                active.pause(); // Always pause before changing src to prevent AbortError
                 active.src = url;
                 active.load();
-                if (playing) active.play().catch(e => console.error(e));
+                if (playing) {
+                    // Yield a microtask to let the pause() settle before play()
+                    const playPromise = active.play();
+                    if (playPromise) playPromise.catch(e => { if (e.name !== 'AbortError') console.error(e); });
+                }
             } else {
                 // Unload content
                 active.pause();
@@ -349,6 +391,12 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         return () => {
             if (primaryRef.current?.src.startsWith('blob:')) URL.revokeObjectURL(primaryRef.current.src);
             if (secondaryRef.current?.src.startsWith('blob:')) URL.revokeObjectURL(secondaryRef.current.src);
+
+            // Critical: Close context to prevent AudioContext exhaustion limit (6 on Chrome/Safari)
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close().catch(e => console.warn('AudioContext close failed', e));
+                audioContextRef.current = null;
+            }
         };
     }, []); // Intentionally not including deps that would trigger unnecessary re-runs
 
@@ -376,10 +424,18 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         if (!active || !url) return;
 
         if (playing) {
-            active.play().catch(error => {
-                if (error.name === 'AbortError') return;
-                onError?.(`Playback failed: ${error.message}`);
-            });
+            // Use a microtask delay to avoid interrupting a pending pause()
+            const timer = setTimeout(() => {
+                if (!active.paused && active.src) return; // Already playing
+                const playPromise = active.play();
+                if (playPromise) {
+                    playPromise.catch(error => {
+                        if (error.name === 'AbortError') return; // Swallow — another state change interrupted us
+                        onError?.(`Playback failed: ${error.message}`);
+                    });
+                }
+            }, 50); // 50ms lets any pending pause() settle
+            return () => clearTimeout(timer);
         } else {
             active.pause();
         }
@@ -389,8 +445,21 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     useEffect(() => {
         const active = getActive();
         const inactive = getInactive();
-        if (active) active.volume = volume;
-        if (inactive) inactive.volume = volume;
+
+        const ctx = audioContextRef.current;
+        if (ctx && active && gainRefs.current.has(active) && ctx.state === 'running') {
+            // Apply volume via Gain Node smoothly
+            const gain = gainRefs.current.get(active)!;
+            gain.gain.setTargetAtTime(volume, ctx.currentTime, 0.05);
+
+            // Force hardware volume to 1 since graph handles attenuation
+            if (active) active.volume = 1;
+            if (inactive) inactive.volume = 1;
+        } else {
+            // Native fallback
+            if (active) active.volume = volume;
+            if (inactive) inactive.volume = volume;
+        }
     }, [volume, activeId]);
 
     // Handle Playback Speed

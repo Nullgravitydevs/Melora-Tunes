@@ -39,7 +39,15 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     return (
         <UIContext.Provider value={value}>
             {children}
-            {/* The global toast UI renderer is in glass-stage or similar, but we could add it here if it was global */}
+            {
+                toast && (
+                    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 bg-zinc-800/90 text-white text-xs font-bold rounded-full border border-white/10 backdrop-blur-md shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 transition-all pointer-events-none">
+                        {toast.type === 'error' && <span className="text-red-400">⚠️</span>}
+                        {toast.type === 'info' && <span className="text-amber-400">ℹ️</span>}
+                        {toast.message}
+                    </div>
+                )
+            }
         </UIContext.Provider>
     );
 }
