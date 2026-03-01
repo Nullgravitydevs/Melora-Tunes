@@ -2,8 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { JioSaavnSong, getAudioUrl, getSongDetails, searchSongs } from "@/lib/jiosaavn";
-import { getHiFiStream } from '@/lib/hifi-client';
-import { searchHiFi } from '@/lib/hifi';
+import { getHiFiStream, searchHiFi } from '@/lib/hifi-client';
 import { KeyVault } from '@/lib/key-vault';
 import { AudioPlayer, AudioPlayerRef } from "@/components/ui/audio-player";
 import { decodeHtml, cleanTrackTitle } from "@/lib/utils";
@@ -626,13 +625,54 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // 2. Search Fallback
         if (allowSearch) {
             try {
-                const query = `${track.title} ${track.artist}`;
-                const searchResult = await searchHiFi(query, signal);
+                // Clean the query: strip (From "Movie") tags, language tags, HTML entities
+                // and use only the first artist for better Tidal matching
+                const cleanTitle = track.title
+                    .replace(/\(From\s+[""&].*?\)/gi, '')  // Remove (From "Movie") tags
+                    .replace(/\((Telugu|Hindi|Tamil|Kannada|Malayalam|Bengali|Punjabi|Marathi|Gujarati)\)/gi, '') // Remove language tags
+                    .replace(/&quot;/g, '"')
+                    .replace(/&amp;/g, '&')
+                    .replace(/\s*-\s*(Telugu|Hindi|Tamil|Kannada|Malayalam|Bengali|Punjabi|Marathi|Gujarati)\s*$/gi, '') // Remove trailing " - Telugu"
+                    .replace(/\s{2,}/g, ' ')               // Collapse multiple spaces
+                    .trim();
+                const firstArtist = (track.artist || '').split(',')[0].trim();
+                const query = `${cleanTitle} ${firstArtist}`;
+                console.log(`[HiFi] Search query: "${query}"`);
+                const searchResult = await searchHiFi(query);
                 if (searchResult && searchResult.tracks && searchResult.tracks.length > 0) {
-                    const match = searchResult.tracks[0];
-                    const stream = await getHiFiStream(match.id, match.source, signal);
-                    if (stream?.url) {
-                        return { url: stream.url, quality: mapHiFiQuality(stream.quality), keyName: stream.keyName };
+                    // SAFETY: Don't blindly use tracks[0] — verify title matches!
+                    // Normalize title for comparison
+                    const normalize = (s: string) => s.toLowerCase()
+                        .replace(/\(.*?\)/g, '')           // Remove parentheticals
+                        .replace(/[^a-z0-9\s]/g, '')       // Remove special chars
+                        .replace(/\s+/g, ' ').trim();
+                    const origWords = new Set(normalize(cleanTitle).split(' ').filter(w => w.length > 1));
+
+                    let bestMatch = null;
+                    let bestScore = 0;
+
+                    for (const candidate of searchResult.tracks) {
+                        const candidateNorm = normalize(candidate.title || '');
+                        const candidateWords = candidateNorm.split(' ').filter(w => w.length > 1);
+                        // Count how many original words appear in the candidate
+                        const matchingWords = candidateWords.filter(w => origWords.has(w)).length;
+                        const score = origWords.size > 0 ? matchingWords / origWords.size : 0;
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMatch = candidate;
+                        }
+                    }
+
+                    // Only use match if at least 50% of original words match
+                    if (bestMatch && bestScore >= 0.5) {
+                        console.log(`[HiFi] Best match: "${bestMatch.title}" (score: ${(bestScore * 100).toFixed(0)}%)`);
+                        const stream = await getHiFiStream(bestMatch.id, bestMatch.source, signal);
+                        if (stream?.url) {
+                            return { url: stream.url, quality: mapHiFiQuality(stream.quality), keyName: stream.keyName };
+                        }
+                    } else {
+                        console.warn(`[HiFi] No good title match found. Best: "${bestMatch?.title}" (${(bestScore * 100).toFixed(0)}%) — skipping HiFi`);
                     }
                 }
             } catch (e) {
@@ -883,9 +923,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         else if (isPlayableTrack(songOrTrack)) {
             // Fix 5: Explicit Preference Flag
             if (songOrTrack.isExplicitPreference) {
-                track = songOrTrack; // Respect manual choice
+                track = songOrTrack; // Respect manual choice — full object preserved
             } else {
-                track = { ...songOrTrack, preferredQuality: targetQualityPreference }; // Apply global default
+                // Trust the quality already set on the track (e.g. from ensurePlayableTrack at click time)
+                // Only fall back to global quality if track has no quality set.
+                track = { ...songOrTrack, preferredQuality: songOrTrack.preferredQuality || targetQualityPreference };
             }
         } else {
             // Raw song: Apply global targetQualityPreference
@@ -917,7 +959,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             if (result && result.url) {
                 console.log(`[Playback] Loaded: ${result.quality} | ${result.url.substring(0, 50)}...`);
                 // Check for silent downgrade (Bug #10)
-                if (result.quality !== track.preferredQuality) {
+                // 'flac' and 'hires' are equivalent lossless tiers — don't warn if one resolves to the other
+                const LOSSLESS_TIERS = new Set(['flac', 'hires', 'lossless']);
+                const isRealDowngrade = result.quality !== track.preferredQuality
+                    && !(LOSSLESS_TIERS.has(result.quality) && LOSSLESS_TIERS.has(track.preferredQuality));
+                if (isRealDowngrade) {
                     console.warn(`[Playback] Quality Downgrade: Requested ${track.preferredQuality}, got ${result.quality}`);
                     showToast(`Playing in ${result.quality} (Requested: ${track.preferredQuality})`, 'info');
                 }

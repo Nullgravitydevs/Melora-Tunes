@@ -102,11 +102,11 @@ export async function searchSongs(query: string, page: number = 1, limit: number
 
                 return {
                     id: item.id,
-                    name: title,
+                    name: decodeHtml(title),
                     type: item.type || 'song', // Default to song if missing to prevents filtering issues
                     album: {
                         id: item.more_info?.album_id || '',
-                        name: item.more_info?.album || '',
+                        name: decodeHtml(item.more_info?.album || ''),
                         url: item.more_info?.album_url || ''
                     },
                     year: item.year || item.more_info?.year || '',
@@ -192,11 +192,11 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
 
                 return {
                     id: item.id || item.albumid, // Search sometimes uses 'albumid'
-                    name: title,
+                    name: decodeHtml(title),
                     type: 'album',
                     album: {
                         id: item.id || item.albumid,
-                        name: title,
+                        name: decodeHtml(title),
                         url: item.perma_url || ''
                     },
                     year: year,
@@ -518,11 +518,11 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
         if (songData && (songData.id || songData.song)) {
             return {
                 id: songData.id,
-                name: songData.song || songData.title || songData.name || "Unknown Details Title",
+                name: decodeHtml(songData.song || songData.title || songData.name || "Unknown Details Title"),
                 type: songData.type,
                 album: {
                     id: songData.albumid,
-                    name: songData.album,
+                    name: decodeHtml(songData.album || ''),
                     url: songData.album_url
                 },
                 year: songData.year,

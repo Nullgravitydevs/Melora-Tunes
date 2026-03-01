@@ -168,24 +168,25 @@ export function SearchView({ onNavigate, onContextMenu }: SearchViewProps) {
     const playTrack = (track: PlayableTrack, allTracks?: PlayableTrack[]) => {
         const tracks = allTracks || [track];
         const idx = tracks.findIndex(t => t.id === track.id);
+        const startIdx = idx >= 0 ? idx : 0;
 
         const newMix: Mix = {
             id: SEARCH_MIX_ID,
             title: 'Search Results',
             color: 'white',
             songs: tracks,
-            currentSongIndex: idx >= 0 ? idx : 0
+            currentSongIndex: startIdx
         };
 
         const added = addMix(newMix);
         if (!added) {
             updateMix(SEARCH_MIX_ID, {
                 songs: tracks,
-                currentSongIndex: idx >= 0 ? idx : 0
+                currentSongIndex: startIdx
             });
         }
 
-        loadMix(SEARCH_MIX_ID);
+        loadMix(SEARCH_MIX_ID, startIdx);
     };
 
     // VIRTUALIZATION / LIMIT RENDER

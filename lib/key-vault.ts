@@ -1,7 +1,7 @@
 import { PlayableSource } from './types';
 
 // ============================================================================
-// The Twelve Keys (God Mode Inventory)
+// The Key Vault (Endpoints loaded from environment variables)
 // ============================================================================
 
 interface KeyEndpoint {
@@ -13,27 +13,24 @@ interface KeyEndpoint {
     appId?: string; // For direct Qobuz fallback
 }
 
-// 🥇 Tier 1: Qobuz (Hi-Res) - 3 Streaming + 1 Metadata Backup
-const QOBUZ_KEYS: KeyEndpoint[] = [
-    { name: 'dab', url: 'https://dab.yeet.su/api/stream', type: 'qobuz', paramName: 'trackId', qualityParam: '7' },
-    { name: 'dabmusic', url: 'https://dabmusic.xyz/api/stream', type: 'qobuz', paramName: 'trackId', qualityParam: '7' },
-    { name: 'squid', url: 'https://qobuz.squid.wtf/api/download-music', type: 'qobuz', paramName: 'track_id' },
-    // The 4th "Key" - Direct Metadata Backup (Not a stream proxy, but an App Secret)
-    // We treat this differently in the search logic, but we track it here.
-    { name: 'backup_app_id', url: 'https://www.qobuz.com/api.json/0.2', type: 'qobuz', appId: '798273057' }
-];
+// Load endpoints from environment variables (set in .env.local, never committed)
+// IMPORTANT: Next.js requires LITERAL process.env.NEXT_PUBLIC_* references.
+// Dynamic lookups like process.env[key] will NOT work — Next.js does static replacement.
+function parseEndpoints(raw: string | undefined): KeyEndpoint[] {
+    try {
+        if (!raw || raw === '[]') return [];
+        return JSON.parse(raw) as KeyEndpoint[];
+    } catch (e) {
+        console.error('[KeyVault] Failed to parse endpoints:', e);
+        return [];
+    }
+}
 
-// 🥈 Tier 2: Tidal (Lossless) - 8 Mirrors
-const TIDAL_KEYS: KeyEndpoint[] = [
-    { name: 'triton', url: 'https://triton.squid.wtf', type: 'tidal' },
-    { name: 'hund', url: 'https://hund.qqdl.site', type: 'tidal' },
-    { name: 'katze', url: 'https://katze.qqdl.site', type: 'tidal' },
-    { name: 'maus', url: 'https://maus.qqdl.site', type: 'tidal' },
-    { name: 'vogel', url: 'https://vogel.qqdl.site', type: 'tidal' },
-    { name: 'wolf', url: 'https://wolf.qqdl.site', type: 'tidal' },
-    { name: 'kinoplus', url: 'https://tidal.kinoplus.online', type: 'tidal' },
-    { name: 'binimum', url: 'https://tidal-api.binimum.org', type: 'tidal' }
-];
+// 🥇 Tier 1: Qobuz (Hi-Res) - Loaded from NEXT_PUBLIC_QOBUZ_ENDPOINTS
+const QOBUZ_KEYS: KeyEndpoint[] = parseEndpoints(process.env.NEXT_PUBLIC_QOBUZ_ENDPOINTS);
+
+// 🥈 Tier 2: Tidal (Lossless) - Loaded from NEXT_PUBLIC_TIDAL_ENDPOINTS
+const TIDAL_KEYS: KeyEndpoint[] = parseEndpoints(process.env.NEXT_PUBLIC_TIDAL_ENDPOINTS);
 
 // ============================================================================
 // Smart Rotation Logic
@@ -55,7 +52,7 @@ class KeyVaultService {
     private stats: Map<string, EndpointStats> = new Map();
 
     constructor() {
-        // Initialize stats
+        // Initialize stats for all loaded endpoints
         [...QOBUZ_KEYS, ...TIDAL_KEYS].forEach(k => {
             this.stats.set(k.name, {
                 failures: 0,
@@ -66,6 +63,8 @@ class KeyVaultService {
                 isCircuitOpen: false
             });
         });
+
+        console.log(`[KeyVault] Loaded ${QOBUZ_KEYS.length} Qobuz + ${TIDAL_KEYS.length} Tidal endpoints.`);
     }
 
     /**
@@ -94,9 +93,7 @@ class KeyVaultService {
             const statA = this.stats.get(a.name)!;
             const statB = this.stats.get(b.name)!;
 
-            // Priority 1: Recent Success (Sticky)
             // Priority 1: Recent Success (Sticky) - BUT ONLY IF NO FAILURES
-            // If checking fails, we must rotate immediately.
             const aRecent = (now - statA.lastSuccess) < 60000 && statA.failures === 0;
             const bRecent = (now - statB.lastSuccess) < 60000 && statB.failures === 0;
             if (aRecent && !bRecent) return -1;

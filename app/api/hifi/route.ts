@@ -18,11 +18,20 @@ export async function GET(request: NextRequest) {
                 return NextResponse.json({ success: false, error: 'Missing search query' }, { status: 400 });
             }
 
-            console.log(`[API/HiFi] Search: ${query}`);
+            // Clean HTML entities from query (JSX rendering can encode quotes as &quot;)
+            const cleanQuery = query
+                .replace(/&quot;/g, '"')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#39;/g, "'");
 
-            const results = await searchHiFi(query);
+            console.log(`[API/HiFi] Search: "${cleanQuery}"`);
+
+            const results = await searchHiFi(cleanQuery);
 
             if (!results) {
+                console.warn(`[API/HiFi] No results for: "${cleanQuery}"`);
                 return NextResponse.json({ success: false, error: 'No results' }, { status: 404 });
             }
 
