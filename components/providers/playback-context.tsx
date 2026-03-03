@@ -351,7 +351,25 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
                                 if (newSongs.length > 0) {
                                     console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
-                                    updateMix(currentMix.id, { songs: [...currentMix.songs, ...newSongs] });
+                                    const updatedSongs = [...currentMix.songs, ...newSongs];
+                                    const MAX_MIX_SIZE = 100;
+
+                                    if (updatedSongs.length > MAX_MIX_SIZE) {
+                                        const overflow = updatedSongs.length - MAX_MIX_SIZE;
+                                        const currentIdx = currentMix.currentSongIndex;
+                                        // Only trim if we've played enough songs (don't trim future songs)
+                                        if (currentIdx >= overflow) {
+                                            updatedSongs.splice(0, overflow);
+                                            const clampedIndex = Math.max(0, currentIdx - overflow);
+                                            console.log(`[Autoplay] Queue cap: trimmed ${overflow} played songs, index ${currentIdx} → ${clampedIndex}`);
+                                            updateMix(currentMix.id, { songs: updatedSongs, currentSongIndex: clampedIndex });
+                                        } else {
+                                            // Not safe to trim yet — just append without trimming
+                                            updateMix(currentMix.id, { songs: updatedSongs });
+                                        }
+                                    } else {
+                                        updateMix(currentMix.id, { songs: updatedSongs });
+                                    }
                                 } else {
                                     console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
                                 }
