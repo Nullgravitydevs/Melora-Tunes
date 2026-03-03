@@ -64,6 +64,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const [activeId, setActiveId] = useState<'primary' | 'secondary'>('primary');
     const progressIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
     const switchingRef = useRef(false); // Guards against onEnded during gapless switch
+    const lastUrlChangeRef = useRef(0); // Timestamp of last URL change — blocks spurious ended events
 
     // Audio Graph Refs
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -302,6 +303,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
             // CRITICAL: Block onEnded events during switch to prevent race condition
             switchingRef.current = true;
+            lastUrlChangeRef.current = Date.now();
             setActiveId(prev => prev === 'primary' ? 'secondary' : 'primary');
 
             const oldActive = active;
@@ -375,6 +377,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                 if (active.src.startsWith('blob:') && active.src !== url) {
                     URL.revokeObjectURL(active.src);
                 }
+                lastUrlChangeRef.current = Date.now(); // Block spurious ended events
                 active.pause(); // Always pause before changing src to prevent AbortError
                 active.src = url;
                 active.load();
@@ -534,10 +537,23 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         if (isPrimary !== isActivePrimary) return; // Ignore events from inactive player
 
         if (type === 'ended') {
+            // Guard 1: Block during gapless switch
             if (switchingRef.current) {
                 console.log('[AudioPlayer] Blocked stale onEnded during gapless switch');
                 return;
             }
+            // Guard 2: Block ended events within 2s of URL change (catches browser quirks)
+            const timeSinceUrlChange = Date.now() - lastUrlChangeRef.current;
+            if (timeSinceUrlChange < 2000) {
+                console.log(`[AudioPlayer] Blocked spurious onEnded (${timeSinceUrlChange}ms since URL change)`);
+                return;
+            }
+            // Guard 3: Block if audio hasn't actually played (currentTime near 0)
+            if (target.currentTime < 3 && target.duration > 10) {
+                console.log(`[AudioPlayer] Blocked premature onEnded (currentTime: ${target.currentTime.toFixed(1)}s, duration: ${target.duration.toFixed(1)}s)`);
+                return;
+            }
+            console.log(`[AudioPlayer] ✓ Legitimate onEnded (played ${target.currentTime.toFixed(1)}s of ${target.duration.toFixed(1)}s)`);
             onEnded();
         }
         if (type === 'playing') onPlaying?.();
