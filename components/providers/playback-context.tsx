@@ -306,6 +306,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // --- Autoplay & Pre-fetch Logic ---
     const autoplayFetchedRef = useRef<string | null>(null);
     const songStartTimeRef = useRef(Date.now()); // Track when current song started
+    const searchReplacedRef = useRef(false); // Track if Spotify-style replace has been done
 
     // [PERF FIX #3] Store progress in a ref so the autoplay effect doesn't re-run ~4x/sec.
     // The effect now only re-runs when song/mix/duration changes, and checks progress via ref.
@@ -322,6 +323,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             songStartTimeRef.current = Date.now(); // Mark song start time
         }
 
+        // Reset search replaced flag when mix changes
+        if (activeMixId !== 'search-results') {
+            searchReplacedRef.current = false;
+        }
+
         // Use an interval to check progress threshold instead of reacting to every progress tick
         const checkAutoplay = () => {
             // GUARD: Don't trigger within 10s of song change (prevents stale progress leak from crossfade)
@@ -335,11 +341,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 const activeMix = mixes.find(m => m.id === activeMixId);
                 if (!activeMix) return;
 
-                // Spotify-style: For search results, trigger on EVERY song (replace remaining with autoplay)
-                // For albums/playlists, only trigger on the last song (respect user's queue)
-                const isSearchMix = activeMix.id === 'search-results';
+                // Spotify-style: For search results (FIRST TIME ONLY), trigger on current song
+                // After first replace, treat as normal mix (only trigger on last song)
+                const isSearchFirstTime = activeMix.id === 'search-results' && !searchReplacedRef.current;
                 const isOnLastSong = activeMix.currentSongIndex >= activeMix.songs.length - 1;
-                const shouldAutoplay = isSearchMix || isOnLastSong;
+                const shouldAutoplay = isSearchFirstTime || isOnLastSong;
 
                 if (shouldAutoplay) {
                     console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
@@ -366,25 +372,26 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                                     });
 
                                 if (newSongs.length > 0) {
-                                    // For search mixes: REPLACE remaining songs after current with autoplay
-                                    // For other mixes: APPEND to the end
-                                    const isSearchContext = currentMix.id === 'search-results';
-                                    const keepSongs = isSearchContext
+                                    // First time from search: REPLACE remaining with autoplay
+                                    // After that: APPEND to end (normal behavior)
+                                    const isFirstSearchReplace = currentMix.id === 'search-results' && !searchReplacedRef.current;
+                                    const keepSongs = isFirstSearchReplace
                                         ? currentMix.songs.slice(0, currentIdx + 1)  // Only keep played songs
-                                        : currentMix.songs;                            // Keep all for albums/playlists
+                                        : currentMix.songs;                            // Keep all
 
                                     const updatedSongs = [...keepSongs, ...newSongs];
                                     const MAX_MIX_SIZE = 100;
 
-                                    if (isSearchContext) {
+                                    if (isFirstSearchReplace) {
                                         console.log(`[Autoplay] Spotify-style: replaced ${currentMix.songs.length - currentIdx - 1} remaining search results with ${newSongs.length} related songs`);
+                                        searchReplacedRef.current = true; // Mark as done — no more replacing
                                     } else {
                                         console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
                                     }
 
                                     if (updatedSongs.length > MAX_MIX_SIZE) {
                                         const overflow = updatedSongs.length - MAX_MIX_SIZE;
-                                        const adjustedIdx = isSearchContext ? currentIdx : currentMix.currentSongIndex;
+                                        const adjustedIdx = isFirstSearchReplace ? currentIdx : currentMix.currentSongIndex;
                                         if (adjustedIdx >= overflow) {
                                             updatedSongs.splice(0, overflow);
                                             const clampedIndex = Math.max(0, adjustedIdx - overflow);
