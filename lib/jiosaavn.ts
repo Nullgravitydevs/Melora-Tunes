@@ -574,6 +574,23 @@ export async function getAlbumDetails(albumId: string): Promise<any> {
     }
 }
 
+/**
+ * Get all songs from an album (for continuous playback — same album = same mood).
+ */
+export async function getAlbumSongs(albumId: string): Promise<JioSaavnSong[]> {
+    if (!albumId) return [];
+    try {
+        const album = await getAlbumDetails(albumId);
+        if (album?.songs && Array.isArray(album.songs)) {
+            return album.songs;
+        }
+        return [];
+    } catch (e) {
+        console.error("[getAlbumSongs] Failed for album:", albumId, e);
+        return [];
+    }
+}
+
 export async function getPlaylistDetails(listId: string): Promise<JioSaavnSong[]> {
     try {
         // Direct API call for robustness

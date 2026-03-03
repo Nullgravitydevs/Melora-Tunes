@@ -1,12 +1,26 @@
+/**
+ * Discovery Engine — Continuous Playback DJ
+ * 
+ * 4-Layer Architecture:
+ *   Layer 1: Session Context (via scoring-engine.ts)
+ *   Layer 2: 3-Tier Candidate Fetching (album → artist → language search)
+ *   Layer 3: Deterministic Scoring (via scoring-engine.ts)
+ *   Layer 4: Diversity Filter (via scoring-engine.ts)
+ * 
+ * Emergency fallback: OfflineStore → HistoryStore → least-recent replay
+ */
+
 import { PlayableTrack } from './types';
 import { SignalStore } from './signal-store';
 import { HistoryStore } from './history-store';
-import { getTrending, searchSongs, getSongDetails } from './jiosaavn';
+import { getTrending, searchSongs, getSongDetails, getAlbumSongs } from './jiosaavn';
 import { searchUnified } from './unified-search';
 import { Mix } from '@/lib/types';
 import { ensurePlayableTrack } from '@/lib/track-utils';
+import { buildSessionContext, scoreCandidates, applyDiversityFilter } from './scoring-engine';
+import type { AudioQuality } from './types';
 
-// --- STRICT NORMALIZATION ---
+// --- STRICT NORMALIZATION (kept for backward compat) ---
 export function normalizeIdentity(title: string, artist: string): string {
     const clean = (s: string) => (s || '').toLowerCase()
         .replace(/\(feat.*?\)/g, '')
@@ -18,84 +32,108 @@ export function normalizeIdentity(title: string, artist: string): string {
     return `${clean(title)}|${clean(artist)}`;
 }
 
+// Junk title filter — reject remixes, slowed, lofi, etc.
+const JUNK_KEYWORDS = ['remix', 'lofi', 'slowed', 'reverb', 'cover', 'live at', 'demo', '8d audio', 'karaoke'];
+function isCleanTrack(title: string): boolean {
+    const lower = title.toLowerCase();
+    return !JUNK_KEYWORDS.some(j => lower.includes(j));
+}
+
 export class DiscoveryEngine {
 
-    // THE GOLDEN RATIO (Fixed)
-    private static RATIOS = {
-        TASTE: 0.3,    // 30% User Taste
-        REGIONAL: 0.3, // 30% Regional/Trending
-        ADJACENT: 0.2, // 20% Adjacent Artists
-        WILDCARD: 0.2  // 20% High Quality Wildcards
-    };
+    // ──────────────────────────────────────────────
+    // PUBLIC: Generate Session Mix (The DJ)
+    // ──────────────────────────────────────────────
 
     /**
-     * Generate a Session Mix (The DJ)
-     * @param seed - The song that started the session
-     * @param region - Optional region/language filter (e.g. 'telugu', 'hindi', 'english')
+     * Generate a Session Mix for continuous playback.
+     * 
+     * Uses 4-layer architecture:
+     * 1. Build session context from last 5 played tracks
+     * 2. Fetch candidates from 3 tiers (album → artist → language)
+     * 3. Score candidates against session context
+     * 4. Apply diversity filter (artist cooldown, album spacing)
+     * 
+     * @param seed - The currently playing song
+     * @param region - Optional language hint (used as fallback if no history)
      */
     static async generateSessionMix(seed: PlayableTrack, region?: string): Promise<Mix> {
-        console.log(`💿 The DJ: Spinning new mix for ${seed.title} [Region: ${region || 'Global'}]`);
+        const startTime = Date.now();
+        const quality = seed.preferredQuality || '320';
 
-        // INHERIT QUALITY
-        const targetQuality = seed.preferredQuality || '320';
+        // ── Layer 1: Session Context ──
+        const history = HistoryStore.getHistory();
+        const context = buildSessionContext(history.slice(0, 5));
 
-        // 1. Fetch Ingredients (Parallel)
-        const [taste, regional, adjacent, wildcards] = await Promise.all([
-            this.getTasteCandidates(targetQuality),
-            this.getRegionalCandidates(targetQuality, region),
-            this.getAdjacentCandidates(seed, targetQuality),
-            this.getWildcardCandidates(targetQuality, region)
+        // If no history, use seed's language or region as context language
+        if (history.length === 0 && seed.song?.language) {
+            context.language = seed.song.language.toLowerCase();
+        } else if (history.length === 0 && region) {
+            context.language = region.toLowerCase();
+        }
+
+        const seedLang = seed.song?.language?.toLowerCase() || context.language;
+        const seedArtist = (seed.artist || '').split(/[,&]/)[0].trim();
+        const seedAlbumId = seed.song?.album?.id || '';
+
+        console.log(`🎧 [Autoplay] Session: lang=${context.language}, artist=${seedArtist}, album=${seed.song?.album?.name || 'none'}, era=${context.avgYear}`);
+
+        // ── Layer 2: Fetch Candidates (3 Tiers, parallel) ──
+        const [albumTracks, artistTracks, languageTracks] = await Promise.all([
+            this.fetchAlbumCandidates(seedAlbumId, seed.id, quality),
+            this.fetchArtistCandidates(seedArtist, seedLang, quality),
+            this.fetchLanguageCandidates(seedLang, context.avgYear, quality),
         ]);
 
-        // 2. Mix Formulation (Target size ~20 songs)
-        const pool: PlayableTrack[] = [];
+        const allCandidates = [...albumTracks, ...artistTracks, ...languageTracks];
+        console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, total=${allCandidates.length}`);
 
-        // Add Seed First (Always)
-        pool.push(seed);
+        // ── Layer 3: Score ──
+        const recentIds = new Set(history.slice(0, 50).map(h => h.track.id));
+        const queueIds = new Set<string>(); // Caller handles queue dedup separately
+        // Add seed to prevent it from appearing
+        recentIds.add(seed.id);
 
-        // Fill buckets
-        const fill = (source: PlayableTrack[], count: number) => {
-            const added = source.slice(0, count);
-            pool.push(...added);
-        };
+        const scored = scoreCandidates(allCandidates, context, recentIds, queueIds);
 
-        const remaining = 19; // Target size 20 (minus seed)
-        fill(taste, Math.ceil(remaining * this.RATIOS.TASTE));
-        fill(regional, Math.ceil(remaining * this.RATIOS.REGIONAL));
-        fill(adjacent, Math.ceil(remaining * this.RATIOS.ADJACENT));
-        fill(wildcards, Math.ceil(remaining * this.RATIOS.WILDCARD));
+        // ── Layer 4: Diversity Filter ──
+        let finalTracks = applyDiversityFilter(scored, 10);
 
-        // 3. Post-Process (Smart Shuffle & Dedup)
-        const finalMix = this.smartShuffle(pool, seed);
+        // ── Emergency Fallback ──
+        if (finalTracks.length === 0) {
+            console.warn('🎧 [Autoplay] All fetchers empty — using emergency fallback');
+            finalTracks = this.emergencyFallback(recentIds, quality);
+        }
 
-        // 4. Session Scoped Mix
+        const elapsed = Date.now() - startTime;
+        console.log(`🎧 [Autoplay] Selected ${finalTracks.length} tracks in ${elapsed}ms`);
+
+        // Return as Mix (compatible with existing playback-context.tsx caller)
         return {
-            id: 'discovery-mix', // STABLE ID
-            title: region ? `${region.charAt(0).toUpperCase() + region.slice(1)} Mix` : "Discovery Mix",
+            id: 'discovery-mix',
+            title: context.language
+                ? `${context.language.charAt(0).toUpperCase() + context.language.slice(1)} Mix`
+                : 'Discovery Mix',
             color: 'blue',
-            songs: finalMix,
-            currentSongIndex: 0
+            songs: finalTracks,
+            currentSongIndex: 0,
         };
     }
 
-    /**
-     * Generate a Genre-Based Mix
-     */
+    // ──────────────────────────────────────────────
+    // PUBLIC: Genre & Chart Mixes (unchanged API)
+    // ──────────────────────────────────────────────
+
     static async generateGenreMix(genre: string, region?: string): Promise<Mix> {
         console.log(`💿 The DJ: Mixing Genre: ${genre}`);
         try {
-            // 1. Find a seed
             const query = `${genre} Hits ${region || ''}`;
             const results = await searchUnified(query);
-
             if (results.length === 0) throw new Error("No seed found for genre");
 
-            // Pick random top seed to avoid same start every time
             const seed = results[Math.floor(Math.random() * Math.min(5, results.length))];
-
-            // 2. Generate Mix
             const mix = await this.generateSessionMix(seed, region);
-            mix.title = `${genre} Mix`; // Override title
+            mix.title = `${genre} Mix`;
             mix.color = 'purple';
             return mix;
         } catch (e) {
@@ -104,19 +142,14 @@ export class DiscoveryEngine {
         }
     }
 
-    /**
-     * Generate a Chart-Based Mix
-     */
     static async generateChartMix(chartName: string, region?: string): Promise<Mix> {
         console.log(`💿 The DJ: Mixing Chart: ${chartName}`);
         try {
             const query = `${chartName} ${region || ''}`;
             const results = await searchUnified(query);
-
             if (results.length === 0) throw new Error("No seed found for chart");
 
-            const seed = results[0]; // Chart usually implies order, pick top
-
+            const seed = results[0];
             const mix = await this.generateSessionMix(seed, region);
             mix.title = `${chartName}`;
             mix.color = 'red';
@@ -126,147 +159,119 @@ export class DiscoveryEngine {
         }
     }
 
-    // --- Ingredient Sourcing ---
+    // ──────────────────────────────────────────────
+    // PRIVATE: Tier 1 — Same Album Candidates
+    // ──────────────────────────────────────────────
 
-    private static async getTasteCandidates(quality: any): Promise<PlayableTrack[]> {
-        const topIds = SignalStore.getTopTaste(10);
-        if (topIds.length === 0) return [];
+    private static async fetchAlbumCandidates(
+        albumId: string,
+        seedId: string,
+        quality: AudioQuality,
+    ): Promise<PlayableTrack[]> {
+        if (!albumId) return [];
 
-        const candidates: PlayableTrack[] = [];
-        // Only fetch top 5 for efficiency
-        for (const id of topIds.slice(0, 5)) {
-            try {
-                const song = await getSongDetails(id);
-                if (song) {
-                    candidates.push(ensurePlayableTrack(song, quality));
-                }
-            } catch (e) { }
-        }
-        return candidates;
-    }
-
-    private static async getRegionalCandidates(quality: any, region?: string): Promise<PlayableTrack[]> {
         try {
-            if (region && region.toLowerCase() !== 'global') {
-                const query = `${region} Hit Songs`;
-                const results = await searchUnified(query);
-                return results.map(r => ensurePlayableTrack(r, quality));
-            } else {
-                // Pass region even for 'global' to respect language settings
-                const trending = await getTrending(region || 'english');
-                return trending.map(s => ensurePlayableTrack(s, quality));
-            }
-        } catch (e) { return []; }
-    }
-
-    private static async getAdjacentCandidates(seed: PlayableTrack, quality: any): Promise<PlayableTrack[]> {
-        try {
-            // Search for Artist Context
-            const artist = seed.artist.split(',')[0].split('&')[0].trim();
-            const query = `${artist} similar songs`;
-            const results = await searchUnified(query);
-
-            // Filter out seed
-            const filtered = results.filter(s => s.id !== seed.id);
-
-            // Minor shuffle for diversity
-            return filtered
-                .sort(() => 0.5 - Math.random())
+            const songs = await getAlbumSongs(albumId);
+            return songs
+                .filter(s => s.id !== seedId && isCleanTrack(s.name || ''))
+                .slice(0, 10)
                 .map(s => ensurePlayableTrack(s, quality));
-        } catch (e) { return []; }
+        } catch (e) {
+            console.warn('[Autoplay] Album fetch failed:', e);
+            return [];
+        }
     }
 
-    private static async getWildcardCandidates(quality: any, region?: string): Promise<PlayableTrack[]> {
-        // High Quality Wildcards - biased by Taste primarily
-        const tasteIds = SignalStore.getTopTaste(3);
+    // ──────────────────────────────────────────────
+    // PRIVATE: Tier 2 — Same Artist Candidates
+    // ──────────────────────────────────────────────
 
-        let results: PlayableTrack[] = [];
+    private static async fetchArtistCandidates(
+        artist: string,
+        language: string,
+        quality: AudioQuality,
+    ): Promise<PlayableTrack[]> {
+        if (!artist) return [];
 
-        // 1. Try Taste-based discovery first
-        if (tasteIds.length > 0) {
-            const randomTasteId = tasteIds[Math.floor(Math.random() * tasteIds.length)];
-            try {
-                const song = await getSongDetails(randomTasteId);
-                if (song) {
-                    const artist = song.primaryArtists.split(',')[0];
-                    const query = `${artist} radio`;
-                    const tasteResults = await searchUnified(query);
-                    results = tasteResults;
-                }
-            } catch (e) { }
+        try {
+            // Search with artist + language for accurate results
+            const query = `${artist} ${language} songs`;
+            const songs = await searchSongs(query, 1, 15);
+            return (songs || [])
+                .filter(s => isCleanTrack(s.name || ''))
+                .slice(0, 10)
+                .map(s => ensurePlayableTrack(s, quality));
+        } catch (e) {
+            console.warn('[Autoplay] Artist fetch failed:', e);
+            return [];
         }
-
-        // 2. Fallback to Keyword Wildcards
-        if (results.length === 0) {
-            const baseTerms = ['Top', 'Viral', 'New', 'Hifi', 'Master', 'Essential', 'Best of'];
-            const term = baseTerms[Math.floor(Math.random() * baseTerms.length)];
-            const query = region ? `${region} ${term}` : term;
-            try {
-                results = await searchUnified(query);
-            } catch (e) { }
-        }
-
-        const clean = results.filter(track => {
-            const name = track.title.toLowerCase();
-            const junk = ['remix', 'lofi', 'slowed', 'reverb', 'cover', 'live at', 'demo'];
-            if (junk.some(j => name.includes(j))) return false;
-            return true;
-        });
-
-        return clean.sort(() => 0.5 - Math.random()).map(s => ensurePlayableTrack(s, quality));
     }
 
-    // --- The Filter (Deduplication & Anti-Loop) ---
+    // ──────────────────────────────────────────────
+    // PRIVATE: Tier 3 — Language + Era Search
+    // ──────────────────────────────────────────────
 
-    private static smartShuffle(pool: PlayableTrack[], seed: PlayableTrack): PlayableTrack[] {
+    private static async fetchLanguageCandidates(
+        language: string,
+        avgYear: number,
+        quality: AudioQuality,
+    ): Promise<PlayableTrack[]> {
+        if (!language) return [];
+
+        try {
+            // Build a query that targets the right era
+            const currentYear = new Date().getFullYear();
+            const eraKeyword = avgYear >= currentYear - 2 ? 'latest hits' : `${avgYear} hits`;
+            const query = `${language} ${eraKeyword}`;
+
+            const songs = await searchSongs(query, 1, 15);
+            return (songs || [])
+                .filter(s => isCleanTrack(s.name || ''))
+                .slice(0, 10)
+                .map(s => ensurePlayableTrack(s, quality));
+        } catch (e) {
+            console.warn('[Autoplay] Language fetch failed:', e);
+            return [];
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // PRIVATE: Emergency Fallback
+    // ──────────────────────────────────────────────
+
+    /**
+     * When all API calls fail, use local data to keep playback alive.
+     * Priority: HistoryStore unplayed → least-recent replay
+     */
+    private static emergencyFallback(
+        recentIds: Set<string>,
+        quality: AudioQuality,
+    ): PlayableTrack[] {
         const history = HistoryStore.getHistory();
 
-        // STRICT 24H RULE: Only block last 24 tracks played
-        // Actually, just last 24 items in history stack is good enough proxy.
-        const recentHistory = history.slice(0, 24);
-        const recentIdentities = new Set(recentHistory.map(h => normalizeIdentity(h.track.title, h.track.artist)));
+        // 1. Try unplayed history tracks (played before but not in recent 50)
+        const unplayed = history
+            .filter(h => !recentIds.has(h.track.id))
+            .slice(0, 10)
+            .map(h => h.track);
 
-        const unique = new Map<string, PlayableTrack>();
-        const artistCounts = new Map<string, number>();
-
-        // Add SEED first manually to ensure it exists
-        unique.set(normalizeIdentity(seed.title, seed.artist), seed);
-
-        const seedArtist = seed.artist.split(',')[0].split('&')[0].trim();
-        artistCounts.set(seedArtist, 1);
-
-        for (const track of pool) {
-            const identity = normalizeIdentity(track.title, track.artist);
-
-            // 1. Anti-Loop (Recent History Identity Check)
-            if (recentIdentities.has(identity)) continue;
-
-            // 2. Dedup in current mix
-            if (unique.has(identity)) continue;
-
-            // 3. Artist Cap (Max 2 per mix)
-            const artist = track.artist.split(',')[0].split('&')[0].trim();
-            const count = artistCounts.get(artist) || 0;
-            if (count >= 2) continue; // Strict Cap
-
-            // Add
-            unique.set(identity, track);
-            artistCounts.set(artist, count + 1);
+        if (unplayed.length > 0) {
+            console.log(`🎧 [Autoplay] Emergency: using ${unplayed.length} unplayed history tracks`);
+            return unplayed;
         }
 
-        // Convert to array
-        const result = Array.from(unique.values());
+        // 2. Last resort: replay least-recent tracks (safe loop)
+        const leastRecent = history
+            .slice(-10)
+            .reverse()
+            .map(h => h.track);
 
-        const seedIdentity = normalizeIdentity(seed.title, seed.artist);
-        const seedTrack = unique.get(seedIdentity);
+        if (leastRecent.length > 0) {
+            console.log(`🎧 [Autoplay] Emergency: replaying ${leastRecent.length} least-recent tracks`);
+            return leastRecent;
+        }
 
-        // Remove seed from result to shuffle the rest
-        const others = result.filter(t => t !== seedTrack);
-
-        // Shuffle others
-        others.sort(() => 0.5 - Math.random());
-
-        // Return Seed + Others
-        return [seedTrack!, ...others];
+        console.warn('🎧 [Autoplay] Emergency: no fallback available');
+        return [];
     }
 }
