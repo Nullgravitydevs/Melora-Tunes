@@ -321,8 +321,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         // Use an interval to check progress threshold instead of reacting to every progress tick
         const checkAutoplay = () => {
-            const currentProgress = progressRef.current;
-            const threshold = Math.max(duration - 20, duration * 0.5);
+            const currentProgress = progressRef.current; // 0.0 to 1.0 (fraction)
+            // Threshold in fraction: fire at 20s before end OR 50% — whichever is later
+            const threshold = Math.max(1 - (20 / duration), 0.5);
 
             if (currentProgress >= threshold && !autoplayFetchedRef.current && !isStationGenerating.current) {
                 const activeMix = mixes.find(m => m.id === activeMixId);
