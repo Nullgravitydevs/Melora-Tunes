@@ -36,6 +36,7 @@ export interface ScoredTrack {
         era: number;
         duration: number;
         popularity: number;
+        recency: number;
         dedup: number;
     };
 }
@@ -176,30 +177,32 @@ export function scoreCandidates(
             era: 0,
             duration: 0,
             popularity: 0,
+            recency: 0,
             dedup: 0,
         };
 
         // --- Language (HARD BLOCK) ---
         const trackLang = song?.language?.toLowerCase() || '';
-        if (trackLang && trackLang !== context.language) {
-            // Wrong language = impossible to select
+        if (!trackLang || trackLang !== context.language) {
+            // Missing or wrong language = impossible to select
             breakdown.language = -Infinity;
             scored.push({ track, score: -Infinity, breakdown });
             continue;
         }
-        breakdown.language = trackLang ? SCORE_WEIGHTS.LANGUAGE : 0;
+        breakdown.language = SCORE_WEIGHTS.LANGUAGE;
 
         // --- Artist Affinity (0-20) ---
         const artist = cleanArtistName(track.artist);
         const artistWeight = artist ? (context.artists.get(artist) || 0) : 0;
         breakdown.artist = Math.min(artistWeight * SCORE_WEIGHTS.ARTIST, SCORE_WEIGHTS.ARTIST);
 
-        // --- Album Affinity (0 or 15) ---
+        // --- Album Affinity (0-15, weighted) ---
         const albumName = song?.album?.name?.toLowerCase();
         const albumWeight = albumName ? (context.albums.get(albumName) || 0) : 0;
-        breakdown.album = albumWeight > 0 ? SCORE_WEIGHTS.ALBUM : 0;
+        breakdown.album = albumWeight * SCORE_WEIGHTS.ALBUM;
 
         // --- Era Proximity (0-10) ---
+        const currentYear = new Date().getFullYear();
         const trackYear = parseInt(song?.year || '') || 0;
         if (trackYear > 0 && context.avgYear > 0) {
             const diff = Math.abs(trackYear - context.avgYear);
@@ -227,6 +230,11 @@ export function scoreCandidates(
             breakdown.popularity = Math.min(logPop / 5 * SCORE_WEIGHTS.POPULARITY, SCORE_WEIGHTS.POPULARITY);
         }
 
+        // --- Recency Boost (0-5) ---
+        if (trackYear > 0 && currentYear - trackYear <= 2) {
+            breakdown.recency = SCORE_WEIGHTS.RECENCY;
+        }
+
         // --- Dedup Penalty ---
         if (recentIds.has(track.id) || queueIds.has(track.id)) {
             breakdown.dedup = -DEDUP_PENALTY;
@@ -239,6 +247,7 @@ export function scoreCandidates(
             + breakdown.era
             + breakdown.duration
             + breakdown.popularity
+            + breakdown.recency
             + breakdown.dedup;
 
         scored.push({ track, score, breakdown });

@@ -305,11 +305,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // --- Autoplay & Pre-fetch Logic ---
     const autoplayFetchedRef = useRef<string | null>(null);
-    const songStartTimeRef = useRef(Date.now()); // Track when current song started
-    const searchReplacedRef = useRef(false); // Track if Spotify-style replace has been done
+    const songStartTimeRef = useRef(Date.now());
 
     // [PERF FIX #3] Store progress in a ref so the autoplay effect doesn't re-run ~4x/sec.
-    // The effect now only re-runs when song/mix/duration changes, and checks progress via ref.
     const progressRef = useRef(0);
     useEffect(() => { progressRef.current = progress; }, [progress]);
 
@@ -319,100 +317,77 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // Reset fetcher if song changed
         if (autoplayFetchedRef.current !== currentSong.id) {
             autoplayFetchedRef.current = null;
-            progressRef.current = 0; // Prevent stale progress from old song
-            songStartTimeRef.current = Date.now(); // Mark song start time
+            progressRef.current = 0;
+            songStartTimeRef.current = Date.now();
         }
 
-        // Reset search replaced flag when mix changes
-        if (activeMixId !== 'search-results') {
-            searchReplacedRef.current = false;
-        }
-
-        // Use an interval to check progress threshold instead of reacting to every progress tick
         const checkAutoplay = () => {
-            // GUARD: Don't trigger within 10s of song change (prevents stale progress leak from crossfade)
+            // GUARD: Don't trigger within 10s of song change
             if (Date.now() - songStartTimeRef.current < 10000) return;
 
-            const currentProgress = progressRef.current; // 0.0 to 1.0 (fraction)
-            // Threshold in fraction: fire at 20s before end OR 50% — whichever is later
+            const currentProgress = progressRef.current;
             const threshold = Math.max(1 - (20 / duration), 0.5);
 
             if (currentProgress >= threshold && !autoplayFetchedRef.current && !isStationGenerating.current) {
                 const activeMix = mixes.find(m => m.id === activeMixId);
                 if (!activeMix) return;
 
-                // Spotify-style: For search results (FIRST TIME ONLY), trigger on current song
-                // After first replace, treat as normal mix (only trigger on last song)
-                const isSearchFirstTime = activeMix.id === 'search-results' && !searchReplacedRef.current;
+                // PURE APPEND: Only trigger when on the last song (never replace, never mutate mid-queue)
                 const isOnLastSong = activeMix.currentSongIndex >= activeMix.songs.length - 1;
-                const shouldAutoplay = isSearchFirstTime || isOnLastSong;
+                if (!isOnLastSong) return;
 
-                if (shouldAutoplay) {
-                    console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
-                    autoplayFetchedRef.current = currentSong.id;
-                    isStationGenerating.current = true;
+                console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
+                autoplayFetchedRef.current = currentSong.id;
+                isStationGenerating.current = true;
 
-                    const seed = ensurePlayableTrack(currentSong);
-                    const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
+                const seed = ensurePlayableTrack(currentSong);
+                const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
 
-                    DiscoveryEngine.generateSessionMix(seed, inferredRegion)
-                        .then((newMix) => {
-                            isStationGenerating.current = false;
-                            const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
-                            if (currentMix && currentMix.id === activeMixIdRef.current) {
-                                const currentIdx = currentMix.currentSongIndex;
-                                const newSongs = newMix.songs
-                                    .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality))
-                                    .filter(sTrack => {
-                                        if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
-                                        return !currentMix.songs.slice(0, currentIdx + 1).some(existing => {
-                                            const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
-                                            return e === sTrack.id;
-                                        });
+                DiscoveryEngine.generateSessionMix(seed, inferredRegion)
+                    .then((newMix) => {
+                        isStationGenerating.current = false;
+                        const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
+                        if (currentMix && currentMix.id === activeMixIdRef.current) {
+                            const newSongs = newMix.songs
+                                .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality))
+                                .filter(sTrack => {
+                                    if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
+                                    return !currentMix.songs.some(existing => {
+                                        const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
+                                        return e === sTrack.id;
                                     });
+                                });
 
-                                if (newSongs.length > 0) {
-                                    // First time from search: REPLACE remaining with autoplay
-                                    // After that: APPEND to end (normal behavior)
-                                    const isFirstSearchReplace = currentMix.id === 'search-results' && !searchReplacedRef.current;
-                                    const keepSongs = isFirstSearchReplace
-                                        ? currentMix.songs.slice(0, currentIdx + 1)  // Only keep played songs
-                                        : currentMix.songs;                            // Keep all
+                            if (newSongs.length > 0) {
+                                // PURE APPEND: Always add to end, never replace
+                                const updatedSongs = [...currentMix.songs, ...newSongs];
+                                const MAX_MIX_SIZE = 100;
 
-                                    const updatedSongs = [...keepSongs, ...newSongs];
-                                    const MAX_MIX_SIZE = 100;
+                                console.log(`[Autoplay] Appended ${newSongs.length} tracks to mix (total: ${updatedSongs.length})`);
 
-                                    if (isFirstSearchReplace) {
-                                        console.log(`[Autoplay] Spotify-style: replaced ${currentMix.songs.length - currentIdx - 1} remaining search results with ${newSongs.length} related songs`);
-                                        searchReplacedRef.current = true; // Mark as done — no more replacing
-                                    } else {
-                                        console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
-                                    }
-
-                                    if (updatedSongs.length > MAX_MIX_SIZE) {
-                                        const overflow = updatedSongs.length - MAX_MIX_SIZE;
-                                        const adjustedIdx = isFirstSearchReplace ? currentIdx : currentMix.currentSongIndex;
-                                        if (adjustedIdx >= overflow) {
-                                            updatedSongs.splice(0, overflow);
-                                            const clampedIndex = Math.max(0, adjustedIdx - overflow);
-                                            console.log(`[Autoplay] Queue cap: trimmed ${overflow} played songs, index ${adjustedIdx} → ${clampedIndex}`);
-                                            updateMix(currentMix.id, { songs: updatedSongs, currentSongIndex: clampedIndex });
-                                        } else {
-                                            updateMix(currentMix.id, { songs: updatedSongs });
-                                        }
+                                if (updatedSongs.length > MAX_MIX_SIZE) {
+                                    const overflow = updatedSongs.length - MAX_MIX_SIZE;
+                                    const currentIdx = currentMix.currentSongIndex;
+                                    if (currentIdx >= overflow) {
+                                        updatedSongs.splice(0, overflow);
+                                        const clampedIndex = Math.max(0, currentIdx - overflow);
+                                        console.log(`[Autoplay] Queue cap: trimmed ${overflow} played songs, index ${currentIdx} → ${clampedIndex}`);
+                                        updateMix(currentMix.id, { songs: updatedSongs, currentSongIndex: clampedIndex });
                                     } else {
                                         updateMix(currentMix.id, { songs: updatedSongs });
                                     }
                                 } else {
-                                    console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
+                                    updateMix(currentMix.id, { songs: updatedSongs });
                                 }
+                            } else {
+                                console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
                             }
-                        })
-                        .catch(err => {
-                            console.error("[Autoplay] Failed to extend session:", err);
-                            isStationGenerating.current = false;
-                        });
-                }
+                        }
+                    })
+                    .catch(err => {
+                        console.error("[Autoplay] Failed to extend session:", err);
+                        isStationGenerating.current = false;
+                    });
             }
         };
 
