@@ -326,7 +326,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
             if (currentProgress >= threshold && !autoplayFetchedRef.current && !isStationGenerating.current) {
                 const activeMix = mixes.find(m => m.id === activeMixId);
-                if (activeMix && activeMix.currentSongIndex >= activeMix.songs.length - 1) {
+                if (!activeMix) return;
+
+                // Spotify-style: For search results, trigger on EVERY song (replace remaining with autoplay)
+                // For albums/playlists, only trigger on the last song (respect user's queue)
+                const isSearchMix = activeMix.id === 'search-results';
+                const isOnLastSong = activeMix.currentSongIndex >= activeMix.songs.length - 1;
+                const shouldAutoplay = isSearchMix || isOnLastSong;
+
+                if (shouldAutoplay) {
                     console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
                     autoplayFetchedRef.current = currentSong.id;
                     isStationGenerating.current = true;
@@ -339,32 +347,43 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             isStationGenerating.current = false;
                             const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
                             if (currentMix && currentMix.id === activeMixIdRef.current) {
+                                const currentIdx = currentMix.currentSongIndex;
                                 const newSongs = newMix.songs
                                     .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality))
                                     .filter(sTrack => {
                                         if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
-                                        return !currentMix.songs.some(existing => {
+                                        return !currentMix.songs.slice(0, currentIdx + 1).some(existing => {
                                             const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
                                             return e === sTrack.id;
                                         });
                                     });
 
                                 if (newSongs.length > 0) {
-                                    console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
-                                    const updatedSongs = [...currentMix.songs, ...newSongs];
+                                    // For search mixes: REPLACE remaining songs after current with autoplay
+                                    // For other mixes: APPEND to the end
+                                    const isSearchContext = currentMix.id === 'search-results';
+                                    const keepSongs = isSearchContext
+                                        ? currentMix.songs.slice(0, currentIdx + 1)  // Only keep played songs
+                                        : currentMix.songs;                            // Keep all for albums/playlists
+
+                                    const updatedSongs = [...keepSongs, ...newSongs];
                                     const MAX_MIX_SIZE = 100;
+
+                                    if (isSearchContext) {
+                                        console.log(`[Autoplay] Spotify-style: replaced ${currentMix.songs.length - currentIdx - 1} remaining search results with ${newSongs.length} related songs`);
+                                    } else {
+                                        console.log(`[Autoplay] Extended mix with ${newSongs.length} songs`);
+                                    }
 
                                     if (updatedSongs.length > MAX_MIX_SIZE) {
                                         const overflow = updatedSongs.length - MAX_MIX_SIZE;
-                                        const currentIdx = currentMix.currentSongIndex;
-                                        // Only trim if we've played enough songs (don't trim future songs)
-                                        if (currentIdx >= overflow) {
+                                        const adjustedIdx = isSearchContext ? currentIdx : currentMix.currentSongIndex;
+                                        if (adjustedIdx >= overflow) {
                                             updatedSongs.splice(0, overflow);
-                                            const clampedIndex = Math.max(0, currentIdx - overflow);
-                                            console.log(`[Autoplay] Queue cap: trimmed ${overflow} played songs, index ${currentIdx} → ${clampedIndex}`);
+                                            const clampedIndex = Math.max(0, adjustedIdx - overflow);
+                                            console.log(`[Autoplay] Queue cap: trimmed ${overflow} played songs, index ${adjustedIdx} → ${clampedIndex}`);
                                             updateMix(currentMix.id, { songs: updatedSongs, currentSongIndex: clampedIndex });
                                         } else {
-                                            // Not safe to trim yet — just append without trimming
                                             updateMix(currentMix.id, { songs: updatedSongs });
                                         }
                                     } else {
