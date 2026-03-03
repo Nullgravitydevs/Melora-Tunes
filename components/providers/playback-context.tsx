@@ -342,8 +342,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
                 const seed = ensurePlayableTrack(currentSong);
                 const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
+                // Pass current queue IDs so scoring engine can penalize duplicates
+                const queueIds = activeMix.songs.map(s => isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id);
 
-                DiscoveryEngine.generateSessionMix(seed, inferredRegion)
+                DiscoveryEngine.generateSessionMix(seed, inferredRegion, queueIds)
                     .then((newMix) => {
                         isStationGenerating.current = false;
                         const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);

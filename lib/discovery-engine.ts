@@ -57,7 +57,7 @@ export class DiscoveryEngine {
      * @param seed - The currently playing song
      * @param region - Optional language hint (used as fallback if no history)
      */
-    static async generateSessionMix(seed: PlayableTrack, region?: string): Promise<Mix> {
+    static async generateSessionMix(seed: PlayableTrack, region?: string, currentQueueIds?: string[]): Promise<Mix> {
         const startTime = Date.now();
         const quality = seed.preferredQuality || '320';
 
@@ -85,12 +85,19 @@ export class DiscoveryEngine {
             this.fetchLanguageCandidates(seedLang, context.avgYear, quality),
         ]);
 
-        const allCandidates = [...albumTracks, ...artistTracks, ...languageTracks];
-        console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, total=${allCandidates.length}`);
+        const allRaw = [...albumTracks, ...artistTracks, ...languageTracks];
+
+        // Cross-tier dedup: prevent same track from being scored multiple times
+        const uniqueMap = new Map<string, PlayableTrack>();
+        for (const t of allRaw) {
+            if (!uniqueMap.has(t.id)) uniqueMap.set(t.id, t);
+        }
+        const allCandidates = Array.from(uniqueMap.values());
+        console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, unique=${allCandidates.length}`);
 
         // ── Layer 3: Score ──
         const recentIds = new Set(history.slice(0, 50).map(h => h.track.id));
-        const queueIds = new Set<string>(); // Caller handles queue dedup separately
+        const queueIds = new Set<string>(currentQueueIds || []);
         // Add seed to prevent it from appearing
         recentIds.add(seed.id);
 
@@ -194,8 +201,8 @@ export class DiscoveryEngine {
         if (!artist) return [];
 
         try {
-            // Search with artist name, pass language to API for accurate regional results
-            const query = `${artist} songs`;
+            // Search with artist + language in both query and API param for strongest results
+            const query = `${artist} ${language} songs`;
             const songs = await searchSongs(query, 1, 15, language);
             return (songs || [])
                 .filter(s => isCleanTrack(s.name || ''))
@@ -222,7 +229,7 @@ export class DiscoveryEngine {
             // Build a query that targets the right era, pass language to API
             const currentYear = new Date().getFullYear();
             const eraKeyword = avgYear >= currentYear - 2 ? 'latest hits' : `${avgYear} hits`;
-            const query = `${eraKeyword}`;
+            const query = `${language} ${eraKeyword}`;
 
             const songs = await searchSongs(query, 1, 15, language);
             return (songs || [])
