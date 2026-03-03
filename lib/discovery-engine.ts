@@ -194,9 +194,9 @@ export class DiscoveryEngine {
         if (!artist) return [];
 
         try {
-            // Search with artist + language for accurate results
-            const query = `${artist} ${language} songs`;
-            const songs = await searchSongs(query, 1, 15);
+            // Search with artist name, pass language to API for accurate regional results
+            const query = `${artist} songs`;
+            const songs = await searchSongs(query, 1, 15, language);
             return (songs || [])
                 .filter(s => isCleanTrack(s.name || ''))
                 .slice(0, 10)
@@ -219,12 +219,12 @@ export class DiscoveryEngine {
         if (!language) return [];
 
         try {
-            // Build a query that targets the right era
+            // Build a query that targets the right era, pass language to API
             const currentYear = new Date().getFullYear();
             const eraKeyword = avgYear >= currentYear - 2 ? 'latest hits' : `${avgYear} hits`;
-            const query = `${language} ${eraKeyword}`;
+            const query = `${eraKeyword}`;
 
-            const songs = await searchSongs(query, 1, 15);
+            const songs = await searchSongs(query, 1, 15, language);
             return (songs || [])
                 .filter(s => isCleanTrack(s.name || ''))
                 .slice(0, 10)
