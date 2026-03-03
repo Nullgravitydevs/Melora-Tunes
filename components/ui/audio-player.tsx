@@ -63,6 +63,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const secondaryRef = useRef<HTMLAudioElement>(null);
     const [activeId, setActiveId] = useState<'primary' | 'secondary'>('primary');
     const progressIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
+    const switchingRef = useRef(false); // Guards against onEnded during gapless switch
 
     // Audio Graph Refs
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -298,6 +299,9 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
         if (isPreloaded && url) {
             console.log("⚡ Gapless Switch!", crossfadeDuration > 0 ? `(Crossfading ${crossfadeDuration}s)` : "");
+
+            // CRITICAL: Block onEnded events during switch to prevent race condition
+            switchingRef.current = true;
             setActiveId(prev => prev === 'primary' ? 'secondary' : 'primary');
 
             const oldActive = active;
@@ -332,6 +336,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                             oldActive.pause();
                             oldActive.currentTime = 0;
                             if (oldActive.src.startsWith('blob:')) URL.revokeObjectURL(oldActive.src);
+                            // Release switch guard after old player is fully cleaned up
+                            setTimeout(() => { switchingRef.current = false; }, 200);
                         }, durationMs + 100);
                     } else {
                         // Fallback if Context isn't ready
@@ -349,6 +355,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                     if (oldActive.src.startsWith('blob:')) {
                         URL.revokeObjectURL(oldActive.src);
                     }
+                    // Release switch guard after cleanup
+                    setTimeout(() => { switchingRef.current = false; }, 200);
                 }
             } else {
                 newActive.volume = volume;
@@ -357,6 +365,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                 if (oldActive.src.startsWith('blob:')) {
                     URL.revokeObjectURL(oldActive.src);
                 }
+                // Release switch guard after cleanup
+                setTimeout(() => { switchingRef.current = false; }, 200);
             }
         } else {
             // Standard load
@@ -523,7 +533,13 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
         if (isPrimary !== isActivePrimary) return; // Ignore events from inactive player
 
-        if (type === 'ended') onEnded();
+        if (type === 'ended') {
+            if (switchingRef.current) {
+                console.log('[AudioPlayer] Blocked stale onEnded during gapless switch');
+                return;
+            }
+            onEnded();
+        }
         if (type === 'playing') onPlaying?.();
         if (type === 'duration') onDuration(target.duration);
         if (type === 'error') {
