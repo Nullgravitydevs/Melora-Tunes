@@ -317,6 +317,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // Reset fetcher if song changed
         if (autoplayFetchedRef.current !== currentSong.id) {
             autoplayFetchedRef.current = null;
+            progressRef.current = 0; // CRITICAL: prevent stale progress from old song triggering autoplay
         }
 
         // Use an interval to check progress threshold instead of reacting to every progress tick
