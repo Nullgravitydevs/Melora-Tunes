@@ -305,6 +305,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // --- Autoplay & Pre-fetch Logic ---
     const autoplayFetchedRef = useRef<string | null>(null);
+    const songStartTimeRef = useRef(Date.now()); // Track when current song started
 
     // [PERF FIX #3] Store progress in a ref so the autoplay effect doesn't re-run ~4x/sec.
     // The effect now only re-runs when song/mix/duration changes, and checks progress via ref.
@@ -317,11 +318,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // Reset fetcher if song changed
         if (autoplayFetchedRef.current !== currentSong.id) {
             autoplayFetchedRef.current = null;
-            progressRef.current = 0; // CRITICAL: prevent stale progress from old song triggering autoplay
+            progressRef.current = 0; // Prevent stale progress from old song
+            songStartTimeRef.current = Date.now(); // Mark song start time
         }
 
         // Use an interval to check progress threshold instead of reacting to every progress tick
         const checkAutoplay = () => {
+            // GUARD: Don't trigger within 10s of song change (prevents stale progress leak from crossfade)
+            if (Date.now() - songStartTimeRef.current < 10000) return;
+
             const currentProgress = progressRef.current; // 0.0 to 1.0 (fraction)
             // Threshold in fraction: fire at 20s before end OR 50% — whichever is later
             const threshold = Math.max(1 - (20 / duration), 0.5);
