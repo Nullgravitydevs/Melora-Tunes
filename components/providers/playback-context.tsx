@@ -332,9 +332,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 const activeMix = mixes.find(m => m.id === activeMixId);
                 if (!activeMix) return;
 
-                // PURE APPEND: Only trigger when on the last song (never replace, never mutate mid-queue)
-                const isOnLastSong = activeMix.currentSongIndex >= activeMix.songs.length - 1;
-                if (!isOnLastSong) return;
+                // PURE APPEND: Trigger when 1 or fewer songs remaining (gives buffer for fetch)
+                const songsRemaining = activeMix.songs.length - activeMix.currentSongIndex - 1;
+                if (songsRemaining > 1) return;
 
                 console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
                 autoplayFetchedRef.current = currentSong.id;
@@ -399,7 +399,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         checkAutoplay();
 
         return () => clearInterval(interval);
-    }, [duration, activeMixId, isPlaying, currentSong, updateMix, qualityPreference, mixes]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [duration, activeMixId, isPlaying, currentSong, updateMix, qualityPreference]);
 
     const loadMix = useCallback((mixId: string, forceIndex?: number) => {
         // FIX 2: Request ID to prevent race condition on rapid taps
@@ -1157,12 +1158,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             // 4. Repeat All / Off Logic
             if (nextIndex >= len) {
                 if (repeat === 'off') {
+                    // If autoplay is currently generating, don't stop — wait for it to append
+                    if (isStationGenerating.current) {
+                        console.log("[NEXT] End of playlist but autoplay is generating — waiting...");
+                        return; // Don't stop, don't advance
+                    }
                     // Stop playback at end
                     console.log("End of playlist (Repeat Off). Stopping.");
                     setIsPlaying(false);
                     setPlaybackState('idle');
-                    // Reset to 0 but don't play? Or just stop?
-                    // Typically 'Stop' means stop. But we update index to 0 so next play starts at 0?
                     setPlayingIndex(0);
                     return;
                 } else {
