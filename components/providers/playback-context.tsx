@@ -195,6 +195,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const currentStreamKeyRef = useRef<string | null>(null); // Track which key provided the current stream
     const toastOnceRef = useRef(false); // [FIX Bug 10] Prevent toast spam
     const currentSongUrlRef = useRef<string | null>(null); // Track latest URL for sync comparison
+    const lastLoadedSongIdRef = useRef<string | null>(null); // [FIX] Prevent re-loading same song after trimQueue
 
     // Synchronize Refs with State for async callbacks (like Next/Prev)
     useEffect(() => { mixesRef.current = mixes; }, [mixes]);
@@ -419,10 +420,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             const merged = [...kept, ...newSongs];
                             console.log(`[Autoplay] Replaced queue after index ${playingIndexRef.current} with ${newSongs.length} discovery tracks (total: ${merged.length})`);
                             const { songs: trimmedSongs, adjustedIndex } = trimQueue(merged, playingIndexRef.current);
-                            // Only update the ref — do NOT call setPlayingIndex here!
-                            // setPlayingIndex triggers the loadSong effect which causes
-                            // desync (wrong song plays) and lag (cascade of re-resolves)
+                            // Update both ref AND state atomically — React batches these
+                            // The loadSong effect has a song-ID guard to prevent re-resolving
                             playingIndexRef.current = adjustedIndex;
+                            setPlayingIndex(adjustedIndex);
                             updateMix(currentMix.id, { songs: trimmedSongs, currentSongIndex: adjustedIndex });
                         } else {
                             console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
@@ -1511,6 +1512,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // [FIX - Bug 3] Use currentTrack to preserve rich metadata (quality/sources)
         if (currentTrack) {
+            // [FIX] Song-ID guard: skip re-loading if same song is already loaded
+            // This prevents the cascade of redundant re-resolves after trimQueue
+            // adjusts the index (same song, different position → should NOT reload)
+            if (lastLoadedSongIdRef.current === currentTrack.id) {
+                return;
+            }
+            lastLoadedSongIdRef.current = currentTrack.id;
+
             toastOnceRef.current = false; // [FIX Bug 10] Reset toast guard on new song
 
             // Check if this transition was initiated by next()
@@ -1532,6 +1541,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 getSkipSegments(ytId || currentTrack.id).then(setSkipSegments);
             }
         } else {
+            lastLoadedSongIdRef.current = null;
             setCurrentSongUrl(null);
             setSkipSegments([]);
         }
