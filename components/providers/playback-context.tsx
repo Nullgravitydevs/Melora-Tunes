@@ -419,10 +419,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             const merged = [...kept, ...newSongs];
                             console.log(`[Autoplay] Replaced queue after index ${playingIndexRef.current} with ${newSongs.length} discovery tracks (total: ${merged.length})`);
                             const { songs: trimmedSongs, adjustedIndex } = trimQueue(merged, playingIndexRef.current);
-                            if (adjustedIndex !== playingIndexRef.current) {
-                                playingIndexRef.current = adjustedIndex;
-                                setPlayingIndex(adjustedIndex);
-                            }
+                            // Only update the ref — do NOT call setPlayingIndex here!
+                            // setPlayingIndex triggers the loadSong effect which causes
+                            // desync (wrong song plays) and lag (cascade of re-resolves)
+                            playingIndexRef.current = adjustedIndex;
                             updateMix(currentMix.id, { songs: trimmedSongs, currentSongIndex: adjustedIndex });
                         } else {
                             console.warn("[Autoplay] Discovery Engine returned no new unique songs.");

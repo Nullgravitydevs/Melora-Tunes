@@ -249,9 +249,11 @@ export function scoreCandidates(
             breakdown.recency = SCORE_WEIGHTS.RECENCY;
         }
 
-        // --- Dedup Penalty ---
+        // --- Dedup HARD BLOCK (recently played or already in queue) ---
         if (recentIds.has(track.id) || queueIds.has(track.id)) {
-            breakdown.dedup = -DEDUP_PENALTY;
+            breakdown.dedup = -Infinity;
+            scored.push({ track, score: -Infinity, breakdown });
+            continue;
         }
 
         // --- Total ---
