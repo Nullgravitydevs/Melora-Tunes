@@ -67,6 +67,8 @@ const DIVERSITY = {
     MAX_ALBUM_PER_WINDOW: 2,                // Max 2 from same album in 5-track window
     WINDOW_SIZE: 5,
     FORCED_DIVERSITY_INTERVAL: 4,           // Every 4th must be different artist
+    ARTIST_COOLDOWN_WINDOW: 8,              // 2F: Look back 8 songs for artist cooldown
+    MAX_SAME_ARTIST_IN_WINDOW: 2,           // 2F: Max 2 same artist in 8-song window
 };
 
 // ──────────────────────────────────────────────
@@ -317,6 +319,16 @@ export function applyDiversityFilter(
             const albumPositions = albumWindow.get(album) || [];
             const recentInWindow = albumPositions.filter(p => pos - p < DIVERSITY.WINDOW_SIZE);
             if (recentInWindow.length >= DIVERSITY.MAX_ALBUM_PER_WINDOW) {
+                continue;
+            }
+        }
+
+        // Rule 2F: Artist cooldown — max 2 same artist in 8-song window
+        if (artist && selected.length >= 2) {
+            const windowStart = Math.max(0, selected.length - DIVERSITY.ARTIST_COOLDOWN_WINDOW);
+            const recentWindow = selected.slice(windowStart);
+            const artistCount = recentWindow.filter(s => cleanArtistName(s.artist) === artist).length;
+            if (artistCount >= DIVERSITY.MAX_SAME_ARTIST_IN_WINDOW) {
                 continue;
             }
         }

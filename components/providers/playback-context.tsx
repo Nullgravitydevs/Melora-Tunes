@@ -350,6 +350,21 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const progressRef = useRef(0);
     useEffect(() => { progressRef.current = progress; }, [progress]);
 
+    // ── 2D: Queue Trimmer ──
+    // Keeps only `keepBehind` songs before current position to prevent memory bloat.
+    // Returns trimmed array and adjusted index.
+    const trimQueue = useCallback((songs: any[], currentIndex: number, keepBehind: number = 5) => {
+        if (currentIndex <= keepBehind) {
+            // Not enough songs behind to trim
+            return { songs, adjustedIndex: currentIndex };
+        }
+        const trimCount = currentIndex - keepBehind;
+        const trimmedSongs = songs.slice(trimCount);
+        const adjustedIndex = currentIndex - trimCount;
+        console.log(`[TrimQueue] Removed ${trimCount} old songs (was ${songs.length}, now ${trimmedSongs.length}, idx: ${currentIndex} → ${adjustedIndex})`);
+        return { songs: trimmedSongs, adjustedIndex };
+    }, []);
+
     useEffect(() => {
         if (!activeMixId || !isPlaying || duration <= 0 || !currentSong) return;
 
@@ -404,6 +419,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             const merged = [...kept, ...newSongs];
                             console.log(`[Autoplay] Replaced queue after index ${playingIndexRef.current} with ${newSongs.length} discovery tracks (total: ${merged.length})`);
                             const { songs: trimmedSongs, adjustedIndex } = trimQueue(merged, playingIndexRef.current);
+                            if (adjustedIndex !== playingIndexRef.current) {
+                                playingIndexRef.current = adjustedIndex;
+                                setPlayingIndex(adjustedIndex);
+                            }
                             updateMix(currentMix.id, { songs: trimmedSongs, currentSongIndex: adjustedIndex });
                         } else {
                             console.warn("[Autoplay] Discovery Engine returned no new unique songs.");

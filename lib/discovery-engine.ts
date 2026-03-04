@@ -61,9 +61,12 @@ export class DiscoveryEngine {
         const startTime = Date.now();
         const quality = seed.preferredQuality || '320';
 
-        // ── Layer 1: Session Context ──
+        // ── Layer 1: Session Context (Session Drift — 2G) ──
+        // Uses last 5 played tracks for context so radio evolves naturally
+        // Instead of being seed-locked, recommendations drift with the session
         const history = HistoryStore.getHistory();
-        const context = buildSessionContext(history.slice(0, 5));
+        const contextHistory = history.length > 0 ? history.slice(0, 5) : [];
+        const context = buildSessionContext(contextHistory);
 
         // If no history, use seed's language or region as context language
         if (history.length === 0 && seed.song?.language) {
@@ -97,7 +100,8 @@ export class DiscoveryEngine {
         console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, trending=${trendingTracks.length}, unique=${allCandidates.length}`);
 
         // ── Layer 3: Score ──
-        const recentIds = new Set(history.slice(0, 50).map(h => h.track.id));
+        // 2E: Use last 200 played IDs (not 50) to prevent repeats in 3+ hour sessions
+        const recentIds = new Set(history.slice(0, 200).map(h => h.track.id));
         const queueIds = new Set<string>(currentQueueIds || []);
         // Add seed to prevent it from appearing
         recentIds.add(seed.id);
