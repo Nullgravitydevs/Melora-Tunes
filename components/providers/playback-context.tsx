@@ -419,12 +419,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             const kept = currentMix.songs.slice(0, keepUpTo);
                             const merged = [...kept, ...newSongs];
                             console.log(`[Autoplay] Replaced queue after index ${playingIndexRef.current} with ${newSongs.length} discovery tracks (total: ${merged.length})`);
-                            const { songs: trimmedSongs, adjustedIndex } = trimQueue(merged, playingIndexRef.current);
-                            // Update both ref AND state atomically — React batches these
-                            // The loadSong effect has a song-ID guard to prevent re-resolving
-                            playingIndexRef.current = adjustedIndex;
-                            setPlayingIndex(adjustedIndex);
-                            updateMix(currentMix.id, { songs: trimmedSongs, currentSongIndex: adjustedIndex });
+                            updateMix(currentMix.id, { songs: merged, currentSongIndex: playingIndexRef.current });
                         } else {
                             console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
                         }
