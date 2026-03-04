@@ -1503,47 +1503,60 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
 
 
-    // [FIX] Keep a ref to currentTrack so the loadSong effect can read it
-    // without depending on the object reference (which changes on every mixes update)
+    // [FIX] Keep a ref to currentTrack for other consumers
     const currentTrackRef = useRef(currentTrack);
     currentTrackRef.current = currentTrack;
 
     // Effect to load URL when song changes — depends on song ID (string), NOT object reference
+    // CRITICAL: Inside the effect, we resolve the track from REFS (always current)
+    // not from state-derived values (which can be stale during rapid skips).
+    // The effect fires when currentSongId changes (from React state), but the refs
+    // tell us what is ACTUALLY playing, so the ID guard catches spurious fires.
     const currentSongId = currentSong?.id;
     useEffect(() => {
-        const track = currentTrackRef.current;
-        if (track && currentSongId) {
-            // Song-ID guard: skip re-loading if same song is already loaded
-            if (lastLoadedSongIdRef.current === currentSongId) {
-                return;
-            }
-            lastLoadedSongIdRef.current = currentSongId;
+        // Resolve the ACTUAL current track from refs (not stale state)
+        const currentMixes = mixesRef.current;
+        const mix = currentMixes.find(m => m.id === activeMixIdRef.current);
+        if (!mix) return;
 
-            toastOnceRef.current = false; // [FIX Bug 10] Reset toast guard on new song
+        const idx = playingIndexRef.current;
+        const item = mix.songs[idx];
+        if (!item) return;
 
-            // Check if this transition was initiated by next()
-            const isSequential = isNextSequentialRef.current;
-            isNextSequentialRef.current = false; // consume flag
+        const track = isPlayableTrack(item) ? item : ensurePlayableTrack(item, qualityPreference as AudioQuality);
+        const trackId = track.id || track.song?.id || null;
 
-            loadSongUrl(track, undefined, isSequential);
-
-            // SponsorBlock: Fetch segments if it looks like a YouTube ID
-            const ytId = track.song?.id;
-            setSkipSegments([]);
-            if (ytId && ytId.length === 11 && !ytId.includes('-') && !ytId.includes(' ')) {
-                getSkipSegments(ytId).then(segs => {
-                    if (segs.length > 0) console.log(`Loaded ${segs.length} skip segments`);
-                    setSkipSegments(segs);
-                });
-            } else if (track.song?.type === 'video') {
-                getSkipSegments(ytId || track.id).then(setSkipSegments);
-            }
-        } else {
-            lastLoadedSongIdRef.current = null;
-            setCurrentSongUrl(null);
-            setSkipSegments([]);
+        // Song-ID guard: skip if the ref-computed track is the same as what's already loaded
+        // This catches spurious fires from stale playingIndex state
+        if (lastLoadedSongIdRef.current === trackId) {
+            return;
         }
-    }, [currentSongId, loadSongUrl]);
+        lastLoadedSongIdRef.current = trackId;
+
+        toastOnceRef.current = false; // Reset toast guard on new song
+
+        // Check if this transition was initiated by next()
+        const isSequential = isNextSequentialRef.current;
+        isNextSequentialRef.current = false; // consume flag
+
+        console.log(`[LoadSong Effect] Loading: ${track.title || track.song?.name} (idx: ${idx}, guard: ${trackId})`);
+        loadSongUrl(track, undefined, isSequential);
+
+        // SponsorBlock: Fetch segments if it looks like a YouTube ID
+        const ytId = track.song?.id;
+        setSkipSegments([]);
+        if (ytId && ytId.length === 11 && !ytId.includes('-') && !ytId.includes(' ')) {
+            getSkipSegments(ytId).then(segs => {
+                if (segs.length > 0) console.log(`Loaded ${segs.length} skip segments`);
+                setSkipSegments(segs);
+            });
+        } else if (track.song?.type === 'video') {
+            getSkipSegments(ytId || track.id).then(setSkipSegments);
+        }
+
+        // Cleanup: if no valid track
+        return undefined;
+    }, [currentSongId, loadSongUrl, qualityPreference]);
 
 
     // Normalize queue for UI
