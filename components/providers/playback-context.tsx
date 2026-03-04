@@ -1503,17 +1503,21 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
 
 
-    // Effect to load URL when song changes
+    // [FIX] Keep a ref to currentTrack so the loadSong effect can read it
+    // without depending on the object reference (which changes on every mixes update)
+    const currentTrackRef = useRef(currentTrack);
+    currentTrackRef.current = currentTrack;
+
+    // Effect to load URL when song changes — depends on song ID (string), NOT object reference
+    const currentSongId = currentSong?.id;
     useEffect(() => {
-        // [FIX - Bug 3] Use currentTrack to preserve rich metadata (quality/sources)
-        if (currentTrack) {
-            // [FIX] Song-ID guard: skip re-loading if same song is already loaded
-            // This prevents the cascade of redundant re-resolves after trimQueue
-            // adjusts the index (same song, different position → should NOT reload)
-            if (lastLoadedSongIdRef.current === currentTrack.id) {
+        const track = currentTrackRef.current;
+        if (track && currentSongId) {
+            // Song-ID guard: skip re-loading if same song is already loaded
+            if (lastLoadedSongIdRef.current === currentSongId) {
                 return;
             }
-            lastLoadedSongIdRef.current = currentTrack.id;
+            lastLoadedSongIdRef.current = currentSongId;
 
             toastOnceRef.current = false; // [FIX Bug 10] Reset toast guard on new song
 
@@ -1521,26 +1525,25 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             const isSequential = isNextSequentialRef.current;
             isNextSequentialRef.current = false; // consume flag
 
-            loadSongUrl(currentTrack, undefined, isSequential);
+            loadSongUrl(track, undefined, isSequential);
 
             // SponsorBlock: Fetch segments if it looks like a YouTube ID
-            // [FIX Bug 14] Use inner song ID to avoid compound IDs (e.g. 123:tidal)
-            const ytId = currentTrack.song?.id;
+            const ytId = track.song?.id;
             setSkipSegments([]);
             if (ytId && ytId.length === 11 && !ytId.includes('-') && !ytId.includes(' ')) {
                 getSkipSegments(ytId).then(segs => {
                     if (segs.length > 0) console.log(`Loaded ${segs.length} skip segments`);
                     setSkipSegments(segs);
                 });
-            } else if (currentTrack.song?.type === 'video') {
-                getSkipSegments(ytId || currentTrack.id).then(setSkipSegments);
+            } else if (track.song?.type === 'video') {
+                getSkipSegments(ytId || track.id).then(setSkipSegments);
             }
         } else {
             lastLoadedSongIdRef.current = null;
             setCurrentSongUrl(null);
             setSkipSegments([]);
         }
-    }, [currentTrack, loadSongUrl]);
+    }, [currentSongId, loadSongUrl]);
 
 
     // Normalize queue for UI
