@@ -79,13 +79,14 @@ export class DiscoveryEngine {
         console.log(`🎧 [Autoplay] Session: lang=${context.language}, artist=${seedArtist}, album=${seed.song?.album?.name || 'none'}, era=${context.avgYear}`);
 
         // ── Layer 2: Fetch Candidates (3 Tiers, parallel) ──
-        const [albumTracks, artistTracks, languageTracks] = await Promise.all([
+        const [albumTracks, artistTracks, languageTracks, trendingTracks] = await Promise.all([
             this.fetchAlbumCandidates(seedAlbumId, seed.id, quality),
             this.fetchArtistCandidates(seedArtist, seedLang, quality),
             this.fetchLanguageCandidates(seedLang, context.avgYear, quality),
+            this.fetchTrendingCandidates(seedLang, quality),
         ]);
 
-        const allRaw = [...albumTracks, ...artistTracks, ...languageTracks];
+        const allRaw = [...albumTracks, ...artistTracks, ...languageTracks, ...trendingTracks];
 
         // Cross-tier dedup: prevent same track from being scored multiple times
         const uniqueMap = new Map<string, PlayableTrack>();
@@ -93,7 +94,7 @@ export class DiscoveryEngine {
             if (!uniqueMap.has(t.id)) uniqueMap.set(t.id, t);
         }
         const allCandidates = Array.from(uniqueMap.values());
-        console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, unique=${allCandidates.length}`);
+        console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, trending=${trendingTracks.length}, unique=${allCandidates.length}`);
 
         // ── Layer 3: Score ──
         const recentIds = new Set(history.slice(0, 50).map(h => h.track.id));
@@ -181,7 +182,7 @@ export class DiscoveryEngine {
             const songs = await getAlbumSongs(albumId);
             return songs
                 .filter(s => s.id !== seedId && isCleanTrack(s.name || ''))
-                .slice(0, 10)
+                .slice(0, 20)
                 .map(s => ensurePlayableTrack(s, quality));
         } catch (e) {
             console.warn('[Autoplay] Album fetch failed:', e);
@@ -206,7 +207,7 @@ export class DiscoveryEngine {
             const songs = await searchSongs(query, 1, 15, language);
             return (songs || [])
                 .filter(s => isCleanTrack(s.name || ''))
-                .slice(0, 10)
+                .slice(0, 20)
                 .map(s => ensurePlayableTrack(s, quality));
         } catch (e) {
             console.warn('[Autoplay] Artist fetch failed:', e);
@@ -228,16 +229,44 @@ export class DiscoveryEngine {
         try {
             // Build a query that targets the right era, pass language to API
             const currentYear = new Date().getFullYear();
-            const eraKeyword = avgYear >= currentYear - 2 ? 'latest hits' : `${avgYear} hits`;
+            // [Phase 3] Randomize queries to break deterministic repetition loops
+            const eraKeywords = avgYear >= currentYear - 2
+                ? ['latest hits', 'new songs', 'popular songs', 'top songs']
+                : [`${avgYear} hits`, `${avgYear} songs`, `best of ${avgYear}`, `${avgYear} popular`];
+            const eraKeyword = eraKeywords[Math.floor(Math.random() * eraKeywords.length)];
+            const page = 1 + Math.floor(Math.random() * 3); // Randomize page 1-3
             const query = `${language} ${eraKeyword}`;
 
-            const songs = await searchSongs(query, 1, 15, language);
+            const songs = await searchSongs(query, page, 20, language);
             return (songs || [])
                 .filter(s => isCleanTrack(s.name || ''))
-                .slice(0, 10)
+                .slice(0, 20)
                 .map(s => ensurePlayableTrack(s, quality));
         } catch (e) {
             console.warn('[Autoplay] Language fetch failed:', e);
+            return [];
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // PRIVATE: Tier 4 — Trending in Language
+    // ──────────────────────────────────────────────
+
+    private static async fetchTrendingCandidates(
+        language: string,
+        quality: AudioQuality,
+    ): Promise<PlayableTrack[]> {
+        try {
+            const trending = await getTrending();
+            return (trending || [])
+                .filter(s => {
+                    const lang = (s as any).language?.toLowerCase() || '';
+                    return (!language || lang === language || !lang) && isCleanTrack(s.name || '');
+                })
+                .slice(0, 15)
+                .map(s => ensurePlayableTrack(s, quality));
+        } catch (e) {
+            console.warn('[Autoplay] Trending fetch failed:', e);
             return [];
         }
     }

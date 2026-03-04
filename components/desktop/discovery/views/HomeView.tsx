@@ -22,6 +22,9 @@ interface HomeViewProps {
 
 const CACHE_TTL = 300_000;
 
+let globalHomeCache: { data: LaunchData; lang: string; ts: number } | null = null;
+let globalHeroSong: JioSaavnSong | null = null;
+
 function deduplicate<T extends { id: string; name?: string }>(arr: T[]): T[] {
     const seen = new Set();
     const seenNames = new Set();
@@ -426,7 +429,7 @@ function HistoryCard({ item, onClick, isCurrent, isPlaying, onContextMenu }: { i
 // MAIN: HOME VIEW
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onContextMenu }: HomeViewProps) {
-    const { playInstantMix } = usePlayback();
+    const { playInstantMix, startRadio } = usePlayback();
     const { recentlyPlayed } = useLibrary();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -435,7 +438,6 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
     const [displayLangs, setDisplayLangs] = useState<string[]>(['English']);
     const [userName, setUserName] = useState("");
 
-    const cacheRef = useRef<{ data: LaunchData; lang: string; ts: number } | null>(null);
     const heroSongRef = useRef<JioSaavnSong | null>(null);
     // Keep ref in sync
     useEffect(() => { heroSongRef.current = heroSong; }, [heroSong]);
@@ -462,10 +464,15 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
         const langString = validLangs.join(',') || 'english';
         setDisplayLangs(validLangs.map(l => l.charAt(0).toUpperCase() + l.slice(1)));
 
-        if (cacheRef.current && cacheRef.current.lang === sortedForCache && Date.now() - cacheRef.current.ts < CACHE_TTL) {
-            setLaunchData(cacheRef.current.data);
-            const pool = deduplicate([...(cacheRef.current.data.new_trending || []), ...(cacheRef.current.data.new_albums || [])]);
-            if (pool.length > 0 && !heroSongRef.current) setHeroSong(pool[Math.floor(Math.random() * Math.min(pool.length, 5))]);
+        if (globalHomeCache && globalHomeCache.lang === sortedForCache && Date.now() - globalHomeCache.ts < CACHE_TTL) {
+            setLaunchData(globalHomeCache.data);
+            const pool = deduplicate([...(globalHomeCache.data.new_trending || []), ...((globalHomeCache.data.new_albums || []) as JioSaavnSong[])]);
+            if (pool.length > 0) {
+                if (!globalHeroSong) {
+                    globalHeroSong = pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
+                }
+                setHeroSong(globalHeroSong);
+            }
             setLoading(false);
             return;
         }
@@ -483,10 +490,13 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
             data.top_playlists = deduplicate(data.top_playlists || []);
 
             setLaunchData(data);
-            cacheRef.current = { data, lang: sortedForCache, ts: Date.now() };
+            globalHomeCache = { data, lang: sortedForCache, ts: Date.now() };
 
             const pool = deduplicate([...(data.new_trending || []), ...((data.new_albums || []) as JioSaavnSong[])]);
-            if (pool.length > 0) setHeroSong(pool[Math.floor(Math.random() * Math.min(pool.length, 5))]);
+            if (pool.length > 0) {
+                globalHeroSong = pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
+                setHeroSong(globalHeroSong);
+            }
         } catch (e) {
             console.error("HomeView fetch error:", e);
             setError("Failed to load content.");
@@ -497,7 +507,7 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
 
     useEffect(() => {
         fetchData();
-        const handler = () => { cacheRef.current = null; fetchData(); };
+        const handler = () => { globalHomeCache = null; globalHeroSong = null; fetchData(); };
         window.addEventListener('melora-settings-changed', handler);
         return () => window.removeEventListener('melora-settings-changed', handler);
     }, [fetchData]);
@@ -599,7 +609,17 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
                                     <HistoryCard
                                         key={`recent-${song.id}`}
                                         item={song}
-                                        onClick={() => playSongInList('recently-played', 'Recently Played', recentlyPlayed.slice(0, 15), i)}
+                                        onClick={() => {
+                                            // Play the clicked song directly — NOT radio
+                                            const songs = recentlyPlayed.slice(0, 15);
+                                            playInstantMix({
+                                                id: 'recently-played-queue',
+                                                title: 'Recently Played',
+                                                color: 'blue',
+                                                songs,
+                                                currentSongIndex: i,
+                                            });
+                                        }}
                                         isCurrent={currentSongId === song.id}
                                         isPlaying={isPlaying}
                                         onContextMenu={onContextMenu ? (e) => onContextMenu(e, song) : undefined}

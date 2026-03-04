@@ -14,6 +14,7 @@ import { getArt, type ViewState } from "../DiscoveryEntry";
    ========================================================================== */
 
 const CACHE_TTL = 300_000;
+let globalHomeTabCache: { data: any; lang: string; ts: number } | null = null;
 
 interface Props { onNavigate: (v: ViewState) => void }
 
@@ -23,7 +24,6 @@ export function HomeTab({ onNavigate }: Props) {
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const { playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
-    const cacheRef = useRef<{ data: any; lang: string; ts: number } | null>(null);
 
     const greeting = useMemo(() => {
         const h = new Date().getHours();
@@ -41,8 +41,8 @@ export function HomeTab({ onNavigate }: Props) {
             const langs = settings.languages || ["english", "hindi"];
             const langStr = langs.join(",");
 
-            if (cacheRef.current && cacheRef.current.lang === langStr && Date.now() - cacheRef.current.ts < CACHE_TTL) {
-                setLaunchData(cacheRef.current.data);
+            if (globalHomeTabCache && globalHomeTabCache.lang === langStr && Date.now() - globalHomeTabCache.ts < CACHE_TTL) {
+                setLaunchData(globalHomeTabCache.data);
                 setIsLoading(false);
                 return;
             }
@@ -53,7 +53,7 @@ export function HomeTab({ onNavigate }: Props) {
                 const data = await getStrictLaunchData(langStr);
                 if (cancelled) return;
                 setLaunchData(data);
-                cacheRef.current = { data, lang: langStr, ts: Date.now() };
+                globalHomeTabCache = { data, lang: langStr, ts: Date.now() };
             } catch {
                 if (!cancelled) setError(true);
             } finally {
@@ -62,7 +62,7 @@ export function HomeTab({ onNavigate }: Props) {
         };
 
         load();
-        const handler = () => { cacheRef.current = null; load(); };
+        const handler = () => { globalHomeTabCache = null; load(); };
         window.addEventListener("melora-settings-changed", handler);
         return () => { cancelled = true; window.removeEventListener("melora-settings-changed", handler); };
     }, [retryCount]);

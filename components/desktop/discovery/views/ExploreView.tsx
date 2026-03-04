@@ -8,6 +8,8 @@ import { usePlayback, useUI } from "@/components/providers/playback-context";
 import { StandardCard, FeatureCard, HorizontalScroll, SectionHeader } from "../home/HomeComponents";
 import { decodeHtml } from "@/lib/utils";
 
+let globalExploreCache: { data: any; ts: number } | null = null;
+
 interface ExploreViewProps {
     onNavigate: (view: { id: string; data?: any }) => void;
     initialMode?: 'explore' | 'radio';
@@ -42,12 +44,11 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const cacheRef = useRef<{ data: typeof content; ts: number } | null>(null);
 
     const loadData = useCallback(async () => {
         // Use cache if <5 min old
-        if (cacheRef.current && Date.now() - cacheRef.current.ts < 300000) {
-            setContent(cacheRef.current.data);
+        if (globalExploreCache && Date.now() - globalExploreCache.ts < 300000) {
+            setContent(globalExploreCache.data);
             setLoading(false);
             return;
         }
@@ -88,7 +89,7 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                 hollywood: holly
             };
             setContent(newContent);
-            cacheRef.current = { data: newContent, ts: Date.now() };
+            globalExploreCache = { data: newContent, ts: Date.now() };
         } catch {
             setError("Failed to load global discovery content.");
         }

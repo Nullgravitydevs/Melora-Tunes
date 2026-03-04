@@ -127,6 +127,20 @@ export interface PlaybackContextType {
     startRadio: (songOrQuery: any) => Promise<void>;
 }
 
+// --- Queue Cap Helper ---
+const MAX_QUEUE_SIZE = 100;
+function trimQueue(songs: (JioSaavnSong | PlayableTrack)[], currentIndex: number, cap: number = MAX_QUEUE_SIZE): { songs: (JioSaavnSong | PlayableTrack)[]; adjustedIndex: number } {
+    if (songs.length <= cap) return { songs, adjustedIndex: currentIndex };
+    const overflow = songs.length - cap;
+    // Only trim if we can safely remove songs before the current index
+    const safeOverflow = Math.min(overflow, currentIndex);
+    if (safeOverflow <= 0) return { songs, adjustedIndex: currentIndex };
+    const trimmed = songs.slice(safeOverflow);
+    const adjustedIndex = currentIndex - safeOverflow;
+    console.log(`[QueueTrim] Trimmed ${safeOverflow} played songs, index ${currentIndex} → ${adjustedIndex} (total: ${trimmed.length})`);
+    return { songs: trimmed, adjustedIndex: Math.max(0, adjustedIndex) };
+}
+
 export const PlaybackContext = createContext<PlaybackContextType | undefined>(undefined);
 
 export function PlaybackProvider({ children }: { children: React.ReactNode }) {
@@ -177,7 +191,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const abortControllerRef = useRef<AbortController | null>(null);
     const mixesRef = useRef<Mix[]>([]);
     const activeMixIdRef = useRef<string | null>(null);
-    const isStationGenerating = useRef(false);
+    const generationLocks = useRef<Map<string, boolean>>(new Map()); // [Phase 4: Mutex] Per-mix lock
     const currentStreamKeyRef = useRef<string | null>(null); // Track which key provided the current stream
     const toastOnceRef = useRef(false); // [FIX Bug 10] Prevent toast spam
     const currentSongUrlRef = useRef<string | null>(null); // Track latest URL for sync comparison
@@ -188,9 +202,34 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const nextPreloadRequestId = useRef(0); // [FIX Bug 15] Preload race condition guard
     const loadMixRequestId = useRef(0); // [FIX 2] loadMix race condition guard
     const downgradeToastRef = useRef<string | null>(null); // [FIX Bug 20] Throttle downgrade toasts
+    const isNextSequentialRef = useRef(false); // [Phase 1: Gapless] Transition flag
     const playingIndexRef = useRef(0);
+    const nextSongUrlRef = useRef<string | null>(null); // [FIX] Ref for loadSongUrl closure
     useEffect(() => { playingIndexRef.current = playingIndex; }, [playingIndex]);
     useEffect(() => { currentSongUrlRef.current = currentSongUrl; }, [currentSongUrl]);
+    useEffect(() => { nextSongUrlRef.current = nextSongUrl; }, [nextSongUrl]);
+
+    // [Phase 2: Gapless] Resolver URL Cache — prevents re-resolution on prev/next
+    const resolverCacheRef = useRef<Map<string, { url: string; quality: AudioQuality; expiry: number }>>(new Map());
+    const getCachedUrl = useCallback((trackId: string, quality: AudioQuality): { url: string; quality: AudioQuality } | null => {
+        const key = `${trackId}:${quality}`;
+        const entry = resolverCacheRef.current.get(key);
+        if (entry && Date.now() < entry.expiry) {
+            console.log(`[Resolver] Cache HIT: ${key}`);
+            return { url: entry.url, quality: entry.quality };
+        }
+        if (entry) resolverCacheRef.current.delete(key); // Expired
+        return null;
+    }, []);
+    const setCachedUrl = useCallback((trackId: string, quality: AudioQuality, url: string) => {
+        const key = `${trackId}:${quality}`;
+        resolverCacheRef.current.set(key, { url, quality, expiry: Date.now() + 5 * 60 * 1000 }); // 5 min TTL
+    }, []);
+
+    // [Phase 2: Gapless] Clear stale nextSongUrl on mix change
+    useEffect(() => {
+        setNextSongUrl(null);
+    }, [activeMixId]);
 
     // Cleanup timers on unmount
     useEffect(() => {
@@ -322,75 +361,59 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         const checkAutoplay = () => {
-            // GUARD: Don't trigger within 10s of song change
-            if (Date.now() - songStartTimeRef.current < 10000) return;
+            // Only use generationLock to prevent concurrent fetches — no time guard
+            if (autoplayFetchedRef.current || generationLocks.current.get(activeMixId)) return;
 
-            const currentProgress = progressRef.current;
-            const threshold = Math.max(1 - (20 / duration), 0.5);
+            const activeMix = mixesRef.current.find(m => m.id === activeMixId);
+            if (!activeMix) return;
 
-            if (currentProgress >= threshold && !autoplayFetchedRef.current && !isStationGenerating.current) {
-                const activeMix = mixes.find(m => m.id === activeMixId);
-                if (!activeMix) return;
+            const currentIndex = playingIndexRef.current;
+            const songsRemaining = activeMix.songs.length - currentIndex - 1;
 
-                // PURE APPEND: Trigger when 1 or fewer songs remaining (gives buffer for fetch)
-                const songsRemaining = activeMix.songs.length - activeMix.currentSongIndex - 1;
-                if (songsRemaining > 1) return;
+            // Simple rule: fetch when ≤ 5 songs remain. No progress gate, no queue size gate.
+            if (songsRemaining > 5) return;
 
-                console.log("[Autoplay] Extending session via Discovery Engine for:", currentSong.name);
-                autoplayFetchedRef.current = currentSong.id;
-                isStationGenerating.current = true;
+            console.log(`[Autoplay] Fetching discovery songs for: ${currentSong.name} (queue: ${activeMix.songs.length}, remaining: ${songsRemaining})`);
+            autoplayFetchedRef.current = currentSong.id;
+            generationLocks.current.set(activeMixId, true);
 
-                const seed = ensurePlayableTrack(currentSong);
-                const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
-                // Pass current queue IDs so scoring engine can penalize duplicates
-                const queueIds = activeMix.songs.map(s => isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id);
+            const seed = ensurePlayableTrack(currentSong);
+            const inferredRegion = activeMix.title.includes('Mix') ? activeMix.title.replace(' Mix', '').toLowerCase() : undefined;
+            const queueIds = activeMix.songs.map(s => isPlayableTrack(s) ? s.id : ensurePlayableTrack(s).id);
 
-                DiscoveryEngine.generateSessionMix(seed, inferredRegion, queueIds)
-                    .then((newMix) => {
-                        isStationGenerating.current = false;
-                        const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
-                        if (currentMix && currentMix.id === activeMixIdRef.current) {
-                            const newSongs = newMix.songs
-                                .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality))
-                                .filter(sTrack => {
-                                    if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
-                                    return !currentMix.songs.some(existing => {
-                                        const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
-                                        return e === sTrack.id;
-                                    });
+            DiscoveryEngine.generateSessionMix(seed, inferredRegion, queueIds)
+                .then((newMix) => {
+                    generationLocks.current.delete(activeMixId);
+                    const currentMix = mixesRef.current.find(m => m.id === activeMixIdRef.current);
+                    if (currentMix && currentMix.id === activeMixIdRef.current) {
+                        const newSongs = newMix.songs
+                            .map(s => ensurePlayableTrack(s, qualityPreference as AudioQuality))
+                            .filter(sTrack => {
+                                if (sTrack.id === seed.id || (sTrack.song?.id === seed.song?.id && sTrack.song)) return false;
+                                return !currentMix.songs.some(existing => {
+                                    const e = isPlayableTrack(existing) ? existing.id : ensurePlayableTrack(existing).id;
+                                    return e === sTrack.id;
                                 });
+                            });
 
-                            if (newSongs.length > 0) {
-                                // PURE APPEND: Always add to end, never replace
-                                const updatedSongs = [...currentMix.songs, ...newSongs];
-                                const MAX_MIX_SIZE = 100;
-
-                                console.log(`[Autoplay] Appended ${newSongs.length} tracks to mix (total: ${updatedSongs.length})`);
-
-                                if (updatedSongs.length > MAX_MIX_SIZE) {
-                                    const overflow = updatedSongs.length - MAX_MIX_SIZE;
-                                    const currentIdx = currentMix.currentSongIndex;
-                                    if (currentIdx >= overflow) {
-                                        updatedSongs.splice(0, overflow);
-                                        const clampedIndex = Math.max(0, currentIdx - overflow);
-                                        console.log(`[Autoplay] Queue cap: trimmed ${overflow} played songs, index ${currentIdx} → ${clampedIndex}`);
-                                        updateMix(currentMix.id, { songs: updatedSongs, currentSongIndex: clampedIndex });
-                                    } else {
-                                        updateMix(currentMix.id, { songs: updatedSongs });
-                                    }
-                                } else {
-                                    updateMix(currentMix.id, { songs: updatedSongs });
-                                }
-                            } else {
-                                console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
-                            }
+                        if (newSongs.length > 0) {
+                            // REPLACE everything after current position with discovery songs
+                            // This creates an infinite stream — old search results are dropped
+                            const keepUpTo = playingIndexRef.current + 1;
+                            const kept = currentMix.songs.slice(0, keepUpTo);
+                            const merged = [...kept, ...newSongs];
+                            console.log(`[Autoplay] Replaced queue after index ${playingIndexRef.current} with ${newSongs.length} discovery tracks (total: ${merged.length})`);
+                            const { songs: trimmedSongs, adjustedIndex } = trimQueue(merged, playingIndexRef.current);
+                            updateMix(currentMix.id, { songs: trimmedSongs, currentSongIndex: adjustedIndex });
+                        } else {
+                            console.warn("[Autoplay] Discovery Engine returned no new unique songs.");
                         }
-                    })
-                    .catch(err => {
-                        console.error("[Autoplay] Failed to extend session:", err);
-                        isStationGenerating.current = false;
-                    });
-            }
+                    }
+                })
+                .catch(err => {
+                    console.error("[Autoplay] Failed:", err);
+                    generationLocks.current.delete(activeMixId);
+                });
         };
 
         // Check every 5 seconds instead of on every progress tick
@@ -431,6 +454,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 setCurrentSongUrl(null);
                 audioPlayerRef.current?.pause();
                 audioPlayerRef.current?.seekTo(0);
+                playingIndexRef.current = startIndex;
                 setPlayingIndex(startIndex);
 
                 setTimeout(() => {
@@ -461,6 +485,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         const targetMix = mixesRef.current.find(m => m.id === mixId);
         const startIndex = forceIndex !== undefined ? forceIndex : (targetMix?.currentSongIndex ?? 0);
         console.log("[loadMix] Starting from index:", startIndex);
+        playingIndexRef.current = startIndex;
         setPlayingIndex(startIndex);
 
         setActiveMixId(mixId);
@@ -511,6 +536,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         // 3. Set active mix
         setActiveMixId(NOW_PLAYING_ID);
+        playingIndexRef.current = targetIndex;
         setPlayingIndex(targetIndex);
 
         // 4. HARD RESET PLAYER — pause immediately, clear URL
@@ -693,8 +719,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                         }
                     }
 
-                    // Only use match if at least 50% of original words match
-                    if (bestMatch && bestScore >= 0.5) {
+                    // Only use match if at least 70% of original words match
+                    if (bestMatch && bestScore >= 0.7) {
                         console.log(`[HiFi] Best match: "${bestMatch.title}" (score: ${(bestScore * 100).toFixed(0)}%)`);
                         const stream = await getHiFiStream(bestMatch.id, bestMatch.source, signal);
                         if (stream?.url) {
@@ -731,7 +757,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // If unknown quality, fallback to 320 path
         const degradationPath = pathMap[targetQ] || pathMap['320'];
 
-        // --- PHASE 1: OFFLINE (Exact -> Lower) ---
+        // --- PHASE 1: CACHE CHECK ---
+        const cached = getCachedUrl(track.id, targetQ);
+        if (cached) {
+            return cached;
+        }
+
+        // --- PHASE 2: OFFLINE (Exact -> Lower) ---
         for (const q of degradationPath) {
             if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
             try {
@@ -801,6 +833,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
             if (result) {
                 console.log(`[Resolver] ✓ Online Success: ${result.quality}`);
+                setCachedUrl(track.id, result.quality, result.url); // Cache for reuse
 
                 // --- TRUTH TOAST ---
                 if (result.quality !== targetQ && !toastOnceRef.current) {
@@ -909,7 +942,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
     }, [qualityPreference, resolvePlayableUrl, showToast]);
 
-    const loadSongUrl = useCallback(async (songOrTrack: JioSaavnSong | PlayableTrack | undefined, overrideQuality?: AudioQuality) => {
+    const loadSongUrl = useCallback(async (
+        songOrTrack: JioSaavnSong | PlayableTrack | undefined,
+        overrideQuality?: AudioQuality,
+        isSequentialTransition: boolean = false
+    ) => {
         setPlaybackState('loading');
 
         if (abortControllerRef.current) {
@@ -918,18 +955,45 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
 
-        // Cleanup old URL if it's a blob to prevent memory leaks
-        setCurrentSongUrl((prevUrl) => {
-            if (prevUrl && prevUrl.startsWith('blob:')) {
-                OfflineStore.revokeUrl(prevUrl);
-            }
-            return null; // Temporarily clear while loading
-        });
-        currentStreamKeyRef.current = null; // Reset key ref
-
         if (!songOrTrack) {
             return;
         }
+
+        // [Phase 1: True Gapless] Preloaded Transition Bypass
+        // READ FROM REF — loadSongUrl's closure captures stale state; ref is always current
+        const preloadedUrl = nextSongUrlRef.current;
+
+        // SAFETY: Block gapless promotion if we've reached the end of the queue with repeat=off
+        const currentMixForGapless = mixesRef.current.find(m => m.id === activeMixIdRef.current);
+        const atQueueEnd = currentMixForGapless && playingIndexRef.current >= currentMixForGapless.songs.length - 1;
+        if (isSequentialTransition && atQueueEnd && repeat === 'off' && !generationLocks.current.get(activeMixIdRef.current ?? '')) {
+            console.log('[Gapless] Blocking promotion — queue ended with repeat=off');
+            setNextSongUrl(null);
+            nextSongUrlRef.current = null;
+            return;
+        }
+
+        if (isSequentialTransition && preloadedUrl) {
+            console.log(`[Gapless] Promoting Preloaded URL: ${preloadedUrl.substring(0, 50)}...`);
+            setCurrentSongUrl(preloadedUrl);
+            setNextSongUrl(null); // Clear preload
+            nextSongUrlRef.current = null;
+            // We must still run the rest of the metadata / analytics updates, but SKIP the URL resolution.
+        } else if (!isSequentialTransition) {
+            // Cold path: Only clean up if this is NOT a sequential transition
+            // Sequential transitions must keep the audio element alive while JIT resolves
+            setCurrentSongUrl((prevUrl) => {
+                if (prevUrl && prevUrl.startsWith('blob:')) {
+                    OfflineStore.revokeUrl(prevUrl);
+                }
+                return null;
+            });
+        } else {
+            // Sequential transition with no preload — keep audio alive, JIT will resolve
+            console.warn('[Gapless] Sequential transition with no preload — JIT fallback active');
+        }
+
+        currentStreamKeyRef.current = null; // Reset key ref
 
         const requestId = ++loadRequestId.current;
         const targetQualityPreference = (overrideQuality as AudioQuality) || (qualityPreference as AudioQuality);
@@ -976,14 +1040,18 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 // Video logic placeholder
             }
 
-            // CRITICAL FIX: Always resolve URL just-in-time
-            console.log(`[Playback] Resolving JIT URL for: ${track.title} (Preferred: ${track.preferredQuality})`);
+            let result: { url: string; quality: AudioQuality; keyName?: string } | null = null;
 
-            // Using UNSPLIT Resolver (Handles both Offline and Online phases internally)
-            const result = await resolvePlayableUrl(track, signal);
-
-            // Guard: If request ID changed during await, discard result
-            if (signal.aborted || loadRequestId.current !== requestId) return;
+            if (isSequentialTransition && preloadedUrl) {
+                // Since we already promoted the URL, fake the result object for the rest of the flow
+                result = { url: preloadedUrl, quality: track.preferredQuality };
+                console.log(`[Gapless] Skipping JIT Resolve. Using preloaded stream.`);
+            } else {
+                console.log(`[Playback] Resolving JIT URL for: ${track.title} (Preferred: ${track.preferredQuality})`);
+                result = await resolvePlayableUrl(track, signal);
+                // Guard: If request ID changed during await, discard result
+                if (signal.aborted || loadRequestId.current !== requestId) return;
+            }
 
             if (result && result.url) {
                 console.log(`[Playback] Loaded: ${result.quality} | ${result.url.substring(0, 50)}...`);
@@ -1097,7 +1165,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         console.log("[NEXT] Called", {
             mix: activeMix.title,
-            idx: activeMix.currentSongIndex,
+            idx: playingIndexRef.current,
             len: activeMix.songs.length
         });
 
@@ -1135,39 +1203,49 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
             // --- RADIO INFINITE QUEUE CHECK ---
             const isRadio = activeMix.id.startsWith('radio-');
-            if (isRadio && nextIndex >= len - 5 && !isStationGenerating.current) {
-                console.log("[Radio] Nearing end of station, appending more tracks...");
-                isStationGenerating.current = true;
+            if (isRadio && nextIndex >= len - 2 && !generationLocks.current.get(activeMix.id)) {
+                console.log(`[Radio] Nearing end of station ${activeMix.id}, appending via DiscoveryEngine...`);
+                generationLocks.current.set(activeMix.id, true);
 
-                const pageToFetch = Math.floor(len / 40) + 1;
-                searchSongs(activeMix.title, pageToFetch, 40).then(newSongs => {
+                // [Phase 3: Radio Unification] Route to Discovery Engine
+                DiscoveryEngine.generateSessionMix(
+                    ensurePlayableTrack(activeMix.songs[activeMix.songs.length - 1], qualityPreference as AudioQuality), // seed 
+                    undefined, // region
+                    activeMix.songs.map(s => s.id) // queue IDs to prevent dupes
+                ).then(newMix => {
+                    const newSongs = newMix.songs;
                     if (newSongs && newSongs.length > 0) {
                         setMixes(prev => prev.map(m => {
                             if (m.id === activeMix.id) {
                                 const existingIds = new Set(m.songs.map((s: any) => s.id));
                                 const uniqueNew = newSongs.filter(s => !existingIds.has(s.id));
-                                return { ...m, songs: [...m.songs, ...uniqueNew] };
+
+                                // Unified queue trim
+                                const appended = [...m.songs, ...uniqueNew];
+                                const { songs: trimmedSongs, adjustedIndex } = trimQueue(appended, playingIndexRef.current);
+
+                                return { ...m, songs: trimmedSongs, currentSongIndex: adjustedIndex };
                             }
                             return m;
                         }));
                     }
                 }).catch(e => console.error("Radio extend failed", e))
-                    .finally(() => { isStationGenerating.current = false; });
+                    .finally(() => { generationLocks.current.delete(activeMix.id); });
             }
 
             // 4. Repeat All / Off Logic
             if (nextIndex >= len) {
+                // If autoplay is currently generating for this mix, don't advance — wait for it to append
+                if (generationLocks.current.get(activeMix.id)) {
+                    console.log("[NEXT] End of playlist but autoplay is generating — waiting...");
+                    return; // Don't stop, don't loop — autoplay will append songs
+                }
+
                 if (repeat === 'off') {
-                    // If autoplay is currently generating, don't stop — wait for it to append
-                    if (isStationGenerating.current) {
-                        console.log("[NEXT] End of playlist but autoplay is generating — waiting...");
-                        return; // Don't stop, don't advance
-                    }
-                    // Stop playback at end
+                    // Stop playback at end — do NOT reset index (prevents loop-back)
                     console.log("End of playlist (Repeat Off). Stopping.");
                     setIsPlaying(false);
                     setPlaybackState('idle');
-                    setPlayingIndex(0);
                     return;
                 } else {
                     // Repeat All -> Loop
@@ -1181,7 +1259,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         console.log("[Next] Advancing to:", nextTitle);
 
+        if (!nextSongUrlRef.current) {
+            console.warn("[Gapless] Preload missing — forcing immediate resolve without nulling audio");
+        }
+
         // Optimistic update
+        // We set playing index, and the effect on line ~1399 triggers `loadSongUrl`
+        // Wait, the effect that watches `currentTrack` calls `loadSongUrl(currentTrack)`.
+        // We need `loadSongUrl` to know if this was a sequential transition or a user jump.
+        // Let's use a global ref to tag the next load as sequential.
+        isNextSequentialRef.current = true;
+        playingIndexRef.current = nextIndex; // Sync ref IMMEDIATELY — prevents stale reads on rapid next()
         setPlayingIndex(nextIndex);
 
         // [SignalStore] Record Skip/Next Action
@@ -1225,6 +1313,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             if (prevIndex < 0) prevIndex = len - 1;
         }
 
+        playingIndexRef.current = prevIndex; // Sync ref IMMEDIATELY
         setPlayingIndex(prevIndex);
         setIsPlaying(true);
     }, [shuffle, updateMix]);
@@ -1232,6 +1321,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // Play specific index in queue
     const playIndex = useCallback((index: number) => {
         if (!activeMix || index < 0 || index >= activeMix.songs.length) return;
+        playingIndexRef.current = index; // Sync ref IMMEDIATELY
         setPlayingIndex(index);
         setIsPlaying(true);
     }, [activeMix]);
@@ -1347,7 +1437,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        const nextIndex = (activeMixForNext.currentSongIndex + 1) % activeMixForNext.songs.length;
+        // Use playingIndexRef to guarantee we calculate next relative to what is ACTUALLY playing
+        const currentIndex = playingIndexRef.current;
+        const nextIndex = (currentIndex + 1) % activeMixForNext.songs.length;
         // Don't preload if valid next index is same as current (1 song loop) unless specific requirement?
         // Actually fine to preload same song if repeating.
 
@@ -1401,7 +1493,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // [FIX - Bug 3] Use currentTrack to preserve rich metadata (quality/sources)
         if (currentTrack) {
             toastOnceRef.current = false; // [FIX Bug 10] Reset toast guard on new song
-            loadSongUrl(currentTrack);
+
+            // Check if this transition was initiated by next()
+            const isSequential = isNextSequentialRef.current;
+            isNextSequentialRef.current = false; // consume flag
+
+            loadSongUrl(currentTrack, undefined, isSequential);
 
             // SponsorBlock: Fetch segments if it looks like a YouTube ID
             // [FIX Bug 14] Use inner song ID to avoid compound IDs (e.g. 123:tidal)
@@ -1472,19 +1569,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         showToast(`Starting Radio for ${decodeHtml(query)}...`, 'info');
         try {
-            const songs = await searchSongs(query, 1, 40);
-            if (songs && songs.length > 0) {
-                const tracks = songs.map((s: any) => ensurePlayableTrack(s, qualityPreference as AudioQuality));
-                playInstantMix({
-                    id: `radio-context-${Date.now()}`,
-                    title: `${decodeHtml(query)} Radio`,
-                    color: 'blue',
-                    songs: tracks,
-                    currentSongIndex: 0
-                });
-            } else {
-                showToast("Couldn't generate radio station", "error");
-            }
+            // [Phase 3] Use DiscoveryEngine properly
+            const seedTrack = isPlayableTrack(songOrQuery) ? songOrQuery : ensurePlayableTrack(songOrQuery, qualityPreference as AudioQuality);
+            const mix = await DiscoveryEngine.generateSessionMix(seedTrack);
+
+            // Adjust metadata to match radio mode flags
+            mix.id = `radio-${Date.now()}`;
+            mix.title = `${decodeHtml(query)} Radio`;
+
+            playInstantMix(mix);
         } catch {
             showToast("Failed to start radio", "error");
         }

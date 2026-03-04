@@ -103,9 +103,11 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
         const song = track.song;
         totalWeight += weight;
 
-        // Language
-        const lang = song?.language?.toLowerCase() || 'english';
-        langVotes.set(lang, (langVotes.get(lang) || 0) + weight);
+        // Language — only vote if language metadata exists
+        const lang = song?.language?.toLowerCase();
+        if (lang) {
+            langVotes.set(lang, (langVotes.get(lang) || 0) + weight);
+        }
 
         // Artist (first artist only, cleaned)
         const artist = cleanArtistName(track.artist);
@@ -119,9 +121,11 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
             albums.set(albumName, (albums.get(albumName) || 0) + weight);
         }
 
-        // Year
-        const year = parseInt(song?.year || '') || new Date().getFullYear();
-        totalYear += year * weight;
+        // Year - Ignore blank years [Phase 5]
+        const year = parseInt(song?.year || '');
+        if (year && year > 1900 && year <= new Date().getFullYear()) {
+            totalYear += year * weight;
+        }
 
         // Duration
         totalDuration += (track.duration || song?.duration || 240) * weight;
@@ -142,11 +146,14 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
         }
     }
 
+    // Handle edge case where no year was valid
+    const finalYear = totalYear > 0 ? totalYear * normFactor : new Date().getFullYear();
+
     return {
         language: dominantLang,
         artists,
         albums,
-        avgYear: Math.round(totalYear * normFactor),
+        avgYear: Math.round(finalYear),
         avgDuration: Math.round(totalDuration * normFactor),
     };
 }
@@ -181,15 +188,20 @@ export function scoreCandidates(
             dedup: 0,
         };
 
-        // --- Language (HARD BLOCK) ---
+        // --- Language (SOFT BLOCK) ---
+        // [Phase 5] Only Hard-Block if language exists and is definitively WRONG
         const trackLang = song?.language?.toLowerCase() || '';
-        if (!trackLang || trackLang !== context.language) {
-            // Missing or wrong language = impossible to select
+        if (trackLang && trackLang !== context.language && trackLang !== 'english') {
             breakdown.language = -Infinity;
             scored.push({ track, score: -Infinity, breakdown });
             continue;
+        } else if (!trackLang) {
+            // Missing language metadata: 0 points, but allowed to exist (Fallback safety)
+            breakdown.language = 0;
+        } else {
+            // Matching language
+            breakdown.language = SCORE_WEIGHTS.LANGUAGE;
         }
-        breakdown.language = SCORE_WEIGHTS.LANGUAGE;
 
         // --- Artist Affinity (0-20) ---
         const artist = cleanArtistName(track.artist);
