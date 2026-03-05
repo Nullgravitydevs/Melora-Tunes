@@ -88,7 +88,8 @@ async function cacheFirst(request, cacheName) {
 
     try {
         const response = await fetch(request);
-        if (response.ok) {
+        // Skip caching 206 Partial Content (audio streams) — Cache API rejects them
+        if (response.ok && response.status !== 206) {
             const cache = await caches.open(cacheName);
             cache.put(request, response.clone());
         }
@@ -104,7 +105,7 @@ async function cacheFirst(request, cacheName) {
 async function networkFirstWithCache(request, cacheName, maxAgeSec) {
     try {
         const response = await fetch(request);
-        if (response.ok) {
+        if (response.ok && response.status !== 206) {
             const cache = await caches.open(cacheName);
             cache.put(request, response.clone());
         }
@@ -125,7 +126,7 @@ async function networkFirstWithCache(request, cacheName, maxAgeSec) {
 async function networkFirstWithFallback(request) {
     try {
         const response = await fetch(request);
-        if (response.ok) {
+        if (response.ok && response.status !== 206) {
             const cache = await caches.open(STATIC_CACHE);
             cache.put(request, response.clone());
         }

@@ -20,7 +20,9 @@ interface TrackContextMenuProps {
     onDownload: (song: JioSaavnSong) => void;
     onRemoveDownload: (songId: string) => void;
     onAddToPlaylist: (song: JioSaavnSong) => void;
+    onAddToOfflinePlaylist?: (song: JioSaavnSong) => void;
     onRemoveFromPlaylist?: (song: JioSaavnSong) => void;
+    onStartRadio?: (song: JioSaavnSong) => void;
 }
 
 export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
@@ -37,7 +39,9 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
     onDownload,
     onRemoveDownload,
     onAddToPlaylist,
-    onRemoveFromPlaylist
+    onAddToOfflinePlaylist,
+    onRemoveFromPlaylist,
+    onStartRadio
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     const { startRadio } = usePlayback();
@@ -93,10 +97,14 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 
                     <MenuItem icon={<Play size={14} />} label="Play Now" onClick={() => { onPlay(song); onClose(); }} />
                     <MenuItem icon={<ListPlus size={14} />} label="Add to Queue" onClick={() => { onAddToQueue(song); onClose(); }} />
-                    <MenuItem icon={<Radio size={14} />} label="Start Radio" onClick={() => { startRadio(song); onClose(); }} />
+                    <MenuItem icon={<Radio size={14} />} label="Start Radio" onClick={() => { onStartRadio ? onStartRadio(song) : startRadio(song); onClose(); }} />
                     <MenuItem icon={<ListMusic size={14} />} label="Add to Playlist" onClick={() => { onAddToPlaylist(song); onClose(); }} />
 
-                    <div className="h-px bg-white/10 my-0.5" />
+                    {isDownloaded && onAddToOfflinePlaylist && (
+                        <MenuItem icon={<ListPlus size={14} />} label="Add to Offline Playlist" onClick={() => { onAddToOfflinePlaylist(song); onClose(); }} />
+                    )}
+
+                    <div className="border-t border-white/10 my-1" />
 
                     <MenuItem icon={<User size={14} />} label="Go to Artist" onClick={() => {
                         // Try multiple paths for artist ID

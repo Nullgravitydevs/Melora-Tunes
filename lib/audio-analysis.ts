@@ -31,16 +31,12 @@ function estimateKeyFromChroma(chroma: number[]): string {
 }
 
 
-export async function analyzeAudioOffline(url: string): Promise<AudioAnalysisResult | null> {
+export async function analyzeAudioOffline(url: string, signal?: AbortSignal): Promise<AudioAnalysisResult | null> {
     try {
         console.log(`[AudioAnalysis] Starting offline analysis for: ${url}`);
 
-        // 1. Fetch a snippet of the audio (e.g., first 30 seconds to save bandwidth/compute)
-        // Note: For accurate BPM, we don't need the whole song. 
-        // We can fetch a partial range if the server supports it, or just fetch the whole thing and take a slice.
-        // JioSaavn URLs might not support HTTP Range requests reliably, but let's fetch it as an ArrayBuffer.
-
-        const response = await fetch(url);
+        // 1. Fetch audio (abortable if user skips, bypass SW cache)
+        const response = await fetch(url, { signal, cache: 'no-store' });
         if (!response.ok) throw new Error("Failed to fetch audio for analysis");
 
         const arrayBuffer = await response.arrayBuffer();
@@ -75,8 +71,10 @@ export async function analyzeAudioOffline(url: string): Promise<AudioAnalysisRes
 
         return { bpm, key: 'Unknown' };
 
-    } catch (e) {
-        console.error("[AudioAnalysis] Failed:", e);
+    } catch (e: any) {
+        if (e.name !== 'AbortError') {
+            console.error("[AudioAnalysis] Failed:", e);
+        }
         return null; // Silent fail, don't break playback
     }
 }

@@ -2,7 +2,92 @@
 import { AudioQuality, PlayableTrack, isPlayableTrack } from "@/lib/types";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 
-// Upgrade helper
+/**
+ * Clean and normalize a song title for semantic comparison.
+ * Removes common trailing junk like "- Telugu", "(From Movie)", etc.
+ * Examples:
+ * "Sahana Sahana (From The Rajasaab) - Telugu" -> "sahana sahana"
+ * "Chuttamalle" -> "chuttamalle"
+ */
+export function normalizeSongTitle(title: string): string {
+    if (!title) return '';
+
+    let cleaned = title.toLowerCase().trim();
+
+    // 1. Remove anything after a hyphen if it looks like a language or version tag
+    // e.g. "Song Name - Telugu", "Song Name - Lofi Flip"
+    const dashIndex = cleaned.lastIndexOf('-');
+    if (dashIndex > 0) {
+        cleaned = cleaned.substring(0, dashIndex).trim();
+    }
+
+    // 2. Remove parenthetical phrases at the end (often movies or features)
+    // e.g. "Song Name (From Movie)", "Song Name (feat. Artist)"
+    cleaned = cleaned.replace(/\s*\([^)]+\)\s*$/g, '').trim();
+
+    // 3. Remove bracket phrases at the end
+    cleaned = cleaned.replace(/\s*\[[^\]]+\]\s*$/g, '').trim();
+
+    return cleaned;
+}
+
+/**
+ * Clean and normalize artist name for comparison.
+ * "Thaman S, Shreya Ghoshal" → "thaman s"
+ */
+export function cleanArtistName(raw: string): string {
+    if (!raw) return '';
+    return raw
+        .split(/[,&;|-]/)[0]        // First artist only
+        .replace(/\(.*?\)/g, '')    // Remove parentheses
+        .trim()
+        .toLowerCase();
+}
+
+/**
+ * Check if two raw artist strings have any overlapping artists.
+ * Used for semantic deduplication (e.g. duet flips).
+ */
+export function checkArtistOverlap(raw1: string, raw2: string): boolean {
+    if (!raw1 || !raw2) return false;
+    const list1 = raw1.toLowerCase().split(/[,&;|-]/).map(s => s.replace(/\(.*?\)/g, '').trim()).filter(Boolean);
+    const list2 = raw2.toLowerCase().split(/[,&;|-]/).map(s => s.replace(/\(.*?\)/g, '').trim()).filter(Boolean);
+    return list1.some(a => list2.includes(a));
+}
+
+/**
+ * Deduplicate an array of tracks (PlayableTrack or JioSaavnSong) semantically.
+ * Keeps the FIRST occurrence of a track and removes subsequent semantic duplicates.
+ */
+export function deduplicateQueue<T>(tracks: T[]): T[] {
+    const unique: T[] = [];
+
+    for (const track of tracks) {
+        const tAny = track as any;
+        // Extract inner song object safely
+        const innerSong = tAny?.song || tAny;
+
+        const title = normalizeSongTitle(tAny.title || innerSong?.name || innerSong?.title || '');
+        const artist = innerSong?.primaryArtists || tAny.artist || '';
+
+        // To deduplicate efficiently, we check against already added unique tracks.
+        const isDuplicate = unique.some(existing => {
+            const eAny = existing as any;
+            const eInner = eAny?.song || eAny;
+            const eTitle = normalizeSongTitle(eAny.title || eInner?.name || eInner?.title || '');
+            if (eTitle !== title) return false;
+
+            const eArtist = eInner?.primaryArtists || eAny.artist || '';
+            return checkArtistOverlap(eArtist, artist);
+        });
+
+        if (!isDuplicate) {
+            unique.push(track);
+        }
+    }
+    return unique;
+}
+
 export function ensurePlayableTrack(song: any, defaultQuality: AudioQuality = '320'): PlayableTrack {
     // 1. If it's explicitly a PlayableTrack (Strict Check)
     if (isPlayableTrack(song)) {

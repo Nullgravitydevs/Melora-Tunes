@@ -28,12 +28,29 @@ interface FullPlayerProps {
 }
 
 export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddToPlaylist }: FullPlayerProps) {
-    const { currentSong, isPlaying, togglePlay, next, prev, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, queue, currentIndex, playIndex, activeQuality, qualityPreference, setQualityPreference, setQueue, addToQueue, activeMixId } = usePlayback();
+    const { currentSong, currentTrack, isPlaying, togglePlay, next, prev, duration, seek, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, queue, currentIndex, playIndex, activeQuality, qualityPreference, setQualityPreference, forceCurrentSongQuality, setQueue, addToQueue, activeMixId } = usePlayback();
     const { isLiked, toggleLike, removeDownload, isDownloaded, mixes } = useLibrary();
     const { downloadSong } = usePlayback();
     const { showToast } = useUI();
 
     const [viewMode, setViewMode] = useState<'art' | 'queue'>('art');
+
+    const [showQualityMenu, setShowQualityMenu] = useState(false);
+    const qualityMenuRef = useRef<HTMLDivElement>(null);
+
+    const hasHiFi = useMemo(() => {
+        return currentTrack?.sources?.some(s => s.provider === 'tidal' || s.provider === 'qobuz') ?? false;
+    }, [currentTrack]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (qualityMenuRef.current && !qualityMenuRef.current.contains(event.target as Node)) {
+                setShowQualityMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     /* ── Queue Virtualization ── */
     const queueParentRef = useRef<HTMLDivElement>(null);
@@ -275,10 +292,46 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                             {/* Minimal Quality Badge */}
                                             {(() => {
                                                 const q = activeQuality || qualityPreference;
-                                                if (q === 'hires') return <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md"><Disc3 size={10} /> Hi-Res Lossless</div>;
-                                                if (q === 'flac') return <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md"><Disc3 size={10} /> Lossless</div>;
-                                                if (q === '320') return <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/60 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md">High Quality</div>;
-                                                return null;
+                                                return <div className="mt-2 inline-flex flex-wrap items-center gap-2 relative" ref={qualityMenuRef}>
+                                                    <button onClick={() => setShowQualityMenu(!showQualityMenu)} className="focus:outline-none">
+                                                        {q === 'hires' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-amber-500/20 transition-colors"><Disc3 size={10} /> Hi-Res Lossless</div>}
+                                                        {q === 'flac' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-blue-500/20 transition-colors"><Disc3 size={10} /> Lossless</div>}
+                                                        {q === '320' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/60 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-white/10 transition-colors">High Quality</div>}
+                                                        {(q === '160' || q === '96') && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/60 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-white/10 transition-colors">Standard</div>}
+                                                    </button>
+
+                                                    <AnimatePresence>
+                                                        {showQualityMenu && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                                transition={{ duration: 0.15 }}
+                                                                className="absolute top-full left-0 mt-2 w-48 bg-[#1a1a1a]/95 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100]"
+                                                            >
+                                                                <div className="p-2 flex flex-col gap-1">
+                                                                    <div className="px-2 py-1 text-[10px] font-bold text-white/40 uppercase tracking-wider">Stream Quality</div>
+                                                                    {hasHiFi && (
+                                                                        <>
+                                                                            <button onClick={() => { forceCurrentSongQuality('hires'); setShowQualityMenu(false); }} className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${q === 'hires' ? 'bg-amber-500/20 text-amber-400' : 'text-white hover:bg-white/10'}`}><Disc3 size={14} /> Hi-Res Lossless</button>
+                                                                            <button onClick={() => { forceCurrentSongQuality('flac'); setShowQualityMenu(false); }} className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${q === 'flac' ? 'bg-blue-500/20 text-blue-400' : 'text-white hover:bg-white/10'}`}><Disc3 size={14} /> Lossless (FLAC)</button>
+                                                                        </>
+                                                                    )}
+                                                                    <button onClick={() => { forceCurrentSongQuality('320'); setShowQualityMenu(false); }} className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${q === '320' ? 'bg-white/20 text-white' : 'text-white hover:bg-white/10'}`}>High (320kbps)</button>
+                                                                    <button onClick={() => { forceCurrentSongQuality('160'); setShowQualityMenu(false); }} className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${q === '160' ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}>Standard (160kbps)</button>
+                                                                    <button onClick={() => { forceCurrentSongQuality('96'); setShowQualityMenu(false); }} className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${q === '96' ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10'}`}>Data Saver (96kbps)</button>
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+
+                                                    {/* AutoPlay Context Badge */}
+                                                    {(currentSong as any)._meta?.isAutoplay && (
+                                                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-cyan-500/20 text-cyan-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md pointer-events-none">
+                                                            <Radio size={10} /> AutoPlay
+                                                        </div>
+                                                    )}
+                                                </div>;
                                             })()}
                                         </div>
                                         <div className="flex gap-2">
@@ -390,7 +443,13 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                                         <img src={getArt(nextTrack)} alt="" className="w-10 h-10 rounded-lg object-cover opacity-80 group-hover/upnext:opacity-100 transition-opacity" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-0.5 drop-shadow-sm">Up Next</p>
+                                        {nextTrack._meta?.isAutoplay ? (
+                                            <p className="text-[9px] font-black text-cyan-400/80 uppercase tracking-[0.2em] mb-0.5 drop-shadow-sm flex items-center gap-1">
+                                                <Radio size={8} /> AutoPlay Pick
+                                            </p>
+                                        ) : (
+                                            <p className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-0.5 drop-shadow-sm">Up Next</p>
+                                        )}
                                         <div className="flex items-center justify-between">
                                             <p className="text-xs font-bold text-white/95 truncate mr-2 drop-shadow-sm">{decodeHtml(nextTrack.name || (nextTrack as any).title)}</p>
                                             <Play size={12} fill="currentColor" className="text-white/0 group-hover/upnext:text-white/50 transition-all duration-300 -ml-2 group-hover/upnext:ml-0" />
@@ -409,7 +468,6 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
                         onAddToQueue={(song) => { addToQueue(song); }}
                         onGoToArtist={(id) => onGoToArtist?.(id)}
                         onGoToAlbum={(id) => onGoToAlbum?.(id)}
-                        onStartRadio={() => { }}
                         isDownloaded={isDownloaded(currentSong.id)}
                         onDownload={() => downloadSong(currentSong)}
                         onRemoveDownload={() => removeDownload(currentSong.id)}

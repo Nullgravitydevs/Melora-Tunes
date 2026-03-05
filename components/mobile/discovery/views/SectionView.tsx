@@ -114,10 +114,10 @@ export function SectionView({ section, onBack, onNavigate }: Props) {
         const existing = mixes.find((m) => m.id === mixId);
         if (existing) {
             updateMix(mixId, { songs, currentSongIndex: index });
-            loadMix(mixId);
+            loadMix(mixId, index);
         } else {
             addMix({ id: mixId, title: sectionTitle, color: "white", songs, currentSongIndex: index });
-            loadMix(mixId);
+            loadMix(mixId, index);
         }
     };
 

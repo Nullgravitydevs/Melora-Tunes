@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, Disc3, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw, ListPlus } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, ArrowLeft, Disc, Disc3, MoreHorizontal, Clock, Pin as PinIcon, Trash2, AlertCircle, RefreshCcw, ListPlus, Download } from "lucide-react";
 import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { getPlaylistDetails, JioSaavnSong } from "@/lib/jiosaavn";
 import { PlayableTrack } from "@/lib/types";
@@ -21,7 +21,7 @@ interface PlaylistViewProps {
 }
 
 export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: PlaylistViewProps) {
-    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin, qualityPreference } = usePlayback();
+    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin, qualityPreference, downloadSongs } = usePlayback();
     const { addMix, updateMix, deleteMix, mixes, toggleLike, isLiked, isDownloaded } = useLibrary();
     const { showToast } = useUI();
 
@@ -316,6 +316,17 @@ export function PlaylistView({ playlist, onBack, onNavigate, onContextMenu }: Pl
                     whileTap={{ scale: 0.9 }}
                 >
                     <Heart size={18} />
+                </motion.button>
+
+                {/* Download All */}
+                <motion.button
+                    onClick={() => downloadSongs(filteredSongs)}
+                    className="p-3 rounded-full bg-white/10 hover:bg-teal-500/20 hover:text-teal-400 text-white transition-colors"
+                    whileTap={{ scale: 0.9 }}
+                    title="Download All"
+                    disabled={filteredSongs.length === 0}
+                >
+                    <Download size={18} />
                 </motion.button>
 
                 {/* Delete Playlist (User Only) */}

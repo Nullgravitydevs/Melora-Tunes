@@ -38,6 +38,7 @@
   ],
   "exclude": [
     "node_modules",
-    "competitor_repos"
+    "competitor_repos",
+    "competitors"
   ]
 }

@@ -13,6 +13,7 @@ export interface AppSettings {
     notificationsEnabled?: boolean;
     crossfadeDuration?: number;
     playbackSpeed?: number;
+    downloadDirectory?: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {

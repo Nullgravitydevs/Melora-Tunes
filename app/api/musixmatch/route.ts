@@ -42,11 +42,12 @@ export async function GET(request: NextRequest) {
     ];
 
     let lastError = null;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
 
     try {
         for (const apiUrl of endpoints) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8_000); // 8s per endpoint
+
             try {
                 const res = await fetch(apiUrl, {
                     signal: controller.signal,
@@ -59,6 +60,8 @@ export async function GET(request: NextRequest) {
                         'Accept-Language': 'en-US,en;q=0.9'
                     }
                 });
+
+                clearTimeout(timeout);
 
                 if (res.status === 404 || res.status === 403 || res.status === 401) {
                     lastError = new Error(`Upstream ${res.status}`);
@@ -91,7 +94,11 @@ export async function GET(request: NextRequest) {
                 return addSecurityHeaders(response);
 
             } catch (e: any) {
-                if (e.name === 'AbortError') throw e;
+                clearTimeout(timeout);
+                if (e.name === 'AbortError') {
+                    lastError = new Error(`Upstream timed out`);
+                    continue; // Try next endpoint
+                }
                 lastError = e;
             }
         }
@@ -102,14 +109,9 @@ export async function GET(request: NextRequest) {
         }, { status: 502 });
 
     } catch (error: any) {
-        if (error.name === 'AbortError') {
-            return NextResponse.json({ error: 'Request timed out' }, { status: 504 });
-        }
         return NextResponse.json({
             error: 'All upstreams failed',
-            details: error?.message
+            details: error?.message || String(error)
         }, { status: 502 });
-    } finally {
-        clearTimeout(timeout);
     }
 }

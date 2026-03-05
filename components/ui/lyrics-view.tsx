@@ -113,8 +113,22 @@ export const LyricsView: React.FC<LyricsViewProps> = ({ currentSong, currentTime
                         ))}
                     </div>
                 ) : (
-                    <div className="whitespace-pre-wrap text-center text-xl text-white/80 leading-loose">
-                        {plainLyrics || "No lyrics found."}
+                    <div className="flex flex-col gap-6 py-[50vh]">
+                        {(plainLyrics || "No lyrics found.").split('\n').filter(l => l.trim().length > 0).map((line, i) => {
+                            const isHeader = /^\[.*\]$/.test(line.trim()) || /^(Verse|Chorus|Bridge|Outro|Intro)/i.test(line.trim());
+                            return (
+                                <motion.p
+                                    key={i}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.05 }}
+                                    className={`text-2xl md:text-3xl font-bold text-center px-4 ${isHeader ? 'text-white/20 text-lg md:text-xl uppercase tracking-widest mt-4' : 'text-white/70'
+                                        }`}
+                                >
+                                    {line}
+                                </motion.p>
+                            );
+                        })}
                     </div>
                 )}
             </div>

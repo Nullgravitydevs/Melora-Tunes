@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Shuffle, Heart, ArrowLeft, MoreHorizontal, Clock, Disc3, AlertCircle, RefreshCcw } from "lucide-react";
+import { Play, Pause, Shuffle, Heart, ArrowLeft, MoreHorizontal, Clock, Disc3, AlertCircle, RefreshCcw, Download } from "lucide-react";
 import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { getAlbumDetails, getArtistDetails, JioSaavnSong, searchAlbums } from "@/lib/jiosaavn";
 import { shuffleArray, getArt } from "@/lib/helpers";
@@ -17,7 +17,7 @@ interface AlbumViewProps {
 }
 
 export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumViewProps) {
-    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin } = usePlayback();
+    const { loadMix, currentSong, isPlaying, togglePlay, activeMixId, togglePin, downloadSongs } = usePlayback();
     const { addMix, updateMix, toggleSaveAlbum, isAlbumSaved, mixes } = useLibrary();
     const { showToast } = useUI();
 
@@ -178,6 +178,16 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                                         />
                                     )}
                                 </div>
+                            </motion.button>
+                            {/* Download All */}
+                            <motion.button
+                                onClick={() => downloadSongs(songs)}
+                                className="w-9 h-9 rounded-full bg-black border border-white/10 flex items-center justify-center hover:border-teal-500/50 hover:text-teal-400 text-white/80 transition-colors"
+                                whileTap={{ scale: 0.9 }}
+                                title="Download All"
+                                disabled={songs.length === 0}
+                            >
+                                <Download size={16} />
                             </motion.button>
                         </div>
                     </div>

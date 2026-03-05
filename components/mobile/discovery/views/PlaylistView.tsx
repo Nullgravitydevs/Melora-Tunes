@@ -112,14 +112,15 @@ export function PlaylistView({ playlist, onBack, onNavigate }: Props) {
     const playSongs = (index: number, shuffled = false) => {
         if (tracks.length === 0) return;
         const list = shuffled ? shuffleArray(tracks) : tracks;
+        const selectedIndex = shuffled ? 0 : index;
         const mixId = playlistId || `playlist-${Date.now()}`;
         const existing = mixes.find((m) => m.id === mixId);
         if (existing) {
-            updateMix(mixId, { songs: list, currentSongIndex: shuffled ? 0 : index });
-            loadMix(mixId);
+            updateMix(mixId, { songs: list, currentSongIndex: selectedIndex });
+            loadMix(mixId, selectedIndex);
         } else {
-            addMix({ id: mixId, title: playlistName, color: "white", songs: list, currentSongIndex: shuffled ? 0 : index });
-            loadMix(mixId);
+            addMix({ id: mixId, title: playlistName, color: "white", songs: list, currentSongIndex: selectedIndex });
+            loadMix(mixId, selectedIndex);
         }
     };
 

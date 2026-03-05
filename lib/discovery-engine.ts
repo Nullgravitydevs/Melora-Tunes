@@ -17,7 +17,8 @@ import { getTrending, searchSongs, getSongDetails, getAlbumSongs } from './jiosa
 import { searchUnified } from './unified-search';
 import { Mix } from '@/lib/types';
 import { ensurePlayableTrack } from '@/lib/track-utils';
-import { buildSessionContext, scoreCandidates, applyDiversityFilter } from './scoring-engine';
+import { buildSessionContext, scoreCandidates, applyDiversityFilter, inferGenre } from './scoring-engine';
+import { loadSettings } from '@/lib/settings';
 import type { AudioQuality } from './types';
 
 // --- STRICT NORMALIZATION (kept for backward compat) ---
@@ -61,43 +62,57 @@ export class DiscoveryEngine {
         const startTime = Date.now();
         const quality = seed.preferredQuality || '320';
 
+        // ── Read user's preferred languages from Settings ──
+        const userSettings = loadSettings();
+        const userLanguages: string[] = userSettings?.languages || ['english'];
+        const primaryUserLang = userLanguages[0] || 'english';
+
         // ── Layer 1: Session Context (Session Drift — 2G) ──
-        // Uses last 5 played tracks for context so radio evolves naturally
-        // Instead of being seed-locked, recommendations drift with the session
         const history = HistoryStore.getHistory();
-        const contextHistory = history.length > 0 ? history.slice(0, 5) : [];
+
+        // [GAPLESS FIX] The currently playing 'seed' song is NOT in HistoryStore yet 
+        // because it just started. If we don't inject it here, the engine 
+        // will build its context exclusively around the user's PREVIOUS session.
+        const seedHistoryItem = { id: 'seed', track: seed, playedAt: Date.now() };
+        const contextHistory = [seedHistoryItem, ...history.slice(0, 4)];
+
         const context = buildSessionContext(contextHistory);
 
-        // If no history, use seed's language or region as context language
-        if (history.length === 0 && seed.song?.language) {
-            context.language = seed.song.language.toLowerCase();
-        } else if (history.length === 0 && region) {
-            context.language = region.toLowerCase();
+        // [BUG FIX #2] If context.language is empty, use the user's preferred language
+        if (!context.language) {
+            context.language = primaryUserLang;
         }
 
-        const seedLang = seed.song?.language?.toLowerCase() || context.language;
+        // [BUG FIX #3] Never allow empty/unknown language — always fall back to user pref
+        const seedLang = seed.song?.language?.toLowerCase() || context.language || primaryUserLang;
         const seedArtist = (seed.artist || '').split(/[,&]/)[0].trim();
         const seedAlbumId = seed.song?.album?.id || '';
 
-        console.log(`🎧 [Autoplay] Session: lang=${context.language}, artist=${seedArtist}, album=${seed.song?.album?.name || 'none'}, era=${context.avgYear}`);
+        console.log(`🎧 [Autoplay] Session: lang=${context.language}, genre=${context.genre || 'none'}, artist=${seedArtist}, album=${seed.song?.album?.name || 'none'}, era=${context.avgYear}`);
 
-        // ── Layer 2: Fetch Candidates (3 Tiers, parallel) ──
-        const [albumTracks, artistTracks, languageTracks, trendingTracks] = await Promise.all([
+        // ── Layer 2: Fetch Candidates (5 Tiers, parallel) ──
+        const [albumTracks, artistTracks, languageTracks, trendingTracks, moodTracks] = await Promise.all([
             this.fetchAlbumCandidates(seedAlbumId, seed.id, quality),
             this.fetchArtistCandidates(seedArtist, seedLang, quality),
             this.fetchLanguageCandidates(seedLang, context.avgYear, quality),
             this.fetchTrendingCandidates(seedLang, quality),
+            this.fetchMoodCandidates(seedLang, context.genre, quality),
         ]);
 
-        const allRaw = [...albumTracks, ...artistTracks, ...languageTracks, ...trendingTracks];
+        const allRaw = [...albumTracks, ...artistTracks, ...languageTracks, ...trendingTracks, ...moodTracks];
 
         // Cross-tier dedup: prevent same track from being scored multiple times
+        // Use semantic key so same song under different IDs does not leak through.
         const uniqueMap = new Map<string, PlayableTrack>();
         for (const t of allRaw) {
-            if (!uniqueMap.has(t.id)) uniqueMap.set(t.id, t);
+            const semanticKey = normalizeIdentity(
+                t.title || t.song?.name || '',
+                t.artist || t.song?.primaryArtists || ''
+            );
+            if (!uniqueMap.has(semanticKey)) uniqueMap.set(semanticKey, t);
         }
         const allCandidates = Array.from(uniqueMap.values());
-        console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, trending=${trendingTracks.length}, unique=${allCandidates.length}`);
+        console.log(`🎧 [Autoplay] Candidates: album=${albumTracks.length}, artist=${artistTracks.length}, language=${languageTracks.length}, trending=${trendingTracks.length}, mood=${moodTracks.length}, unique=${allCandidates.length}`);
 
         // ── Layer 3: Score ──
         // 2E: Use last 200 played IDs (not 50) to prevent repeats in 3+ hour sessions
@@ -231,6 +246,11 @@ export class DiscoveryEngine {
         if (!language) return [];
 
         try {
+            // [V2 Fix 1] Pick language randomly from user's preferred languages
+            const userSettings = loadSettings();
+            const userLangs: string[] = userSettings?.languages || [language];
+            const searchLang = userLangs[Math.floor(Math.random() * userLangs.length)] || language;
+
             // Build a query that targets the right era, pass language to API
             const currentYear = new Date().getFullYear();
             // [Phase 3] Randomize queries to break deterministic repetition loops
@@ -239,9 +259,9 @@ export class DiscoveryEngine {
                 : [`${avgYear} hits`, `${avgYear} songs`, `best of ${avgYear}`, `${avgYear} popular`];
             const eraKeyword = eraKeywords[Math.floor(Math.random() * eraKeywords.length)];
             const page = 1 + Math.floor(Math.random() * 3); // Randomize page 1-3
-            const query = `${language} ${eraKeyword}`;
+            const query = `${searchLang} ${eraKeyword}`;
 
-            const songs = await searchSongs(query, page, 20, language);
+            const songs = await searchSongs(query, page, 20, searchLang);
             return (songs || [])
                 .filter(s => isCleanTrack(s.name || ''))
                 .slice(0, 20)
@@ -261,16 +281,68 @@ export class DiscoveryEngine {
         quality: AudioQuality,
     ): Promise<PlayableTrack[]> {
         try {
+            // [LOOPHOLE FIX #5] Also accept songs matching any of user's preferred languages
+            const userSettings = loadSettings();
+            const userLangs = new Set((userSettings?.languages || []).map((l: string) => l.toLowerCase()));
+            if (language) userLangs.add(language);
+
             const trending = await getTrending();
             return (trending || [])
                 .filter(s => {
                     const lang = (s as any).language?.toLowerCase() || '';
-                    return (!language || lang === language || !lang) && isCleanTrack(s.name || '');
+                    // Only allow songs whose language matches user's preferences (or has no tag)
+                    return (userLangs.has(lang) || !lang) && isCleanTrack(s.name || '');
                 })
                 .slice(0, 15)
                 .map(s => ensurePlayableTrack(s, quality));
         } catch (e) {
             console.warn('[Autoplay] Trending fetch failed:', e);
+            return [];
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // PRIVATE: Tier 5 — Mood/Genre-Aware Search
+    // ──────────────────────────────────────────────
+
+    private static async fetchMoodCandidates(
+        language: string,
+        genre: string,
+        quality: AudioQuality,
+    ): Promise<PlayableTrack[]> {
+        if (!genre) return []; // No mood detected, skip
+
+        try {
+            // Pick language randomly from user's preferred languages
+            const userSettings = loadSettings();
+            const userLangs: string[] = userSettings?.languages || [language];
+            const searchLang = userLangs[Math.floor(Math.random() * userLangs.length)] || language;
+
+            // Genre-specific search queries for richer results
+            const moodQueries: Record<string, string[]> = {
+                romantic: ['romantic songs', 'love songs', 'romantic melody'],
+                sad: ['sad songs', 'heartbreak songs', 'emotional songs'],
+                party: ['party songs', 'dance hits', 'party anthems'],
+                devotional: ['devotional songs', 'bhakti songs', 'spiritual songs'],
+                chill: ['chill songs', 'lo-fi songs', 'acoustic songs'],
+                hiphop: ['hip hop songs', 'rap songs', 'rap hits'],
+                retro: ['classic songs', 'evergreen hits', 'golden hits'],
+                workout: ['workout songs', 'gym songs', 'motivation songs'],
+                melody: ['melody songs', 'soulful songs', 'melodious hits'],
+            };
+
+            const queries = moodQueries[genre] || [`${genre} songs`];
+            const query = `${searchLang} ${queries[Math.floor(Math.random() * queries.length)]}`;
+            const page = 1 + Math.floor(Math.random() * 2);
+
+            console.log(`🎧 [Autoplay] Mood search: "${query}" (genre: ${genre})`);
+            const songs = await searchSongs(query, page, 15, searchLang);
+            return (songs || [])
+                .filter(s => isCleanTrack(s.name || ''))
+                .slice(0, 15)
+                .map(s => ensurePlayableTrack(s, quality));
+        } catch (e) {
+            console.warn('[Autoplay] Mood fetch failed:', e);
             return [];
         }
     }
@@ -289,25 +361,40 @@ export class DiscoveryEngine {
     ): PlayableTrack[] {
         const history = HistoryStore.getHistory();
 
-        // 1. Try unplayed history tracks (played before but not in recent 50)
-        const unplayed = history
-            .filter(h => !recentIds.has(h.track.id))
-            .slice(0, 10)
-            .map(h => h.track);
+        // [BUG FIX #1] Title-level dedup to prevent "Gangsta's Paradise" x3
+        const seenTitles = new Set<string>();
+        const dedupByTitle = (tracks: PlayableTrack[]): PlayableTrack[] => {
+            return tracks.filter(t => {
+                const key = normalizeIdentity(t.title || '', t.artist || '');
+                if (seenTitles.has(key)) return false;
+                seenTitles.add(key);
+                return true;
+            });
+        };
+
+        // 1. Try unplayed history tracks (played before but not in recent 200)
+        const unplayed = dedupByTitle(
+            history
+                .filter(h => !recentIds.has(h.track.id))
+                .slice(0, 20)
+                .map(h => h.track)
+        ).slice(0, 10);
 
         if (unplayed.length > 0) {
-            console.log(`🎧 [Autoplay] Emergency: using ${unplayed.length} unplayed history tracks`);
+            console.log(`🎧 [Autoplay] Emergency: using ${unplayed.length} unique unplayed history tracks`);
             return unplayed;
         }
 
-        // 2. Last resort: replay least-recent tracks (safe loop)
-        const leastRecent = history
-            .slice(-10)
-            .reverse()
-            .map(h => h.track);
+        // 2. Last resort: replay least-recent tracks with dedup
+        const leastRecent = dedupByTitle(
+            history
+                .slice(-20)
+                .reverse()
+                .map(h => h.track)
+        ).slice(0, 10);
 
         if (leastRecent.length > 0) {
-            console.log(`🎧 [Autoplay] Emergency: replaying ${leastRecent.length} least-recent tracks`);
+            console.log(`🎧 [Autoplay] Emergency: replaying ${leastRecent.length} unique least-recent tracks`);
             return leastRecent;
         }
 

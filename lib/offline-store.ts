@@ -8,6 +8,9 @@ export interface OfflineSong {
     blob: Blob;
     metadata: JioSaavnSong;
     savedAt: number;
+    downloadedAt?: number;
+    fileSize?: number;
+    qualityLabel?: string;
 }
 
 const DB_NAME = 'MeloraOfflineDB';
@@ -71,13 +74,24 @@ class OfflineDB {
             const response = await fetch(url);
             const blob = await response.blob();
 
+            // 3. Determine quality label
+            let qualityLabel = 'Standard';
+            if (quality === 'hires') qualityLabel = 'Hi-Res Lossless';
+            else if (quality === 'flac') qualityLabel = 'Lossless (FLAC)';
+            else if (quality === '320') qualityLabel = 'High Quality (320kbps)';
+            else if (quality === '160') qualityLabel = 'Standard (160kbps)';
+            else if (quality === '96') qualityLabel = 'Data Saver (96kbps)';
+
             const record: OfflineSong = {
                 id: this.getCompositeId(song.id, quality),
                 songId: song.id,
                 quality,
                 blob,
                 metadata: song,
-                savedAt: Date.now()
+                savedAt: Date.now(),
+                downloadedAt: Date.now(),
+                fileSize: blob.size,
+                qualityLabel
             };
 
             const db = await this.open();
@@ -220,6 +234,14 @@ class OfflineDB {
      * For UI display of "Downloaded Songs"
      */
     async getAllDownloadedSongs(): Promise<JioSaavnSong[]> {
+        const records = await this.getAllDownloadedDetails();
+        return records.map(r => r.metadata);
+    }
+
+    /**
+     * Returns full offline song details (for UI displaying quality, sizes, etc)
+     */
+    async getAllDownloadedDetails(): Promise<OfflineSong[]> {
         const db = await this.open();
         return new Promise((resolve, reject) => {
             const tx = db.transaction(STORE_NAME, 'readonly');
@@ -228,11 +250,14 @@ class OfflineDB {
 
             req.onsuccess = () => {
                 const records = req.result as OfflineSong[];
-                // Deduplicate by songId, taking the first one found
-                const map = new Map<string, JioSaavnSong>();
+                // Deduplicate by songId, taking the highest quality (or first found)
+                const map = new Map<string, OfflineSong>();
                 records.forEach(r => {
                     if (!map.has(r.songId)) {
-                        map.set(r.songId, r.metadata);
+                        map.set(r.songId, r);
+                    } else {
+                        // Could add logic here to prefer 'flac' over '320' if multiple downloaded
+                        // For now just keep first
                     }
                 });
                 resolve(Array.from(map.values()));

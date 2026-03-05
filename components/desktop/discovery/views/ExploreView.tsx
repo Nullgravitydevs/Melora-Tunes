@@ -45,13 +45,16 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (isCancelled?: () => boolean) => {
+        if (isCancelled?.()) return;
         // Use cache if <5 min old
         if (globalExploreCache && Date.now() - globalExploreCache.ts < 300000) {
+            if (isCancelled?.()) return;
             setContent(globalExploreCache.data);
             setLoading(false);
             return;
         }
+        if (isCancelled?.()) return;
         setLoading(true);
         try {
             const settings = loadSettings();
@@ -88,16 +91,25 @@ export function ExploreView({ onNavigate, initialMode = 'explore', onContextMenu
                 tollywood: tolly,
                 hollywood: holly
             };
+            if (isCancelled?.()) return;
             setContent(newContent);
             globalExploreCache = { data: newContent, ts: Date.now() };
         } catch {
-            setError("Failed to load global discovery content.");
+            if (!isCancelled?.()) {
+                setError("Failed to load global discovery content.");
+            }
         }
-        finally { setLoading(false) }
+        finally {
+            if (!isCancelled?.()) {
+                setLoading(false);
+            }
+        }
     }, []);
 
     useEffect(() => {
-        loadData();
+        let cancelled = false;
+        loadData(() => cancelled);
+        return () => { cancelled = true; };
     }, [loadData]);
 
     const handleRetry = () => {

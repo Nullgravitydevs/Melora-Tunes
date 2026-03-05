@@ -6,7 +6,6 @@ import { Play, ChevronRight, Radio, Globe, Sparkles, Headphones, Music } from "l
 import { searchSongs, searchPlaylists, searchAlbums, searchArtists, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
-import { shuffleArray } from "@/lib/helpers";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 interface Props { onNavigate: (v: ViewState) => void }
@@ -48,7 +47,7 @@ export function ExploreTab({ onNavigate }: Props) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
-    const { playInstantMix } = usePlayback();
+    const { playInstantMix, startRadio } = usePlayback();
 
     useEffect(() => {
         let cancelled = false;
@@ -93,21 +92,6 @@ export function ExploreTab({ onNavigate }: Props) {
         return () => { cancelled = true; };
     }, [retryCount]);
 
-    const startRadio = async (query: string, title: string) => {
-        try {
-            const songs = await searchSongs(query, 1, 30);
-            if (songs.length > 0) {
-                playInstantMix({
-                    id: `radio-${Date.now()}`,
-                    title: `${title} Radio`,
-                    color: "white",
-                    songs: shuffleArray(songs),
-                    currentSongIndex: 0,
-                });
-            }
-        } catch { }
-    };
-
     if (isLoading) {
         return (
             <div className="p-5 pt-14">
@@ -144,7 +128,7 @@ export function ExploreTab({ onNavigate }: Props) {
             {/* Radio stations hero */}
             <div className="px-5 mb-7">
                 <button
-                    onClick={() => startRadio("top hits 2026", "Melora FM")}
+                    onClick={() => startRadio("top hits 2026")}
                     className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 active:bg-white/[0.05] transition-colors"
                 >
                     <div className="flex items-center gap-3">
@@ -169,7 +153,7 @@ export function ExploreTab({ onNavigate }: Props) {
                     {data.artistRadio.map((artist) => (
                         <button
                             key={artist.name}
-                            onClick={() => startRadio(artist.query, artist.name)}
+                            onClick={() => startRadio(artist.query)}
                             className="flex-shrink-0 flex flex-col items-center w-[80px] active:scale-95 transition-transform"
                         >
                             <div className="w-[72px] h-[72px] rounded-full overflow-hidden bg-white/[0.04] border border-white/[0.06] mb-2">
@@ -187,7 +171,7 @@ export function ExploreTab({ onNavigate }: Props) {
                     {DECADE_STATIONS.map((d) => (
                         <button
                             key={d.name}
-                            onClick={() => startRadio(d.query, d.name)}
+                            onClick={() => startRadio(d.query)}
                             className="flex-1 h-20 bg-white/[0.03] border border-white/[0.05] rounded-xl flex flex-col items-center justify-center gap-1 active:bg-white/[0.06] transition-colors"
                         >
                             <span className="text-lg font-black text-white/70">{d.era}</span>
@@ -203,7 +187,7 @@ export function ExploreTab({ onNavigate }: Props) {
                     {VIBE_STATIONS.map((v) => (
                         <button
                             key={v.name}
-                            onClick={() => startRadio(v.query, v.name)}
+                            onClick={() => startRadio(v.query)}
                             className="flex-1 h-20 bg-white/[0.03] border border-white/[0.05] rounded-xl flex flex-col items-center justify-center gap-1.5 active:bg-white/[0.06] transition-colors"
                         >
                             <v.icon size={18} className="text-white/40" />

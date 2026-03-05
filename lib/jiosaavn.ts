@@ -447,53 +447,81 @@ export async function getLyrics(songId: string): Promise<string | null> {
 }
 
 export async function getLyricsWithFallback(song: JioSaavnSong): Promise<string | null> {
-    const jiosaavnLyrics = await getLyrics(song.id);
-    if (jiosaavnLyrics && jiosaavnLyrics.trim().length > 0) {
-        return jiosaavnLyrics;
-    }
+    // [FIX] Priority: Synced lyrics FIRST, then plain text as last resort.
+    // Old code returned JioSaavn plain text immediately and never tried synced sources.
 
-    // Try LRCLib (returns syncedLyrics / plainLyrics)
+    // Step 1: Try LRCLib for SYNCED lyrics (best Apple-style experience)
     try {
-        console.log('JioSaavn failed, trying LRCLib fallback...');
+        console.log('Trying LRCLib for synced lyrics...');
         const albumName = song.album?.name || '';
         const durationStr = song.duration ? String(song.duration) : '';
         let lrcUrl = `/api/lyrics-fallback?track=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.primaryArtists)}`;
         if (albumName) lrcUrl += `&album=${encodeURIComponent(albumName)}`;
         if (durationStr) lrcUrl += `&duration=${durationStr}`;
+        if (song.language) lrcUrl += `&language=${encodeURIComponent(song.language)}`;
         const response = await fetch(lrcUrl);
         if (response.ok) {
             const data = await response.json();
-            // LRCLib returns syncedLyrics (LRC format) and plainLyrics
             if (data.syncedLyrics && data.syncedLyrics.trim().length > 0) {
-                console.log('Found synced lyrics from LRCLib!');
+                console.log('✓ Found synced lyrics from LRCLib!');
                 return data.syncedLyrics;
             }
+            // Hold LRCLib plain for later comparison, don't return yet
             if (data.plainLyrics && data.plainLyrics.trim().length > 0) {
-                console.log('Found plain lyrics from LRCLib!');
-                return data.plainLyrics;
+                console.log('Found plain lyrics from LRCLib, checking Musixmatch for synced...');
             }
         }
     } catch (error) {
-        console.error('LRCLib fallback failed:', error);
+        console.error('LRCLib failed:', error);
     }
 
-    // Try Musixmatch
+    // Step 2: Try Musixmatch for SYNCED lyrics
     try {
-        console.log('LRCLib failed, trying Musixmatch fallback...');
+        console.log('Trying Musixmatch for synced lyrics...');
         const { Musixmatch } = await import('@/lib/musixmatch');
         const mx = new Musixmatch();
         const result = await mx.getSyncedLyrics(
             song.name,
             song.primaryArtists || '',
-            song.duration ? parseInt(String(song.duration)) : 0
+            song.duration ? parseInt(String(song.duration)) : 0,
+            song.language
         );
         if (result && result.text && result.text.trim().length > 0) {
-            console.log(`Found ${result.synced ? 'synced' : 'plain'} lyrics from Musixmatch!`);
+            console.log(`✓ Found ${result.synced ? 'synced' : 'plain'} lyrics from Musixmatch!`);
             return result.text;
         }
     } catch (error) {
-        console.error('Musixmatch fallback failed:', error);
+        console.error('Musixmatch failed:', error);
     }
+
+    // Step 3: Fall back to JioSaavn plain text (no timestamps, but at least shows lyrics)
+    try {
+        const jiosaavnLyrics = await getLyrics(song.id);
+        if (jiosaavnLyrics && jiosaavnLyrics.trim().length > 0) {
+            console.log('✓ Using JioSaavn plain lyrics as final fallback.');
+            return jiosaavnLyrics;
+        }
+    } catch (error) {
+        console.error('JioSaavn lyrics failed:', error);
+    }
+
+    // Step 4: Try LRCLib plain text as absolute last resort
+    try {
+        const albumName = song.album?.name || '';
+        const durationStr = song.duration ? String(song.duration) : '';
+        let lrcUrl = `/api/lyrics-fallback?track=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.primaryArtists)}`;
+        if (albumName) lrcUrl += `&album=${encodeURIComponent(albumName)}`;
+        if (durationStr) lrcUrl += `&duration=${durationStr}`;
+        if (song.language) lrcUrl += `&language=${encodeURIComponent(song.language)}`;
+        const response = await fetch(lrcUrl);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.plainLyrics && data.plainLyrics.trim().length > 0) {
+                console.log('✓ Using LRCLib plain lyrics as absolute fallback.');
+                return data.plainLyrics;
+            }
+        }
+    } catch (error) { /* silent */ }
 
     return null;
 }
@@ -729,10 +757,21 @@ export async function getSyncedLyrics(song: JioSaavnSong): Promise<{ synced: boo
         if (typeof window !== 'undefined') {
             try {
                 const { get } = await import('idb-keyval');
-                const cached = await get(CACHE_KEY);
+                const cached = await get(CACHE_KEY) as { synced: boolean; text: string | null; cachedAt?: number } | undefined;
                 if (cached) {
-                    console.log('Returned cached lyrics for', song.id);
-                    return cached;
+                    // [FIX] Only trust cache if it has synced lyrics.
+                    // If cached result is plain text, re-fetch to give synced sources a chance.
+                    if (cached.synced) {
+                        console.log('Returned cached SYNCED lyrics for', song.id);
+                        return cached;
+                    }
+                    // Plain cache is stale-while-revalidate: use if < 24h, but still re-fetch
+                    const age = cached.cachedAt ? Date.now() - cached.cachedAt : Infinity;
+                    if (age < 86400000) { // 24 hours
+                        console.log('Cached plain lyrics found, re-fetching for synced in background...');
+                        // Still return cached plain for now, but trigger background re-fetch
+                        // Actually: let's just skip cache and try fresh for better UX
+                    }
                 }
             } catch (e) { }
         }
@@ -742,7 +781,7 @@ export async function getSyncedLyrics(song: JioSaavnSong): Promise<{ synced: boo
 
         // Check if it looks like LRC
         const isSynced = /\[\d{2}:\d{2}\.\d{2,3}\]/.test(text);
-        const result = { synced: isSynced, text };
+        const result = { synced: isSynced, text, cachedAt: Date.now() };
 
         if (typeof window !== 'undefined') {
             try {
@@ -991,10 +1030,7 @@ export function fixImageUrl(url: string, quality: string): string {
     if (url.includes('jioimages.cdn.jio.com')) return url; // Don't touch Jio cdn
 
     // Ensure https
-    let finalUrl = url;
-    if (finalUrl.startsWith('http://')) {
-        finalUrl = finalUrl.replace('http://', 'https://');
-    }
+    let finalUrl = url.replace(/http:\/\//g, 'https://');
 
     // Generic replacement for saavncdn
     return finalUrl.replace(/150x150|50x50|500x500/g, quality);

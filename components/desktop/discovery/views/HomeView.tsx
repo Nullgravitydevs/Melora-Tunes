@@ -442,7 +442,8 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
     // Keep ref in sync
     useEffect(() => { heroSongRef.current = heroSong; }, [heroSong]);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (isCancelled?: () => boolean) => {
+        if (isCancelled?.()) return;
         let storedLangs = ['english'];
         let name = "";
         try {
@@ -456,27 +457,32 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
             }
         } catch { /* ignored */ }
 
+        if (isCancelled?.()) return;
         setUserName(name);
 
         const validLangs = storedLangs.map(l => l.toLowerCase().trim()).filter(Boolean);
         // Sort languages for consistent cache key ("english,telugu" === "telugu,english")
         const sortedForCache = [...validLangs].sort().join(',') || 'english';
         const langString = validLangs.join(',') || 'english';
+        if (isCancelled?.()) return;
         setDisplayLangs(validLangs.map(l => l.charAt(0).toUpperCase() + l.slice(1)));
 
         if (globalHomeCache && globalHomeCache.lang === sortedForCache && Date.now() - globalHomeCache.ts < CACHE_TTL) {
+            if (isCancelled?.()) return;
             setLaunchData(globalHomeCache.data);
             const pool = deduplicate([...(globalHomeCache.data.new_trending || []), ...((globalHomeCache.data.new_albums || []) as JioSaavnSong[])]);
             if (pool.length > 0) {
                 if (!globalHeroSong) {
                     globalHeroSong = pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
                 }
+                if (isCancelled?.()) return;
                 setHeroSong(globalHeroSong);
             }
             setLoading(false);
             return;
         }
 
+        if (isCancelled?.()) return;
         setLoading(true);
         setError(null);
         try {
@@ -489,27 +495,37 @@ export function HomeView({ onNavigate, onPlaySong, currentSongId, isPlaying, onC
             data.retro = deduplicate(data.retro || []);
             data.top_playlists = deduplicate(data.top_playlists || []);
 
+            if (isCancelled?.()) return;
             setLaunchData(data);
             globalHomeCache = { data, lang: sortedForCache, ts: Date.now() };
 
             const pool = deduplicate([...(data.new_trending || []), ...((data.new_albums || []) as JioSaavnSong[])]);
             if (pool.length > 0) {
                 globalHeroSong = pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
+                if (isCancelled?.()) return;
                 setHeroSong(globalHeroSong);
             }
         } catch (e) {
             console.error("HomeView fetch error:", e);
-            setError("Failed to load content.");
+            if (!isCancelled?.()) {
+                setError("Failed to load content.");
+            }
         } finally {
-            setLoading(false);
+            if (!isCancelled?.()) {
+                setLoading(false);
+            }
         }
     }, []); // No heroSong dependency — use heroSongRef instead
 
     useEffect(() => {
-        fetchData();
-        const handler = () => { globalHomeCache = null; globalHeroSong = null; fetchData(); };
+        let cancelled = false;
+        fetchData(() => cancelled);
+        const handler = () => { globalHomeCache = null; globalHeroSong = null; fetchData(() => cancelled); };
         window.addEventListener('melora-settings-changed', handler);
-        return () => window.removeEventListener('melora-settings-changed', handler);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('melora-settings-changed', handler);
+        };
     }, [fetchData]);
 
     // Create carousel items from the top playlist of each selected language in BestOf

@@ -5,6 +5,8 @@ import { PlayableTrack, PlayableSource, AudioQuality, QualityFilterType } from '
 
 // ... (Normalization Helpers remain same, importing from types changed)
 
+import { normalizeSongTitle, checkArtistOverlap } from './track-utils';
+
 // --- Normalization Helpers ---
 
 /**
@@ -138,20 +140,18 @@ export async function searchUnified(
 
     // Helper: Find existing track using Fuzzy Match
     const findMatch = (title: string, artist: string, duration: number): PlayableTrack | undefined => {
-        const normTitle = normalizeStr(title);
-        const normArtist = normalizeArtist(artist);
+        const normTitle = normalizeSongTitle(title);
         const rawTitleLower = title.toLowerCase();
 
         return uniqueTracks.find(t => {
             if (!t.song) return false;
-            const tTitle = normalizeStr(t.song.name);
-            const tArtist = normalizeArtist(t.song.primaryArtists);
+            const tTitle = normalizeSongTitle(t.song.name);
 
             // 1. Title Match
             if (tTitle !== normTitle) return false;
 
             // 2. Artist Match
-            if (tArtist !== normArtist) return false;
+            if (!checkArtistOverlap(t.song.primaryArtists, artist)) return false;
 
             // 3. Anti-Merge Guard — check raw titles, not normalized (normalizeStr strips these keywords)
             const keywords = ['live', 'remix', 'demo', 'acoustic', 'cover', 'reprised', 'edited'];

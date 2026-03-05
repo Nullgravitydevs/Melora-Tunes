@@ -78,10 +78,10 @@ export function SearchTab({ onNavigate }: Props) {
         const existing = mixes.find((m) => m.id === mixId);
         if (existing) {
             updateMix(mixId, { songs: results, currentSongIndex: index });
-            loadMix(mixId);
+            loadMix(mixId, index);
         } else {
             addMix({ id: mixId, title: "Search Results", color: "white", songs: results, currentSongIndex: index });
-            loadMix(mixId);
+            loadMix(mixId, index);
         }
     };
 

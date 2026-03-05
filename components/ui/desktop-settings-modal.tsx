@@ -2,12 +2,14 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Database, Info, Layout, Disc, Radio, Monitor, Zap, Volume2, Moon, Heart, Coffee, Github, MessageCircle, Server, User } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { usePlayback, useLibrary, useUI } from "@/components/providers/playback-context";
 import { useSettings } from "@/components/providers/settings-provider";
 import { FREQUENCIES } from "@/hooks/useEqualizer";
 import { factoryReset } from "@/lib/cleanup";
 import { AppSettings, loadSettings, saveSettings } from "@/lib/settings";
+import { getStats, getTopSongs, getTopArtists, GlobalStats, SongStats } from "@/lib/stats";
+import { formatDuration } from "@/lib/helpers";
 
 interface DesktopSettingsModalProps {
     isOpen: boolean;
@@ -101,6 +103,7 @@ function sanitizeSettings(value: unknown): Partial<AppSettings> {
     if (Array.isArray(value.languages) && value.languages.every((l) => typeof l === 'string')) out.languages = value.languages;
     if (typeof value.stopAtEndOfSong === 'boolean') out.stopAtEndOfSong = value.stopAtEndOfSong;
     if (typeof value.notificationsEnabled === 'boolean') out.notificationsEnabled = value.notificationsEnabled;
+    if (hasString(value.downloadDirectory)) out.downloadDirectory = value.downloadDirectory;
 
     return out;
 }
@@ -187,6 +190,20 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     // Profile State
     const [profileName, setProfileName] = useState(initialSettings.userName || "");
     const [profileDOB, setProfileDOB] = useState(initialSettings.userDOB || "");
+    const [downloadDir, setDownloadDir] = useState(initialSettings.downloadDirectory || "");
+
+    // Stats State
+    const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+    const [topSongs, setTopSongs] = useState<SongStats[]>([]);
+    const [topArtists, setTopArtists] = useState<{ name: string, plays: number }[]>([]);
+
+    useEffect(() => {
+        if (activeTab === 'stats') {
+            setGlobalStats(getStats());
+            setTopSongs(getTopSongs(5));
+            setTopArtists(getTopArtists(5));
+        }
+    }, [activeTab]);
 
     const currentCounts = {
         mixes: mixes.length,
@@ -733,6 +750,35 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                             </div>
                                         )}
 
+                                        <div className="p-6 bg-zinc-900/40 rounded-2xl border border-white/5 space-y-4">
+                                            <div>
+                                                <div className="text-white font-bold flex items-center gap-2">
+                                                    Storage Location
+                                                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full uppercase tracking-wide">Desktop App</span>
+                                                </div>
+                                                <div className="text-zinc-500 text-sm mt-1">Choose where offline music and cache are downloaded.</div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="text"
+                                                    value={downloadDir}
+                                                    onChange={(e) => setDownloadDir(e.target.value)}
+                                                    onBlur={() => saveSettings({ downloadDirectory: downloadDir })}
+                                                    placeholder="C:\Users\Name\Music\Melora"
+                                                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm font-mono"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        // Fallback for web until Tauri is bridged
+                                                        showToast("Folder picker is native-only. Please manually enter a path.", "info");
+                                                    }}
+                                                    className="px-4 py-3 bg-white/5 text-white rounded-xl border border-white/10 font-bold hover:bg-white/10 transition-colors whitespace-nowrap"
+                                                >
+                                                    Browse...
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         {pendingImport && (
                                             <div className="p-6 bg-amber-500/10 rounded-2xl border border-amber-500/20 space-y-4">
                                                 <div className="text-amber-300 font-bold">Confirm Restore</div>
@@ -834,32 +880,94 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                             {activeTab === 'stats' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <header>
-                                        <h1 className="text-3xl font-bold text-white mb-2">Statistics</h1>
-                                        <p className="text-zinc-500">Your listening DNA.</p>
+                                        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                                            Statistics
+                                            <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1 font-bold rounded-full uppercase tracking-widest mt-1">Premium Analytics</span>
+                                        </h1>
+                                        <p className="text-zinc-500">Your listening DNA recorded entirely locally.</p>
                                     </header>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {/* Top Level Cards */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         {[
-                                            { label: 'Total Mixes', value: mixes.length },
-                                            { label: 'Total Songs', value: mixes.reduce((acc, m) => acc + m.songs.length, 0) },
-                                            { label: 'Liked Songs', value: likedSongs.length },
-                                            { label: 'Recently Played', value: recentlyPlayed.length },
-                                            { label: 'Saved Albums', value: savedAlbums.length },
-                                            { label: 'Followed Artists', value: savedArtists.length },
-                                        ].map(s => (
-                                            <div key={s.label} className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5">
-                                                <div className="text-4xl font-extrabold text-white mb-1">{s.value}</div>
-                                                <div className="text-xs uppercase tracking-widest text-zinc-500">{s.label}</div>
-                                            </div>
-                                        ))}
+                                            { label: 'Total Plays', value: globalStats?.totalPlays || 0, icon: Disc },
+                                            { label: 'Time Listened', value: formatDuration(globalStats?.totalTime || 0), icon: Monitor },
+                                            { label: 'Saved Songs', value: likedSongs.length, icon: Heart },
+                                            { label: 'Curated Mixes', value: mixes.length, icon: Radio },
+                                        ].map((s, i) => {
+                                            const Icon = s.icon;
+                                            return (
+                                                <div key={i} className="bg-zinc-900/40 p-5 rounded-2xl border border-white/5 relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                        <Icon size={48} />
+                                                    </div>
+                                                    <div className="text-3xl font-extrabold text-white mb-1 tracking-tight">{s.value}</div>
+                                                    <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{s.label}</div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
 
-                                    <div className="p-6 bg-zinc-900/30 border border-white/5 rounded-2xl">
-                                        <div className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">Quick Insight</div>
-                                        <p className="text-sm text-zinc-300 leading-relaxed">
-                                            You have {mixes.length} mixes with {mixes.reduce((acc, m) => acc + m.songs.length, 0)} total songs.
-                                            {likedSongs.length > 0 ? ` ${likedSongs.length} songs are liked.` : ' Start liking tracks to train your taste profile.'}
-                                        </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Top Songs */}
+                                        <div className="bg-zinc-900/40 p-6 rounded-3xl border border-white/5 shadow-xl">
+                                            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-6 flex items-center justify-between">
+                                                Top Tracks
+                                                <span className="text-xs font-mono text-white/30 truncate block max-w-32 text-right">ALL TIME</span>
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {topSongs.length > 0 ? topSongs.map((song, idx) => (
+                                                    <div key={song.id} className="flex items-center gap-4 group">
+                                                        <div className="w-6 text-center text-xs font-bold text-zinc-600 group-hover:text-white transition-colors">{idx + 1}</div>
+                                                        <img src={song.image || 'https://via.placeholder.com/150'} className="w-10 h-10 rounded-lg object-cover bg-white/10" alt="" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-white font-medium text-sm truncate">{song.name}</div>
+                                                            <div className="text-zinc-500 text-xs truncate">{song.artist}</div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-white font-bold text-sm tracking-tight">{song.plays}</div>
+                                                            <div className="text-[9px] uppercase tracking-widest text-zinc-600 font-bold">Plays</div>
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="text-center py-8 text-zinc-600 text-sm">No listening history yet.</div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Top Artists & Quick Insight */}
+                                        <div className="space-y-6 flex flex-col">
+                                            <div className="bg-zinc-900/40 p-6 rounded-3xl border border-white/5 shadow-xl flex-1">
+                                                <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-6">Top Artists</h3>
+                                                <div className="space-y-4">
+                                                    {topArtists.length > 0 ? topArtists.map((artist, idx) => (
+                                                        <div key={artist.name + idx} className="flex items-center gap-4 text-sm">
+                                                            <div className="flex-1 truncate font-medium text-white/90">{artist.name}</div>
+                                                            <div className="text-xs font-bold bg-white/5 px-2 py-1 rounded text-white/70">{artist.plays} plays</div>
+                                                        </div>
+                                                    )) : (
+                                                        <div className="text-center py-6 text-zinc-600 text-sm">No artist data.</div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-3xl mt-auto">
+                                                <div className="flex items-start gap-4">
+                                                    <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-1">
+                                                        <Zap size={20} fill="currentColor" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-1">Your Vibe</div>
+                                                        <p className="text-sm text-indigo-200/70 leading-relaxed font-medium">
+                                                            {globalStats && globalStats.totalPlays > 100
+                                                                ? `You are an avid listener! You've streamed ${formatDuration(globalStats.totalTime)} of pure audio across ${globalStats.totalPlays} tracks.`
+                                                                : `You're just getting started. Keep playing music to build your unique Melora acoustic profile.`}
+                                                            {likedSongs.length > 0 ? ` Your library is growing with ${likedSongs.length} favorites.` : ' Start liking tracks to catalog your taste.'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}

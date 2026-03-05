@@ -3,8 +3,6 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from 'react';
 
 interface AudioPlayerProps {
-    url: string | null;
-    nextUrl?: string | null;
     playing: boolean;
     volume: number;
     speed?: number;
@@ -32,13 +30,13 @@ export interface AudioPlayerRef {
     getCurrentTime: () => number;
     play: () => void;
     pause: () => void;
+    playNext: (url: string) => void;
+    prebuffer: (url: string) => void;
     setVolume: (vol: number) => void;
     getAnalyser: () => AnalyserNode | null;
 }
 
 export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
-    url,
-    nextUrl,
     playing,
     volume,
     speed = 1,
@@ -284,120 +282,134 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
             const active = getActive();
             if (active) active.volume = vol;
         },
-        getAnalyser: () => analyserRef.current
-    }));
+        getAnalyser: () => analyserRef.current,
+        prebuffer: (prebufferUrl: string) => {
+            const inactive = getInactive();
+            if (!inactive || !prebufferUrl) return;
 
-    // Handle URL changes (The core Gapless Logic)
-    useEffect(() => {
-        const active = getActive();
-        const inactive = getInactive();
+            // Prevent reloading if already loaded
+            if (inactive.src === prebufferUrl || inactive.src.endsWith(prebufferUrl)) return;
 
-        if (!active || !inactive) return;
+            // Cleanup inactive blob before preloading new one
+            if (inactive.src.startsWith('blob:') && inactive.src !== prebufferUrl) {
+                URL.revokeObjectURL(inactive.src);
+            }
 
-        // Check if the requested URL is already loaded in the inactive player (Preloaded)
-        // We compare checks cleanly to avoid relative/absolute URL mismatches
-        const isPreloaded = inactive.src === url || (url && inactive.src.endsWith(url));
+            console.log("Preloading next:", prebufferUrl);
+            inactive.src = prebufferUrl;
 
-        if (isPreloaded && url) {
-            console.log("⚡ Gapless Switch!", crossfadeDuration > 0 ? `(Crossfading ${crossfadeDuration}s)` : "");
+            // [LOOPHOLE FIX #8] Catch CORS/network errors during preload
+            inactive.onerror = () => {
+                console.warn('[AudioPlayer] Preload failed (CORS/network), clearing prebuffer');
+                inactive.removeAttribute('src');
+                inactive.load(); // Reset the element
+                inactive.onerror = null;
+            };
 
-            // CRITICAL: Block onEnded events during switch to prevent race condition
-            switchingRef.current = true;
-            lastUrlChangeRef.current = Date.now();
-            setActiveId(prev => prev === 'primary' ? 'secondary' : 'primary');
+            inactive.load();
+        },
+        playNext: (newUrl: string) => {
+            const active = getActive();
+            const inactive = getInactive();
 
-            const oldActive = active;
-            const newActive = inactive;
+            if (!active || !inactive) return;
 
-            if (playing) {
-                if (crossfadeDuration > 0) {
-                    const ctx = audioContextRef.current;
-                    const oldGain = gainRefs.current.get(oldActive);
-                    const newGain = gainRefs.current.get(newActive);
-                    const durationMs = crossfadeDuration * 1000;
+            // Check if the requested URL is already loaded in the inactive player (Preloaded)
+            const isPreloaded = inactive.src === newUrl || (newUrl && inactive.src.endsWith(newUrl));
 
-                    if (ctx && oldGain && newGain && ctx.state === 'running') {
-                        // Web Audio API Ramping (Runs beautifully in background tabs)
-                        newActive.volume = 1.0;
-                        oldActive.volume = 1.0;
+            if (isPreloaded && newUrl) {
+                console.log("⚡ Gapless Switch!", crossfadeDuration > 0 ? `(Crossfading ${crossfadeDuration}s)` : "");
 
-                        const now = ctx.currentTime;
+                // CRITICAL: Block onEnded events during switch to prevent race condition
+                switchingRef.current = true;
+                lastUrlChangeRef.current = Date.now();
+                setActiveId(prev => prev === 'primary' ? 'secondary' : 'primary');
 
-                        oldGain.gain.cancelScheduledValues(now);
-                        newGain.gain.cancelScheduledValues(now);
+                const oldActive = active;
+                const newActive = inactive;
 
-                        oldGain.gain.setValueAtTime(oldGain.gain.value, now);
-                        newGain.gain.setValueAtTime(0, now);
+                if (playing) {
+                    if (crossfadeDuration > 0) {
+                        const ctx = audioContextRef.current;
+                        const oldGain = gainRefs.current.get(oldActive);
+                        const newGain = gainRefs.current.get(newActive);
+                        const durationMs = crossfadeDuration * 1000;
 
-                        oldGain.gain.linearRampToValueAtTime(0, now + durationMs / 1000);
-                        newGain.gain.linearRampToValueAtTime(volume, now + durationMs / 1000);
+                        if (ctx && oldGain && newGain && ctx.state === 'running') {
+                            newActive.volume = 1.0;
+                            oldActive.volume = 1.0;
 
-                        newActive.play().catch(e => console.error(e));
+                            const now = ctx.currentTime;
 
-                        setTimeout(() => {
+                            oldGain.gain.cancelScheduledValues(now);
+                            newGain.gain.cancelScheduledValues(now);
+
+                            oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+                            newGain.gain.setValueAtTime(0, now);
+
+                            oldGain.gain.linearRampToValueAtTime(0, now + durationMs / 1000);
+                            newGain.gain.linearRampToValueAtTime(volume, now + durationMs / 1000);
+
+                            newActive.play().catch(e => console.error(e));
+
+                            setTimeout(() => {
+                                oldActive.pause();
+                                oldActive.currentTime = 0;
+                                if (oldActive.src.startsWith('blob:')) URL.revokeObjectURL(oldActive.src);
+                                setTimeout(() => { switchingRef.current = false; }, 200);
+                            }, durationMs + 100);
+                        } else {
+                            newActive.volume = volume;
+                            newActive.play().catch(e => console.error(e));
                             oldActive.pause();
                             oldActive.currentTime = 0;
                             if (oldActive.src.startsWith('blob:')) URL.revokeObjectURL(oldActive.src);
-                            // Release switch guard after old player is fully cleaned up
-                            setTimeout(() => { switchingRef.current = false; }, 200);
-                        }, durationMs + 100);
+                        }
                     } else {
-                        // Fallback if Context isn't ready
                         newActive.volume = volume;
                         newActive.play().catch(e => console.error(e));
                         oldActive.pause();
                         oldActive.currentTime = 0;
-                        if (oldActive.src.startsWith('blob:')) URL.revokeObjectURL(oldActive.src);
+                        if (oldActive.src.startsWith('blob:')) {
+                            URL.revokeObjectURL(oldActive.src);
+                        }
+                        setTimeout(() => { switchingRef.current = false; }, 200);
                     }
                 } else {
                     newActive.volume = volume;
-                    newActive.play().catch(e => console.error(e));
                     oldActive.pause();
                     oldActive.currentTime = 0;
                     if (oldActive.src.startsWith('blob:')) {
                         URL.revokeObjectURL(oldActive.src);
                     }
-                    // Release switch guard after cleanup
                     setTimeout(() => { switchingRef.current = false; }, 200);
                 }
             } else {
-                newActive.volume = volume;
-                oldActive.pause();
-                oldActive.currentTime = 0;
-                if (oldActive.src.startsWith('blob:')) {
-                    URL.revokeObjectURL(oldActive.src);
+                // Standard load
+                if (newUrl) {
+                    if (active.src.startsWith('blob:') && active.src !== newUrl) {
+                        URL.revokeObjectURL(active.src);
+                    }
+                    lastUrlChangeRef.current = Date.now();
+                    active.pause();
+                    active.src = newUrl;
+                    active.load();
+                    if (playing) {
+                        const playPromise = active.play();
+                        if (playPromise) playPromise.catch(e => { if (e.name !== 'AbortError') console.error(e); });
+                    }
+                } else {
+                    active.pause();
+                    if (active.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(active.src);
+                    }
+                    active.removeAttribute('src');
+                    active.src = "";
+                    active.load();
                 }
-                // Release switch guard after cleanup
-                setTimeout(() => { switchingRef.current = false; }, 200);
-            }
-        } else {
-            // Standard load
-            if (url) {
-                // Cleanup current active blob before replacing
-                if (active.src.startsWith('blob:') && active.src !== url) {
-                    URL.revokeObjectURL(active.src);
-                }
-                lastUrlChangeRef.current = Date.now(); // Block spurious ended events
-                active.pause(); // Always pause before changing src to prevent AbortError
-                active.src = url;
-                active.load();
-                if (playing) {
-                    // Yield a microtask to let the pause() settle before play()
-                    const playPromise = active.play();
-                    if (playPromise) playPromise.catch(e => { if (e.name !== 'AbortError') console.error(e); });
-                }
-            } else {
-                // Unload content
-                active.pause();
-                if (active.src.startsWith('blob:')) {
-                    URL.revokeObjectURL(active.src);
-                }
-                active.removeAttribute('src');
-                active.src = "";
-                active.load();
             }
         }
-    }, [url]);
+    }));
 
     // Handle Component Unmount Cleanup
     useEffect(() => {
@@ -413,28 +425,10 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         };
     }, []); // Intentionally not including deps that would trigger unnecessary re-runs
 
-    // Handle Next URL (Preloading)
-    useEffect(() => {
-        const inactive = getInactive();
-        if (!inactive || !nextUrl) return;
-
-        // Prevent reloading if already loaded
-        if (inactive.src === nextUrl || inactive.src.endsWith(nextUrl)) return;
-
-        // Cleanup inactive blob before preloading new one
-        if (inactive.src.startsWith('blob:') && inactive.src !== nextUrl) {
-            URL.revokeObjectURL(inactive.src);
-        }
-
-        console.log("Preloading next:", nextUrl);
-        inactive.src = nextUrl;
-        inactive.load();
-    }, [nextUrl, activeId]); // When activeId changes, inactive changes, so we might need to preload active's old content? No, nextUrl stays same usually.
-
     // Handle Play/Pause
     useEffect(() => {
         const active = getActive();
-        if (!active || !url) return;
+        if (!active || !active.getAttribute('src')) return;
 
         if (playing) {
             // Use a microtask delay to avoid interrupting a pending pause()
@@ -484,6 +478,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     }, [speed, activeId]);
 
     // Progress Tracking
+    const lastProgressSecondRef = useRef(-1);
     useEffect(() => {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 
@@ -493,23 +488,31 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
             const active = getActive();
             const inactive = getInactive();
             if (active && active.duration) {
-                const played = active.currentTime / active.duration;
-                const remainingSeconds = active.duration - active.currentTime;
+                const playedSeconds = active.currentTime;
+                const currentSecond = Math.floor(playedSeconds);
 
-                onProgress({
-                    played,
-                    playedSeconds: active.currentTime,
-                    loaded: active.buffered.length > 0
-                        ? active.buffered.end(0) / active.duration
-                        : 0,
-                    loadedSeconds: active.buffered.length > 0
-                        ? active.buffered.end(0)
-                        : 0
-                });
+                // [PERF FIX] Throttle progress updates to 1 per second to prevent React render lag
+                if (currentSecond !== lastProgressSecondRef.current) {
+                    lastProgressSecondRef.current = currentSecond;
+
+                    const played = playedSeconds / active.duration;
+                    const remainingSeconds = active.duration - playedSeconds;
+
+                    onProgress({
+                        played,
+                        playedSeconds,
+                        loaded: active.buffered.length > 0
+                            ? active.buffered.end(0) / active.duration
+                            : 0,
+                        loadedSeconds: active.buffered.length > 0
+                            ? active.buffered.end(0)
+                            : 0
+                    });
+                }
 
                 // Safety: If we are effectively at the end (> 99.5%) and playing, trigger end.
                 // This prevents cases where browser doesn't fire 'ended' event due to floating point precision.
-                if (played >= 0.995 && active.duration > 10) { // Only for songs > 10s
+                if (playedSeconds / active.duration >= 0.995 && active.duration > 10) { // Only for songs > 10s
                     // We rely on native onEnded for main logic, but this acts as a failsafe?
                     // Actually, calling onEnded here might cause double-skip if native fires too.
                     // Better to let native handle it, but maybe force a seek to end?
@@ -524,7 +527,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         return () => {
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    }, [playing, onProgress, activeId, nextUrl]);
+    }, [playing, onProgress, activeId]);
 
     // Event Handlers helper
     const handleEvent = (e: React.SyntheticEvent<HTMLAudioElement>, type: 'ended' | 'duration' | 'error' | 'playing') => {

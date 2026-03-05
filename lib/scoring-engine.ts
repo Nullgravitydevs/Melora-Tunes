@@ -12,7 +12,9 @@
 
 import { PlayableTrack, isPlayableTrack } from './types';
 import { JioSaavnSong } from './jiosaavn';
+import { cleanArtistName, normalizeSongTitle, checkArtistOverlap } from './track-utils';
 import { HistoryItem } from './history-store';
+import { loadSettings } from './settings';
 
 // ──────────────────────────────────────────────
 // Types
@@ -24,6 +26,7 @@ export interface SessionContext {
     albums: Map<string, number>;            // Album → weighted frequency (0-1)
     avgYear: number;                        // Weighted average release year
     avgDuration: number;                    // Weighted average duration (seconds)
+    genre: string;                          // Inferred genre/mood (e.g. "romantic", "sad", "party")
 }
 
 export interface ScoredTrack {
@@ -37,6 +40,7 @@ export interface ScoredTrack {
         duration: number;
         popularity: number;
         recency: number;
+        genre: number;
         dedup: number;
     };
 }
@@ -53,11 +57,40 @@ const SCORE_WEIGHTS = {
     LANGUAGE: 40,     // Hard block if mismatch
     ARTIST: 20,     // 0-20
     ALBUM: 15,     // 0 or 15
-    ERA: 10,     // 0-10 (±3 year window)
+    ERA: 15,     // 0-15 (±3 year window) — BOOSTED from 10 for stronger era grouping
     DURATION: 5,     // 0-5 (within ±60s)
     POPULARITY: 5,     // 0-5
     RECENCY: 5,     // 0-5 (favor recent releases)
+    GENRE: 10,     // 0-10 (mood/genre match bonus)
 };
+
+// ──────────────────────────────────────────────
+// Genre/Mood Inference from Metadata
+// ──────────────────────────────────────────────
+
+/** Genre keyword patterns — matched against song name + album name (lowercase) */
+const GENRE_KEYWORDS: Record<string, string[]> = {
+    romantic: ['love', 'romantic', 'romance', 'ishq', 'pyaar', 'prema', 'priya', 'heart', 'dil', 'valentine'],
+    sad: ['sad', 'broken', 'pain', 'cry', 'tears', 'miss', 'alone', 'lonely', 'virah', 'bewafa', 'heartbreak', 'lost'],
+    party: ['party', 'dance', 'club', 'bass', 'dj', 'remix', 'beat', 'groov', 'edm', 'peppy'],
+    devotional: ['bhakti', 'devotional', 'bhajan', 'aarti', 'mantra', 'prayer', 'god', 'temple', 'spiritual'],
+    chill: ['chill', 'lofi', 'lo-fi', 'relax', 'calm', 'peace', 'acoustic', 'unplugged', 'soft', 'soothing'],
+    hiphop: ['rap', 'hip hop', 'hiphop', 'trap', 'bars', 'flow', 'freestyle'],
+    retro: ['retro', 'classic', 'golden', 'evergreen', 'old', 'nostalg', 'vintage', 'timeless'],
+    workout: ['workout', 'gym', 'pump', 'motivation', 'energy', 'power', 'run', 'beast'],
+    melody: ['melody', 'melodious', 'melodic', 'soulful', 'sufi', 'ghazal', 'classical'],
+};
+
+/** Infer genre/mood from song name + album name */
+export function inferGenre(songName: string, albumName: string): string {
+    const text = `${songName} ${albumName}`.toLowerCase();
+    for (const [genre, keywords] of Object.entries(GENRE_KEYWORDS)) {
+        for (const kw of keywords) {
+            if (text.includes(kw)) return genre;
+        }
+    }
+    return ''; // No genre detected
+}
 
 const DEDUP_PENALTY = 100;
 
@@ -89,12 +122,14 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
             albums: new Map(),
             avgYear: new Date().getFullYear(),
             avgDuration: 240,
+            genre: '',
         };
     }
 
     const artists = new Map<string, number>();
     const albums = new Map<string, number>();
     let totalYear = 0;
+    let yearWeightSum = 0;
     let totalDuration = 0;
     let totalWeight = 0;
     const langVotes = new Map<string, number>();
@@ -127,6 +162,7 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
         const year = parseInt(song?.year || '');
         if (year && year > 1900 && year <= new Date().getFullYear()) {
             totalYear += year * weight;
+            yearWeightSum += weight;
         }
 
         // Duration
@@ -139,7 +175,7 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
     for (const [k, v] of albums) albums.set(k, v * normFactor);
 
     // Dominant language (highest weighted vote)
-    let dominantLang = 'english';
+    let dominantLang = '';
     let maxLangWeight = 0;
     for (const [lang, w] of langVotes) {
         if (w > maxLangWeight) {
@@ -148,8 +184,29 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
         }
     }
 
+    // [LOOPHOLE FIX #6] If no language votes, use user's preferred language
+    if (!dominantLang) {
+        const settings = loadSettings();
+        dominantLang = settings?.languages?.[0]?.toLowerCase() || '';
+    }
+
     // Handle edge case where no year was valid
-    const finalYear = totalYear > 0 ? totalYear * normFactor : new Date().getFullYear();
+    const finalYear = yearWeightSum > 0 ? Math.round(totalYear / yearWeightSum) : new Date().getFullYear();
+
+    // Infer dominant genre from recent tracks
+    const genreVotes = new Map<string, number>();
+    for (let i = 0; i < recent.length; i++) {
+        const weight = RECENCY_WEIGHTS[i] ?? 0.05;
+        const track = recent[i].track;
+        const song = track.song;
+        const g = inferGenre(track.title || song?.name || '', song?.album?.name || '');
+        if (g) genreVotes.set(g, (genreVotes.get(g) || 0) + weight);
+    }
+    let dominantGenre = '';
+    let maxGenreWeight = 0;
+    for (const [g, w] of genreVotes) {
+        if (w > maxGenreWeight) { dominantGenre = g; maxGenreWeight = w; }
+    }
 
     return {
         language: dominantLang,
@@ -157,6 +214,7 @@ export function buildSessionContext(history: HistoryItem[]): SessionContext {
         albums,
         avgYear: Math.round(finalYear),
         avgDuration: Math.round(totalDuration * normFactor),
+        genre: dominantGenre,
     };
 }
 
@@ -187,22 +245,36 @@ export function scoreCandidates(
             duration: 0,
             popularity: 0,
             recency: 0,
+            genre: 0,
             dedup: 0,
         };
 
         // --- Language (SOFT BLOCK) ---
-        // [Phase 5] Only Hard-Block if language exists and is definitively WRONG
+        // [V2 Fix 1b] Accept ANY of user's preferred languages, not just context.language
+        const userSettings = loadSettings();
+        const userLangs = new Set<string>((userSettings?.languages || []).map((l: string) => l.toLowerCase()));
+        if (context.language) userLangs.add(context.language);
+
         const trackLang = song?.language?.toLowerCase() || '';
-        if (trackLang && trackLang !== context.language && trackLang !== 'english') {
+        if (trackLang && !userLangs.has(trackLang) && trackLang !== 'english') {
             breakdown.language = -Infinity;
             scored.push({ track, score: -Infinity, breakdown });
             continue;
         } else if (!trackLang) {
-            // Missing language metadata: 0 points, but allowed to exist (Fallback safety)
             breakdown.language = 0;
+        } else if (trackLang === context.language) {
+            breakdown.language = SCORE_WEIGHTS.LANGUAGE; // Full score for session language
         } else {
-            // Matching language
-            breakdown.language = SCORE_WEIGHTS.LANGUAGE;
+            breakdown.language = SCORE_WEIGHTS.LANGUAGE * 0.7; // Slight penalty for non-dominant user language
+        }
+
+        // --- [V2 Fix 4] Popularity Floor — block garbage (nursery rhymes etc.) ---
+        const trackPlayCount = song?.playCount || 0;
+        const seedArtistMatch = context.artists.get(cleanArtistName(track.artist)) || 0;
+        if (trackPlayCount > 0 && trackPlayCount < 10000 && seedArtistMatch === 0) {
+            breakdown.language = -Infinity;
+            scored.push({ track, score: -Infinity, breakdown });
+            continue;
         }
 
         // --- Artist Affinity (0-20) ---
@@ -249,6 +321,16 @@ export function scoreCandidates(
             breakdown.recency = SCORE_WEIGHTS.RECENCY;
         }
 
+        // --- Genre/Mood Match (0-10) ---
+        if (context.genre) {
+            const trackGenre = inferGenre(track.title || song?.name || '', song?.album?.name || '');
+            if (trackGenre === context.genre) {
+                breakdown.genre = SCORE_WEIGHTS.GENRE; // Full match
+            } else if (trackGenre && trackGenre !== context.genre) {
+                breakdown.genre = -SCORE_WEIGHTS.GENRE * 0.3; // Mild penalty for clashing mood
+            }
+        }
+
         // --- Dedup HARD BLOCK (recently played or already in queue) ---
         if (recentIds.has(track.id) || queueIds.has(track.id)) {
             breakdown.dedup = -Infinity;
@@ -264,6 +346,7 @@ export function scoreCandidates(
             + breakdown.duration
             + breakdown.popularity
             + breakdown.recency
+            + breakdown.genre
             + breakdown.dedup;
 
         scored.push({ track, score, breakdown });
@@ -299,15 +382,15 @@ export function applyDiversityFilter(
     if (viable.length === 0) return [];
     if (viable.length <= 3) return viable.map(s => s.track);
 
+
     const selected: PlayableTrack[] = [];
     const albumWindow = new Map<string, number[]>(); // album → positions selected
     let lastArtist = '';
-    let consecutiveSameArtist = 0;
 
-    for (const { track } of viable) {
+    for (const { track, breakdown } of viable) {
         if (selected.length >= targetCount) break;
 
-        const artist = cleanArtistName(track.artist);
+        const artist = cleanArtistName(track.artist || (track.song as any)?.primaryArtists || '');
         const album = track.song?.album?.name?.toLowerCase() || '';
         const pos = selected.length;
 
@@ -325,43 +408,63 @@ export function applyDiversityFilter(
             }
         }
 
-        // Rule 2F: Artist cooldown — max 2 same artist in 8-song window
-        if (artist && selected.length >= 2) {
-            const windowStart = Math.max(0, selected.length - DIVERSITY.ARTIST_COOLDOWN_WINDOW);
-            const recentWindow = selected.slice(windowStart);
-            const artistCount = recentWindow.filter(s => cleanArtistName(s.artist) === artist).length;
-            if (artistCount >= DIVERSITY.MAX_SAME_ARTIST_IN_WINDOW) {
-                continue;
+        const tName = normalizeSongTitle(track.title || (track.song as any)?.name || (track.song as any)?.title || '');
+        const targetRawArtist = track.artist || (track.song as any)?.primaryArtists || '';
+
+        // Skip if we already selected a different version of this same song
+        const isDuplicate = selected.some(s => {
+            const eName = normalizeSongTitle(s.title || (s.song as any)?.name || (s.song as any)?.title || '');
+            if (eName !== tName) return false;
+
+            const eRawArtist = s.artist || (s.song as any)?.primaryArtists || '';
+            return checkArtistOverlap(eRawArtist, targetRawArtist);
+        });
+
+        if (isDuplicate) continue;
+
+        // Count how many from this artist are already selected
+        const artistCount = selected.filter(s => {
+            const sArtist = cleanArtistName((s.song as any)?.primaryArtists || s.artist || '');
+            return sArtist === cleanArtistName(targetRawArtist);
+        }).length;
+
+        // Diversity bounds: max 2 songs from same artist within a 10-song batch
+        if (artistCount < 2) {
+            selected.push(track);
+            lastArtist = artist;
+
+            if (album) {
+                const positions = albumWindow.get(album) || [];
+                positions.push(pos);
+                albumWindow.set(album, positions);
             }
-        }
 
-        // Rule 3: Every 4th must be different from the preceding 3
-        if (pos > 0 && pos % DIVERSITY.FORCED_DIVERSITY_INTERVAL === 0) {
-            const recentArtists = selected.slice(-3).map(s => cleanArtistName(s.artist));
-            if (recentArtists.includes(artist)) {
-                continue; // Force a different artist
+            if (track.song) {
+                (track.song as any).recommendationReason = breakdown;
+            } else {
+                (track as any).recommendationReason = breakdown;
             }
-        }
-
-        // Passed all rules — select this track
-        selected.push(track);
-        lastArtist = artist;
-
-        if (album) {
-            const positions = albumWindow.get(album) || [];
-            positions.push(pos);
-            albumWindow.set(album, positions);
         }
     }
 
     // Fallback: if diversity rules were too strict, fill remaining from top scores
     if (selected.length < targetCount && selected.length < viable.length) {
-        const selectedIds = new Set(selected.map(s => s.id));
         for (const { track } of viable) {
             if (selected.length >= targetCount) break;
-            if (!selectedIds.has(track.id)) {
+
+            const tName = normalizeSongTitle(track.title || (track.song as any)?.name || (track.song as any)?.title || '');
+            const targetRawArtist = track.artist || (track.song as any)?.primaryArtists || '';
+
+            const isDuplicate = selected.some(s => {
+                const eName = normalizeSongTitle(s.title || (s.song as any)?.name || (s.song as any)?.title || '');
+                if (eName !== tName) return false;
+
+                const eRawArtist = s.artist || (s.song as any)?.primaryArtists || '';
+                return checkArtistOverlap(eRawArtist, targetRawArtist);
+            });
+
+            if (!isDuplicate) {
                 selected.push(track);
-                selectedIds.add(track.id);
             }
         }
     }
@@ -369,19 +472,7 @@ export function applyDiversityFilter(
     return selected;
 }
 
+
 // ──────────────────────────────────────────────
 // Utilities
 // ──────────────────────────────────────────────
-
-/**
- * Clean and normalize artist name for comparison.
- * "Thaman S, Shreya Ghoshal" → "thaman s"
- */
-function cleanArtistName(raw: string): string {
-    if (!raw) return '';
-    return raw
-        .split(/[,&]/)[0]          // First artist only
-        .replace(/\(.*?\)/g, '')    // Remove parentheses
-        .trim()
-        .toLowerCase();
-}

@@ -124,17 +124,38 @@ export class Musixmatch {
         this.token = null;
     }
 
-    async getSyncedLyrics(trackName: string, artistName: string, duration: number): Promise<{ synced: boolean, text: string } | null> {
+    async getSyncedLyrics(trackName: string, artistName: string, duration: number, language?: string): Promise<{ synced: boolean, text: string } | null> {
         try {
             // 1. Search Track
-            const searchRes = await this._get("track.search", {
+            const queryParams: Record<string, string> = {
                 q_track: trackName,
                 q_artist: artistName,
                 page_size: "5",
                 page: "1",
                 f_has_lyrics: "1",
                 s_track_rating: "desc"
-            });
+            };
+
+            // Convert common Indian languages to ISO 639-1 codes for Musixmatch
+            const langMap: Record<string, string> = {
+                'hindi': 'hi',
+                'telugu': 'te',
+                'tamil': 'ta',
+                'malayalam': 'ml',
+                'kannada': 'kn',
+                'punjabi': 'pa',
+                'bengali': 'bn',
+                'marathi': 'mr',
+                'gujarati': 'gu',
+                'english': 'en',
+            };
+
+            const mxLang = language ? langMap[language.toLowerCase().trim()] : null;
+            if (mxLang) {
+                queryParams['f_lyrics_language'] = mxLang;
+            }
+
+            const searchRes = await this._get("track.search", queryParams);
             // Also try `q` if specific fields fail? Audion used `q`.
             // Audion: `["q", searchTerm]`
 
@@ -142,27 +163,49 @@ export class Musixmatch {
             let tracks = searchRes.message.body?.track_list || [];
 
             if (tracks.length === 0) {
-                // Try fallback generic search
-                const res2 = await this._get("track.search", {
+                // Try fallback generic search — still include language filter if available
+                const fallbackParams: Record<string, string> = {
                     q: `${trackName} ${artistName}`,
                     page_size: "5",
                     page: "1"
-                });
+                };
+                if (mxLang) fallbackParams['f_lyrics_language'] = mxLang;
+                const res2 = await this._get("track.search", fallbackParams);
                 tracks = res2.message.body?.track_list || [];
+
+                // If language-filtered fallback returns nothing, try without language filter
+                if (tracks.length === 0 && mxLang) {
+                    const res3 = await this._get("track.search", {
+                        q: `${trackName} ${artistName}`,
+                        page_size: "5",
+                        page: "1"
+                    });
+                    tracks = res3.message.body?.track_list || [];
+                }
             }
 
             if (tracks.length === 0) return null;
 
-            // Simple match: First result
-            // Maybe filter by duration?
-            const track = tracks[0].track;
-            // Diff check?
+            // Language-aware track selection: prefer tracks matching the requested language
+            let bestTrack = tracks[0].track;
+            if (mxLang && tracks.length > 1) {
+                const langMatch = tracks.find((t: any) => {
+                    const trackLang = (t.track.track_language || '').toLowerCase();
+                    return trackLang === mxLang || trackLang === (language || '').toLowerCase();
+                });
+                if (langMatch) {
+                    bestTrack = langMatch.track;
+                    console.log(`[Musixmatch] Language-matched track: ${bestTrack.track_name} (${bestTrack.track_language})`);
+                }
+            }
+
+            const track = bestTrack;
+            trackId = String(track.track_id);
+
+            // Duration sanity check
             if (Math.abs((track.track_length || 0) - duration) > 15) {
                 console.warn("[Musixmatch] Duration Mismatch:", track.track_length, duration);
-                // Proceed anyway? Or try next?
-                // Let's rely on search ranking for now.
             }
-            trackId = String(track.track_id);
 
             // 2. Get Subtitles (Synced)
             const subRes = await this._get("track.subtitle.get", {

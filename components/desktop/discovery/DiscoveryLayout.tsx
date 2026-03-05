@@ -19,9 +19,13 @@ import { RadioView } from "./views/RadioView";
 import { DesktopSettingsModal } from "@/components/ui/desktop-settings-modal";
 import { SectionView } from "./views/SectionView";
 import { PeelRevealView } from "./views/PeelRevealView";
+import { OfflinePlaylistView } from "./views/OfflinePlaylistView";
+import { AddToOfflinePlaylistModal } from "./modals/AddToOfflinePlaylistModal";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
+import { DownloadQueuePanel } from "@/components/ui/download-queue-panel";
 import { LanguageModal } from "@/components/desktop/deck/scenes/language-modal";
 import { JioSaavnSong } from "@/lib/jiosaavn";
+import { DownloadView } from "./views/DownloadView";
 import { PlaylistItem } from "@/components/shared/PlaylistItem";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AddToPlaylistModal } from "./modals/AddToPlaylistModal";
@@ -36,7 +40,7 @@ import { useAudioProgress } from "@/hooks/use-audio-progress";
    Monochrome Elegance
    ============================================================================ */
 
-type ViewId = 'home' | 'search' | 'library' | 'explore' | 'radio' | 'artist' | 'album' | 'playlist' | 'settings' | 'trending' | 'albums' | 'charts' | 'retro' | 'editors_picks';
+type ViewId = 'home' | 'search' | 'library' | 'explore' | 'radio' | 'artist' | 'album' | 'playlist' | 'settings' | 'trending' | 'albums' | 'charts' | 'retro' | 'editors_picks' | 'downloads';
 
 interface ViewState {
     id: ViewId | string;
@@ -236,7 +240,7 @@ export function DiscoveryLayout() {
     const [showFullPlayer, setShowFullPlayer] = useState(false);
     const { currentSong, isPlaying, loadMix, playInstantMix, activeMixId, play, togglePin, addToQueue } = usePlayback();
     const { mixes, likedSongs, recentlyPlayed, removeDownload, isDownloaded, addSongToMix, addMix, deleteMix, updateMix, isLiked, toggleLike } = useLibrary();
-    const { downloadSong } = usePlayback();
+    const { downloadSong, downloadQueue } = usePlayback();
     const { showToast } = useUI();
 
     // Context Menu State
@@ -249,6 +253,7 @@ export function DiscoveryLayout() {
 
     // Add to Playlist Modal State
     const [addToPlaylistSong, setAddToPlaylistSong] = useState<JioSaavnSong | PlayableTrack | null>(null);
+    const [addToOfflinePlaylistSong, setAddToOfflinePlaylistSong] = useState<JioSaavnSong | null>(null);
     const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState("New Playlist");
 
@@ -409,6 +414,11 @@ export function DiscoveryLayout() {
                 {addToPlaylistSong && <AddToPlaylistModal song={addToPlaylistSong} onClose={() => setAddToPlaylistSong(null)} />}
             </AnimatePresence>
 
+            {/* ADD TO OFFLINE PLAYLIST MODAL */}
+            <AnimatePresence>
+                {addToOfflinePlaylistSong && <AddToOfflinePlaylistModal song={addToOfflinePlaylistSong} onClose={() => setAddToOfflinePlaylistSong(null)} />}
+            </AnimatePresence>
+
             {/* CREATE PLAYLIST MODAL */}
             <AnimatePresence>
                 {showCreatePlaylist && (
@@ -469,6 +479,7 @@ export function DiscoveryLayout() {
                         <NavItem icon={<Compass size={18} />} label="Explore" active={currentView.id === 'explore'} onClick={() => resetTo({ id: 'explore' })} />
                         <NavItem icon={<Radio size={18} />} label="Radio" active={currentView.id === 'radio'} onClick={() => resetTo({ id: 'radio' })} />
                         <NavItem icon={<Library size={18} />} label="Your Library" active={currentView.id === 'library'} onClick={() => resetTo({ id: 'library' })} />
+                        <NavItem icon={<Download size={18} />} label="Downloads" active={currentView.id === 'downloads'} onClick={() => resetTo({ id: 'downloads' })} />
                     </nav>
 
                     {/* Quick Links */}
@@ -588,10 +599,29 @@ export function DiscoveryLayout() {
                             />
                         )}
 
+                        {currentView.id === 'offline-playlist' && currentView.data && (
+                            <OfflinePlaylistView
+                                playlist={currentView.data}
+                                onBack={handleBack}
+                                onNavigate={handleNavigate}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
+
                         {currentView.id === 'library' && (
                             <LibraryView
                                 onNavigate={handleNavigate}
                                 initialTab={currentView.data?.tab}
+                                onContextMenu={handleContextMenu}
+                            />
+                        )}
+
+                        {currentView.id === 'downloads' && (
+                            <DownloadView
+                                onNavigate={handleNavigate}
+                                onPlaySong={handlePlaySong}
+                                currentSongId={currentSong?.id}
+                                isPlaying={isPlaying}
                                 onContextMenu={handleContextMenu}
                             />
                         )}
@@ -677,6 +707,7 @@ export function DiscoveryLayout() {
                 onDownload={(s) => downloadSong(s)}
                 onRemoveDownload={(id) => removeDownload(id)}
                 onAddToPlaylist={(s) => setAddToPlaylistSong(s)}
+                onAddToOfflinePlaylist={(s) => setAddToOfflinePlaylistSong(s)}
                 onRemoveFromPlaylist={
                     contextMenu.sourceMixId && isUserPlaylistId(contextMenu.sourceMixId)
                         ? (s) => {
@@ -694,6 +725,11 @@ export function DiscoveryLayout() {
                         : undefined
                 }
             />
+
+            {/* Download Queue Panel */}
+            <AnimatePresence>
+                {downloadQueue.length > 0 && <DownloadQueuePanel queue={downloadQueue} />}
+            </AnimatePresence>
         </div >
     );
 }
