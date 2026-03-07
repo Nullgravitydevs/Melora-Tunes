@@ -159,11 +159,12 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     }, [savedAlbums, showToast]);
 
     const toggleFollowArtist = useCallback((artist: any) => {
+        const name = artist.name || artist.primaryArtists || 'Artist';
         const exists = savedArtists.some(a => a.id === artist.id);
         if (exists) {
-            showToast(`Unfollowed ${artist.name}`, 'info');
+            showToast(`Unfollowed ${name}`, 'info');
         } else {
-            showToast(`Followed ${artist.name}`, 'success');
+            showToast(`Followed ${name}`, 'success');
         }
 
         setSavedArtists(prev => {

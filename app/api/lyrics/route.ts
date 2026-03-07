@@ -12,7 +12,8 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Song ID required' }, { status: 400 });
     }
 
-    const apiUrl = `https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&lyrics_id=${id}`;
+    const baseUrl = process.env.NEXT_PUBLIC_JIOSAAVN_API_URL || "https://www.jiosaavn.com/api.php?__call=";
+    const apiUrl = `${baseUrl}lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&lyrics_id=${id}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
 

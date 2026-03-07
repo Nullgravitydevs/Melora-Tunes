@@ -186,6 +186,7 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
     const [restoreMode, setRestoreMode] = useState<RestoreMode>('mixes-only');
     const [initialSettings] = useState(() => loadSettings());
     const [languages, setLanguages] = useState<string[]>(initialSettings.languages || ['english', 'hindi']);
+    const [showHiresModal, setShowHiresModal] = useState(false);
 
     // Profile State
     const [profileName, setProfileName] = useState(initialSettings.userName || "");
@@ -545,7 +546,12 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                                             ] as const).map((q) => (
                                                 <button
                                                     key={q.id}
-                                                    onClick={() => setQualityPreference(q.id)}
+                                                    onClick={() => {
+                                                        if (q.id === 'hires' && qualityPreference !== 'hires') {
+                                                            setShowHiresModal(true);
+                                                        }
+                                                        setQualityPreference(q.id);
+                                                    }}
                                                     className={`p-4 rounded-xl border text-left transition-all ${qualityPreference === q.id
                                                         ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20'
                                                         : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:bg-zinc-800'
@@ -1024,6 +1030,50 @@ export function DesktopSettingsModal({ isOpen, onClose, onSwitchLayout, currentL
                         </div>
                     </div>
                 </motion.div>
+
+                {/* HI-RES MODAL */}
+                <AnimatePresence>
+                    {showHiresModal && (
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                                className="glass-panel max-w-md w-full rounded-2xl border border-amber-500/20 shadow-2xl overflow-hidden bg-[#0a0a0a]"
+                            >
+                                <div className="p-6">
+                                    <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center mb-4 text-amber-500">
+                                        <Disc size={24} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Hi-Res Audio Enabled</h3>
+                                    <p className="text-zinc-400 text-sm leading-relaxed mb-6">
+                                        Hi-Res 24-bit tracks are downloaded in pieces by Melora and stitched together.
+                                        <strong className="text-white block mt-2">Only downloaded Hi-Res songs play in true 24-bit.</strong> Online streaming uses standard Lossless (16-bit).
+                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setShowHiresModal(false)}
+                                            className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-white font-bold hover:bg-white/5 transition-colors"
+                                        >
+                                            Got it
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowHiresModal(false);
+                                                onClose();
+                                                setTimeout(() => window.dispatchEvent(new CustomEvent('melora-navigate', { detail: { id: 'downloads', data: { tab: 'audiophile' } } })), 300);
+                                            }}
+                                            className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            Lossless Tool
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
         </AnimatePresence>
     );

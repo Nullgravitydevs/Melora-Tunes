@@ -10,6 +10,8 @@ interface DownloadJob {
     song: JioSaavnSong | PlayableTrack;
     quality: AudioQuality;
     status: 'pending' | 'downloading' | 'error' | 'done';
+    progress?: number;
+    speed?: number;
 }
 
 interface DownloadQueuePanelProps {
@@ -24,7 +26,6 @@ export function DownloadQueuePanel({ queue }: DownloadQueuePanelProps) {
     const activeCount = queue.filter(j => j.status === 'downloading').length;
     const doneCount = queue.filter(j => j.status === 'done').length;
     const errorCount = queue.filter(j => j.status === 'error').length;
-    const pendingCount = queue.filter(j => j.status === 'pending').length;
     const totalCount = queue.length;
     const progress = totalCount > 0 ? ((doneCount + errorCount) / totalCount) * 100 : 0;
 
@@ -34,9 +35,9 @@ export function DownloadQueuePanel({ queue }: DownloadQueuePanelProps) {
 
     const getStatusIcon = (status: DownloadJob['status']) => {
         switch (status) {
-            case 'pending': return <Download size={14} className="text-white/30" />;
-            case 'downloading': return <Loader2 size={14} className="text-teal-400 animate-spin" />;
-            case 'done': return <Check size={14} className="text-green-400" />;
+            case 'pending': return <Download size={14} className="text-white/20" />;
+            case 'downloading': return <Loader2 size={14} className="text-white animate-spin" />;
+            case 'done': return <Check size={14} className="text-white/50" />;
             case 'error': return <AlertCircle size={14} className="text-red-400" />;
         }
     };
@@ -48,14 +49,14 @@ export function DownloadQueuePanel({ queue }: DownloadQueuePanelProps) {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-24 right-6 z-[100] w-80"
         >
-            <div className="bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-black/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
                 {/* Header */}
                 <button
                     onClick={() => setExpanded(!expanded)}
                     className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors"
                 >
                     <div className="flex items-center gap-2">
-                        <Download size={16} className="text-teal-400" />
+                        <Download size={16} className="text-white/60" />
                         <span className="text-sm font-semibold text-white">
                             {activeCount > 0
                                 ? `Downloading ${doneCount}/${totalCount}`
@@ -78,7 +79,7 @@ export function DownloadQueuePanel({ queue }: DownloadQueuePanelProps) {
                 {/* Progress Bar */}
                 <div className="h-0.5 bg-white/5 relative">
                     <motion.div
-                        className="h-full bg-teal-400"
+                        className="h-full bg-white/40"
                         initial={{ width: 0 }}
                         animate={{ width: `${progress}%` }}
                         transition={{ duration: 0.3 }}
@@ -101,24 +102,40 @@ export function DownloadQueuePanel({ queue }: DownloadQueuePanelProps) {
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: i * 0.02 }}
-                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${job.status === 'downloading' ? 'bg-teal-500/10' :
-                                                job.status === 'done' ? 'bg-green-500/5' :
-                                                    job.status === 'error' ? 'bg-red-500/5' :
-                                                        'bg-transparent'
+                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${job.status === 'downloading' ? 'bg-white/5' :
+                                            job.status === 'done' ? 'bg-white/[0.02]' :
+                                                job.status === 'error' ? 'bg-red-500/5' :
+                                                    'bg-transparent'
                                             }`}
                                     >
                                         {getStatusIcon(job.status)}
-                                        <div className="flex-1 min-w-0">
-                                            <p className={`text-xs font-medium truncate ${job.status === 'done' ? 'text-white/50' :
+                                        <div className="flex-1 min-w-0 pr-2">
+                                            <div className="flex justify-between items-center gap-2">
+                                                <p className={`text-xs font-medium truncate ${job.status === 'done' ? 'text-white/30' :
                                                     job.status === 'error' ? 'text-red-300/70' :
                                                         'text-white/80'
-                                                }`}>
-                                                {getSongName(job.song)}
-                                            </p>
+                                                    }`}>
+                                                    {getSongName(job.song)}
+                                                </p>
+                                                {job.status === 'downloading' && job.speed ? (
+                                                    <span className="text-[10px] text-teal-400 font-medium tabular-nums whitespace-nowrap">
+                                                        {(job.speed / (1024 * 1024)).toFixed(2)} MB/s
+                                                    </span>
+                                                ) : job.status === 'downloading' ? (
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
+                                                ) : null}
+                                            </div>
+                                            {job.status === 'downloading' && job.progress !== undefined && (
+                                                <div className="h-0.5 bg-white/10 rounded-full mt-2 overflow-hidden w-full">
+                                                    <motion.div
+                                                        className="h-full bg-teal-400"
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${job.progress}%` }}
+                                                        transition={{ duration: 0.25, ease: "linear" }}
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
-                                        {job.status === 'downloading' && (
-                                            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-                                        )}
                                     </motion.div>
                                 ))}
                             </div>

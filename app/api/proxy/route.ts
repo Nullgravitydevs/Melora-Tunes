@@ -22,6 +22,7 @@ const ALLOWED_CALLS = new Set([
     'playlist.getDetails',
     'content.getArtistPageData',
     'search.getTopSearches',
+    'artist.getDetails', // FIX: Allow Artist View to fetch details
 ]);
 
 export async function GET(request: Request) {
@@ -46,7 +47,9 @@ export async function GET(request: Request) {
     }
 
     // Forward to JioSaavn with timeout
-    const apiUrl = `https://www.jiosaavn.com/api.php?${queryString}`;
+    const baseUrl = process.env.NEXT_PUBLIC_JIOSAAVN_API_URL || "https://www.jiosaavn.com/api.php?__call=";
+    const cleanBaseUrl = baseUrl.replace('?__call=', '');
+    const apiUrl = `${cleanBaseUrl}?${queryString}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
 

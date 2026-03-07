@@ -268,6 +268,7 @@ export function DiscoveryLayout() {
     // [PERF FIX #7] Wrap all handlers in useCallback to prevent re-rendering child views
     const handleContextMenu = useCallback((e: React.MouseEvent, song: JioSaavnSong, sourceMixId?: string) => {
         e.preventDefault();
+        e.stopPropagation();
         setContextMenu({
             visible: true,
             x: e.clientX,
@@ -280,6 +281,7 @@ export function DiscoveryLayout() {
 
     const handlePlaylistContextMenu = useCallback((e: React.MouseEvent, mixId: string) => {
         e.preventDefault();
+        e.stopPropagation();
         setPlaylistMenu({
             visible: true,
             x: e.clientX,
@@ -299,7 +301,9 @@ export function DiscoveryLayout() {
     };
 
     const handleGoToAlbum = (albumId: string) => {
-        handleNavigate({ id: 'peel-reveal', data: { id: albumId } });
+        if (!albumId) return;
+        // Use 'album' route — AlbumView fetches full details from the ID
+        handleNavigate({ id: 'album', data: { id: albumId, albumid: albumId } });
         setShowFullPlayer(false);
     };
 
@@ -702,7 +706,6 @@ export function DiscoveryLayout() {
                 onAddToQueue={(s) => { addToQueue(s); }}
                 onGoToArtist={handleGoToArtist}
                 onGoToAlbum={handleGoToAlbum}
-                onStartRadio={(s) => handleNavigate({ id: 'radio', data: s })}
                 isDownloaded={contextMenu.song ? isDownloaded(contextMenu.song.id) : false}
                 onDownload={(s) => downloadSong(s)}
                 onRemoveDownload={(id) => removeDownload(id)}
@@ -861,7 +864,10 @@ function PlayerBar({ onExpand, onAddToPlaylist }: { onExpand: () => void; onAddT
 
     if (!currentSong) return null;
 
-    const qualityBadge = activeQuality ? activeQuality.toUpperCase() : null;
+    let qualityBadge = (activeQuality || qualityPreference)?.toUpperCase();
+    if (qualityBadge === 'HIRES' && !isDownloaded(currentSong.id)) {
+        qualityBadge = 'FLAC';
+    }
 
     return (
         <motion.div

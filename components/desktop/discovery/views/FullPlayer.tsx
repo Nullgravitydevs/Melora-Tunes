@@ -291,14 +291,29 @@ export function FullPlayer({ isOpen, onClose, onGoToArtist, onGoToAlbum, onAddTo
 
                                             {/* Minimal Quality Badge */}
                                             {(() => {
-                                                const q = activeQuality || qualityPreference;
+                                                let q = activeQuality || qualityPreference;
+                                                // [F13] Hide misleading HI-RES badge for online streams, unless downloaded
+                                                if (q === 'hires' && !isDownloaded(currentSong.id)) {
+                                                    q = 'flac';
+                                                }
                                                 return <div className="mt-2 inline-flex flex-wrap items-center gap-2 relative" ref={qualityMenuRef}>
-                                                    <button onClick={() => setShowQualityMenu(!showQualityMenu)} className="focus:outline-none">
-                                                        {q === 'hires' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-amber-500/20 transition-colors"><Disc3 size={10} /> Hi-Res Lossless</div>}
-                                                        {q === 'flac' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-blue-500/20 transition-colors"><Disc3 size={10} /> Lossless</div>}
-                                                        {q === '320' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/60 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-white/10 transition-colors">High Quality</div>}
-                                                        {(q === '160' || q === '96') && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/60 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-white/10 transition-colors">Standard</div>}
-                                                    </button>
+                                                    <div className="flex items-center gap-2">
+                                                        {isDownloaded(currentSong.id) && (
+                                                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md">
+                                                                <Download size={10} /> OFFLINE
+                                                            </div>
+                                                        )}
+                                                        <button
+                                                            onClick={() => !isDownloaded(currentSong.id) && setShowQualityMenu(!showQualityMenu)}
+                                                            className={`focus:outline-none ${isDownloaded(currentSong.id) ? 'cursor-default opacity-80' : 'hover:scale-105 transition-transform'}`}
+                                                            title={isDownloaded(currentSong.id) ? "Offline tracks have a fixed quality" : "Change Quality"}
+                                                        >
+                                                            {q === 'hires' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-amber-500/20 transition-colors"><Disc3 size={10} /> Hi-Res Lossless</div>}
+                                                            {q === 'flac' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-blue-500/20 transition-colors"><Disc3 size={10} /> Lossless</div>}
+                                                            {q === '320' && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/60 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-white/10 transition-colors">High Quality</div>}
+                                                            {(q === '160' || q === '96') && <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/60 font-bold text-[9px] uppercase tracking-wider backdrop-blur-md hover:bg-white/10 transition-colors">Standard</div>}
+                                                        </button>
+                                                    </div>
 
                                                     <AnimatePresence>
                                                         {showQualityMenu && (

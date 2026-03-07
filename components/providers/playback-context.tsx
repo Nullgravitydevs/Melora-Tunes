@@ -127,7 +127,7 @@ export interface PlaybackContextType {
     getAnalyser: () => AnalyserNode | null;
     downloadSong: (songOrTrack: JioSaavnSong | PlayableTrack) => Promise<boolean>;
     downloadSongs: (songs: (JioSaavnSong | PlayableTrack)[]) => Promise<boolean>;
-    downloadQueue: { song: JioSaavnSong | PlayableTrack; quality: AudioQuality; status: 'pending' | 'downloading' | 'error' | 'done' }[];
+    downloadQueue: { song: JioSaavnSong | PlayableTrack; quality: AudioQuality; status: 'pending' | 'downloading' | 'error' | 'done', progress?: number, speed?: number }[];
     startRadio: (songOrQuery: any) => Promise<void>;
     forceCurrentSongQuality: (q: AudioQuality) => void;
 }
@@ -158,16 +158,31 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
     const [currentSongUrl, setCurrentSongUrl] = useState<string | null>(null);
-    const [nextSongUrl, setNextSongUrl] = useState<string | null>(null); // New state for preloaded URL
+    const [nextSongDetails, setNextSongDetails] = useState<{ url: string, quality: AudioQuality } | null>(null); // New state for preloaded URL
     const [currentTrackMetadata, setCurrentTrackMetadata] = useState<AudioAnalysisResult | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [shuffle, setShuffle] = useState(false);
+
+    // F27: Track active blob URLs to prevent memory leaks
+    const activeBlobsRef = useRef<Set<string>>(new Set());
+    const registerBlob = useCallback((url: string) => {
+        if (url && url.startsWith('blob:')) activeBlobsRef.current.add(url);
+    }, []);
+    const cleanupBlobs = useCallback((keepUrls: (string | null)[]) => {
+        const keeps = new Set(keepUrls.filter(Boolean));
+        activeBlobsRef.current.forEach(url => {
+            if (!keeps.has(url)) {
+                OfflineStore.revokeUrl(url);
+                activeBlobsRef.current.delete(url);
+            }
+        });
+    }, []);
 
     // Downloads State
     const [downloadModalOpen, setDownloadModalOpen] = useState(false);
     const [songToDownload, setSongToDownload] = useState<JioSaavnSong | PlayableTrack | null>(null);
     const [songsToDownload, setSongsToDownload] = useState<(JioSaavnSong | PlayableTrack)[] | null>(null);
-    const [downloadQueue, setDownloadQueue] = useState<{ song: JioSaavnSong | PlayableTrack; quality: AudioQuality; status: 'pending' | 'downloading' | 'error' | 'done' }[]>([]);
+    const [downloadQueue, setDownloadQueue] = useState<{ song: JioSaavnSong | PlayableTrack; quality: AudioQuality; status: 'pending' | 'downloading' | 'error' | 'done'; progress?: number; speed?: number; }[]>([]);
     const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
     const repeatRef = useRef<'off' | 'one' | 'all'>('off');
 
@@ -224,7 +239,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const playingIndexRef = useRef(0);
     const playbackStartedFromRef = useRef<number | null>(null);
     const lastPreloadedIdRef = useRef<string | null>(null); // [PERF] Track which song ID was preloaded to skip redundant preloads
-    const nextSongUrlRef = useRef<string | null>(null); // [FIX] Ref for loadSongUrl closure
+    const nextSongDetailsRef = useRef<{ url: string, quality: AudioQuality } | null>(null); // [FIX] Ref for loadSongUrl closure
 
     // [DESYNC FIX] Playback Load Mutex ensures only one URL resolution happens at a time
     const loadMutexRef = useRef(false);
@@ -232,7 +247,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     // Playback State
     useEffect(() => { playingIndexRef.current = playingIndex; }, [playingIndex]);
     useEffect(() => { currentSongUrlRef.current = currentSongUrl; }, [currentSongUrl]);
-    useEffect(() => { nextSongUrlRef.current = nextSongUrl; }, [nextSongUrl]);
+    useEffect(() => { nextSongDetailsRef.current = nextSongDetails; }, [nextSongDetails]);
     useEffect(() => { repeatRef.current = repeat; }, [repeat]);
 
     // [Phase 2: Gapless] Resolver URL Cache — prevents re-resolution on prev/next
@@ -252,9 +267,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         resolverCacheRef.current.set(key, { url, quality, expiry: Date.now() + 5 * 60 * 1000 }); // 5 min TTL
     }, []);
 
-    // [Phase 2: Gapless] Clear stale nextSongUrl on mix change
+    // [Phase 2: Gapless] Clear stale nextSongDetails on mix change
     useEffect(() => {
-        setNextSongUrl(null);
+        setNextSongDetails(null);
         lastPreloadedIdRef.current = null; // [PERF] Reset preload tracking on mix change
     }, [activeMixId]);
 
@@ -411,6 +426,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             const activeMix = mixesRef.current.find(m => m.id === activeMixId);
             if (!activeMix) return;
 
+            // [FIX] Disable autoplay for the offline downloads queue
+            if (activeMixId === 'downloads-queue') return;
+
             const currentIndex = playingIndexRef.current;
             const songsRemaining = activeMix.songs.length - currentIndex - 1;
 
@@ -536,7 +554,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                 setIsPlaying(false);
                 setPlaybackState('loading');
                 setCurrentSongUrl(null);
-                setNextSongUrl(null); // [FIX] Clear stale prebuffer
+                setNextSongDetails(null); // [FIX] Clear stale prebuffer
                 isNextSequentialRef.current = false; // [FIX] Prevent stale gapless promotion
                 audioPlayerRef.current?.pause();
                 audioPlayerRef.current?.seekTo(0);
@@ -563,7 +581,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(false); // Stop current
         setPlaybackState('loading');
         setCurrentSongUrl(null); // Clear old URL
-        setNextSongUrl(null); // [FIX] Clear stale prebuffer URL
+        setNextSongDetails(null); // [FIX] Clear stale prebuffer URL
         isNextSequentialRef.current = false; // [FIX] Prevent stale gapless promotion
         audioPlayerRef.current?.pause(); // Explicitly pause audio engine
         if (audioPlayerRef.current) {
@@ -875,11 +893,37 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                             showToast(`Playing offline optimized (${q})`, 'info');
                             toastOnceRef.current = true;
                         }
+                        registerBlob(url);
                         return { url, quality: q };
                     }
                 }
             } catch { /* ignore */ }
         }
+
+        // --- PHASE 2.5: OFFLINE FALLBACK (Any Available) ---
+        // If the user requested 320kbps globally, but downloaded the song in FLAC manually,
+        // we should play the downloaded FLAC to save data rather than streaming 320kbps online.
+        try {
+            if (await OfflineStore.isDownloaded(track.id)) {
+                // Find out what quality is available
+                // We'll iterate through all known qualities from best to worst
+                const allQualities: AudioQuality[] = ['hires', 'flac', '320', '160', '96'];
+                for (const availableQ of allQualities) {
+                    if (await OfflineStore.isDownloaded(track.id, availableQ)) {
+                        const url = await OfflineStore.getSongUrl(track.id, availableQ);
+                        if (url) {
+                            console.log(`[Resolver] ✓ Offline fallback hit (${availableQ})`);
+                            if (!toastOnceRef.current) {
+                                showToast(`Playing offline available quality (${availableQ})`, 'info');
+                                toastOnceRef.current = true;
+                            }
+                            registerBlob(url);
+                            return { url, quality: availableQ };
+                        }
+                    }
+                }
+            }
+        } catch { /* ignore */ }
 
         // --- PHASE 2: ONLINE (Exact -> Lower) ---
         let hiFiResolved = false; // [FIX Bug 4] Lock to prevent overwrite
@@ -1036,7 +1080,43 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
             if (result.url) {
                 const songToSave = { ...songMetadata, id: track.id };
-                await OfflineStore.saveSong(songToSave, result.url, targetQuality);
+
+                // [F16/F17] Wrap in tagging proxy if it's a remote URL
+                let finalDownloadUrl = result.url;
+                if (result.url.startsWith('http')) {
+                    const params = new URLSearchParams({
+                        url: result.url,
+                        title: songMetadata.name || '',
+                        artist: songMetadata.primaryArtists || '',
+                        album: songMetadata.album?.name || '',
+                        art: songMetadata.image?.[songMetadata.image.length - 1]?.link || ''
+                    });
+                    finalDownloadUrl = `/api/audiophile-download?${params.toString()}`;
+                }
+
+                let lastTime = Date.now();
+                let lastLoaded = 0;
+
+                await OfflineStore.saveSong(songToSave, finalDownloadUrl, targetQuality, (loaded, total) => {
+                    const now = Date.now();
+                    // Update UI every 250ms for smooth progress
+                    if (now - lastTime >= 250 || loaded === total) {
+                        const bytesSinceLast = loaded - lastLoaded;
+                        const timeDelta = (now - lastTime) / 1000;
+                        const speed = timeDelta > 0 ? bytesSinceLast / timeDelta : 0; // bytes per second
+
+                        lastTime = now;
+                        lastLoaded = loaded;
+
+                        setDownloadQueue(prev => prev.map(job => {
+                            const jId = job.song.id || (job.song as any).song?.id;
+                            if (jId === track.id) {
+                                return { ...job, progress: total ? (loaded / total) * 100 : 0, speed };
+                            }
+                            return job;
+                        }));
+                    }
+                });
 
                 refreshDownloadedState();
                 return true;
@@ -1126,13 +1206,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
             // [Phase 1: True Gapless] Preloaded Transition Bypass
             // READ FROM REF — loadSongUrl's closure captures stale state; ref is always current
-            const preloadedUrl = nextSongUrlRef.current;
+            const preloadedDetails = nextSongDetailsRef.current;
 
-            if (isSequentialTransition && preloadedUrl) {
-                console.log(`[Gapless] Promoting Preloaded URL: ${preloadedUrl.substring(0, 50)}...`);
-                setCurrentSongUrl(preloadedUrl);
-                setNextSongUrl(null); // Clear preload
-                nextSongUrlRef.current = null;
+            if (isSequentialTransition && preloadedDetails?.url) {
+                console.log(`[Gapless] Promoting Preloaded URL: ${preloadedDetails.url.substring(0, 50)}...`);
+                setCurrentSongUrl(preloadedDetails.url);
+                setNextSongDetails(null); // Clear preload
+                nextSongDetailsRef.current = null;
                 // We must still run the rest of the metadata / analytics updates, but SKIP the URL resolution.
             } else if (!isSequentialTransition) {
                 // Cold path: Only clean up if this is NOT a sequential transition
@@ -1204,10 +1284,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
                 let result: { url: string; quality: AudioQuality; keyName?: string } | null = null;
 
-                if (isSequentialTransition && preloadedUrl) {
-                    // Since we already promoted the URL, fake the result object for the rest of the flow
-                    result = { url: preloadedUrl, quality: track.preferredQuality };
-                    console.log(`[Gapless] Skipping JIT Resolve. Using preloaded stream.`);
+                if (isSequentialTransition && preloadedDetails?.url) {
+                    // Since we already promoted the URL, pass the accurate offline quality
+                    result = { url: preloadedDetails.url, quality: preloadedDetails.quality };
+                    console.log(`[Gapless] Skipping JIT Resolve. Using preloaded stream (${result.quality}).`);
                 } else {
                     console.log(`[Playback] Resolving JIT URL for: ${track.title} (Preferred: ${track.preferredQuality})`);
                     result = await resolvePlayableUrl(track, signal);
@@ -1252,16 +1332,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     console.log(`[Playback] Loaded: ${result.quality} | ${result.url.substring(0, 50)}...`);
                     // Check for silent downgrade (Bug #10)
                     // 'flac' and 'hires' are equivalent lossless tiers — don't hard-warn
-                    const LOSSLESS_TIERS = new Set(['flac', 'hires', 'lossless']);
-                    const isRealDowngrade = result.quality !== track.preferredQuality
-                        && !(LOSSLESS_TIERS.has(result.quality) && LOSSLESS_TIERS.has(track.preferredQuality));
-                    if (isRealDowngrade) {
+                    const QUALITY_RANKS: Record<string, number> = { '128': 1, '160': 2, '320': 3, 'aac': 3, 'lossless': 4, 'flac': 4, 'hires': 5 };
+                    const prefRank = QUALITY_RANKS[track.preferredQuality] || 0;
+                    const resRank = QUALITY_RANKS[result.quality] || 0;
+
+                    if (resRank < prefRank) {
                         console.warn(`[Playback] Quality Downgrade: Requested ${track.preferredQuality}, got ${result.quality}`);
-                        showToast(`Optimized streaming quality (${result.quality})`, 'info');
-                    }
-                    // [UX] Gentle notification when Hi-Res requested but only Lossless available
-                    else if (track.preferredQuality === 'hires' && result.quality === 'flac') {
-                        showToast('Hi-Res not available — playing Lossless (FLAC)', 'info');
+                        // Only toast if it's a severe downgrade (e.g. hires to 320) or if explicitly requested tracking
+                        if (prefRank >= 4 && resRank < 4) {
+                            showToast(`Playing at lower quality (${result.quality})`, 'info');
+                        } else if (track.preferredQuality === 'hires' && result.quality === 'flac') {
+                            showToast('Hi-Res not available — playing Lossless (FLAC)', 'info');
+                        }
+                    } else if (resRank > prefRank) {
+                        console.log(`[Playback] Quality Upgrade: Requested ${track.preferredQuality}, got ${result.quality}`);
                     }
                     if (result.url !== currentSongUrlRef.current) {
                         console.log(`[LoadSong] Setting URL: ${result.url.substring(0, 50)}...`);
@@ -1271,6 +1355,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                         setCurrentSongUrl(result.url);
                         setActiveQuality(result.quality);
                         setIsPlaying(true); // Sync Fix: Ensure playback resumes
+
+                        // F27: Cleanup unused blobs on track switch
+                        cleanupBlobs([result.url, nextSongDetailsRef.current?.url || null]);
 
                         if (result.keyName) {
                             currentStreamKeyRef.current = result.keyName;
@@ -1513,7 +1600,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
         console.log("[Next] Advancing to:", nextTitle);
 
-        if (!nextSongUrlRef.current) {
+        if (!nextSongDetailsRef.current) {
             console.warn("[Gapless] Preload missing — forcing immediate resolve without nulling audio");
         }
 
@@ -1704,13 +1791,13 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         // Optimization: Only preload if current song is actually loaded/playing.
         // This prevents race conditions where we preload while still struggling to resolve current song.
         if (!currentSongUrl) {
-            setNextSongUrl(null);
+            setNextSongDetails(null);
             return;
         }
 
         const activeMixForNext = mixes.find(m => m.id === activeMixId);
         if (!activeMixForNext) {
-            setNextSongUrl(null);
+            setNextSongDetails(null);
             return;
         }
 
@@ -1719,20 +1806,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         const nextIndex = currentIndex + 1;
 
         if (nextIndex >= activeMixForNext.songs.length) {
-            setNextSongUrl(null);
-            nextSongUrlRef.current = null;
+            setNextSongDetails(null);
+            nextSongDetailsRef.current = null;
             return;
         }
 
         const nextItem = activeMixForNext.songs[nextIndex];
         if (!nextItem) {
-            setNextSongUrl(null);
+            setNextSongDetails(null);
             return;
         }
 
         // [PERF FIX] Skip preload if the next song hasn't actually changed
         const nextItemId = isPlayableTrack(nextItem) ? nextItem.id : (nextItem as any).id;
-        if (nextSongUrlRef.current && lastPreloadedIdRef.current === nextItemId) {
+        if (nextSongDetailsRef.current && lastPreloadedIdRef.current === nextItemId) {
             return; // Already preloaded this exact song
         }
 
@@ -1760,8 +1847,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
-                if (result?.url) {
-                    setNextSongUrl(result.url);
+                if (result?.url && result?.quality) {
+                    setNextSongDetails({ url: result.url, quality: result.quality });
                     lastPreloadedIdRef.current = nextItemId; // [PERF] Remember what we preloaded
                     // Pass it imperatively down to AudioPlayer's internal queue
                     audioPlayerRef.current?.prebuffer(result.url);

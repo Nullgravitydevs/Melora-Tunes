@@ -1,4 +1,4 @@
-import { JioSaavnSong } from './jiosaavn';
+import { JioSaavnSong, getLyricsWithFallback } from './jiosaavn';
 import { AudioQuality } from './types';
 
 export interface OfflineSong {
@@ -15,7 +15,22 @@ export interface OfflineSong {
 
 const DB_NAME = 'MeloraOfflineDB';
 const STORE_NAME = 'offline_songs';
-const DB_VERSION = 2; // Bump version for schema change
+const HISTORY_STORE_NAME = 'download_history';
+const DB_VERSION = 3; // Bump version for history store
+
+export interface DownloadHistoryEntry {
+    id?: number;
+    songId: string;
+    name: string;
+    artist: string;
+    quality: AudioQuality;
+    size: number;
+    status: 'success' | 'failed' | 'retried';
+    timestamp: number;
+    error?: string;
+    source: string; // e.g. 'Tidal', 'JioSaavn'
+    metadataString?: string;
+}
 
 /**
  * Vanilla IndexedDB Wrapper (No NPM dependencies)
@@ -31,14 +46,17 @@ class OfflineDB {
 
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
-                // If upgrading, clear old store to avoid schema mismatch or migrate
-                // For simplicity in this refactor, we recreate.
-                if (db.objectStoreNames.contains(STORE_NAME)) {
-                    db.deleteObjectStore(STORE_NAME);
+
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    store.createIndex('songId', 'songId', { unique: false });
                 }
-                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                // Index to find all qualities for a song
-                store.createIndex('songId', 'songId', { unique: false });
+
+                if (!db.objectStoreNames.contains(HISTORY_STORE_NAME)) {
+                    const historyStore = db.createObjectStore(HISTORY_STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    historyStore.createIndex('songId', 'songId', { unique: false });
+                    historyStore.createIndex('timestamp', 'timestamp', { unique: false });
+                }
             };
 
             request.onsuccess = (event) => {
@@ -56,7 +74,7 @@ class OfflineDB {
         return `${songId}_${quality}`;
     }
 
-    async saveSong(song: JioSaavnSong, url: string, quality: AudioQuality): Promise<void> {
+    async saveSong(song: JioSaavnSong, urlOrBlob: string | Blob, quality: AudioQuality, onProgress?: (loaded: number, total: number) => void): Promise<void> {
         try {
             // 1. Quota Check
             if (navigator.storage && navigator.storage.estimate) {
@@ -70,11 +88,83 @@ class OfflineDB {
                 }
             }
 
-            // 2. Fetch blob
-            const response = await fetch(url);
-            const blob = await response.blob();
+            // 2. Fetch blob if string URL provided
+            let blob: Blob;
+            if (typeof urlOrBlob === 'string') {
+                const response = await fetch(urlOrBlob);
 
-            // 3. Determine quality label
+                if (onProgress && response.body) {
+                    const contentLength = response.headers.get('content-length');
+                    const total = contentLength ? parseInt(contentLength, 10) : 0;
+                    let loaded = 0;
+
+                    const reader = response.body.getReader();
+                    const chunks: Uint8Array[] = [];
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                            chunks.push(value);
+                            loaded += value.length;
+                            onProgress(loaded, total);
+                        }
+                    }
+                    blob = new Blob(chunks as BlobPart[], { type: response.headers.get('content-type') || 'audio/mp4' });
+                } else {
+                    blob = await response.blob();
+                }
+            } else {
+                blob = urlOrBlob;
+            }
+
+            // 3. Auto-cache cover art (F25)
+            let metadataToSave = JSON.parse(JSON.stringify(song)) as JioSaavnSong; // Deep clone
+            try {
+                if (metadataToSave.image && Array.isArray(metadataToSave.image) && metadataToSave.image.length > 0) {
+                    const bestImage = metadataToSave.image[metadataToSave.image.length - 1];
+                    const rawUrl = bestImage.link || (bestImage as any).url;
+                    if (rawUrl && rawUrl.startsWith('http')) {
+                        const imgRes = await fetch(rawUrl);
+                        if (imgRes.ok) {
+                            const imgBlob = await imgRes.blob();
+                            const reader = new FileReader();
+                            const base64data = await new Promise<string>((resolve) => {
+                                reader.onloadend = () => resolve(reader.result as string);
+                                reader.readAsDataURL(imgBlob);
+                            });
+                            // Override all image variants to the local base64 version so offline works seamlessly
+                            metadataToSave.image = metadataToSave.image.map(img => ({
+                                ...img,
+                                link: base64data
+                            })) as any;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[OfflineDB] Failed to cache cover art natively', e);
+            }
+
+            // 3.5 Auto-download Lyrics (B12)
+            try {
+                const lyrics = await getLyricsWithFallback(song);
+                if (lyrics) {
+                    metadataToSave.offlineLyrics = lyrics;
+                }
+            } catch (e) {
+                console.warn('[OfflineDB] Failed to cache lyrics softly', e);
+            }
+
+            // 4. Auto-delete lower quality clones when upgrading (F26)
+            if (quality === 'flac' || quality === 'hires') {
+                try {
+                    await this.removeSong(song.id, '320');
+                    await this.removeSong(song.id, '160');
+                    await this.removeSong(song.id, '96');
+                } catch { /* ignore */ }
+            }
+
+            // 5. Determine quality label
             let qualityLabel = 'Standard';
             if (quality === 'hires') qualityLabel = 'Hi-Res Lossless';
             else if (quality === 'flac') qualityLabel = 'Lossless (FLAC)';
@@ -87,7 +177,7 @@ class OfflineDB {
                 songId: song.id,
                 quality,
                 blob,
-                metadata: song,
+                metadata: metadataToSave,
                 savedAt: Date.now(),
                 downloadedAt: Date.now(),
                 fileSize: blob.size,
@@ -95,7 +185,7 @@ class OfflineDB {
             };
 
             const db = await this.open();
-            return new Promise((resolve, reject) => {
+            await new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 const store = tx.objectStore(STORE_NAME);
                 const req = store.put(record);
@@ -103,8 +193,36 @@ class OfflineDB {
                 req.onsuccess = () => resolve();
                 req.onerror = () => reject(req.error);
             });
+
+            // 4. Record History
+            await this.recordHistoryEntry({
+                songId: song.id,
+                name: song.name,
+                artist: song.primaryArtists || 'Unknown',
+                quality,
+                size: blob.size,
+                status: 'success',
+                timestamp: Date.now(),
+                source: (quality === 'hires' || quality === 'flac') ? 'Audiophile' : 'JioSaavn',
+                metadataString: JSON.stringify(song)
+            });
         } catch (error) {
             console.error('[OfflineDB] Save failed', error);
+            // Log failure to history if possible
+            try {
+                await this.recordHistoryEntry({
+                    songId: song.id,
+                    name: song.name,
+                    artist: song.primaryArtists || 'Unknown',
+                    quality,
+                    size: 0,
+                    status: 'failed',
+                    timestamp: Date.now(),
+                    error: String(error),
+                    source: (quality === 'hires' || quality === 'flac') ? 'Audiophile' : 'JioSaavn',
+                    metadataString: JSON.stringify(song)
+                });
+            } catch { /* ignore log error */ }
             throw error;
         }
     }
@@ -274,6 +392,95 @@ class OfflineDB {
         if (url && url.startsWith('blob:')) {
             URL.revokeObjectURL(url);
         }
+    }
+
+    // --- History Store ---
+
+    async recordHistoryEntry(entry: DownloadHistoryEntry): Promise<void> {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(HISTORY_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(HISTORY_STORE_NAME);
+            const req = store.add(entry);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async getHistory(): Promise<DownloadHistoryEntry[]> {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(HISTORY_STORE_NAME, 'readonly');
+            const store = tx.objectStore(HISTORY_STORE_NAME);
+            const index = store.index('timestamp');
+            const req = index.getAll(); // Will be sorted by timestamp if we use a cursor or if the index handles it
+
+            req.onsuccess = () => {
+                const records = req.result as DownloadHistoryEntry[];
+                // Return reversed to show latest first
+                resolve(records.sort((a, b) => b.timestamp - a.timestamp));
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async clearHistory(): Promise<void> {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(HISTORY_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(HISTORY_STORE_NAME);
+            const req = store.clear();
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // --- Storage Stats ---
+
+    async getStorageStats(): Promise<{
+        totalBytes: number;
+        count: number;
+        byQuality: Record<AudioQuality, { bytes: number, count: number }>;
+        quota?: number;
+        usage?: number;
+    }> {
+        const db = await this.open();
+        const stats = {
+            totalBytes: 0,
+            count: 0,
+            byQuality: {} as Record<AudioQuality, { bytes: number, count: number }>
+        };
+
+        const qualities: AudioQuality[] = ['hires', 'flac', '320', '160', '96'];
+        qualities.forEach(q => {
+            stats.byQuality[q] = { bytes: 0, count: 0 };
+        });
+
+        const records = await new Promise<OfflineSong[]>((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result as OfflineSong[]);
+            req.onerror = () => reject(req.error);
+        });
+
+        records.forEach(r => {
+            stats.totalBytes += r.fileSize || 0;
+            stats.count += 1;
+            if (stats.byQuality[r.quality]) {
+                stats.byQuality[r.quality].bytes += r.fileSize || 0;
+                stats.byQuality[r.quality].count += 1;
+            }
+        });
+
+        let quota, usage;
+        if (navigator.storage && navigator.storage.estimate) {
+            const estimate = await navigator.storage.estimate();
+            quota = estimate.quota;
+            usage = estimate.usage;
+        }
+
+        return { ...stats, quota, usage };
     }
 }
 

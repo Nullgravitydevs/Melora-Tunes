@@ -18,7 +18,8 @@ export async function GET(request: Request) {
     const safeLimit = Math.min(Math.max(parseInt(limit) || 10, 1), 50);
     const safePage = Math.max(parseInt(page) || 1, 1);
 
-    const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${safeLimit}&p=${safePage}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
+    const baseUrl = process.env.NEXT_PUBLIC_JIOSAAVN_API_URL || "https://www.jiosaavn.com/api.php?__call=";
+    const apiUrl = `${baseUrl}search.getResults&_format=json&n=${safeLimit}&p=${safePage}&q=${encodeURIComponent(query)}&ctx=wap6dot0`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useUI } from "@/components/providers/playback-context";
 
 interface CoverFlow3DProps {
     items: { id: string; image: string; title: string; artist?: string }[];
@@ -23,6 +24,7 @@ export function CoverFlow3D({
     tracks = [],
     onScanLibrary
 }: CoverFlow3DProps) {
+    const { showToast } = useUI();
     if (!items || items.length === 0) {
         return (
             <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 text-center space-y-3">
@@ -36,7 +38,7 @@ export function CoverFlow3D({
                 <button
                     onClick={() => {
                         if (onScanLibrary) onScanLibrary();
-                        else alert("Please add music to your library.");
+                        else showToast("Please add music to your library.", "info");
                     }}
                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-medium rounded-full transition-colors shadow-lg shadow-blue-900/20"
                 >

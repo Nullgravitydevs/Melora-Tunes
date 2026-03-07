@@ -24,6 +24,7 @@ export interface JioSaavnSong {
     playCount: number;
     language: string;
     hasLyrics: string;
+    offlineLyrics?: string;
     url: string;
     copyright: string;
     image: {
@@ -65,6 +66,7 @@ export interface SearchResponse {
 }
 
 const DES_KEY = process.env.NEXT_PUBLIC_DES_KEY || '38346591';
+const JIOSAAVN_API_URL = process.env.NEXT_PUBLIC_JIOSAAVN_API_URL || 'https://www.jiosaavn.com/api.php?__call=';
 
 const isElectron = false; // Electron now uses embedded Next.js server with API routes — no direct fetch needed
 
@@ -76,11 +78,11 @@ export async function searchSongs(query: string, page: number = 1, limit: number
 
         // FIX: Disabled static query caching to ensure language correctness
         if (Capacitor.isNativePlatform()) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const apiUrl = `${JIOSAAVN_API_URL}search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const apiUrl = `${JIOSAAVN_API_URL}search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
@@ -149,11 +151,11 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
 
         // Use search.getAlbumResults
         if (Capacitor.isNativePlatform()) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const apiUrl = `${JIOSAAVN_API_URL}search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const apiUrl = `${JIOSAAVN_API_URL}search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
@@ -232,11 +234,11 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
         let data: any;
 
         if (Capacitor.isNativePlatform()) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const apiUrl = `${JIOSAAVN_API_URL}search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
+            const apiUrl = `${JIOSAAVN_API_URL}search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
@@ -424,11 +426,11 @@ export async function getLyrics(songId: string): Promise<string | null> {
     try {
         let data: any;
         if (Capacitor.isNativePlatform()) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
+            const apiUrl = `${JIOSAAVN_API_URL}lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
+            const apiUrl = `${JIOSAAVN_API_URL}lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {
@@ -447,6 +449,11 @@ export async function getLyrics(songId: string): Promise<string | null> {
 }
 
 export async function getLyricsWithFallback(song: JioSaavnSong): Promise<string | null> {
+    // [B12] Prefer offline/cached lyrics if playing a downloaded track
+    if (song.offlineLyrics) {
+        return song.offlineLyrics;
+    }
+
     // [FIX] Priority: Synced lyrics FIRST, then plain text as last resort.
     // Old code returned JioSaavn plain text immediately and never tried synced sources.
 
@@ -530,11 +537,11 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
     try {
         let data: any;
         if (Capacitor.isNativePlatform()) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
+            const apiUrl = `${JIOSAAVN_API_URL}song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
             const response = await CapacitorHttp.get({ url: apiUrl });
             data = response.data;
         } else if (isElectron) {
-            const apiUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
+            const apiUrl = `${JIOSAAVN_API_URL}song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
             const response = await fetch(apiUrl);
             data = await response.json();
         } else {

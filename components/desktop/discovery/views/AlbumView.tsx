@@ -108,7 +108,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                 <div className="flex items-end gap-6 px-6 mb-4">
 
                     {/* ALBUM ART + REALISTIC SILVER CD */}
-                    <div className="relative flex-shrink-0">
+                    <div className="relative flex-shrink-0 mr-12">
                         {/* CD (Realistic Silver) */}
                         <motion.div
                             className="absolute top-1 left-1 w-[180px] h-[180px] rounded-full shadow-xl"
@@ -121,7 +121,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
                                 <div className="absolute inset-0 rounded-full opacity-30 mix-blend-overlay" style={{ background: `conic-gradient(from 0deg, transparent 0%, #ff0000 10%, #00ff00 20%, #0000ff 30%, transparent 40%)` }} />
                                 <div className="absolute inset-0 rounded-full opacity-30" style={{ background: 'repeating-radial-gradient(transparent 0, transparent 1.5px, #000 2px)' }} />
                                 <div className="absolute top-[35%] left-[35%] w-[30%] h-[30%] rounded-full overflow-hidden border-2 border-neutral-300/20">
-                                    <img src={albumImage} className="w-full h-full object-cover" />
+                                    {albumImage ? <img src={albumImage} className="w-full h-full object-cover" /> : null}
                                 </div>
                                 <div className="absolute top-[46.5%] left-[46.5%] w-[7%] h-[7%] bg-black rounded-full shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                             </div>
@@ -129,7 +129,7 @@ export function AlbumView({ album, onBack, onNavigate, onContextMenu }: AlbumVie
 
                         {/* SLEEVE */}
                         <motion.div className="relative w-[185px] h-[185px] rounded-md shadow-2xl z-10 overflow-hidden" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                            <img src={albumImage} alt={albumName} className="w-full h-full object-cover" />
+                            {albumImage ? <img src={albumImage} alt={albumName} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-neutral-800" />}
                             <div className="absolute inset-0 shadow-[inset_0_0_15px_rgba(0,0,0,0.3)] pointer-events-none" />
                         </motion.div>
                     </div>

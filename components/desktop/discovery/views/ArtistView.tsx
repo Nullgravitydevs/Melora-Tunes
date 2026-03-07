@@ -58,13 +58,25 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                 if (id) {
                     const details = await getArtistDetails(id);
                     if (details) {
-                        setArtistData(details);
-                        setSongs(details.topSongs || []);
+                        let artistSongs = details.topSongs || [];
+                        // Fallback: If API returns no songs for this artist ID, search by name
+                        if (artistSongs.length === 0) {
+                            const { searchSongs } = await import("@/lib/jiosaavn");
+                            artistSongs = await searchSongs(artistName, 30);
+                        }
+
+                        // Use the first song's image as a fallback if the artist has no image
+                        const fallbackImage = artistSongs[0]?.image ?
+                            (typeof artistSongs[0].image === 'string' ? artistSongs[0].image : artistSongs[0].image[0]?.link)
+                            : details.image;
+
+                        setArtistData({ ...details, image: details.image || fallbackImage });
+                        setSongs(artistSongs);
                         setAlbums(details.topAlbums || []);
                         setSimilar(details.similarArtists || []);
                         setBio(details.bio || []);
                     } else {
-                        // API returned null, fallback to search
+                        // API returned null entirely, fallback to search
                         const { searchSongs } = await import("@/lib/jiosaavn");
                         const results = await searchSongs(artistName, 30);
                         setSongs(results);
@@ -273,7 +285,7 @@ export function ArtistView({ artist, onBack, onNavigate, onContextMenu }: Artist
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
-                                                <p className={`font-bold truncate ${active ? 'text-white' : 'text-white/80'}`}>{decodeHtml(song.name)}</p>
+                                                    <p className={`font-bold truncate ${active ? 'text-white' : 'text-white/80'}`}>{decodeHtml(song.name)}</p>
                                                     <p className="text-xs text-white/40 truncate">{song.album?.name || 'Single'}</p>
                                                 </div>
 

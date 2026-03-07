@@ -957,7 +957,7 @@ function AndroidEntryContent({ onSwitchToDesktop }: AndroidEntryProps) {
                 return [{
                     label: "No Music Added",
                     type: 'action',
-                    action: () => alert("Use Search to add music first!")
+                    action: () => showToast("Use Search to add music first!")
                 }];
             }
 

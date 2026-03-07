@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { JioSaavnSong } from "@/lib/jiosaavn";
-import { Play, ListPlus, Radio, User, Disc, X, HardDrive, Trash2, ListMusic } from "lucide-react";
-import { usePlayback } from "@/components/providers/playback-context";
+import { Play, ListPlus, Radio, User, Disc, X, HardDrive, Trash2, ListMusic, Download, Sparkles } from "lucide-react";
+import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface TrackContextMenuProps {
@@ -22,7 +22,7 @@ interface TrackContextMenuProps {
     onAddToPlaylist: (song: JioSaavnSong) => void;
     onAddToOfflinePlaylist?: (song: JioSaavnSong) => void;
     onRemoveFromPlaylist?: (song: JioSaavnSong) => void;
-    onStartRadio?: (song: JioSaavnSong) => void;
+    showNavigation?: boolean; // [B2] Control visibility of Go to Artist/Album
 }
 
 export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
@@ -41,10 +41,16 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
     onAddToPlaylist,
     onAddToOfflinePlaylist,
     onRemoveFromPlaylist,
-    onStartRadio
+    showNavigation = true
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
-    const { startRadio } = usePlayback();
+    const { downloadedState } = useLibrary();
+    const { downloadSong } = usePlayback();
+
+    // Determine quality upgrade opportunity
+    const downloadedQualities = song ? downloadedState[song.id] || [] : [];
+    const hasFlac = downloadedQualities.includes('flac') || downloadedQualities.includes('hires');
+    const isOnlyLossy = downloadedQualities.length > 0 && !hasFlac;
 
     // Close on click outside
     useEffect(() => {
@@ -63,19 +69,38 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
         };
     }, [visible, onClose]);
 
+    // Track online state dynamically for Navigation (F28)
+    const [isOnline, setIsOnline] = useState(true);
+    useEffect(() => {
+        setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
     // Adjust position if off-screen
     const style: React.CSSProperties = {
         top: y,
         left: x,
     };
 
-    // Simple boundary check (logic can be improved for edge detection)
     if (typeof window !== 'undefined') {
         if (x + 200 > window.innerWidth) style.left = x - 200;
         if (y + 300 > window.innerHeight) style.top = y - 300;
     }
 
     if (!visible || !song) return null;
+
+    // [B1/B2/F28] Determine if we can navigate to artist/album (require internet for these actions)
+    const hasArtistId = !!(song.primaryArtistsId && song.primaryArtistsId.trim());
+    const hasArtistName = !!(song.primaryArtists && song.primaryArtists.trim());
+    const canGoToArtist = showNavigation && isOnline && (hasArtistId || hasArtistName);
+    const canGoToAlbum = showNavigation && isOnline && !!(song.album?.id && song.album.id.trim());
 
     return (
         <AnimatePresence>
@@ -88,7 +113,7 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
                     transition={{ duration: 0.1 }}
                     className="fixed z-50 w-56 glass-panel rounded-xl border border-white/10 shadow-2xl p-1.5 flex flex-col gap-1 backdrop-blur-xl bg-black/80 text-white"
                     style={style}
-                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+                    onClick={(e) => e.stopPropagation()}
                 >
                     <div className="px-2 py-1.5 mb-1 border-b border-white/10">
                         <h4 className="text-xs font-bold text-white line-clamp-1">{song.name}</h4>
@@ -97,40 +122,54 @@ export const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 
                     <MenuItem icon={<Play size={14} />} label="Play Now" onClick={() => { onPlay(song); onClose(); }} />
                     <MenuItem icon={<ListPlus size={14} />} label="Add to Queue" onClick={() => { onAddToQueue(song); onClose(); }} />
-                    <MenuItem icon={<Radio size={14} />} label="Start Radio" onClick={() => { onStartRadio ? onStartRadio(song) : startRadio(song); onClose(); }} />
                     <MenuItem icon={<ListMusic size={14} />} label="Add to Playlist" onClick={() => { onAddToPlaylist(song); onClose(); }} />
+
+                    {!isDownloaded && (
+                        <MenuItem icon={<Download size={14} />} label="Download" onClick={() => { onDownload(song); onClose(); }} />
+                    )}
+
+                    {/* Quality Upgrade Detector */}
+                    {isOnlyLossy && (
+                        <MenuItem
+                            icon={<Sparkles size={14} />}
+                            label="Upgrade to FLAC"
+                            highlight={true}
+                            onClick={() => { downloadSong(song); onClose(); }}
+                        />
+                    )}
+
+                    {isDownloaded && onRemoveDownload && (
+                        <MenuItem icon={<Trash2 size={14} />} label="Remove Download" variant="danger" onClick={() => { onRemoveDownload(song.id); onClose(); }} />
+                    )}
 
                     {isDownloaded && onAddToOfflinePlaylist && (
                         <MenuItem icon={<ListPlus size={14} />} label="Add to Offline Playlist" onClick={() => { onAddToOfflinePlaylist(song); onClose(); }} />
                     )}
 
-                    <div className="border-t border-white/10 my-1" />
+                    {/* [B2] Only show navigation when data is available */}
+                    {(canGoToArtist || canGoToAlbum) && (
+                        <>
+                            <div className="border-t border-white/10 my-1" />
 
-                    <MenuItem icon={<User size={14} />} label="Go to Artist" onClick={() => {
-                        // Try multiple paths for artist ID
-                        let artistId = '';
-                        if (song.primaryArtistsId) {
-                            artistId = song.primaryArtistsId.split(',')[0].trim();
-                        }
-                        if (artistId) {
-                            onGoToArtist(artistId);
-                            onClose();
-                        } else if (song.primaryArtists) {
-                            // Fallback: pass the artist name so ArtistView can search for it
-                            onGoToArtist(song.primaryArtists.split(',')[0].trim());
-                            onClose();
-                        }
-                    }} />
-                    <MenuItem icon={<Disc size={14} />} label="Go to Album" onClick={() => {
-                        if (song.album?.id) {
-                            onGoToAlbum(song.album.id);
-                            onClose();
-                        } else if (song.id) {
-                            // Fallback: use the song itself as album reference
-                            onGoToAlbum(song.id);
-                            onClose();
-                        }
-                    }} />
+                            {canGoToArtist && (
+                                <MenuItem icon={<User size={14} />} label="Go to Artist" onClick={() => {
+                                    const artistId = hasArtistId ? song.primaryArtistsId.split(',')[0].trim() : '';
+                                    if (artistId) {
+                                        onGoToArtist(artistId);
+                                    } else if (hasArtistName) {
+                                        onGoToArtist(song.primaryArtists.split(',')[0].trim());
+                                    }
+                                    onClose();
+                                }} />
+                            )}
+                            {canGoToAlbum && (
+                                <MenuItem icon={<Disc size={14} />} label="Go to Album" onClick={() => {
+                                    onGoToAlbum(song.album!.id);
+                                    onClose();
+                                }} />
+                            )}
+                        </>
+                    )}
                 </motion.div>
             )}
         </AnimatePresence>

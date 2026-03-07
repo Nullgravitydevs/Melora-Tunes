@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
+  serverExternalPackages: ["@ffmpeg-installer/ffmpeg"],
   turbopack: {},
   async rewrites() {
     return [

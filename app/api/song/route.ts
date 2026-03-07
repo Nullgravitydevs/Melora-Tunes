@@ -17,7 +17,8 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Invalid song ID format' }, { status: 400 });
     }
 
-    const apiUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&_format=json&pids=${id}&ctx=wap6dot0`;
+    const baseUrl = process.env.NEXT_PUBLIC_JIOSAAVN_API_URL || "https://www.jiosaavn.com/api.php?__call=";
+    const apiUrl = `${baseUrl}song.getDetails&_format=json&pids=${id}&ctx=wap6dot0`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
 

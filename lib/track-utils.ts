@@ -124,7 +124,12 @@ export function ensurePlayableTrack(song: any, defaultQuality: AudioQuality = '3
     // If it already has a compound ID (e.g. from OfflineStore), use it. 
     // Otherwise, bind it to the source provider to prevent collision.
     const sourceProvider = (song as any).source || 'jiosaavn';
-    const stableId = (song as any).stableId || (String(song.id).includes(':') ? song.id : `${song.id}:${sourceProvider}`);
+    let stableId = (song as any).stableId || String(song.id);
+
+    // Don't append provider suffix if it's an Audiophile/Apple Music ID or already has one
+    if (!stableId.includes(':') && !stableId.startsWith('am_')) {
+        stableId = `${stableId}:${sourceProvider}`;
+    }
 
     return {
         id: stableId,
