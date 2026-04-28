@@ -298,8 +298,14 @@ export function AudiophileSearch() {
 
                 setDownloadProgress({ id: String(amId), stage: 'Saving to library...', percent: 100 });
                 const meta = generateJioSaavnMetaFromApple(track);
-                const qualityLabel = parseInt(bitDepth) >= 24 ? 'hires' : 'flac';
-                await OfflineStore.saveSong(meta, blob, qualityLabel);
+                let qualityLabel = parseInt(bitDepth) >= 24 ? 'hires' : 'flac';
+
+                // Fallback Size Protection (same as offline-store)
+                if (blob.size < 12 * 1024 * 1024 && (qualityLabel === 'hires' || qualityLabel === 'flac')) {
+                    qualityLabel = '320';
+                }
+
+                await OfflineStore.saveSong(meta, blob, qualityLabel as any);
 
                 showToast(`✓ ${track.trackName} — ${bitDepth}-bit/${(parseInt(sampleRate) / 1000).toFixed(1)}kHz FLAC`, "success");
                 window.dispatchEvent(new CustomEvent('melora-offline-changed', { detail: { songId: meta.id, status: 'downloaded' } }));
@@ -326,10 +332,15 @@ export function AudiophileSearch() {
 
             const blob = await streamResponseToBlob(audioRes, String(amId), 'audio/flac');
 
-            setDownloadProgress({ id: String(amId), stage: 'Saving to library...', percent: 100 });
             const meta = generateJioSaavnMetaFromApple(track);
-            const qualityLabel = data.bitDepth >= 24 ? 'hires' : (data.quality === 'LOSSLESS' ? 'flac' : '320');
-            await OfflineStore.saveSong(meta, blob, qualityLabel);
+            let qualityLabel = data.bitDepth >= 24 ? 'hires' : (data.quality === 'LOSSLESS' ? 'flac' : '320');
+
+            // Fallback Size Protection (same as offline-store)
+            if (blob.size < 12 * 1024 * 1024 && (qualityLabel === 'hires' || qualityLabel === 'flac')) {
+                qualityLabel = '320';
+            }
+
+            await OfflineStore.saveSong(meta, blob, qualityLabel as any);
 
             const qualityText = data.bitDepth >= 24
                 ? `${data.bitDepth}-bit/${(data.sampleRate / 1000).toFixed(1)}kHz`

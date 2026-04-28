@@ -260,12 +260,6 @@ export async function GET(request: Request) {
 
             const songLinkData = await songLinkRes.json();
             const tidalUrl = songLinkData.linksByPlatform?.tidal?.url;
-            if (!tidalUrl) {
-                return NextResponse.json({ error: 'Song not found on Tidal.' }, { status: 404 });
-            }
-
-            tidalId = tidalUrl?.split('track/')[1]?.split('?')[0];
-            console.log(`[Audiophile] amId ${amId} → Tidal ID: ${tidalId}`);
 
             // S3: Grab Spotify URL for potential Deezer/Yoinkify fallback
             const spotifyUrl = songLinkData.linksByPlatform?.spotify?.url;
@@ -274,31 +268,68 @@ export async function GET(request: Request) {
                 // Attach it to the request context dynamically
                 (request as any).spotifyUrlFallback = spotifyUrl;
             }
+
+            if (!tidalUrl) {
+                if (spotifyUrl) {
+                    console.log(`[Audiophile] Song not on Tidal. Forcing Deezer/Spotify fallback early.`);
+                    tidalId = 'none'; // Signal to skip proxy
+                } else {
+                    return NextResponse.json({ error: 'Song not found on Tidal or Spotify.' }, { status: 404 });
+                }
+            } else {
+                tidalId = tidalUrl?.split('track/')[1]?.split('?')[0];
+                console.log(`[Audiophile] amId ${amId} → Tidal ID: ${tidalId}`);
+            }
         }
 
-        // Step 2: Fetch manifest from proxy
-        const proxyData = await fetchFromProxy(tidalId as string, requestedQuality);
-        if (!proxyData) {
+        // Step 2: Fetch manifest from proxy (skip if no Tidal ID)
+        let proxyData = null;
+        if (tidalId !== 'none') {
+            proxyData = await fetchFromProxy(tidalId as string, requestedQuality);
+        }
+
+        if (!proxyData && tidalId !== 'none') {
             return NextResponse.json({ error: 'All proxy endpoints failed.' }, { status: 502 });
         }
 
-        const manifestB64 = proxyData.data.manifest;
-        let audioQuality = proxyData.data.audioQuality || requestedQuality;
-        let bitDepth = proxyData.data.bitDepth || 24;
-        let sampleRate = proxyData.data.sampleRate || 192000;
+        // If proxyData is null, it means we must force Yoinkify Deezer Fallback
+        if (!proxyData) {
+            console.log(`[Audiophile] Skipping Tidal proxy (no Tidal ID). Preparing Deezer fallback.`);
+            // Mock a parsed object so it falls through to Case C / Deezer
+            const parsed = { isDash: true, directUrl: undefined, initUrl: undefined, mediaUrls: undefined };
+            // Simulate falling through...
+        }
+
+        const manifestB64 = proxyData?.data?.manifest || '';
+        let audioQuality = proxyData?.data?.audioQuality || requestedQuality;
+        let bitDepth = proxyData?.data?.bitDepth || 24;
+        let sampleRate = proxyData?.data?.sampleRate || 192000;
 
         // Step 3: Parse manifest
-        const parsed = parseManifest(manifestB64);
+        const parsed = manifestB64 ? parseManifest(manifestB64) : { isDash: true };
 
         // F30: If it's a pre-flight check, return what quality we actually found without downloading
         if (checkOnly) {
+            // Case A: proxyData is null, but we have a spotify fallback
+            if (!proxyData && (request as any).spotifyUrlFallback) {
+                return NextResponse.json({
+                    available: true,
+                    requested: requestedQuality,
+                    actual: 'LOSSLESS',
+                    bitDepth: 16,
+                    sampleRate: 44100,
+                    isDash: false,
+                    tidalId: 'none'
+                });
+            }
+
             return NextResponse.json({
                 available: true,
                 requested: requestedQuality,
                 actual: audioQuality,
                 bitDepth,
                 sampleRate,
-                isDash: parsed.isDash,
+                isDash: parsed?.isDash || false,
                 tidalId
             });
         }

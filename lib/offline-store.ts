@@ -165,17 +165,26 @@ class OfflineDB {
             }
 
             // 5. Determine quality label
+            let actualQuality = quality;
+            // FAKE HIRES PROTECTION: 
+            // If the blob is smaller than 10MB (approx 3-minute 320kbps is ~7.2MB), 
+            // it's highly likely a lossy proxy fallback that shouldn't get the premium FLAC/Hi-Res badge.
+            if ((quality === 'hires' || quality === 'flac') && blob.size < 12 * 1024 * 1024) {
+                console.warn(`[OfflineDB] Down-badging ${quality} track (${blob.size} bytes) to 320kbps. Likely a proxy fallback.`);
+                actualQuality = '320';
+            }
+
             let qualityLabel = 'Standard';
-            if (quality === 'hires') qualityLabel = 'Hi-Res Lossless';
-            else if (quality === 'flac') qualityLabel = 'Lossless (FLAC)';
-            else if (quality === '320') qualityLabel = 'High Quality (320kbps)';
-            else if (quality === '160') qualityLabel = 'Standard (160kbps)';
-            else if (quality === '96') qualityLabel = 'Data Saver (96kbps)';
+            if (actualQuality === 'hires') qualityLabel = 'Hi-Res Lossless';
+            else if (actualQuality === 'flac') qualityLabel = 'Lossless (FLAC)';
+            else if (actualQuality === '320') qualityLabel = 'High Quality (320kbps)';
+            else if (actualQuality === '160') qualityLabel = 'Standard (160kbps)';
+            else if (actualQuality === '96') qualityLabel = 'Data Saver (96kbps)';
 
             const record: OfflineSong = {
-                id: this.getCompositeId(song.id, quality),
+                id: this.getCompositeId(song.id, actualQuality),
                 songId: song.id,
-                quality,
+                quality: actualQuality,
                 blob,
                 metadata: metadataToSave,
                 savedAt: Date.now(),

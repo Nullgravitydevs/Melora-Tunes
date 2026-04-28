@@ -634,7 +634,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         };
 
         // 2. Use ephemeral "Now Playing" queue instead of Discovery Mix
-        const NOW_PLAYING_ID = 'now-playing-queue';
+        const NOW_PLAYING_ID = safeMix.id || 'now-playing-queue';
         setMixes(prev => {
             // Remove old now-playing queue if exists
             const filtered = prev.filter(m => m.id !== NOW_PLAYING_ID);
