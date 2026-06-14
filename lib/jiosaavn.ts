@@ -913,6 +913,19 @@ export async function getStrictLaunchData(language?: string): Promise<LaunchData
         const allLangs = lang.split(',').map(l => l.trim().toLowerCase()).filter(Boolean);
         const primaryLang = allLangs[0] || 'english';
 
+        // Check Cache (12 hour TTL)
+        if (typeof window !== 'undefined') {
+            try {
+                const { get } = await import('idb-keyval');
+                const CACHE_KEY = `launch_data_${primaryLang}`;
+                const cached = await get(CACHE_KEY);
+                if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 12) {
+                    console.log(`[getLaunchData] CACHE HIT for ${primaryLang}`);
+                    return cached.data;
+                }
+            } catch (e) {}
+        }
+
         // Rule 1: Max 3 languages for mixed sections (to prevent API overload)
         const mixLangs = allLangs.slice(0, 3);
         // Rule 2: Max 4 languages for "Best of" sections
@@ -988,10 +1001,9 @@ export async function getStrictLaunchData(language?: string): Promise<LaunchData
 
         const [moodLove, moodParty, moodWorkout, moodChill] = moodResults;
 
-        // Filter out empty bestOf sections
         const bestOf = bestOfResults.filter(b => b.items.length >= 2);
 
-        return {
+        const result: LaunchData = {
             new_trending: trending,
             new_albums: albums,
             moods: {
@@ -1014,6 +1026,17 @@ export async function getStrictLaunchData(language?: string): Promise<LaunchData
             charts: [],
             artist_recos: []
         };
+
+        // Save Cache
+        if (typeof window !== 'undefined') {
+            try {
+                const { set } = await import('idb-keyval');
+                const CACHE_KEY = `launch_data_${primaryLang}`;
+                await set(CACHE_KEY, { data: result, timestamp: Date.now() });
+            } catch (e) {}
+        }
+
+        return result;
     } catch (e) {
         console.error("Error fetching launch data", e);
         return {

@@ -64,6 +64,21 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
             </div>
 
+            {/* Unmute Overlay (Mobile Only) */}
+            <AnimatePresence>
+                {isMuted && isMobile && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer"
+                        onClick={() => setIsMuted(false)}
+                    >
+                        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 animate-pulse text-white/90 text-sm font-bold tracking-widest uppercase shadow-2xl">
+                            Tap to Unmute
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* === CONTENT LAYER === */}
             <div className="relative z-10 flex-1 flex flex-col">
 

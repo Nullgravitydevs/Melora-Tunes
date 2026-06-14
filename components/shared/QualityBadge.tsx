@@ -44,7 +44,7 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
                 );
             case '320':
                 return (
-                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-green-500/20 text-green-400 border border-green-500/30", className)}>
+                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-white/20 text-white border border-white/30", className)}>
                         HQ
                     </span>
                 );
@@ -95,7 +95,7 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
             case '320':
                 return (
                     <div className={cn("flex flex-col items-center gap-1", className)}>
-                        <span className="text-green-500 font-bold tracking-widest text-[10px] uppercase flex items-center gap-1">
+                        <span className="text-white font-bold tracking-widest text-[10px] uppercase flex items-center gap-1">
                             🎶 High-Quality Streaming
                         </span>
                         <span className="text-[10px] text-white/40 font-mono tracking-tight uppercase">

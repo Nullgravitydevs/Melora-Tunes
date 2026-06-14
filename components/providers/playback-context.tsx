@@ -212,6 +212,29 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         downloadedState, removeDownload, isDownloaded, refreshDownloadedState
     } = useLibrary();
 
+    // --- State Persistence ---
+    const hasRestoredRef = useRef(false);
+    useEffect(() => {
+        if (hasRestoredRef.current || mixes.length === 0) return;
+        try {
+            const savedState = localStorage.getItem('melora_playback_state');
+            if (savedState) {
+                const { savedMixId, savedIndex } = JSON.parse(savedState);
+                if (savedMixId && mixes.some(m => m.id === savedMixId)) {
+                    setActiveMixId(savedMixId);
+                    setPlayingIndex(savedIndex || 0);
+                }
+            }
+        } catch (e) {}
+        hasRestoredRef.current = true;
+    }, [mixes]);
+
+    useEffect(() => {
+        if (activeMixId) {
+            localStorage.setItem('melora_playback_state', JSON.stringify({ savedMixId: activeMixId, savedIndex: playingIndex }));
+        }
+    }, [activeMixId, playingIndex]);
+
     // Audio Hooks/Refs
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
     const loadRequestId = useRef(0); // Async guard
@@ -326,6 +349,27 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
         return () => navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
     }, [isPlaying, showToast]);
+
+    // Background Audio & MediaSession Integration
+    useEffect(() => {
+        if ('mediaSession' in navigator && currentSong) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: decodeHtml(currentSong.name || currentSong.title || 'Unknown Title'),
+                artist: decodeHtml(currentSong.primaryArtists || currentSong.artist || 'Unknown Artist'),
+                album: decodeHtml((currentSong.album as any)?.name || ''),
+                artwork: [
+                    { src: currentSong.image?.[0]?.link || '', sizes: '96x96', type: 'image/jpeg' },
+                    { src: currentSong.image?.[1]?.link || currentSong.image?.[0]?.link || '', sizes: '256x256', type: 'image/jpeg' },
+                    { src: currentSong.image?.[2]?.link || currentSong.image?.[0]?.link || '', sizes: '512x512', type: 'image/jpeg' }
+                ].filter(a => a.src)
+            });
+
+            navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+            navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+            navigator.mediaSession.setActionHandler('previoustrack', () => setPlayingIndex(p => Math.max(0, p - 1)));
+            navigator.mediaSession.setActionHandler('nexttrack', () => setPlayingIndex(p => p + 1));
+        }
+    }, [currentSong]);
 
     // [PERF FIX #2] Memoize derived state and inject local playingIndex to prevent massive LibraryContext re-renders
     const activeMix = useMemo(() => {

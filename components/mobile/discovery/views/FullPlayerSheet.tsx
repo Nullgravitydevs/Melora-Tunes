@@ -183,16 +183,7 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                                                 {activeQuality && (
                                                     <QualityBadge quality={activeQuality} variant="full" />
                                                 )}
-                                                {currentTrackMetadata && (
-                                                    <div className="flex gap-1">
-                                                        <span className="bg-white/10 text-white/70 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-white/5 tracking-wider backdrop-blur-md">
-                                                            {currentTrackMetadata.bpm} BPM
-                                                        </span>
-                                                        <span className="bg-white/10 text-white/70 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-white/5 tracking-wider backdrop-blur-md">
-                                                            {currentTrackMetadata.key}
-                                                        </span>
-                                                    </div>
-                                                )}
+
                                             </div>
                                         </div>
                                     </motion.div>

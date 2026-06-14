@@ -29,6 +29,8 @@ $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;an
 
 echo "=== 4. Building APK ==="
 cd /home/pepper-salt/Documents/melora-tunes/android
+export JAVA_HOME="/home/pepper-salt/Documents/melora-tunes/jdk-21.0.2"
+export PATH="$JAVA_HOME/bin:$PATH"
 chmod +x gradlew
 ./gradlew assembleDebug
 
