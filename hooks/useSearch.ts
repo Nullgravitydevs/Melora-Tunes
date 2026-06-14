@@ -44,7 +44,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
         setIsSearching(true);
         searchTimeout.current = setTimeout(async () => {
             try {
-                const data = await searchUnified(query, filter);
+                const data = await searchUnified(query, undefined, filter);
                 setResults(data);
             } catch (e) {
                 console.error("Search error:", e);

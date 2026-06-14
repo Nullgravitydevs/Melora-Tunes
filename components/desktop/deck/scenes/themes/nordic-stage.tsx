@@ -349,6 +349,7 @@ export function NordicStage({
                                 </div>
 
                                 <div className="flex items-center gap-3 relative">
+                                    <span className="text-[9px] font-mono font-bold tracking-wider text-slate-500 shrink-0">VOL</span>
                                     <Volume2 size={18} className="text-slate-400" />
                                     <div className="w-20 h-1 bg-slate-800 rounded-full relative overflow-hidden">
                                         <div

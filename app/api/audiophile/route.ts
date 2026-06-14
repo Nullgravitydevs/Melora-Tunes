@@ -415,18 +415,37 @@ export async function GET(request: Request) {
                 });
 
                 // Read the FLAC and return as streamable response
-                const { readFileSync, statSync } = require('fs');
-                const flacBuffer = readFileSync(flacPath);
+                const { createReadStream, statSync } = require('fs');
                 const flacSize = statSync(flacPath).size;
 
                 console.log(`[Audiophile] ✓ DASH stitch complete! FLAC size: ${(flacSize / 1024 / 1024).toFixed(2)} MB`);
 
-                // Clean up temp files
-                try { await unlink(m4aPath); } catch { }
-                try { if (artPath) await unlink(artPath); } catch { }
-                try { await unlink(flacPath); } catch { }
+                const stream = createReadStream(flacPath);
+                const cleanup = () => {
+                    try { unlink(m4aPath); } catch { }
+                    try { if (artPath) unlink(artPath); } catch { }
+                    try { unlink(flacPath); } catch { }
+                };
 
-                return new Response(flacBuffer, {
+                const readableStream = new ReadableStream({
+                    start(controller) {
+                        stream.on('data', (chunk: any) => controller.enqueue(chunk));
+                        stream.on('end', () => {
+                            controller.close();
+                            cleanup();
+                        });
+                        stream.on('error', (err: any) => {
+                            controller.error(err);
+                            cleanup();
+                        });
+                    },
+                    cancel() {
+                        stream.destroy();
+                        cleanup();
+                    }
+                });
+
+                return new Response(readableStream, {
                     headers: {
                         'Content-Type': 'audio/flac',
                         'Content-Length': String(flacSize),

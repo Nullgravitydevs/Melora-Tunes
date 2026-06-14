@@ -12,7 +12,8 @@ import { usePlayback, useLibrary, Mix } from "@/components/providers/playback-co
 import { Visualizer } from "@/components/ui/visualizer";
 import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
-import { QualityBadge } from "@/components/shared/QualityBadge";import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { QualityBadge } from "@/components/shared/QualityBadge";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
 interface ZenStageProps {
@@ -74,6 +75,7 @@ export function ZenStage({
     const [showLyrics, setShowLyrics] = useState(false);
     const [showEq, setShowEq] = useState(false);
     const [isRackOpen, setIsRackOpen] = useState(false);
+    const [failedMixId, setFailedMixId] = useState<string | null>(null);
 
     // Drag Logic Helpers
     const isDraggingRef = useRef(false);
@@ -97,9 +99,14 @@ export function ZenStage({
             if (pt.x >= rect.left && pt.x <= rect.right && pt.y >= rect.top && pt.y <= rect.bottom) {
                 playClunk();
                 loadMix(mixId);
+            } else {
+                setFailedMixId(mixId);
+                setTimeout(() => {
+                    setFailedMixId(null);
+                }, 500);
             }
         }
-    }, [playClunk, loadMix]);
+    }, [playClunk, loadMix, setFailedMixId]);
 
     const handleClick = useCallback((callback: () => void) => {
         if (!isDraggingRef.current) callback();
@@ -239,6 +246,7 @@ export function ZenStage({
                                     const colorClass = isDark ? "bg-zinc-900" : "bg-zinc-200";
                                     const isDarkCassette = isDark; // In dark mode, tapes are dark. In light mode, tapes are light.
 
+                                    const isFailed = failedMixId === mix.id;
                                     return (
                                         <motion.div
                                             key={mix.id}
@@ -250,16 +258,27 @@ export function ZenStage({
                                             onDragStart={handleDragStart}
                                             onDragEnd={(e, info) => handleDragEnd(e, info, mix.id)}
                                             initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
+                                            animate={isFailed ? {
+                                                opacity: 1,
+                                                scale: 1,
+                                                x: [0, -8, 8, -8, 8, -4, 4, 0]
+                                            } : {
+                                                opacity: 1,
+                                                scale: 1,
+                                                x: 0
+                                            }}
+                                            transition={isFailed ? { duration: 0.4 } : undefined}
                                             whileHover={{ scale: 1.05, zIndex: 50, transition: { duration: 0.2 } }}
                                             whileDrag={{ scale: 1.1, zIndex: 100, rotate: 2, cursor: "grabbing" }}
                                             onClick={() => handleClick(() => {
                                                 playClunk();
                                                 loadMix(mix.id);
                                             })}
-                                            className={clsx("group relative w-full aspect-[3/2] rounded-lg shadow-lg border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing overflow-visible z-0 transition-colors",
+                                            className={clsx("group relative w-full aspect-[3/2] rounded-lg shadow-lg border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing overflow-visible z-0 transition-all",
                                                 colorClass,
-                                                isDarkCassette ? "border-white/10" : "border-black/10 shadow-xl"
+                                                isFailed 
+                                                    ? "border-red-500 ring-4 ring-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.8)]"
+                                                    : (isDarkCassette ? "border-white/10" : "border-black/10 shadow-xl")
                                             )}
                                         >
                                             {/* Screws */}

@@ -1766,6 +1766,85 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    // --- OS Media Session API Integration ---
+    useEffect(() => {
+        if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+        if (currentSong) {
+            const song = currentSong as any;
+            const getArt = () => {
+                if (song.image) {
+                    if (Array.isArray(song.image)) {
+                        const highestRes = song.image[song.image.length - 1] as any;
+                        return highestRes?.link || highestRes?.url || (typeof highestRes === 'string' ? highestRes : "");
+                    }
+                    if (typeof song.image === 'string') {
+                        return song.image;
+                    }
+                }
+                return "";
+            };
+
+            const artUrl = getArt();
+            const albumName = typeof song.album === 'object'
+                ? (song.album?.name || "Melora Tunes")
+                : (song.album || "Melora Tunes");
+
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: decodeHtml(song.name || song.title || "Unknown Title"),
+                artist: decodeHtml(song.primaryArtists || song.artist || "Unknown Artist"),
+                album: decodeHtml(albumName),
+                artwork: artUrl ? [
+                    { src: artUrl, sizes: '500x500', type: 'image/jpeg' }
+                ] : []
+            });
+        } else {
+            navigator.mediaSession.metadata = null;
+        }
+    }, [currentSong]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+        navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+    }, [isPlaying]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+        try {
+            navigator.mediaSession.setActionHandler('play', () => {
+                play();
+            });
+            navigator.mediaSession.setActionHandler('pause', () => {
+                pause();
+            });
+            navigator.mediaSession.setActionHandler('previoustrack', () => {
+                prev();
+            });
+            navigator.mediaSession.setActionHandler('nexttrack', () => {
+                next();
+            });
+            navigator.mediaSession.setActionHandler('seekto', (details) => {
+                if (details.seekTime !== undefined) {
+                    seek(details.seekTime);
+                }
+            });
+        } catch (error) {
+            console.warn("Failed to set MediaSession action handlers:", error);
+        }
+
+        return () => {
+            if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+            try {
+                navigator.mediaSession.setActionHandler('play', null);
+                navigator.mediaSession.setActionHandler('pause', null);
+                navigator.mediaSession.setActionHandler('previoustrack', null);
+                navigator.mediaSession.setActionHandler('nexttrack', null);
+                navigator.mediaSession.setActionHandler('seekto', null);
+            } catch (e) {}
+        };
+    }, [play, pause, next, prev, seek]);
+
     const getAnalyser = useCallback(() => {
         return audioPlayerRef.current?.getAnalyser() || null;
     }, []);

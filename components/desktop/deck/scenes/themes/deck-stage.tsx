@@ -40,6 +40,7 @@ interface DragPosition { x: number; y: number; }
 export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSettings, onEditMix, onOpenSearch, onCreateMix, onCinemaMode, onOpenThemeSelector, onShowLyrics, onShowQueue, onShareMix, isMobileDevice }: DeckStageProps) {
     const [viewMode, setViewMode] = useState<'split' | 'rack' | 'player'>('split');
     const [isCompact, setIsCompact] = useState(false);
+    const [failedMixId, setFailedMixId] = useState<string | null>(null);
 
     // Drag Persistence State
     const [positions, setPositions] = useState<Record<string, DragPosition>>({});
@@ -213,9 +214,14 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                     playInsert();
                     loadMix(id.replace('mix-', ''));
                 }
+            } else {
+                setFailedMixId(id);
+                setTimeout(() => {
+                    setFailedMixId(null);
+                }, 500);
             }
         }
-    }, [activeMixId, playInsert, loadMix, updatePosition]);
+    }, [activeMixId, playInsert, loadMix, updatePosition, setFailedMixId]);
 
     const cassetteColors: Record<string, string> = {
         purple: "bg-purple-600",
@@ -481,6 +487,10 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                         ? "bg-white/40"
                                         : (accentColors[mix.color] || "bg-orange-300");
 
+                                    const isFailed = failedMixId === `mix-${mix.id}`;
+                                    const xPos = positions[`mix-${mix.id}`]?.x || 0;
+                                    const yPos = positions[`mix-${mix.id}`]?.y || 0;
+
                                     return (
                                         <motion.div
                                             key={mix.id}
@@ -488,7 +498,14 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                             dragConstraints={containerRef}
                                             dragElastic={0.2}
                                             dragMomentum={false} // False for strict persistence
-                                            animate={{ x: positions[`mix-${mix.id}`]?.x || 0, y: positions[`mix-${mix.id}`]?.y || 0 }}
+                                            animate={isFailed ? {
+                                                x: [xPos, xPos - 8, xPos + 8, xPos - 8, xPos + 8, xPos - 4, xPos + 4, xPos],
+                                                y: yPos
+                                            } : {
+                                                x: xPos,
+                                                y: yPos
+                                            }}
+                                            transition={isFailed ? { duration: 0.4 } : undefined}
                                             onDragEnd={(e, info) => handleDragEnd(e, info, `mix-${mix.id}`, true)}
                                             // Click handler for Guardrail (Rack Mode)
                                             onClick={() => {
@@ -501,8 +518,9 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                             }}
                                             whileDrag={{ zIndex: 9999, scale: 1.1, cursor: "grabbing" }}
                                             className={clsx(
-                                                "group relative w-full aspect-[3/2] rounded-lg shadow-lg hover:shadow-xl p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing transform-gpu will-change-transform",
-                                                bgColor
+                                                "group relative w-full aspect-[3/2] rounded-lg shadow-lg hover:shadow-xl p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing transform-gpu will-change-transform border transition-all",
+                                                bgColor,
+                                                isFailed ? "border-red-500 ring-4 ring-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.8)]" : "border-transparent"
                                             )}
                                             id={`studio-mix-${mix.id}`}
                                             style={{ backgroundImage: isOTG ? 'url("/glass-noise.png"), linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)' : 'repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px, transparent 2px, transparent 4px)' }}
@@ -942,7 +960,8 @@ export function DeckStage({ currentTheme, onThemeChange, onSelectTheme, onOpenSe
                                     <span className="mt-0.5 tracking-widest text-[9px] font-bold">EQ</span>
                                 </button>
 
-                                <div className="flex items-center gap-2 w-28 ml-4">
+                                <div className="flex items-center gap-2 w-36 ml-4">
+                                    <span className="text-[10px] font-bold text-gray-500 tracking-wider font-mono shrink-0">VOLUME</span>
                                     <Volume2 size={16} className="text-gray-400 shrink-0" />
                                     <div
                                         className="h-1.5 flex-grow bg-gray-300 rounded-full relative cursor-pointer z-50 group hover:h-2 transition-all"

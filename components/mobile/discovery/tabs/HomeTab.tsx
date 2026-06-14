@@ -30,14 +30,13 @@ export function HomeTab({ onNavigate }: Props) {
         return h < 12 ? "Good Morning" : h < 18 ? "Good Afternoon" : "Good Evening";
     }, []);
 
-    const userName = useMemo(() => {
-        try { return loadSettings().userName || ""; } catch { return ""; }
-    }, []);
+    const [userName, setUserName] = useState("");
 
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
             const settings = loadSettings();
+            setUserName(settings.userName || "");
             const langs = settings.languages || ["english", "hindi"];
             const langStr = langs.join(",");
 

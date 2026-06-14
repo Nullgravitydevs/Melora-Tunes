@@ -24,6 +24,18 @@ if (!ffmpegPath) {
     } catch (e) { }
 }
 
+function isValidUrl(urlString: string | null) {
+    if (!urlString) return false;
+    try {
+        const url = new URL(urlString);
+        if (!['http:', 'https:'].includes(url.protocol)) return false;
+        if (url.hostname.match(/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/)) return false;
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const downloadUrl = searchParams.get('url');
@@ -33,8 +45,8 @@ export async function GET(request: Request) {
     const artUrl = searchParams.get('art');
     const songId = searchParams.get('songId');
 
-    if (!downloadUrl) {
-        return NextResponse.json({ error: 'Missing download URL' }, { status: 400 });
+    if (!downloadUrl || !isValidUrl(downloadUrl)) {
+        return NextResponse.json({ error: 'Missing or invalid download URL' }, { status: 400 });
     }
 
     // Case 1: Simple Proxy (No metadata or no ffmpeg)
@@ -121,14 +133,33 @@ export async function GET(request: Request) {
             });
         });
 
-        const { readFileSync, statSync } = require('fs');
-        const buffer = readFileSync(outputPath);
+        const { createReadStream, statSync } = require('fs');
         const size = statSync(outputPath).size;
+        const stream = createReadStream(outputPath);
 
-        // Cleanup
-        try { unlink(inputPath); unlink(artPath); unlink(outputPath); } catch { }
+        const cleanup = () => {
+            try { unlink(inputPath); unlink(artPath); unlink(outputPath); } catch { }
+        };
 
-        return new Response(buffer, {
+        const readableStream = new ReadableStream({
+            start(controller) {
+                stream.on('data', (chunk: any) => controller.enqueue(chunk));
+                stream.on('end', () => {
+                    controller.close();
+                    cleanup();
+                });
+                stream.on('error', (err: any) => {
+                    controller.error(err);
+                    cleanup();
+                });
+            },
+            cancel() {
+                stream.destroy();
+                cleanup();
+            }
+        });
+
+        return new Response(readableStream, {
             headers: {
                 'Content-Type': 'audio/flac',
                 'Content-Length': String(size),

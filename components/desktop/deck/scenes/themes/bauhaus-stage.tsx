@@ -11,7 +11,8 @@ import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
-import { QualityBadge } from "@/components/shared/QualityBadge";import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { QualityBadge } from "@/components/shared/QualityBadge";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
 export interface Position { x: number; y: number; rotation: number; }
@@ -63,6 +64,7 @@ function DraggableMixCard({
 }) {
     const x = useMotionValue(position.x);
     const y = useMotionValue(position.y);
+    const [isFailed, setIsFailed] = useState(false);
 
     // Sync if parent updates
     useEffect(() => {
@@ -78,8 +80,13 @@ function DraggableMixCard({
             dragElastic={0.1}
             whileDrag={{ scale: 1.05, zIndex: 100, rotate: 0 }}
             whileHover={{ scale: 1.02, zIndex: 50 }}
+            animate={isFailed ? {
+                x: [x.get(), x.get() - 8, x.get() + 8, x.get() - 8, x.get() + 8, x.get() - 4, x.get() + 4, x.get()]
+            } : undefined}
+            transition={isFailed ? { duration: 0.4 } : undefined}
             className={clsx("absolute top-0 left-0 cursor-grab active:cursor-grabbing w-[200px] group", isActive && "opacity-50 pointer-events-none grayscale")}
             onDragEnd={(e, info) => {
+                let droppedOnPlayer = false;
                 // Check drop on player
                 if (playerRef.current) {
                     const rect = playerRef.current.getBoundingClientRect();
@@ -87,7 +94,14 @@ function DraggableMixCard({
                     if (dropX >= rect.left && dropX <= rect.right && dropY >= rect.top && dropY <= rect.bottom) {
                         playClick();
                         loadMix(mix.id);
+                        droppedOnPlayer = true;
                     }
+                }
+                if (!droppedOnPlayer) {
+                    setIsFailed(true);
+                    setTimeout(() => {
+                        setIsFailed(false);
+                    }, 500);
                 }
                 // Persist Position
                 onDragEnd(mix.id, { x: x.get(), y: y.get(), rotation: position.rotation });
@@ -98,7 +112,10 @@ function DraggableMixCard({
             <div
                 id={`mix-card-${mix.id}`}
                 className={clsx(
-                    "relative p-3 border-2 border-[#1a1a1a] transition-transform transform aspect-[3/2] flex flex-col justify-between shadow-[6px_6px_0px_0px_#1a1a1a]",
+                    "relative p-3 border-2 transition-all transform aspect-[3/2] flex flex-col justify-between",
+                    isFailed
+                        ? "border-red-600 ring-4 ring-red-600/50 shadow-[0_0_20px_rgba(220,38,38,0.8)]"
+                        : "border-[#1a1a1a] shadow-[6px_6px_0px_0px_#1a1a1a]",
                     // Bauhaus Color Mapping: Strict Theme-Controlled Colors (Ignoring mix.color)
                     (() => {
                         // Deterministic Hash based on Mix ID - Theme decides the color, not the playlist
@@ -415,6 +432,7 @@ export function BauhausStage({ currentTheme, onThemeChange, onSelectTheme, onOpe
                                 <span className="mt-0.5 tracking-widest text-[9px] font-bold">EQ</span>
                             </button>
                             <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-bold text-gray-500 font-mono tracking-widest uppercase shrink-0">VOL</span>
                                 <Volume2 size={14} className="text-gray-400" />
                                 <div className="h-1.5 w-16 bg-gray-200 rounded-full relative cursor-pointer border border-[#1a1a1a]"
                                     onClick={(e) => {

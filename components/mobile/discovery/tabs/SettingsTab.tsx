@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { useSettings } from "@/components/providers/settings-provider";
 import { motion, AnimatePresence } from "framer-motion";
@@ -39,12 +39,18 @@ export function SettingsTab() {
     const { likedSongs, mixes, setMixes, recentlyPlayed } = useLibrary();
 
     const [activeTab, setActiveTab] = useState<Tab>("profile");
-    const settings = useMemo(() => loadSettings(), []);
-    const [selectedLangs, setSelectedLangs] = useState<string[]>(settings.languages || ["english", "hindi"]);
+    const [selectedLangs, setSelectedLangs] = useState<string[]>([]);
 
     // Profile
-    const [profileName, setProfileName] = useState(settings.userName || "");
-    const [profileDOB, setProfileDOB] = useState(settings.userDOB || "");
+    const [profileName, setProfileName] = useState("");
+    const [profileDOB, setProfileDOB] = useState("");
+
+    useEffect(() => {
+        const settings = loadSettings();
+        setSelectedLangs(settings.languages || ["english", "hindi"]);
+        setProfileName(settings.userName || "");
+        setProfileDOB(settings.userDOB || "");
+    }, []);
 
     const [showConfirm, setShowConfirm] = useState<{ message: string; action: () => void; destructive?: boolean } | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);

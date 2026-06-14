@@ -29,8 +29,37 @@ export function ClickWheel({ theme = 'classic', enableSounds = true, onScroll, o
     const lastScrollSound = useRef(0);
     const hasMoved = useRef(false);
 
+    const hapticsRef = useRef<any>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        import('@capacitor/haptics').then((module) => {
+            if (isMounted) {
+                hapticsRef.current = module.Haptics;
+            }
+        }).catch((err) => {
+            console.warn("Capacitor haptics not available:", err);
+        });
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     // Feedback Helpers
     const triggerHaptic = (duration: number | number[]) => {
+        if (hapticsRef.current) {
+            try {
+                if (typeof duration === 'number' && duration <= 5) {
+                    hapticsRef.current.impact({ style: 'light' });
+                } else {
+                    hapticsRef.current.vibrate();
+                }
+                return;
+            } catch (e) {
+                // fall back to navigator.vibrate
+            }
+        }
+
         if (typeof navigator === 'undefined' || !navigator.vibrate) return;
         const now = Date.now();
         if (now - lastVibration.current > 50) { // Global throttle 50ms

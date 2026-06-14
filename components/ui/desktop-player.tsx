@@ -471,6 +471,7 @@ function CassetteDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig })
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-500 tracking-wider font-mono shrink-0">VOL</span>
                         <Volume2 className="text-gray-600 dark:text-gray-400 size-5" />
                         <div className="w-16 h-1 rounded-full bg-gray-300 dark:bg-gray-600 cursor-pointer"
                             onClick={(e) => {
@@ -655,7 +656,8 @@ function StudioDeck({ theme, ...props }: PlayerProps & { theme: ThemeConfig }) {
                         <span className="mt-0.5 tracking-widest text-[9px]">EJECT</span>
                     </button>
 
-                    <div className="flex items-center gap-2 w-20">
+                    <div className="flex items-center gap-2 w-24">
+                        <span className="text-[9px] font-bold text-gray-400 font-mono shrink-0">VOL</span>
                         <span className="material-icons-round text-base text-gray-400">volume_up</span>
                         <div
                             className="h-1 flex-grow bg-gray-300 rounded-full relative cursor-pointer"

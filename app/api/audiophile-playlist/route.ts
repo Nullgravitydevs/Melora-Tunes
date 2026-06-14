@@ -25,11 +25,11 @@ export async function GET(request: Request) {
 
         // Strategy: Look for the serialized data script tag which contains the full track list JSON
         // Using RegExp object to avoid TS parser issues with script tags inside regex literals
-        const scriptMatch = html.match(new RegExp('<script id="serialized-server-data" type="application/json">([\\\\s\\\\S]*?)</script>'));
+        const scriptMatch = html.match(/<script id="serialized-server-data" type="application\/json">([\s\S]*?)<\/script>/);
 
         if (!scriptMatch) {
             // Fallback: Try to find any large JSON blob that looks like track data
-            const anyJsonMatch = html.match(new RegExp('\\[\\{"id":"pl\\..*?\\}\\]'));
+            const anyJsonMatch = html.match(/\[\{"id":"pl\..*?\}\]/);
             if (!anyJsonMatch) {
                 return NextResponse.json({ error: 'Could not find playlist data on page. It might be private or region-locked.' }, { status: 404 });
             }

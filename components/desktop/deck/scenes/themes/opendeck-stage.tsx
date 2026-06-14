@@ -16,7 +16,8 @@ import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
 import { Visualizer } from "@/components/ui/visualizer";
-import { QualityBadge } from "@/components/shared/QualityBadge";import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { QualityBadge } from "@/components/shared/QualityBadge";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
 interface OpenDeckStageProps {
@@ -54,6 +55,7 @@ export function OpenDeckStage({
 
     // Drag State
     const [dragPosition, setDragPosition] = useState<{ x: number, y: number } | null>(null);
+    const [failedMixId, setFailedMixId] = useState<string | null>(null);
     const [draggingMix, setDraggingMix] = useState<{ mix: Mix, index: number } | null>(null);
     const [isOverPlayer, setIsOverPlayer] = useState(false);
 
@@ -130,12 +132,17 @@ export function OpenDeckStage({
         if (isOverPlayer) {
             playInsert();
             loadMix(draggingMix.mix.id);
+        } else {
+            setFailedMixId(draggingMix.mix.id);
+            setTimeout(() => {
+                setFailedMixId(null);
+            }, 500);
         }
 
         setDraggingMix(null);
         setDragPosition(null);
         setIsOverPlayer(false);
-    }, [draggingMix, isOverPlayer, playInsert, loadMix]);
+    }, [draggingMix, isOverPlayer, playInsert, loadMix, setFailedMixId]);
 
     return (
         <div
@@ -146,6 +153,22 @@ export function OpenDeckStage({
             onPointerUp={handleDragEnd}
             onPointerLeave={handleDragEnd}
         >
+            <style>{`
+                @keyframes opendeck-shake {
+                    0%, 100% { transform: translateX(0); }
+                    12.5% { transform: translateX(-8px); }
+                    25% { transform: translateX(8px); }
+                    37.5% { transform: translateX(-8px); }
+                    50% { transform: translateX(8px); }
+                    62.5% { transform: translateX(-4px); }
+                    75% { transform: translateX(4px); }
+                    87.5% { transform: translateX(-2px); }
+                    93.75% { transform: translateX(2px); }
+                }
+                .opendeck-shake {
+                    animation: opendeck-shake 0.5s ease-in-out;
+                }
+            `}</style>
             {/* Header - Fixed height */}
             <header className="flex items-center justify-between px-6 py-4 shrink-0">
                 <div className="flex items-center gap-3">
@@ -185,18 +208,25 @@ export function OpenDeckStage({
                                     const isInsidePlayer = isLoaded && activeMixId === mix.id;
                                     const isDragging = draggingMix?.mix.id === mix.id;
 
+                                    const isFailed = failedMixId === mix.id;
                                     return (
                                         <div
                                             key={mix.id}
                                             onPointerDown={(e) => { if (!isInsidePlayer) handleDragStart(mix, index, e); }}
                                             onClick={() => { if (!isInsidePlayer && !draggingMix) { playClick(); loadMix(mix.id); } }}
                                             className={clsx(
-                                                "select-none shrink-0",
+                                                "select-none shrink-0 transition-all duration-300",
                                                 isInsidePlayer ? "opacity-40 cursor-default" : "cursor-grab",
-                                                isDragging && "opacity-20"
+                                                isDragging && "opacity-20",
+                                                isFailed && "opendeck-shake"
                                             )}
                                         >
-                                            <div className={`w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-lg relative overflow-hidden`}>
+                                            <div className={clsx(
+                                                `w-52 h-36 bg-gradient-to-br ${style.bg} rounded shadow-lg relative overflow-hidden border transition-all`,
+                                                isFailed
+                                                    ? "border-red-500 ring-4 ring-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.8)]"
+                                                    : "border-transparent"
+                                            )}>
                                                 <div className="absolute inset-1 flex items-center justify-center">
                                                     <div className="w-full h-5 bg-black/20 flex justify-around items-center px-2">
                                                         <div className={`size-3 rounded-full border-2 ${style.reelBorder}`} />
@@ -319,9 +349,12 @@ export function OpenDeckStage({
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); togglePlay(); }} className="size-10 rounded-full bg-[#2d8652] flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-transform">{isPlaying ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current pl-0.5" />}</button>
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); next(); }} disabled={!isLoaded} className={clsx("p-1.5", isLoaded ? "text-neutral-500 hover:text-[#2d8652]" : "text-neutral-300")}><SkipForward size={18} className="fill-current" /></button>
                                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { playClick(); setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'); }} className={clsx("p-1.5 relative", repeat !== 'off' ? "text-[#2d8652]" : isLoaded ? "text-neutral-400 hover:text-[#2d8652]" : "text-neutral-300")} title={`Repeat: ${repeat.toUpperCase()}`}><Repeat size={15} />{repeat === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[7px] font-bold text-[#2d8652]">1</span>}</button>
-                                <div className="relative h-1 w-16 bg-neutral-200 rounded-full ml-3" onPointerDown={(e) => e.stopPropagation()}>
-                                    <div className="absolute inset-y-0 left-0 bg-[#2d8652]/50 rounded-full" style={{ width: `${volume * 100}%` }} />
-                                    <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
+                                <div className="flex items-center gap-2 ml-3">
+                                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest shrink-0">VOL</span>
+                                    <div className="relative h-1 w-16 bg-neutral-200 rounded-full" onPointerDown={(e) => e.stopPropagation()}>
+                                        <div className="absolute inset-y-0 left-0 bg-[#2d8652]/50 rounded-full" style={{ width: `${volume * 100}%` }} />
+                                        <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer w-full" />
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -17,7 +17,8 @@ import { LyricsView } from "@/components/ui/lyrics-view";
 import { EqualizerView } from "@/components/ui/equalizer-view";
 import { Mic2, SlidersHorizontal, ListMusic } from "lucide-react";
 import { TapeRackModal } from "@/components/desktop/deck/modals/TapeRackModal";
-import { QualityBadge } from "@/components/shared/QualityBadge";import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { QualityBadge } from "@/components/shared/QualityBadge";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
 interface BoomboxStageProps {
@@ -70,6 +71,7 @@ function DraggablePolaroid({
     const x = useMotionValue(position.x);
     const y = useMotionValue(position.y);
     const [showButtons, setShowButtons] = useState(false);
+    const [isFailed, setIsFailed] = useState(false);
 
     // Cache rect to avoid thrashing
     const playerRectRef = useRef<DOMRect | null>(null);
@@ -96,15 +98,24 @@ function DraggablePolaroid({
     };
 
     const handleDragEnd = (_: any, info: any) => {
+        let droppedOnPlayer = false;
         if (playerRectRef.current) {
             const rect = playerRectRef.current;
             if (info.point.x >= rect.left && info.point.x <= rect.right &&
                 info.point.y >= rect.top && info.point.y <= rect.bottom) {
                 onDropOnPlayer(mix);
+                droppedOnPlayer = true;
             }
         }
         onHoverPlayer(false);
         playerRectRef.current = null; // Clear cache
+
+        if (!droppedOnPlayer) {
+            setIsFailed(true);
+            setTimeout(() => {
+                setIsFailed(false);
+            }, 500);
+        }
 
         // Persist new position
         onPositionChange(mix.id, { x: x.get(), y: y.get() });
@@ -121,6 +132,10 @@ function DraggablePolaroid({
             onMouseEnter={() => setShowButtons(true)}
             onMouseLeave={() => setShowButtons(false)}
             style={{ x, y, rotate: position.rotation }}
+            animate={isFailed ? {
+                x: [x.get(), x.get() - 8, x.get() + 8, x.get() - 8, x.get() + 8, x.get() - 4, x.get() + 4, x.get()]
+            } : undefined}
+            transition={isFailed ? { duration: 0.4 } : undefined}
             className={clsx(
                 "absolute top-0 left-0 cursor-grab active:cursor-grabbing select-none z-20",
                 isInsidePlayer && "opacity-50 cursor-default" // Stuck in player
@@ -129,9 +144,10 @@ function DraggablePolaroid({
             whileHover={{ scale: 1.05, zIndex: 50 }}
         >
             {!isInsidePlayer && (
-                <div className={clsx("p-2 pb-6 shadow-lg transition-all duration-300",
-                    // Boombox Color Logic: Uniform Polaroid Style (Clean/Retro)
-                    "bg-white"
+                <div className={clsx("p-2 pb-6 shadow-lg transition-all duration-300 border",
+                    isFailed 
+                        ? "bg-red-50 border-red-500 ring-4 ring-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.8)]" 
+                        : "bg-white border-transparent"
                 )}>
                     <div className="w-24 h-24 relative overflow-hidden">
                         {albumArt ? (

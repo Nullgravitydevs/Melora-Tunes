@@ -11,7 +11,7 @@ import { getArt, formatDuration, shuffleArray } from "@/lib/helpers";
 import { usePlayback, useLibrary, useUI, Mix } from "@/components/providers/playback-context";
 import { OfflineStore, OfflineSong } from "@/lib/offline-store";
 import { OfflinePlaylistStore, OfflinePlaylist } from "@/lib/offline-playlist-store";
-import { ListMusic, Plus, ChevronRight, History, HardDrive, AlertCircle, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
+import { ListMusic, Plus, ChevronRight, History, HardDrive, AlertCircle, CheckCircle2, XCircle, RotateCcw, Disc } from "lucide-react";
 import { AudiophileSearch } from "./AudiophileSearch";
 import { DownloadHistoryEntry } from "@/lib/offline-store";
 import { MiniWaveform } from "@/components/shared/MiniWaveform";
