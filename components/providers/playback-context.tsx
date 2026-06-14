@@ -354,8 +354,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if ('mediaSession' in navigator && currentSong) {
             navigator.mediaSession.metadata = new MediaMetadata({
-                title: decodeHtml(currentSong.name || currentSong.title || 'Unknown Title'),
-                artist: decodeHtml(currentSong.primaryArtists || currentSong.artist || 'Unknown Artist'),
+                title: decodeHtml(currentSong.name || (currentSong as any).title || 'Unknown Title'),
+                artist: decodeHtml(currentSong.primaryArtists || (currentSong as any).artist || 'Unknown Artist'),
                 album: decodeHtml((currentSong.album as any)?.name || ''),
                 artwork: [
                     { src: currentSong.image?.[0]?.link || '', sizes: '96x96', type: 'image/jpeg' },
