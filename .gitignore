@@ -42,3 +42,5 @@ yarn-error.log*
 next-env.d.ts
 
 competitors/
+jdk-21.0.2/
+*.tar.gz
