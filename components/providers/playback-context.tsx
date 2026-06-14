@@ -350,26 +350,6 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         return () => navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
     }, [isPlaying, showToast]);
 
-    // Background Audio & MediaSession Integration
-    useEffect(() => {
-        if ('mediaSession' in navigator && currentSong) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: decodeHtml(currentSong.name || (currentSong as any).title || 'Unknown Title'),
-                artist: decodeHtml(currentSong.primaryArtists || (currentSong as any).artist || 'Unknown Artist'),
-                album: decodeHtml((currentSong.album as any)?.name || ''),
-                artwork: [
-                    { src: currentSong.image?.[0]?.link || '', sizes: '96x96', type: 'image/jpeg' },
-                    { src: currentSong.image?.[1]?.link || currentSong.image?.[0]?.link || '', sizes: '256x256', type: 'image/jpeg' },
-                    { src: currentSong.image?.[2]?.link || currentSong.image?.[0]?.link || '', sizes: '512x512', type: 'image/jpeg' }
-                ].filter(a => a.src)
-            });
-
-            navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-            navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
-            navigator.mediaSession.setActionHandler('previoustrack', () => setPlayingIndex(p => Math.max(0, p - 1)));
-            navigator.mediaSession.setActionHandler('nexttrack', () => setPlayingIndex(p => p + 1));
-        }
-    }, [currentSong]);
 
     // [PERF FIX #2] Memoize derived state and inject local playingIndex to prevent massive LibraryContext re-renders
     const activeMix = useMemo(() => {
@@ -391,6 +371,27 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         if (isPlayableTrack(rawCurrentItem)) return rawCurrentItem;
         return ensurePlayableTrack(rawCurrentItem, qualityPreference as AudioQuality);
     }, [rawCurrentItem, qualityPreference]);
+
+    // Background Audio & MediaSession Integration
+    useEffect(() => {
+        if ('mediaSession' in navigator && currentSong) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: decodeHtml(currentSong.name || (currentSong as any).title || 'Unknown Title'),
+                artist: decodeHtml(currentSong.primaryArtists || (currentSong as any).artist || 'Unknown Artist'),
+                album: decodeHtml((currentSong.album as any)?.name || ''),
+                artwork: [
+                    { src: currentSong.image?.[0]?.link || '', sizes: '96x96', type: 'image/jpeg' },
+                    { src: currentSong.image?.[1]?.link || currentSong.image?.[0]?.link || '', sizes: '256x256', type: 'image/jpeg' },
+                    { src: currentSong.image?.[2]?.link || currentSong.image?.[0]?.link || '', sizes: '512x512', type: 'image/jpeg' }
+                ].filter(a => a.src)
+            });
+
+            navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+            navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+            navigator.mediaSession.setActionHandler('previoustrack', () => setPlayingIndex(p => Math.max(0, p - 1)));
+            navigator.mediaSession.setActionHandler('nexttrack', () => setPlayingIndex(p => p + 1));
+        }
+    }, [currentSong]);
 
     // --- Audio Playback Effects ---
 
