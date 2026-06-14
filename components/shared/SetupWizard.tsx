@@ -85,10 +85,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     {/* Spacer for layout balance */}
                     <button
                         onClick={() => setIsMuted(!isMuted)}
-                        className="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors"
+                        className={`w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors ${isMuted ? 'animate-pulse bg-white/5' : ''}`}
                         aria-label={isMuted ? "Unmute" : "Mute"}
                     >
-                        {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                        {isMuted ? <VolumeX size={20} className="text-white/70" /> : <Volume2 size={20} className="text-white" />}
                     </button>
                 </header>
 

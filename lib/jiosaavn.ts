@@ -80,7 +80,7 @@ export async function searchSongs(query: string, page: number = 1, limit: number
         if (Capacitor.isNativePlatform()) {
             const apiUrl = `${JIOSAAVN_API_URL}search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
+            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else if (isElectron) {
             const apiUrl = `${JIOSAAVN_API_URL}search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
@@ -153,7 +153,7 @@ export async function searchAlbums(query: string, page: number = 1, limit: numbe
         if (Capacitor.isNativePlatform()) {
             const apiUrl = `${JIOSAAVN_API_URL}search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
+            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else if (isElectron) {
             const apiUrl = `${JIOSAAVN_API_URL}search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
@@ -236,7 +236,7 @@ export async function searchPlaylists(query: string, page: number = 1, limit: nu
         if (Capacitor.isNativePlatform()) {
             const apiUrl = `${JIOSAAVN_API_URL}search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
+            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else if (isElectron) {
             const apiUrl = `${JIOSAAVN_API_URL}search.getPlaylistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}&ctx=wap6dot0&language=${lang}`;
             const response = await fetch(apiUrl);
@@ -296,7 +296,7 @@ export async function searchArtists(query: string, page: number = 1, limit: numb
         if (Capacitor.isNativePlatform()) {
             const apiUrl = `https://www.jiosaavn.com/api.php?${params}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
+            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else if (isElectron) {
             const apiUrl = `https://www.jiosaavn.com/api.php?${params}`;
             const response = await fetch(apiUrl);
@@ -340,7 +340,7 @@ export async function getArtistDetails(artistId: string, page: number = 1): Prom
             const apiUrl = `https://www.jiosaavn.com/api.php?${params}`;
             if (Capacitor.isNativePlatform()) {
                 const response = await CapacitorHttp.get({ url: apiUrl });
-                data = response.data;
+                data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
             } else {
                 const response = await fetch(apiUrl);
                 data = await response.json();
@@ -428,7 +428,7 @@ export async function getLyrics(songId: string): Promise<string | null> {
         if (Capacitor.isNativePlatform()) {
             const apiUrl = `${JIOSAAVN_API_URL}lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
             const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
+            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else if (isElectron) {
             const apiUrl = `${JIOSAAVN_API_URL}lyrics.getLyrics&_format=json&ctx=wap6dot0&api_version=4&n=1&p=1&q=${songId}&lyrics_id=${songId}`;
             const response = await fetch(apiUrl);
@@ -539,7 +539,7 @@ export async function getSongDetails(songId: string): Promise<JioSaavnSong | nul
         if (Capacitor.isNativePlatform()) {
             const apiUrl = `${JIOSAAVN_API_URL}song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
             const response = await CapacitorHttp.get({ url: apiUrl });
-            data = response.data;
+            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else if (isElectron) {
             const apiUrl = `${JIOSAAVN_API_URL}song.getDetails&_format=json&pids=${songId}&ctx=wap6dot0`;
             const response = await fetch(apiUrl);
