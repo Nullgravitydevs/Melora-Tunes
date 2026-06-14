@@ -2,7 +2,7 @@
   "name": "melora-tunes",
   "version": "1.0.0-beta.1",
   "description": "Premium music player with hi-fi streaming",
-  "author": "Null Gravity Devs",
+  "author": "Null Gravity Devs <support@meloratunes.com>",
   "private": true,
   "main": "desktop_app/main.js",
   "scripts": {
@@ -11,13 +11,19 @@
     "start": "next start",
     "lint": "eslint",
     "electron": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on tcp:3000 && node scripts/launch-electron.js\"",
-    "electron:build": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --win --x64"
+    "electron:build": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --win --x64",
+    "electron:build:win": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --win --x64",
+    "electron:build:linux": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --linux --x64",
+    "cap:build": "cross-env IS_CAP_BUILD=true next build && npx cap sync android",
+    "cap:open": "npx cap open android",
+    "cap:run": "npx cap run android"
   },
   "dependencies": {
     "@capacitor-community/http": "^1.4.1",
     "@capacitor/android": "^8.0.0",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/preferences": "^8.0.0",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
@@ -58,10 +64,10 @@
     "wait-on": "^9.0.3"
   },
   "build": {
-    "appId": "com.meloratunes.music",
+    "appId": "com.meloratunes.app",
     "productName": "Melora Tunes",
     "directories": {
-      "output": "C:/melora-build"
+      "output": "./dist"
     },
     "asarUnpack": [
       "**/*.node"
@@ -97,6 +103,25 @@
       ],
       "icon": "public/app-icon.ico",
       "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icons/",
+      "category": "Audio;Music;Player",
+      "synopsis": "Premium music player with retro cassette & iPod experience"
     },
     "nsis": {
       "oneClick": false,

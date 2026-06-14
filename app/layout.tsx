@@ -10,14 +10,35 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "Melora - Premium Audio Experience",
-  description: "High-fidelity retro cassette player and iPod simulator.",
+  metadataBase: new URL('https://meloratunes.com'),
+  title: "Melora Tunes - Premium Audio Experience",
+  description: "Premium music player with authentic retro cassette deck & iPod experience. Stream, discover, and feel the music.",
   generator: 'Next.js',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: "Melora",
+    title: "Melora Tunes",
+  },
+  openGraph: {
+    title: "Melora Tunes - Premium Audio Experience",
+    description: "Premium music player with authentic retro cassette deck & iPod experience. Stream, discover, and feel the music.",
+    siteName: "Melora Tunes",
+    type: "website",
+    images: [
+      {
+        url: "/app-icon-512x.png",
+        width: 512,
+        height: 512,
+        alt: "Melora Tunes Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Melora Tunes - Premium Audio Experience",
+    description: "Premium music player with authentic retro cassette deck & iPod experience.",
+    images: ["/app-icon-512x.png"],
   },
   icons: {
     icon: [

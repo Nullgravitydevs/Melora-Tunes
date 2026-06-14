@@ -1,7 +1,7 @@
 {
-    "name": "Melora - Let the Music Touch You",
-    "short_name": "Melora",
-    "description": "Melora Music Player - Stream music with authentic iPod and Cassette Deck experience. Let the music touch you.",
+    "name": "Melora Tunes - Premium Audio Experience",
+    "short_name": "Melora Tunes",
+    "description": "Premium music player with authentic retro cassette deck & iPod experience. Stream, discover, and feel the music.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#000000",

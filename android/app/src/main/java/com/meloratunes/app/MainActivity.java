@@ -1,4 +1,4 @@
-package com.melora.music;
+package com.meloratunes.app;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -1,9 +1,23 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.melora.music',
-  appName: 'Melora',
-  webDir: 'out'
+  appId: 'com.meloratunes.app',
+  appName: 'Melora Tunes',
+  webDir: 'out',
+  server: {
+    androidScheme: 'https'
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 2000,
+      backgroundColor: '#000000',
+      showSpinner: false,
+      androidScaleType: 'CENTER_CROP',
+    },
+    Haptics: {
+      // Uses default config
+    }
+  }
 };
 
 export default config;
