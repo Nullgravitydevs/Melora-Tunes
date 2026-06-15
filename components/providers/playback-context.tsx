@@ -374,15 +374,21 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
     // Background Audio & MediaSession Integration
     useEffect(() => {
-        if ('mediaSession' in navigator && currentSong) {
+        if (!currentSong) return;
+
+        const title = decodeHtml(currentSong.name || (currentSong as any).title || 'Unknown Title');
+        const artist = decodeHtml(currentSong.primaryArtists || (currentSong as any).artist || 'Unknown Artist');
+        const album = decodeHtml((currentSong.album as any)?.name || '');
+        const artwork = currentSong.image?.[2]?.link || currentSong.image?.[1]?.link || currentSong.image?.[0]?.link || '';
+
+        // Standard Web MediaSession (works for Desktop and some mobile browsers)
+        if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = new MediaMetadata({
-                title: decodeHtml(currentSong.name || (currentSong as any).title || 'Unknown Title'),
-                artist: decodeHtml(currentSong.primaryArtists || (currentSong as any).artist || 'Unknown Artist'),
-                album: decodeHtml((currentSong.album as any)?.name || ''),
+                title, artist, album,
                 artwork: [
                     { src: currentSong.image?.[0]?.link || '', sizes: '96x96', type: 'image/jpeg' },
-                    { src: currentSong.image?.[1]?.link || currentSong.image?.[0]?.link || '', sizes: '256x256', type: 'image/jpeg' },
-                    { src: currentSong.image?.[2]?.link || currentSong.image?.[0]?.link || '', sizes: '512x512', type: 'image/jpeg' }
+                    { src: currentSong.image?.[1]?.link || '', sizes: '256x256', type: 'image/jpeg' },
+                    { src: artwork, sizes: '512x512', type: 'image/jpeg' }
                 ].filter(a => a.src)
             });
 
@@ -391,7 +397,62 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
             navigator.mediaSession.setActionHandler('previoustrack', () => setPlayingIndex(p => Math.max(0, p - 1)));
             navigator.mediaSession.setActionHandler('nexttrack', () => setPlayingIndex(p => p + 1));
         }
-    }, [currentSong]);
+
+        // Native Android/iOS Foreground Service & Lockscreen via cordova-plugin-music-controls2
+        const MusicControls = (window as any).MusicControls;
+        if (MusicControls) {
+            MusicControls.create({
+                track: title,
+                artist: artist,
+                album: album,
+                cover: artwork,
+                isPlaying: isPlaying,
+                dismissable: true,
+                hasPrev: true,
+                hasNext: true,
+                hasClose: true,
+                playIcon: 'media_play',
+                pauseIcon: 'media_pause',
+                prevIcon: 'media_prev',
+                nextIcon: 'media_next',
+                closeIcon: 'media_close',
+                notificationIcon: 'notification'
+            }, () => {}, () => {});
+
+            const events = (action: string) => {
+                const message = JSON.parse(action).message;
+                switch(message) {
+                    case 'music-controls-next':
+                        setPlayingIndex(p => p + 1);
+                        break;
+                    case 'music-controls-previous':
+                        setPlayingIndex(p => Math.max(0, p - 1));
+                        break;
+                    case 'music-controls-pause':
+                        setIsPlaying(false);
+                        break;
+                    case 'music-controls-play':
+                        setIsPlaying(true);
+                        break;
+                    case 'music-controls-destroy':
+                        setIsPlaying(false);
+                        break;
+                }
+            };
+            MusicControls.subscribe(events);
+            MusicControls.listen();
+        }
+    }, [currentSong, isPlaying]); // Added isPlaying dependency to update notification state
+
+    // Clean up MusicControls on unmount
+    useEffect(() => {
+        return () => {
+            const MusicControls = (window as any).MusicControls;
+            if (MusicControls) {
+                MusicControls.destroy(() => {}, () => {});
+            }
+        };
+    }, []);
 
     // --- Audio Playback Effects ---
 

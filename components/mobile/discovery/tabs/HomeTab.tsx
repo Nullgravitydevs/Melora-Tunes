@@ -67,34 +67,15 @@ export function HomeTab({ onNavigate }: Props) {
     }, [retryCount]);
 
     const playSong = (song: JioSaavnSong) => {
-        playInstantMix({ id: `quick-${Date.now()}`, title: "Quick Play", color: "white", songs: [song], currentSongIndex: 0 });
+        playInstantMix({ id: "quick-play", title: "Quick Play", color: "white", songs: [song], currentSongIndex: 0 });
     };
 
     const playList = (songs: JioSaavnSong[], title: string) => {
         if (songs.length === 0) return;
-        playInstantMix({ id: `home-${Date.now()}`, title, color: "white", songs, currentSongIndex: 0 });
+        playInstantMix({ id: "home-feed", title, color: "white", songs, currentSongIndex: 0 });
     };
 
     const isCurrent = (song: any) => currentSong && (currentSong as any).id === song.id;
-
-    // ─── SKELETON ─────────────────────────────────────────
-    if (isLoading) {
-        return (
-            <div className="p-5 pt-14">
-                <div className="h-7 w-48 bg-white/[0.03] rounded-lg mb-8 animate-pulse" />
-                <div className="w-full aspect-[16/9] bg-white/[0.03] rounded-2xl mb-8 animate-pulse" />
-                {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="flex gap-3 mb-3">
-                        <div className="w-14 h-14 bg-white/[0.03] rounded-xl animate-pulse" />
-                        <div className="flex-1 space-y-2 pt-2">
-                            <div className="h-3 w-3/4 bg-white/[0.03] rounded animate-pulse" />
-                            <div className="h-2.5 w-1/2 bg-white/[0.03] rounded animate-pulse" />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    }
 
     // ─── ERROR ────────────────────────────────────────────
     if (error) {
@@ -113,7 +94,6 @@ export function HomeTab({ onNavigate }: Props) {
     const topCharts = launchData?.top_charts?.slice(0, 8) || [];
     const quickPicks = launchData?.quick_picks?.slice(0, 8) || [];
     const retro = launchData?.retro?.slice(0, 10) || [];
-    const heroSong = trending[0];
 
     return (
         <div className="pb-4">
@@ -124,33 +104,58 @@ export function HomeTab({ onNavigate }: Props) {
                 </h1>
             </div>
 
-            {/* ─── HERO ─── */}
-            {heroSong && (
-                <div className="px-5 mb-8">
-                    <div
-                        className="w-full aspect-[4/3] rounded-3xl overflow-hidden relative active:scale-[0.98] transition-transform shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.05]"
-                        onClick={() => playSong(heroSong)}
-                    >
-                        {getArt(heroSong) && (
-                            <img src={getArt(heroSong)} className="absolute inset-0 w-full h-full object-cover" alt="" />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent pointer-events-none" />
+            {/* ─── SKELETON (Progressive Load) ─── */}
+            {isLoading && (
+                <div className="px-5 mt-2">
+                    <div className="w-full aspect-[4/3] bg-white/[0.03] rounded-3xl mb-8 animate-pulse shadow-md" />
+                    <div className="h-6 w-32 bg-white/[0.03] rounded-md mb-4 animate-pulse" />
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="flex gap-3 mb-3">
+                            <div className="w-12 h-12 bg-white/[0.03] rounded-xl animate-pulse" />
+                            <div className="flex-1 space-y-2 pt-2">
+                                <div className="h-3 w-3/4 bg-white/[0.03] rounded animate-pulse" />
+                                <div className="h-2.5 w-1/2 bg-white/[0.03] rounded animate-pulse" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
-                        <div className="absolute bottom-5 left-5 right-20">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/[0.08] backdrop-blur-md rounded-full text-[9px] font-bold uppercase tracking-[0.2em] text-white/80 mb-3 border border-white/10 shadow-sm">
-                                <Disc3 size={10} className="opacity-70" /> Featured
-                            </span>
-                            <h3 className="text-[22px] font-bold text-white leading-tight truncate tracking-tight drop-shadow-md">{decodeHtml(heroSong.name)}</h3>
-                            <p className="text-[13px] font-medium text-white/60 truncate mt-1 drop-shadow-md">{decodeHtml(heroSong.primaryArtists)}</p>
-                        </div>
-                        <div className="absolute bottom-5 right-5 w-14 h-14 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center shadow-2xl hover:bg-white hover:text-black transition-colors">
-                            {isCurrent(heroSong) && isPlaying ? (
-                                <Pause size={20} fill="currentColor" className="text-white hover:text-black" />
-                            ) : (
-                                <Play size={20} fill="currentColor" className="text-white hover:text-black ml-1" />
-                            )}
-                        </div>
+            {!isLoading && (
+                <>
+
+            {/* ─── HERO CAROUSEL ─── */}
+            {trending.length > 0 && (
+                <div className="px-5 mb-8">
+                    <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar" style={{ scrollbarWidth: 'none' }}>
+                        {trending.slice(0, 5).map((heroSong: any, i: number) => (
+                            <div
+                                key={heroSong.id + i}
+                                className="min-w-full aspect-[4/3] rounded-3xl overflow-hidden relative active:scale-[0.98] transition-transform shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.05] snap-center shrink-0"
+                                onClick={() => playSong(heroSong)}
+                            >
+                                {getArt(heroSong) && (
+                                    <img src={getArt(heroSong, '500x500')} className="absolute inset-0 w-full h-full object-cover" alt="" loading="lazy" />
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent pointer-events-none" />
+
+                                <div className="absolute bottom-5 left-5 right-20">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/[0.08] backdrop-blur-md rounded-full text-[9px] font-bold uppercase tracking-[0.2em] text-white/80 mb-3 border border-white/10 shadow-sm">
+                                        <Disc3 size={10} className="opacity-70" /> Featured
+                                    </span>
+                                    <h3 className="text-[22px] font-bold text-white leading-tight truncate tracking-tight drop-shadow-md">{decodeHtml(heroSong.name)}</h3>
+                                    <p className="text-[13px] font-medium text-white/60 truncate mt-1 drop-shadow-md">{decodeHtml(heroSong.primaryArtists)}</p>
+                                </div>
+                                <div className="absolute bottom-5 right-5 w-14 h-14 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center shadow-2xl hover:bg-white hover:text-black transition-colors">
+                                    {isCurrent(heroSong) && isPlaying ? (
+                                        <Pause size={20} fill="currentColor" className="text-white hover:text-black" />
+                                    ) : (
+                                        <Play size={20} fill="currentColor" className="text-white hover:text-black ml-1" />
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
@@ -208,6 +213,62 @@ export function HomeTab({ onNavigate }: Props) {
                         ))}
                     </HScroll>
                 </Section>
+            )}
+
+            {/* ─── BEST OF ─── */}
+            {launchData?.bestOf && launchData.bestOf.map((bo: any, i: number) => (
+                <Section key={`bo-${i}`} title={`Best of ${bo.lang}`} onSeeAll={() => onNavigate({ id: "section", data: { id: `bestof-${bo.lang}`, title: `Best of ${bo.lang}` } })}>
+                    <HScroll>
+                        {bo.items.map((playlist: any, j: number) => (
+                            <PlaylistCard key={playlist.id + j} item={playlist} onTap={() => onNavigate({ id: "playlist", data: playlist })} />
+                        ))}
+                    </HScroll>
+                </Section>
+            ))}
+
+            {/* ─── MOODS ─── */}
+            {launchData?.moods?.love && launchData.moods.love.length > 0 && (
+                <Section title="Romance & Chill" onSeeAll={() => onNavigate({ id: "section", data: { id: "mood-love", title: "Romance & Chill" } })}>
+                    <HScroll>
+                        {launchData.moods.love.map((playlist: any, j: number) => (
+                            <PlaylistCard key={playlist.id + j} item={playlist} onTap={() => onNavigate({ id: "playlist", data: playlist })} />
+                        ))}
+                    </HScroll>
+                </Section>
+            )}
+            
+            {launchData?.moods?.party && launchData.moods.party.length > 0 && (
+                <Section title="Party & Workout" onSeeAll={() => onNavigate({ id: "section", data: { id: "mood-party", title: "Party & Workout" } })}>
+                    <HScroll>
+                        {launchData.moods.party.map((playlist: any, j: number) => (
+                            <PlaylistCard key={playlist.id + j} item={playlist} onTap={() => onNavigate({ id: "playlist", data: playlist })} />
+                        ))}
+                    </HScroll>
+                </Section>
+            )}
+
+            {/* ─── PROMO ─── */}
+            {launchData?.promo && launchData.promo.length > 0 && (
+                <div className="px-5 mb-8">
+                    <h2 className="text-[18px] font-bold text-white/90 tracking-tight mb-4">Featured Playlists</h2>
+                    <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar" style={{ scrollbarWidth: 'none' }}>
+                        {launchData.promo.map((promo: any, i: number) => (
+                            <div
+                                key={promo.id + i}
+                                className="min-w-[85%] aspect-[2/1] rounded-2xl overflow-hidden relative active:scale-[0.98] transition-transform shadow-lg ring-1 ring-white/[0.05] snap-center shrink-0 cursor-pointer"
+                                onClick={() => onNavigate({ id: "playlist", data: promo })}
+                            >
+                                {getArt(promo, '500x500') && (
+                                    <img src={getArt(promo, '500x500')} className="absolute inset-0 w-full h-full object-cover" alt="" loading="lazy" />
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                                <h3 className="absolute bottom-4 left-4 right-4 text-[16px] font-bold text-white tracking-tight drop-shadow-md line-clamp-2">{decodeHtml(promo.name)}</h3>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+                </>
             )}
         </div>
     );

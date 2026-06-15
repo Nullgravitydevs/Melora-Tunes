@@ -219,16 +219,7 @@ export function AlbumView({ album, onBack, onNavigate }: Props) {
                                             {song.primaryArtists !== albumArtist && (
                                                 <p className="text-[10px] text-white/25 truncate">{decodeHtml(song.primaryArtists)}</p>
                                             )}
-                                            {trackMetadataMap[song.id] && (
-                                                <div className="flex items-center gap-1 flex-shrink-0">
-                                                    <span className="text-[8px] bg-white/10 text-white/60 px-1 py-0.5 rounded uppercase font-bold tracking-widest leading-none border border-white/5">
-                                                        {trackMetadataMap[song.id].bpm} BPM
-                                                    </span>
-                                                    <span className="text-[8px] bg-white/10 text-white/60 px-1 py-0.5 rounded uppercase font-bold tracking-widest leading-none border border-white/5">
-                                                        {trackMetadataMap[song.id].key}
-                                                    </span>
-                                                </div>
-                                            )}
+                                            {/* Removed BPM and Key rendering */}
                                         </div>
                                     </div>
                                     <span className="text-[10px] text-white/15 font-mono flex-shrink-0">

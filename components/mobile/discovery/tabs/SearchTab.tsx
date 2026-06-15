@@ -8,7 +8,7 @@ import { searchUnified } from "@/lib/unified-search";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
 import { QualityBadge } from "@/components/shared/QualityBadge";
-import { useSearchHistory } from "@/components/hooks/useSearchHistory";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 interface Props { onNavigate: (v: ViewState) => void }
@@ -31,6 +31,7 @@ export function SearchTab({ onNavigate }: Props) {
     const [results, setResults] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [qualityFilter, setQualityFilter] = useState<string>("auto");
+    const [typeFilter, setTypeFilter] = useState<"song" | "album" | "playlist" | "artist">("song");
     const inputRef = useRef<HTMLInputElement>(null);
     const abortRef = useRef<AbortController | null>(null);
     const { history, addSearch, removeSearch, clearHistory } = useSearchHistory();
@@ -59,7 +60,7 @@ export function SearchTab({ onNavigate }: Props) {
             try {
                 const settings = loadSettings();
                 const lang = (settings.languages || ["english", "hindi"]).join(",");
-                const r = await searchUnified(query, lang, "song", qualityFilter as any);
+                const r = await searchUnified(query, lang, typeFilter as any, qualityFilter as any);
                 if (!controller.signal.aborted) {
                     setResults(r);
                     if (r.length > 0) addSearch(query.trim());
@@ -71,9 +72,22 @@ export function SearchTab({ onNavigate }: Props) {
             }
         }, 350);
         return () => { clearTimeout(timeout); controller.abort(); };
-    }, [query, qualityFilter]);
+    }, [query, qualityFilter, typeFilter]);
 
-    const playSong = (track: any, index: number) => {
+    const handleResultClick = (track: any, index: number) => {
+        if (typeFilter === "album") {
+            onNavigate({ id: "album", data: track });
+            return;
+        }
+        if (typeFilter === "playlist") {
+            onNavigate({ id: "playlist", data: track });
+            return;
+        }
+        if (typeFilter === "artist") {
+            onNavigate({ id: "artist", data: track });
+            return;
+        }
+
         const mixId = "search-results";
         const existing = mixes.find((m) => m.id === mixId);
         if (existing) {
@@ -141,6 +155,28 @@ export function SearchTab({ onNavigate }: Props) {
                         </button>
                     ))}
                 </div>
+
+                {/* Type filter */}
+                <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+                    {[
+                        { value: "song", label: "Songs" },
+                        { value: "album", label: "Albums" },
+                        { value: "playlist", label: "Playlists" },
+                        { value: "artist", label: "Artists" },
+                    ].map((opt) => (
+                        <button
+                            key={opt.value}
+                            onClick={() => setTypeFilter(opt.value as any)}
+                            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors
+                                ${typeFilter === opt.value
+                                    ? "bg-white text-black border-white"
+                                    : "bg-transparent text-white/40 border-white/[0.06] active:bg-white/[0.06]"
+                                }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Results / Default state */}
@@ -163,36 +199,38 @@ export function SearchTab({ onNavigate }: Props) {
                                 : track.preferredQuality || '320';
                             const duration = track.duration || track.song?.duration || 0;
 
-                            return (
-                                <button
-                                    key={(track.id || i) + "-" + i}
-                                    onClick={() => current ? togglePlay() : playSong(track, i)}
-                                    className={`w-full flex items-center gap-3 p-2.5 rounded-xl active:bg-white/[0.04] transition-colors ${current ? "bg-white/[0.03]" : ""}`}
-                                >
-                                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-white/[0.04] flex-shrink-0 relative">
-                                        {art && <img src={art} className="w-full h-full object-cover" alt="" loading="lazy" />}
-                                        {current && isPlaying && (
-                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                                <span className="flex gap-0.5">
-                                                    <span className="w-[2px] h-3 bg-white rounded-full animate-pulse" />
-                                                    <span className="w-[2px] h-2 bg-white rounded-full animate-pulse delay-75" />
-                                                    <span className="w-[2px] h-3.5 bg-white rounded-full animate-pulse delay-150" />
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0 text-left">
-                                        <div className="flex items-center gap-1.5">
-                                            <p className={`text-[13px] font-medium truncate ${current ? "text-white" : "text-white/80"}`}>{name}</p>
-                                            {quality && <QualityBadge quality={quality} variant="mini" />}
+                                return (
+                                    <button
+                                        key={(track.id || i) + "-" + i}
+                                        onClick={() => current && typeFilter === "song" ? togglePlay() : handleResultClick(track, i)}
+                                        className={`w-full flex items-center gap-3 p-2.5 rounded-xl active:bg-white/[0.04] transition-colors ${current && typeFilter === "song" ? "bg-white/[0.03]" : ""}`}
+                                    >
+                                        <div className={`w-12 h-12 overflow-hidden bg-white/[0.04] flex-shrink-0 relative ${typeFilter === "artist" ? "rounded-full" : "rounded-lg"}`}>
+                                            {art && <img src={art} className="w-full h-full object-cover" alt="" loading="lazy" />}
+                                            {current && isPlaying && typeFilter === "song" && (
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                    <span className="flex gap-0.5">
+                                                        <span className="w-[2px] h-3 bg-white rounded-full animate-pulse" />
+                                                        <span className="w-[2px] h-2 bg-white rounded-full animate-pulse delay-75" />
+                                                        <span className="w-[2px] h-3.5 bg-white rounded-full animate-pulse delay-150" />
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
-                                        <p className="text-[11px] text-white/30 truncate mt-0.5">{artist}</p>
-                                    </div>
-                                    <span className="text-[10px] text-white/15 font-mono flex-shrink-0">
-                                        {duration ? `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, "0")}` : ""}
-                                    </span>
-                                </button>
-                            );
+                                        <div className="flex-1 min-w-0 text-left">
+                                            <div className="flex items-center gap-1.5">
+                                                <p className={`text-[13px] font-medium truncate ${current && typeFilter === "song" ? "text-white" : "text-white/80"}`}>{name}</p>
+                                                {quality && typeFilter === "song" && <QualityBadge quality={quality} variant="mini" />}
+                                            </div>
+                                            <p className="text-[11px] text-white/30 truncate mt-0.5">{artist}</p>
+                                        </div>
+                                        {typeFilter === "song" && (
+                                            <span className="text-[10px] text-white/15 font-mono flex-shrink-0">
+                                                {duration ? `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, "0")}` : ""}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
                         })}
                     </div>
                 ) : query ? (

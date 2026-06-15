@@ -69,11 +69,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 {isMuted && isMobile && (
                     <motion.div 
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer"
+                        className="absolute inset-0 z-[100] flex items-center justify-center cursor-pointer"
                         onClick={() => setIsMuted(false)}
                     >
-                        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 animate-pulse text-white/90 text-sm font-bold tracking-widest uppercase shadow-2xl">
-                            Tap to Unmute
+                        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 animate-pulse text-white/90 text-[12px] font-bold tracking-[0.2em] uppercase shadow-2xl pointer-events-auto">
+                            Tap Anywhere to Unmute
                         </div>
                     </motion.div>
                 )}
@@ -97,13 +97,13 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                         ))}
                     </div>
 
-                    {/* Spacer for layout balance */}
-                    <button
-                        onClick={() => setIsMuted(!isMuted)}
-                        className={`w-10 h-10 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-white/10 transition-colors ${isMuted ? 'animate-pulse bg-white/5' : ''}`}
+                    {/* Volume Toggle */}
+                    <button 
+                        onClick={() => setIsMuted(!isMuted)} 
+                        className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 z-[100] hover:bg-white/20 transition-colors"
                         aria-label={isMuted ? "Unmute" : "Mute"}
                     >
-                        {isMuted ? <VolumeX size={20} className="text-white/70" /> : <Volume2 size={20} className="text-white" />}
+                        {isMuted ? <VolumeX size={18} className="text-white/60" /> : <Volume2 size={18} className="text-white" />}
                     </button>
                 </header>
 

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import {
     ChevronDown, Play, Pause, SkipBack, SkipForward,
     Heart, Shuffle, Repeat, Repeat1, Share2, ListMusic,
-    Mic2, Plus, Volume2, VolumeX
+    Mic2, Plus, Volume2, VolumeX, Gauge, Timer
 } from "lucide-react";
 import { decodeHtml } from "@/lib/utils";
 import { QualityBadge } from "@/components/shared/QualityBadge";
@@ -24,7 +24,7 @@ interface Props {
 type ViewMode = "art" | "lyrics" | "queue";
 
 export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
-    const { currentSong, isPlaying, togglePlay, next, prev, seek, duration, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, activeQuality, queue, currentIndex, playIndex, currentTrackMetadata, playbackState } = usePlayback();
+    const { currentSong, isPlaying, togglePlay, next, prev, seek, duration, volume, setVolume, shuffle, setShuffle, repeat, setRepeat, activeQuality, queue, currentIndex, playIndex, currentTrackMetadata, playbackState, playbackSpeed, setPlaybackSpeed, sleepTimer, setSleepTimer } = usePlayback();
     const { toggleLike, isLiked, addSongToMix, mixes } = useLibrary();
     const { progress } = useAudioProgress();
 
@@ -61,19 +61,21 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
 
     const elapsed = (progress || 0) * (duration || 0);
 
-    // Auto-scroll lyrics
-    useEffect(() => {
-        if (viewMode !== "lyrics" || !isSynced || !lyricsRef.current) return;
+    const activeLyricIndex = useMemo(() => {
+        if (!isSynced || lyrics.length === 0) return -1;
         const currentTime = elapsed;
-        const activeIdx = lyrics.findIndex((l, i) => {
+        return lyrics.findIndex((l, i) => {
             const next = lyrics[i + 1];
             return currentTime >= l.time && (!next || currentTime < next.time);
         });
-        if (activeIdx >= 0) {
-            const el = lyricsRef.current.children[activeIdx] as HTMLElement;
-            el?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-    }, [elapsed, lyrics, viewMode, isSynced]);
+    }, [elapsed, lyrics, isSynced]);
+
+    // Auto-scroll lyrics
+    useEffect(() => {
+        if (viewMode !== "lyrics" || activeLyricIndex < 0 || !lyricsRef.current) return;
+        const el = lyricsRef.current.children[activeLyricIndex] as HTMLElement;
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, [activeLyricIndex, viewMode]);
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -290,8 +292,12 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                         <div className="px-6 pb-10 pt-2">
                             {/* Progress bar */}
                             <div className="mb-3">
-                                <div className="h-[4px] bg-white/[0.08] rounded-full overflow-hidden cursor-pointer" onClick={handleSeek}>
-                                    <div className="h-full bg-white rounded-full transition-all duration-150" style={{ width: `${(progress || 0) * 100}%` }} />
+                                <div className="h-8 -my-2 flex items-center cursor-pointer group touch-none" onClick={handleSeek}>
+                                    <div className="w-full h-[4px] bg-white/[0.08] rounded-full overflow-hidden group-active:scale-y-150 transition-transform">
+                                        <div className="h-full bg-white rounded-full transition-all duration-150 relative" style={{ width: `${(progress || 0) * 100}%` }}>
+                                            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1 bg-white rounded-full scale-0 group-active:scale-100 transition-transform" />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="flex justify-between mt-1.5">
                                     <span className="text-[10px] text-white/25 font-mono">{fmt(elapsed)}</span>
@@ -344,9 +350,22 @@ export function FullPlayerSheet({ isOpen, onClose, onNavigate }: Props) {
                                 <button onClick={() => setViewMode(viewMode === "queue" ? "art" : "queue")} className={`p-2 ${viewMode === "queue" ? "text-white" : "text-white/25"}`}>
                                     <ListMusic size={20} />
                                 </button>
-                                <button onClick={handleShare} className="p-2 text-white/25 active:text-white/50">
-                                    <Share2 size={20} />
-                                </button>
+                                <div className="flex gap-1">
+                                    <button 
+                                        onClick={() => setPlaybackSpeed(playbackSpeed === 1 ? 1.25 : playbackSpeed === 1.25 ? 1.5 : playbackSpeed === 1.5 ? 2 : 1)} 
+                                        className={`p-2 flex items-center gap-1 ${playbackSpeed !== 1 ? "text-white" : "text-white/25"}`}
+                                    >
+                                        <Gauge size={16} />
+                                        {playbackSpeed !== 1 && <span className="text-[9px] font-bold">{playbackSpeed}x</span>}
+                                    </button>
+                                    <button 
+                                        onClick={() => setSleepTimer(sleepTimer ? null : { endTime: Date.now() + 30 * 60000, duration: 30 * 60000 })} 
+                                        className={`p-2 flex items-center gap-1 ${sleepTimer ? "text-white" : "text-white/25"}`}
+                                    >
+                                        <Timer size={16} />
+                                        {sleepTimer && <span className="text-[9px] font-bold">{Math.max(0, Math.round((sleepTimer.endTime - Date.now()) / 60000))}m</span>}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

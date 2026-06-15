@@ -14,11 +14,12 @@
     "electron:build": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --win --x64",
     "electron:build:win": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --win --x64",
     "electron:build:linux": "cross-env IS_ELECTRON_BUILD=true next build && node scripts/prepare-electron.js && electron-builder --linux --x64",
-    "cap:build": "cross-env IS_CAP_BUILD=true next build && npx cap sync android",
+    "cap:build": "node scripts/build-cap.js",
     "cap:open": "npx cap open android",
     "cap:run": "npx cap run android"
   },
   "dependencies": {
+    "@awesome-cordova-plugins/music-controls": "^9.2.0",
     "@capacitor-community/http": "^1.4.1",
     "@capacitor/android": "^8.0.0",
     "@capacitor/cli": "^8.0.0",
@@ -33,6 +34,7 @@
     "@types/crypto-js": "^4.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cordova-plugin-music-controls2": "^3.0.7",
     "crypto-js": "^4.2.0",
     "framer-motion": "^12.23.24",
     "html-to-image": "^1.11.13",
@@ -59,6 +61,7 @@
     "electron-builder": "^26.4.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "jetifier": "^2.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "wait-on": "^9.0.3"

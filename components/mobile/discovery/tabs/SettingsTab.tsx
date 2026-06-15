@@ -3,11 +3,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { usePlayback, useLibrary } from "@/components/providers/playback-context";
 import { useSettings } from "@/components/providers/settings-provider";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-    Disc, ChevronRight, Volume2, Moon, Gauge, Globe,
-    Trash2, Info, User, Monitor, Database, Heart, Coffee,
-    Github, MessageCircle, Check, Layout, Radio, Server
+    ChevronRight, Volume2, Globe, Trash2, Info, User,
+    Monitor, Database, Heart, Coffee, Github, MessageCircle,
+    Check, Activity
 } from "lucide-react";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { getStats } from "@/lib/stats";
@@ -21,27 +20,12 @@ const LANGUAGES = [
     "malayalam", "urdu", "haryanvi", "rajasthani", "odia", "assamese",
 ];
 
-type Tab = "profile" | "experience" | "audio" | "library" | "stats" | "support" | "about";
-
-const TABS: { id: Tab; label: string; icon: any }[] = [
-    { id: "profile", label: "Profile", icon: User },
-    { id: "experience", label: "Experience", icon: Monitor },
-    { id: "audio", label: "Audio & Language", icon: Volume2 },
-    { id: "library", label: "Library", icon: Database },
-    { id: "stats", label: "Stats", icon: Server },
-    { id: "support", label: "Support", icon: Heart },
-    { id: "about", label: "About", icon: Info },
-];
-
 export function SettingsTab() {
     const { volume, setVolume, qualityPreference, setQualityPreference, sleepTimer, setSleepTimer, notificationsEnabled, setNotificationsEnabled, playbackSpeed, setPlaybackSpeed, stopAtEndOfSong, setStopAtEndOfSong, eq } = usePlayback();
     const { crossfadeDuration, setCrossfadeDuration } = useSettings();
     const { likedSongs, mixes, setMixes, recentlyPlayed } = useLibrary();
 
-    const [activeTab, setActiveTab] = useState<Tab>("profile");
     const [selectedLangs, setSelectedLangs] = useState<string[]>([]);
-
-    // Profile
     const [profileName, setProfileName] = useState("");
     const [profileDOB, setProfileDOB] = useState("");
 
@@ -111,522 +95,287 @@ export function SettingsTab() {
     };
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pb-4">
-            <div className="px-5 pt-14 pb-2">
-                <h1 className="text-[26px] font-bold text-white tracking-tight">Settings</h1>
+        <div className="pb-44 flex flex-col h-full font-sans overflow-y-auto no-scrollbar">
+            <div className="px-5 pt-14 pb-6 sticky top-0 bg-black/80 backdrop-blur-xl z-20 border-b border-white/[0.05]">
+                <h1 className="text-[32px] font-bold text-white tracking-tight">Settings</h1>
             </div>
 
-            {/* Tab bar - horizontal scroll */}
-            <div className="px-5 mb-4 overflow-x-auto no-scrollbar">
-                <div className="flex gap-2 pb-1">
-                    {TABS.map((tab) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
+            <div className="px-5 space-y-8 pt-4">
+                
+                {/* ─── PROFILE ─── */}
+                <SettingsGroup title="Profile" icon={User}>
+                    <div className="p-4 space-y-4">
+                        <div className="flex items-center gap-4 mb-2">
+                            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-white shadow-lg">
+                                {profileName ? profileName.charAt(0).toUpperCase() : <User size={28} />}
+                            </div>
+                            <div>
+                                <p className="text-[16px] font-bold text-white">{profileName || "Guest User"}</p>
+                                <p className="text-[11px] text-white/30">Local Profile</p>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-white/25 tracking-[0.1em] mb-1.5 block">Display Name</label>
+                            <input
+                                type="text"
+                                value={profileName}
+                                onChange={(e) => setProfileName(e.target.value)}
+                                onBlur={saveProfile}
+                                placeholder="Enter your name"
+                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/20 focus:outline-none focus:border-white/[0.12]"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-white/25 tracking-[0.1em] mb-1.5 block">Date of Birth</label>
+                            <input
+                                type="date"
+                                value={profileDOB}
+                                onChange={(e) => setProfileDOB(e.target.value)}
+                                onBlur={saveProfile}
+                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3.5 py-2.5 text-[13px] text-white focus:outline-none focus:border-white/[0.12]"
+                            />
+                        </div>
+                    </div>
+                </SettingsGroup>
+
+                {/* ─── VISUAL EXPERIENCE ─── */}
+                <SettingsGroup title="Visual Experience" icon={Monitor}>
+                    <div className="p-2 space-y-1">
+                        {[
+                            { id: "DISCOVERY", title: "Discovery Mobile", desc: "Modern touch-first player" },
+                            { id: "CLASSIC", title: "iPod Classic", desc: "Click Wheel interface" },
+                        ].map((mode) => (
                             <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap border transition-all flex-shrink-0
-                                    ${isActive
-                                        ? "bg-white text-black border-white"
-                                        : "bg-white/[0.03] text-white/40 border-white/[0.06] active:bg-white/[0.06]"
-                                    }`}
+                                key={mode.id}
+                                onClick={() => handleSwitchMode(mode.id)}
+                                className="w-full p-3 flex items-center gap-3 rounded-xl active:bg-white/[0.06] transition-colors"
                             >
-                                <Icon size={13} />
-                                {tab.label}
+                                <div className="flex-1 text-left">
+                                    <p className="text-[14px] font-bold text-white">{mode.title}</p>
+                                    <p className="text-[11px] text-white/30">{mode.desc}</p>
+                                </div>
+                                <ChevronRight size={16} className="text-white/20" />
                             </button>
-                        );
-                    })}
-                </div>
-            </div>
+                        ))}
+                    </div>
+                </SettingsGroup>
 
-            <div className="px-5 pb-44">
-                <AnimatePresence mode="wait">
-                    {/* ─── PROFILE ─── */}
-                    {activeTab === "profile" && (
-                        <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
-                            <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-5">
-                                <div className="flex items-center gap-4 mb-5">
-                                    <div className="w-16 h-16 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-2xl font-bold text-white shadow-lg">
-                                        {profileName ? profileName.charAt(0).toUpperCase() : <User size={28} />}
-                                    </div>
-                                    <div>
-                                        <p className="text-[16px] font-bold text-white">{profileName || "Guest User"}</p>
-                                        <p className="text-[11px] text-white/30">Local Profile</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase text-white/25 tracking-[0.1em] mb-1.5 block">Display Name</label>
-                                        <input
-                                            type="text"
-                                            value={profileName}
-                                            onChange={(e) => setProfileName(e.target.value)}
-                                            onBlur={saveProfile}
-                                            placeholder="Enter your name"
-                                            className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/20 focus:outline-none focus:border-white/[0.12]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase text-white/25 tracking-[0.1em] mb-1.5 block">Date of Birth</label>
-                                        <input
-                                            type="date"
-                                            value={profileDOB}
-                                            onChange={(e) => setProfileDOB(e.target.value)}
-                                            onBlur={saveProfile}
-                                            className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3.5 py-2.5 text-[13px] text-white focus:outline-none focus:border-white/[0.12]"
-                                        />
-                                    </div>
-                                </div>
-
-
-                            </div>
-
-                            {/* Stats card */}
-                            <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4">
-                                <h3 className="text-[11px] font-bold uppercase text-white/25 tracking-[0.15em] mb-3">Your Stats</h3>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div className="text-center">
-                                        <p className="text-xl font-bold text-white">{stats.totalPlays}</p>
-                                        <p className="text-[9px] text-white/25 uppercase tracking-wider mt-0.5">Plays</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-xl font-bold text-white">{formatTime(stats.totalTime || 0)}</p>
-                                        <p className="text-[9px] text-white/25 uppercase tracking-wider mt-0.5">Listen Time</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-xl font-bold text-white">{likedSongs.length}</p>
-                                        <p className="text-[9px] text-white/25 uppercase tracking-wider mt-0.5">Liked</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* ─── EXPERIENCE ─── */}
-                    {activeTab === "experience" && (
-                        <motion.div key="experience" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
-                            <p className="text-[12px] text-white/30 mb-2">Choose your visual interface</p>
-
-                            {[
-                                { id: "DISCOVERY", title: "Discovery Mobile", desc: "Modern touch-first player", icon: Disc },
-                                { id: "CLASSIC", title: "iPod Classic", desc: "Click Wheel interface", icon: Disc },
-                            ].map((mode) => (
+                {/* ─── AUDIO & CONTENT ─── */}
+                <SettingsGroup title="Audio & Content" icon={Volume2}>
+                    <div className="p-4 border-b border-white/[0.04]">
+                        <label className="text-[10px] font-bold uppercase text-white/25 tracking-[0.1em] mb-2 block">Content Languages</label>
+                        <div className="flex flex-wrap gap-2">
+                            {LANGUAGES.map((lang) => (
                                 <button
-                                    key={mode.id}
-                                    onClick={() => handleSwitchMode(mode.id)}
-                                    className="w-full bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4 flex items-center gap-4 active:bg-white/[0.06] transition-colors"
+                                    key={lang}
+                                    onClick={() => handleLangToggle(lang)}
+                                    className={`px-3 py-1.5 rounded-full text-[11px] font-medium border capitalize transition-colors flex items-center gap-1
+                                        ${selectedLangs.includes(lang)
+                                            ? "bg-white text-black border-white"
+                                            : "bg-transparent text-white/30 border-white/[0.06]"
+                                        }`}
                                 >
-                                    <div className="w-11 h-11 rounded-xl bg-white/[0.06] flex items-center justify-center">
-                                        <mode.icon size={20} className="text-white/60" />
-                                    </div>
-                                    <div className="flex-1 text-left">
-                                        <p className="text-[14px] font-bold text-white">{mode.title}</p>
-                                        <p className="text-[11px] text-white/30">{mode.desc}</p>
-                                    </div>
-                                    <ChevronRight size={18} className="text-white/20" />
+                                    {lang}
+                                    {selectedLangs.includes(lang) && <Check size={10} />}
                                 </button>
                             ))}
-                        </motion.div>
-                    )}
+                        </div>
+                    </div>
 
-                    {/* ─── AUDIO & LANGUAGE ─── */}
-                    {activeTab === "audio" && (
-                        <motion.div key="audio" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
-                            {/* Languages */}
-                            <SettingsGroup title="Content Languages">
-                                <div className="p-4">
-                                    <div className="flex flex-wrap gap-2">
-                                        {LANGUAGES.map((lang) => (
-                                            <button
-                                                key={lang}
-                                                onClick={() => handleLangToggle(lang)}
-                                                className={`px-3 py-1.5 rounded-full text-[11px] font-medium border capitalize transition-colors flex items-center gap-1
-                                                    ${selectedLangs.includes(lang)
-                                                        ? "bg-white text-black border-white"
-                                                        : "bg-transparent text-white/30 border-white/[0.06]"
-                                                    }`}
-                                            >
-                                                {lang}
-                                                {selectedLangs.includes(lang) && <Check size={10} />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </SettingsGroup>
-
-                            {/* Quality */}
-                            <SettingsGroup title="Streaming Quality">
-                                <div className="p-4">
-                                    <div className="grid grid-cols-3 gap-1.5">
-                                        {([
-                                            { id: "hires", label: "Hi-Res", sub: "24-bit" },
-                                            { id: "flac", label: "Lossless", sub: "16-bit" },
-                                            { id: "320", label: "High", sub: "320k" },
-                                            { id: "160", label: "Standard", sub: "160k" },
-                                            { id: "96", label: "Saver", sub: "96k" },
-                                            { id: "auto", label: "Auto", sub: "Adaptive" },
-                                        ] as const).map((q) => (
-                                            <button
-                                                key={q.id}
-                                                onClick={() => setQualityPreference(q.id as any)}
-                                                className={`py-2.5 rounded-lg border transition-colors text-center
-                                                    ${qualityPreference === q.id
-                                                        ? "bg-white text-black border-white"
-                                                        : "bg-transparent text-white/30 border-white/[0.06] active:bg-white/[0.04]"
-                                                    }`}
-                                            >
-                                                <div className="text-[11px] font-bold">{q.label}</div>
-                                                <div className={`text-[9px] ${qualityPreference === q.id ? "text-black/50" : "text-white/15"}`}>{q.sub}</div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </SettingsGroup>
-
-                            {/* Playback Speed */}
-                            <SettingsGroup title="Playback Speed">
-                                <div className="p-4">
-                                    <div className="flex gap-1.5">
-                                        {[0.5, 0.75, 1, 1.25, 1.5, 2].map((s) => (
-                                            <button
-                                                key={s}
-                                                onClick={() => setPlaybackSpeed(s)}
-                                                className={`flex-1 py-2 rounded-lg text-[10px] font-semibold border transition-colors
-                                                    ${playbackSpeed === s
-                                                        ? "bg-white text-black border-white"
-                                                        : "bg-transparent text-white/30 border-white/[0.06]"
-                                                    }`}
-                                            >
-                                                {s}x
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </SettingsGroup>
-
-                            {/* Volume */}
-                            <SettingsGroup title="Volume">
-                                <div className="p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <Volume2 size={14} className="text-white/30" />
-                                        <span className="text-[11px] text-white/30 font-mono">{Math.round(volume * 100)}%</span>
-                                    </div>
-                                    <input
-                                        type="range" min="0" max="1" step="0.01" value={volume}
-                                        onChange={(e) => setVolume(parseFloat(e.target.value))}
-                                        className="w-full accent-white h-1"
-                                    />
-                                </div>
-                            </SettingsGroup>
-
-                            {/* Equalizer */}
-                            <SettingsGroup title="Equalizer">
-                                <div className="p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <select
-                                            value={eq.currentPreset}
-                                            onChange={(e) => eq.setPreset(e.target.value)}
-                                            className="bg-white/[0.06] text-white text-[11px] font-medium rounded-lg px-2 py-1.5 outline-none border border-white/[0.06]"
-                                            disabled={!eq.isEnabled}
-                                        >
-                                            {eq.presets.map((p: string) => (
-                                                <option key={p} value={p} className="bg-black">{p}</option>
-                                            ))}
-                                            <option value="Custom" className="bg-black">Custom</option>
-                                        </select>
-                                        <button
-                                            onClick={() => eq.setIsEnabled(!eq.isEnabled)}
-                                            className={`w-10 h-6 rounded-full p-0.5 transition-colors ${eq.isEnabled ? "bg-white" : "bg-white/10"}`}
-                                        >
-                                            <div className={`w-5 h-5 rounded-full transition-transform ${eq.isEnabled ? "translate-x-4 bg-black" : "translate-x-0 bg-white/30"}`} />
-                                        </button>
-                                    </div>
-
-                                    <div className={`transition-opacity ${eq.isEnabled ? "opacity-100" : "opacity-30 pointer-events-none"}`}>
-                                        <div className="flex items-end justify-between gap-1 h-24">
-                                            {FREQUENCIES.map((freq, i) => (
-                                                <div key={freq} className="flex flex-col items-center gap-1 flex-1">
-                                                    <div className="relative h-16 w-1 bg-white/10 rounded-full">
-                                                        <div
-                                                            className="absolute bottom-0 w-full bg-white/40 rounded-full"
-                                                            style={{ height: `${((eq.bands[i] + 12) / 24) * 100}%` }}
-                                                        />
-                                                        <input
-                                                            type="range" min="-12" max="12" step="0.5"
-                                                            value={eq.bands[i]}
-                                                            onChange={(e) => eq.setBand(i, parseFloat(e.target.value))}
-                                                            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-16 -rotate-90 opacity-0 cursor-pointer"
-                                                        />
-                                                        <div
-                                                            className="absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-lg pointer-events-none"
-                                                            style={{ bottom: `${((eq.bands[i] + 12) / 24) * 100}%`, transform: "translate(-50%, 50%)" }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-[7px] text-white/25 font-mono">
-                                                        {freq >= 1000 ? `${freq / 1000}k` : freq}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </SettingsGroup>
-
-                            {/* Sleep Timer */}
-                            <SettingsGroup title="Sleep Timer">
-                                <div className="p-4">
-                                    {sleepTimer ? (
-                                        <div className="bg-white/[0.06] border border-white/10 p-3 rounded-xl flex items-center justify-between">
-                                            <div>
-                                                <p className="text-white text-[12px] font-bold">Timer Active</p>
-                                                <p className="text-[10px] text-white/40">
-                                                    Stops in {Math.max(0, Math.round((sleepTimer.endTime - Date.now()) / 60000))}m
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => setSleepTimer(null)}
-                                                className="px-3 py-1.5 bg-white/10 text-white text-[11px] font-bold rounded-lg active:scale-95 transition-transform"
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex gap-1.5 flex-wrap">
-                                            {[
-                                                { min: 5, label: "5m" },
-                                                { min: 15, label: "15m" },
-                                                { min: 30, label: "30m" },
-                                                { min: 45, label: "45m" },
-                                                { min: 60, label: "1h" },
-                                                { min: 120, label: "2h" },
-                                            ].map((opt) => (
-                                                <button
-                                                    key={opt.min}
-                                                    onClick={() => setSleepMinutes(opt.min)}
-                                                    className="px-3.5 py-2 rounded-lg text-[11px] font-semibold border bg-transparent text-white/30 border-white/[0.06] active:bg-white/[0.04] transition-colors"
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </SettingsGroup>
-
-                            {/* Toggle rows */}
-                            <SettingsGroup title="Playback Options">
-                                <ToggleRow label="Stop at end of song" value={stopAtEndOfSong} onChange={setStopAtEndOfSong} />
-                                <ToggleRow label="Push notifications" value={notificationsEnabled} onChange={setNotificationsEnabled} />
-                            </SettingsGroup>
-
-                            {/* Crossfade */}
-                            <SettingsGroup title="Crossfade">
-                                <div className="p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[11px] font-bold text-white/50">Overlap duration</span>
-                                        <span className="text-[11px] text-white/30 font-mono">{crossfadeDuration}s</span>
-                                    </div>
-                                    <input
-                                        type="range" min="0" max="12" step="1" value={crossfadeDuration}
-                                        onChange={(e) => setCrossfadeDuration(parseInt(e.target.value))}
-                                        className="w-full accent-white h-1"
-                                    />
-                                    <p className="text-[9px] text-white/30 mt-3 leading-relaxed">
-                                        Smoothly fade between songs. Set to 0s to disable.
-                                    </p>
-                                </div>
-                            </SettingsGroup>
-                        </motion.div>
-                    )}
-
-                    {/* ─── LIBRARY ─── */}
-                    {activeTab === "library" && (
-                        <motion.div key="library" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
-                            {/* Export */}
-                            <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between">
-                                <div>
-                                    <p className="text-[13px] font-bold text-white">Export Data</p>
-                                    <p className="text-[11px] text-white/30">Save your mixes as JSON</p>
-                                </div>
+                    <div className="p-4 border-b border-white/[0.04]">
+                        <label className="text-[10px] font-bold uppercase text-white/25 tracking-[0.1em] mb-2 block">Streaming Quality</label>
+                        <div className="grid grid-cols-3 gap-1.5">
+                            {([
+                                { id: "hires", label: "Hi-Res", sub: "24-bit" },
+                                { id: "flac", label: "Lossless", sub: "16-bit" },
+                                { id: "320", label: "High", sub: "320k" },
+                                { id: "160", label: "Standard", sub: "160k" },
+                                { id: "96", label: "Saver", sub: "96k" },
+                                { id: "auto", label: "Auto", sub: "Adaptive" },
+                            ] as const).map((q) => (
                                 <button
-                                    onClick={() => {
-                                        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mixes));
-                                        const a = document.createElement("a");
-                                        a.setAttribute("href", dataStr);
-                                        a.setAttribute("download", "melora-backup.json");
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        a.remove();
-                                    }}
-                                    className="px-4 py-2 bg-white text-black text-[11px] font-bold rounded-xl active:scale-95 transition-transform"
+                                    key={q.id}
+                                    onClick={() => setQualityPreference(q.id as any)}
+                                    className={`py-2 rounded-lg border transition-colors text-center
+                                        ${qualityPreference === q.id
+                                            ? "bg-white text-black border-white"
+                                            : "bg-transparent text-white/30 border-white/[0.06]"
+                                        }`}
                                 >
-                                    Export
+                                    <div className="text-[11px] font-bold">{q.label}</div>
+                                    <div className={`text-[9px] ${qualityPreference === q.id ? "text-black/50" : "text-white/15"}`}>{q.sub}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="p-4 border-b border-white/[0.04]">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px] font-bold text-white/50">Crossfade Duration</span>
+                            <span className="text-[11px] text-white/30 font-mono">{crossfadeDuration}s</span>
+                        </div>
+                        <input
+                            type="range" min="0" max="12" step="1" value={crossfadeDuration}
+                            onChange={(e) => setCrossfadeDuration(parseInt(e.target.value))}
+                            className="w-full accent-white h-1"
+                        />
+                    </div>
+                    
+                    {/* Equalizer */}
+                    <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-[11px] font-bold text-white/50">Equalizer</label>
+                            <div className="flex items-center gap-3">
+                                <select
+                                    value={eq.currentPreset}
+                                    onChange={(e) => eq.setPreset(e.target.value)}
+                                    className="bg-white/[0.06] text-white text-[11px] font-medium rounded-lg px-2 py-1 outline-none border border-white/[0.06]"
+                                    disabled={!eq.isEnabled}
+                                >
+                                    {eq.presets.map((p: string) => <option key={p} value={p} className="bg-black">{p}</option>)}
+                                    <option value="Custom" className="bg-black">Custom</option>
+                                </select>
+                                <button
+                                    onClick={() => eq.setIsEnabled(!eq.isEnabled)}
+                                    className={`w-10 h-6 rounded-full p-0.5 transition-colors ${eq.isEnabled ? "bg-white" : "bg-white/10"}`}
+                                >
+                                    <div className={`w-5 h-5 rounded-full transition-transform ${eq.isEnabled ? "translate-x-4 bg-black" : "translate-x-0 bg-white/30"}`} />
                                 </button>
                             </div>
+                        </div>
 
-                            {/* Import */}
-                            <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between">
-                                <div>
-                                    <p className="text-[13px] font-bold text-white">Import Data</p>
-                                    <p className="text-[11px] text-white/30">Restore mixes from backup</p>
-                                </div>
-                                <label className="px-4 py-2 bg-white/[0.06] text-white text-[11px] font-bold rounded-xl active:scale-95 transition-transform cursor-pointer">
-                                    Import
-                                    <input
-                                        type="file"
-                                        accept=".json"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-                                            const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                                try {
-                                                    const imported = JSON.parse(event.target?.result as string);
-                                                    if (Array.isArray(imported)) {
-                                                        setMixes(imported);
-                                                        window.dispatchEvent(new CustomEvent("melora-library-updated"));
-                                                    }
-                                                } catch { }
-                                            };
-                                            reader.readAsText(file);
-                                        }}
-                                    />
-                                </label>
-                            </div>
-
-                            {/* Clear Cache */}
-                            <button
-                                onClick={handleClearCache}
-                                className="w-full bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between active:bg-white/[0.05] transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Trash2 size={16} className="text-white/30" />
-                                    <span className="text-[13px] font-medium text-white/70">Clear Cache</span>
-                                </div>
-                                <ChevronRight size={14} className="text-white/15" />
-                            </button>
-
-                            {/* Factory Reset */}
-                            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 mt-6">
-                                <p className="text-white/40 text-[11px] font-bold uppercase tracking-wider mb-3">Danger Zone</p>
-                                {!showResetConfirm ? (
-                                    <button
-                                        onClick={() => setShowResetConfirm(true)}
-                                        className="w-full py-3 bg-white/[0.06] text-white/50 rounded-xl text-[12px] font-bold active:bg-white/10 transition-colors"
-                                    >
-                                        Factory Reset App
-                                    </button>
-                                ) : (
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setShowResetConfirm(false)}
-                                            className="flex-1 py-3 bg-white/[0.06] text-white/50 rounded-xl text-[12px] font-bold"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={() => factoryReset()}
-                                            className="flex-1 py-3 bg-white/20 text-white rounded-xl text-[12px] font-bold active:scale-95 transition-transform"
-                                        >
-                                            Confirm Reset
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* ─── STATS ─── */}
-                    {activeTab === "stats" && (
-                        <motion.div key="stats" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    { label: "Total Plays", value: stats.totalPlays },
-                                    { label: "Listen Time", value: formatTime(stats.totalTime || 0) },
-                                    { label: "Liked Songs", value: likedSongs.length },
-                                    { label: "Playlists", value: mixes.length },
-                                    { label: "Total Songs", value: mixes.reduce((acc, m) => acc + m.songs.length, 0) },
-                                    { label: "Recent", value: recentlyPlayed.length },
-                                ].map((s) => (
-                                    <div key={s.label} className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4 text-center">
-                                        <p className="text-2xl font-bold text-white">{s.value}</p>
-                                        <p className="text-[9px] text-white/25 uppercase tracking-wider mt-1">{s.label}</p>
+                        <div className={`transition-opacity mt-4 ${eq.isEnabled ? "opacity-100" : "opacity-30 pointer-events-none"}`}>
+                            <div className="flex items-end justify-between gap-1 h-20">
+                                {FREQUENCIES.map((freq, i) => (
+                                    <div key={freq} className="flex flex-col items-center gap-1 flex-1">
+                                        <div className="relative h-14 w-1 bg-white/10 rounded-full">
+                                            <div
+                                                className="absolute bottom-0 w-full bg-white/40 rounded-full"
+                                                style={{ height: `${((eq.bands[i] + 12) / 24) * 100}%` }}
+                                            />
+                                            <input
+                                                type="range" min="-12" max="12" step="0.5"
+                                                value={eq.bands[i]}
+                                                onChange={(e) => eq.setBand(i, parseFloat(e.target.value))}
+                                                className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-14 -rotate-90 opacity-0 cursor-pointer"
+                                            />
+                                        </div>
+                                        <span className="text-[7px] text-white/25 font-mono">
+                                            {freq >= 1000 ? `${freq / 1000}k` : freq}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
-                            <div className="p-8 text-center border border-dashed border-white/[0.06] rounded-2xl text-white/15 text-[12px]">
-                                More insights coming soon
-                            </div>
-                        </motion.div>
-                    )}
+                        </div>
+                    </div>
+                </SettingsGroup>
 
-                    {/* ─── SUPPORT ─── */}
-                    {activeTab === "support" && (
-                        <motion.div key="support" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-center py-10 space-y-6">
-                            <div className="w-16 h-16 bg-white/10 rounded-full mx-auto flex items-center justify-center text-white shadow-xl">
-                                <Heart size={28} fill="currentColor" />
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-white mb-2">Support Melora</h2>
-                                <p className="text-[13px] text-white/40 max-w-xs mx-auto leading-relaxed">
-                                    Melora is an open-source passion project. If you love the music, consider supporting development.
-                                </p>
-                            </div>
-                            <div className="flex flex-col gap-3 px-4">
-                                <a href="https://buymeacoffee.com/melora" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white text-black rounded-2xl text-[13px] font-bold active:scale-95 transition-transform">
-                                    <Coffee size={16} /> Buy us a Coffee
-                                </a>
-                                <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white/[0.06] text-white/70 rounded-2xl text-[13px] font-bold border border-white/[0.06] active:scale-95 transition-transform">
-                                    <Github size={16} /> Star on GitHub
-                                </a>
-                                <a href="https://discord.gg/657ZJJUkkH" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#5865F2]/20 text-[#5865F2] rounded-2xl text-[13px] font-bold border border-[#5865F2]/20 active:scale-95 transition-transform">
-                                    <MessageCircle size={16} /> Join our Discord
-                                </a>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* ─── ABOUT ─── */}
-                    {activeTab === "about" && (
-                        <motion.div key="about" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-center py-12 space-y-6">
-                            <div>
-                                <h2 className="text-4xl font-black text-white tracking-tighter mb-2">MELORA</h2>
-                                <span className="px-3 py-1 bg-white/10 text-white rounded-full text-[10px] font-mono">v3.0.0</span>
-                            </div>
-                            <p className="text-[13px] text-white/30 max-w-xs mx-auto">
-                                Designed for audiophiles who miss the tangible feel of music.
-                            </p>
-
-                            <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl overflow-hidden mx-4">
-                                <div className="divide-y divide-white/[0.04]">
-                                    <InfoRow label="Version" value="3.0.0" />
-                                    <InfoRow label="Playlists" value={String(mixes.length)} />
-                                    <InfoRow label="Recent Songs" value={String(recentlyPlayed.length)} />
-                                    <InfoRow label="Liked Songs" value={String(likedSongs.length)} />
+                {/* ─── PLAYBACK OPTIONS ─── */}
+                <SettingsGroup title="Playback Options" icon={Activity}>
+                    <ToggleRow label="Stop at end of song" value={stopAtEndOfSong} onChange={setStopAtEndOfSong} />
+                    <ToggleRow label="Push notifications" value={notificationsEnabled} onChange={setNotificationsEnabled} />
+                    
+                    <div className="p-4 border-t border-white/[0.04]">
+                        <label className="text-[10px] font-bold uppercase text-white/25 tracking-[0.1em] mb-2 block">Sleep Timer</label>
+                        {sleepTimer ? (
+                            <div className="bg-white/[0.06] p-3 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <p className="text-white text-[12px] font-bold">Timer Active</p>
+                                    <p className="text-[10px] text-white/40">Stops in {Math.max(0, Math.round((sleepTimer.endTime - Date.now()) / 60000))}m</p>
                                 </div>
+                                <button onClick={() => setSleepTimer(null)} className="px-3 py-1 bg-white/10 text-white text-[11px] font-bold rounded-lg">Cancel</button>
                             </div>
-
-                            <div className="flex flex-col gap-3 px-6 pt-2">
-                                <a href="https://discord.gg/657ZJJUkkH" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-2.5 bg-[#5865F2]/15 text-[#5865F2] rounded-xl text-[12px] font-bold border border-[#5865F2]/20 active:scale-95 transition-transform">
-                                    <MessageCircle size={14} /> Join our Discord
-                                </a>
-                                <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-2.5 bg-white/[0.04] text-white/40 rounded-xl text-[12px] font-bold border border-white/[0.06] active:scale-95 transition-transform">
-                                    <Github size={14} /> GitHub
-                                </a>
+                        ) : (
+                            <div className="flex gap-1.5 flex-wrap">
+                                {[5, 15, 30, 45, 60, 120].map((min) => (
+                                    <button
+                                        key={min}
+                                        onClick={() => setSleepMinutes(min)}
+                                        className="px-3 py-1.5 rounded-lg text-[11px] font-semibold border bg-transparent text-white/30 border-white/[0.06]"
+                                    >
+                                        {min}m
+                                    </button>
+                                ))}
                             </div>
+                        )}
+                    </div>
+                </SettingsGroup>
 
-                            <p className="text-[9px] text-white/10 pt-8">
-                                © 2026 Melora Tunes Project
-                            </p>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                {/* ─── DATA & STORAGE ─── */}
+                <SettingsGroup title="Data & Storage" icon={Database}>
+                    <button onClick={handleClearCache} className="w-full p-4 flex items-center justify-between active:bg-white/[0.02]">
+                        <div className="flex items-center gap-3"><Trash2 size={16} className="text-white/30" /><span className="text-[13px] font-medium text-white/70">Clear Cache</span></div>
+                        <ChevronRight size={14} className="text-white/15" />
+                    </button>
+                    <div className="p-4 border-t border-white/[0.04]">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    const a = document.createElement("a");
+                                    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mixes));
+                                    a.download = "melora-backup.json";
+                                    document.body.appendChild(a); a.click(); a.remove();
+                                }}
+                                className="flex-1 py-2.5 bg-white/[0.06] text-white text-[12px] font-bold rounded-xl"
+                            >
+                                Export Data
+                            </button>
+                            <label className="flex-1 py-2.5 bg-white/[0.06] text-white text-[12px] font-bold rounded-xl text-center cursor-pointer">
+                                Import Data
+                                <input
+                                    type="file" accept=".json" className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const reader = new FileReader();
+                                        reader.onload = (event) => {
+                                            try {
+                                                const imported = JSON.parse(event.target?.result as string);
+                                                if (Array.isArray(imported)) { setMixes(imported); window.dispatchEvent(new CustomEvent("melora-library-updated")); }
+                                            } catch { }
+                                        };
+                                        reader.readAsText(file);
+                                    }}
+                                />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="p-4 border-t border-white/[0.04]">
+                        {!showResetConfirm ? (
+                            <button onClick={() => setShowResetConfirm(true)} className="w-full py-2.5 bg-red-500/10 text-red-400 rounded-xl text-[12px] font-bold">Factory Reset</button>
+                        ) : (
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowResetConfirm(false)} className="flex-1 py-2.5 bg-white/[0.06] text-white/50 rounded-xl text-[12px] font-bold">Cancel</button>
+                                <button onClick={() => factoryReset()} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-[12px] font-bold">Confirm Reset</button>
+                            </div>
+                        )}
+                    </div>
+                </SettingsGroup>
+
+                {/* ─── ABOUT & STATS ─── */}
+                <SettingsGroup title="About" icon={Info}>
+                    <div className="p-6 text-center">
+                        <h2 className="text-3xl font-black text-white tracking-tighter mb-1">MELORA</h2>
+                        <span className="px-3 py-1 bg-white/10 text-white rounded-full text-[10px] font-mono">v3.0.0</span>
+                    </div>
+                    <div className="divide-y divide-white/[0.04] border-t border-white/[0.04]">
+                        <InfoRow label="Total Plays" value={String(stats.totalPlays)} />
+                        <InfoRow label="Listen Time" value={formatTime(stats.totalTime || 0)} />
+                        <InfoRow label="Liked Songs" value={String(likedSongs.length)} />
+                        <InfoRow label="Playlists" value={String(mixes.length)} />
+                    </div>
+                    <div className="p-4 flex flex-col gap-2 border-t border-white/[0.04]">
+                        <a href="https://discord.gg/657ZJJUkkH" target="_blank" rel="noopener noreferrer" className="flex justify-center items-center gap-2 py-2.5 bg-[#5865F2]/15 text-[#5865F2] rounded-xl text-[12px] font-bold">
+                            <MessageCircle size={14} /> Discord
+                        </a>
+                        <a href="https://github.com/Nullgravitydevs/Melora-Tunes" target="_blank" rel="noopener noreferrer" className="flex justify-center items-center gap-2 py-2.5 bg-white/[0.04] text-white/40 rounded-xl text-[12px] font-bold">
+                            <Github size={14} /> GitHub
+                        </a>
+                    </div>
+                </SettingsGroup>
+
             </div>
 
-            {/* Confirm Modal */}
             <ConfirmDialog
                 open={showConfirm !== null}
                 message={showConfirm?.message || ''}
@@ -634,17 +383,19 @@ export function SettingsTab() {
                 onCancel={() => setShowConfirm(null)}
                 destructive={showConfirm?.destructive}
             />
-        </motion.div>
+        </div>
     );
 }
 
 // ─── Sub-components ──────────────────────────────────────
 
-function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {
+function SettingsGroup({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
     return (
         <div>
-            <h3 className="text-[11px] font-bold uppercase text-white/25 tracking-[0.15em] mb-2 px-1">{title}</h3>
-            <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden">
+            <h3 className="text-[13px] font-bold text-white/50 mb-3 ml-2 flex items-center gap-2">
+                <Icon size={16} /> {title}
+            </h3>
+            <div className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden shadow-sm backdrop-blur-md">
                 {children}
             </div>
         </div>
@@ -664,7 +415,7 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 
 function InfoRow({ label, value }: { label: string; value: string }) {
     return (
-        <div className="p-4 flex justify-between items-center">
+        <div className="px-4 py-3 flex justify-between items-center">
             <span className="text-[13px] font-medium text-white/70">{label}</span>
             <span className="text-[11px] text-white/30 font-mono">{value}</span>
         </div>

@@ -6,6 +6,7 @@ import { Play, ChevronRight, Radio, Globe, Sparkles, Headphones, Music } from "l
 import { searchSongs, searchPlaylists, searchAlbums, searchArtists, JioSaavnSong } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
+import { get, set } from "idb-keyval";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 interface Props { onNavigate: (v: ViewState) => void }
@@ -58,34 +59,58 @@ export function ExploreTab({ onNavigate }: Props) {
                 const settings = loadSettings();
                 const langs = settings.languages || ["english", "hindi"];
                 const langStr = langs.join(",");
+                const CACHE_KEY = `explore_data_${langStr}`;
+                const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
 
-                const [chartToppers, trending, newReleases, topPlaylists, bollywood, tollywood, hollywood, ...artistResults] =
-                    await Promise.all([
-                        searchPlaylists("Global Top 50", 1, 6, langStr).catch(() => []),
-                        searchSongs("Top Hits 2026", 1, 12, langStr).catch(() => []),
-                        searchAlbums("New Releases 2026", 1, 10, langStr).catch(() => []),
-                        searchPlaylists("Top Playlists", 1, 8, langStr).catch(() => []),
-                        searchSongs("Bollywood Hits", 1, 8, langStr).catch(() => []),
-                        searchSongs("Tollywood Hits", 1, 8, langStr).catch(() => []),
-                        searchSongs("Hollywood Hits", 1, 8, langStr).catch(() => []),
-                        ...ARTIST_STATIONS.map((a) => searchArtists(a.name, 1, 1).catch(() => [])),
-                    ]);
+                const cached = await get<{ ts: number, data: ExploreData }>(CACHE_KEY);
+                if (cached && Date.now() - cached.ts < CACHE_TTL) {
+                    if (!cancelled) {
+                        setData(cached.data);
+                        setIsLoading(false);
+                    }
+                    return;
+                }
+
+                const [chartToppers, trending, newReleases] = await Promise.all([
+                    searchPlaylists("Global Top 50", 1, 6, langStr).catch(() => []),
+                    searchSongs("Top Hits 2026", 1, 12, langStr).catch(() => []),
+                    searchAlbums("New Releases 2026", 1, 10, langStr).catch(() => []),
+                ]);
 
                 if (cancelled) return;
-                setData({
-                    chartToppers, trending, newReleases, topPlaylists,
-                    bollywood, tollywood, hollywood,
-                    artistRadio: ARTIST_STATIONS.map((a, i) => ({
-                        ...a,
-                        image: artistResults[i]?.[0]?.image
-                            ? (typeof artistResults[i][0].image === "string" ? artistResults[i][0].image : getArt(artistResults[i][0]))
-                            : "",
-                    })),
+                
+                let currentData: ExploreData = {
+                    chartToppers, trending, newReleases, topPlaylists: [],
+                    bollywood: [], tollywood: [], hollywood: [], artistRadio: []
+                };
+                
+                setData(currentData);
+                setIsLoading(false); // Show UI instantly with top content
+
+                // Fetch the rest asynchronously without blocking
+                Promise.all([
+                    searchPlaylists("Top Playlists", 1, 8, langStr).catch(() => []),
+                    searchSongs("Bollywood Hits", 1, 8, langStr).catch(() => []),
+                    searchSongs("Tollywood Hits", 1, 8, langStr).catch(() => []),
+                    searchSongs("Hollywood Hits", 1, 8, langStr).catch(() => []),
+                    ...ARTIST_STATIONS.map((a) => searchArtists(a.name, 1, 1).catch(() => [])),
+                ]).then(([topPlaylists, bollywood, tollywood, hollywood, ...artistResults]) => {
+                    if (cancelled) return;
+                    currentData = {
+                        ...currentData,
+                        topPlaylists, bollywood, tollywood, hollywood,
+                        artistRadio: ARTIST_STATIONS.map((a, i) => ({
+                            ...a,
+                            image: artistResults[i]?.[0]?.image
+                                ? (typeof artistResults[i][0].image === "string" ? artistResults[i][0].image : getArt(artistResults[i][0]))
+                                : "",
+                        })),
+                    };
+                    setData(currentData);
+                    set(CACHE_KEY, { ts: Date.now(), data: currentData });
                 });
             } catch (e) {
                 if (!cancelled) setError(true);
-            } finally {
-                if (!cancelled) setIsLoading(false);
             }
         };
         load();

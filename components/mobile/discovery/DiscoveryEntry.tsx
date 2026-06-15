@@ -14,13 +14,15 @@ import { getArt } from "@/lib/helpers";
 import { HomeTab } from "./tabs/HomeTab";
 import { SearchTab } from "./tabs/SearchTab";
 import { ExploreTab } from "./tabs/ExploreTab";
+
 import { LibraryTab } from "./tabs/LibraryTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { FullPlayerSheet } from "./views/FullPlayerSheet";
 import { ArtistView } from "./views/ArtistView";
 import { AlbumView } from "./views/AlbumView";
 import { PlaylistView } from "./views/PlaylistView";
-import { SectionView } from "./views/SectionView";import { useAudioProgress } from "@/hooks/use-audio-progress";
+import { SectionView } from "./views/SectionView";
+import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
 // ─── Types ───────────────────────────────────────────────
@@ -36,7 +38,8 @@ export interface ViewState {
 export { getArt } from "@/lib/helpers";
 
 // ─── Main Entry ──────────────────────────────────────────
-export function DiscoveryEntry() { const [activeTab, setActiveTab] = useState<Tab>("HOME");
+export function DiscoveryEntry() {
+    const [activeTab, setActiveTab] = useState<Tab>("HOME");
     const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(new Set(["HOME"]));
     const [viewStack, setViewStack] = useState<ViewState[]>([]);
     const [showFullPlayer, setShowFullPlayer] = useState(false);
@@ -105,6 +108,7 @@ export function DiscoveryEntry() { const [activeTab, setActiveTab] = useState<Ta
                         <div className="flex justify-center pt-3 pb-0 cursor-grab active:cursor-grabbing">
                             <div className="w-10 h-1 rounded-full bg-white/20" />
                         </div>
+
                         <div className="overflow-y-auto h-[calc(100%-20px)] overscroll-contain" style={{ touchAction: "pan-y" }}>
                             <SettingsTab />
                         </div>

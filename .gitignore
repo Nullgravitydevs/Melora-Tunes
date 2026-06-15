@@ -44,3 +44,4 @@ next-env.d.ts
 competitors/
 jdk-21.0.2/
 *.tar.gz
+jdk-21.0.11/

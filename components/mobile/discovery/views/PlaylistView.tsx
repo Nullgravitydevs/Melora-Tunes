@@ -260,16 +260,7 @@ export function PlaylistView({ playlist, onBack, onNavigate }: Props) {
                                             <p className={`text-[13px] font-medium truncate ${current ? "text-white" : "text-white/70"}`}>{name}</p>
                                             <div className="flex items-center gap-1.5 mt-0.5">
                                                 <p className="text-[10px] text-white/25 truncate">{artist}</p>
-                                                {trackMetadataMap[((song as any).id || (song as any).song?.id)] && (
-                                                    <div className="flex items-center gap-1 flex-shrink-0">
-                                                        <span className="text-[8px] bg-white/10 text-white/60 px-1 py-0.5 rounded uppercase font-bold tracking-widest leading-none border border-white/5">
-                                                            {trackMetadataMap[((song as any).id || (song as any).song?.id)].bpm} BPM
-                                                        </span>
-                                                        <span className="text-[8px] bg-white/10 text-white/60 px-1 py-0.5 rounded uppercase font-bold tracking-widest leading-none border border-white/5">
-                                                            {trackMetadataMap[((song as any).id || (song as any).song?.id)].key}
-                                                        </span>
-                                                    </div>
-                                                )}
+                                                {/* Removed BPM and Key rendering */}
                                             </div>
                                         </div>
                                     </button>

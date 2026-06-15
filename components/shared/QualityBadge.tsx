@@ -32,13 +32,13 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
         switch (quality) {
             case 'hires':
                 return (
-                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-yellow-500/20 text-yellow-500 border border-yellow-500/30", className)}>
+                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-white/20 text-white border border-white/30", className)}>
                         HI-RES
                     </span>
                 );
             case 'flac':
                 return (
-                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30", className)}>
+                    <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-white/20 text-white border border-white/30", className)}>
                         LOSSLESS
                     </span>
                 );
@@ -73,7 +73,7 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
             case 'hires':
                 return (
                     <div className={cn("flex flex-col items-center gap-1", className)}>
-                        <span className="text-yellow-500 font-bold tracking-widest text-[10px] uppercase flex items-center gap-1">
+                        <span className="text-white font-bold tracking-widest text-[10px] uppercase flex items-center gap-1">
                             🔥 Hi-Res Studio Quality
                         </span>
                         <span className="text-[10px] text-white/40 font-mono tracking-tight uppercase">
@@ -84,7 +84,7 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
             case 'flac':
                 return (
                     <div className={cn("flex flex-col items-center gap-1", className)}>
-                        <span className="text-blue-400 font-bold tracking-widest text-[10px] uppercase flex items-center gap-1">
+                        <span className="text-white font-bold tracking-widest text-[10px] uppercase flex items-center gap-1">
                             💿 CD Quality Lossless
                         </span>
                         <span className="text-[10px] text-white/40 font-mono tracking-tight uppercase">

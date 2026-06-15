@@ -11,14 +11,16 @@ import { decodeHtml } from "@/lib/utils";
 import { shuffleArray } from "@/lib/helpers";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { QualityBadge } from "@/components/shared/QualityBadge";
+import { OfflineStore } from "@/lib/offline-store";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 interface Props { onNavigate: (v: ViewState) => void }
 
-type LibTab = "liked" | "albums" | "artists" | "recent" | "playlists";
+type LibTab = "liked" | "downloads" | "albums" | "artists" | "recent" | "playlists";
 
 const TABS: { id: LibTab; label: string; icon: any }[] = [
     { id: "liked", label: "Liked", icon: Heart },
+    { id: "downloads", label: "Downloads", icon: Download },
     { id: "albums", label: "Albums", icon: Disc3 },
     { id: "artists", label: "Artists", icon: Users },
     { id: "recent", label: "Recent", icon: Clock },
@@ -32,8 +34,18 @@ export function LibraryTab({ onNavigate }: Props) {
     const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
     const [showConfirm, setShowConfirm] = useState<{ message: string; action: () => void } | null>(null);
     const [newPlaylistName, setNewPlaylistName] = useState("");
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [sortMode, setSortMode] = useState<"recent" | "alpha">("recent");
+    const [downloadedSongs, setDownloadedSongs] = useState<any[]>([]);
+
     const { playInstantMix, loadMix } = usePlayback();
     const { likedSongs, savedAlbums, savedArtists, recentlyPlayed, mixes, toggleLike, isLiked, toggleSaveAlbum, toggleFollowArtist, addMix, deleteMix, isDownloaded } = useLibrary();
+
+    React.useEffect(() => {
+        if (activeTab === "downloads") {
+            OfflineStore.getAllDownloadedSongs().then(setDownloadedSongs);
+        }
+    }, [activeTab]);
 
     const userPlaylists = useMemo(() =>
         mixes.filter((m) => !m.id.startsWith("quick-") && !m.id.startsWith("search-") && !m.id.startsWith("album-") && !m.id.startsWith("artist-") && !m.id.startsWith("radio-") && !m.id.startsWith("explore-") && !m.id.startsWith("home-") && !m.id.startsWith("region-") && !m.id.startsWith("section-") && !m.id.startsWith("instant-")),
@@ -41,13 +53,24 @@ export function LibraryTab({ onNavigate }: Props) {
     );
 
     const filterItems = (items: any[]) => {
-        if (!search.trim()) return items;
-        const q = search.toLowerCase();
-        return items.filter((item) => {
-            const name = ((item as any).name || (item as any).title || "").toLowerCase();
-            const artist = ((item as any).primaryArtists || (item as any).artist || "").toLowerCase();
-            return name.includes(q) || artist.includes(q);
-        });
+        let filtered = items;
+        if (search.trim()) {
+            const q = search.toLowerCase();
+            filtered = items.filter((item) => {
+                const name = ((item as any).name || (item as any).title || "").toLowerCase();
+                const artist = ((item as any).primaryArtists || (item as any).artist || "").toLowerCase();
+                return name.includes(q) || artist.includes(q);
+            });
+        }
+        
+        if (sortMode === "alpha") {
+            return [...filtered].sort((a, b) => {
+                const nameA = ((a as any).name || (a as any).title || "").toLowerCase();
+                const nameB = ((b as any).name || (b as any).title || "").toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+        }
+        return filtered; // recent mode maintains default order
     };
 
     const playAll = (songs: any[], title: string, shuffled = false) => {
@@ -71,11 +94,22 @@ export function LibraryTab({ onNavigate }: Props) {
                 <div className="flex items-center justify-between mb-4">
                     <h1 className="text-[26px] font-bold text-white tracking-tight">Library</h1>
                     <div className="flex gap-2">
-                        <button onClick={() => setShowSearch(!showSearch)} className="p-2 text-white/40 active:text-white/60">
-                            <Search size={20} />
+                        <select 
+                            value={sortMode}
+                            onChange={(e) => setSortMode(e.target.value as "recent" | "alpha")}
+                            className="bg-white/[0.05] border border-white/[0.06] text-white text-[11px] font-medium rounded-lg px-2 py-1 outline-none"
+                        >
+                            <option value="recent" className="bg-black text-white">Recent</option>
+                            <option value="alpha" className="bg-black text-white">A-Z</option>
+                        </select>
+                        <button onClick={() => setViewMode(v => v === "grid" ? "list" : "grid")} className="p-2 bg-white/[0.05] border border-white/[0.06] rounded-lg text-white/60 active:text-white">
+                            {viewMode === "grid" ? <ListMusic size={14} /> : <Disc3 size={14} />}
                         </button>
-                        <button onClick={() => onNavigate({ id: "settings" })} className="p-2 text-white/40 active:text-white/60">
-                            <Settings size={20} />
+                        <button onClick={() => setShowSearch(!showSearch)} className="p-2 bg-white/[0.05] border border-white/[0.06] rounded-lg text-white/60 active:text-white">
+                            <Search size={14} />
+                        </button>
+                        <button onClick={() => onNavigate({ id: "settings" })} className="p-2 bg-white/[0.05] border border-white/[0.06] rounded-lg text-white/60 active:text-white">
+                            <Settings size={14} />
                         </button>
                     </div>
                 </div>
@@ -133,17 +167,28 @@ export function LibraryTab({ onNavigate }: Props) {
                         </TabContent>
                     )}
 
+                    {activeTab === "downloads" && (
+                        <TabContent key="downloads">
+                            <PlayControls count={downloadedSongs.length} onPlay={() => playAll(downloadedSongs, "Downloaded Songs")} onShuffle={() => playAll(downloadedSongs, "Downloaded Songs", true)} />
+                            {filterItems(downloadedSongs).length > 0 ? (
+                                <SongList songs={filterItems(downloadedSongs)} onPlay={(songs, i) => { const list = songs.slice(i).concat(songs.slice(0, i)); playAll(list, "Downloaded Songs"); }} isDownloaded={isDownloaded} />
+                            ) : (
+                                <EmptyState message="No downloaded songs" sub="Download songs to listen offline" />
+                            )}
+                        </TabContent>
+                    )}
+
                     {activeTab === "albums" && (
                         <TabContent key="albums">
                             {filterItems(savedAlbums).length > 0 ? (
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className={viewMode === "grid" ? "grid grid-cols-2 gap-3" : "flex flex-col gap-2"}>
                                     {filterItems(savedAlbums).map((album: any, i: number) => (
                                         <button
                                             key={album.id || i}
                                             onClick={() => onNavigate({ id: "album", data: album })}
-                                            className="text-left active:scale-95 transition-transform"
+                                            className={`text-left active:scale-95 transition-transform ${viewMode === "list" ? "flex items-center gap-3 bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.04]" : ""}`}
                                         >
-                                            <div className="aspect-square rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.04] relative group">
+                                            <div className={`${viewMode === "grid" ? "aspect-square w-full" : "w-14 h-14 flex-shrink-0"} rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.04] relative group`}>
                                                 {getArt(album) && <img src={getArt(album)} className="w-full h-full object-cover" alt="" loading="lazy" />}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); toggleSaveAlbum(album); }}
@@ -152,8 +197,10 @@ export function LibraryTab({ onNavigate }: Props) {
                                                     <X size={12} className="text-white/60" />
                                                 </button>
                                             </div>
-                                            <p className="mt-2 text-[12px] font-medium text-white/70 truncate">{decodeHtml(album.name || album.title || "")}</p>
-                                            <p className="text-[10px] text-white/25 truncate">{decodeHtml(album.primaryArtists || "")}</p>
+                                            <div className={viewMode === "list" ? "flex-1 min-w-0" : ""}>
+                                                <p className={`${viewMode === "grid" ? "mt-2 text-[12px]" : "text-[14px]"} font-medium text-white/70 truncate`}>{decodeHtml(album.name || album.title || "")}</p>
+                                                <p className={`${viewMode === "grid" ? "text-[10px]" : "text-[12px]"} text-white/25 truncate`}>{decodeHtml(album.primaryArtists || "")}</p>
+                                            </div>
                                         </button>
                                     ))}
                                 </div>
