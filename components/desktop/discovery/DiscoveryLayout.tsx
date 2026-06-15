@@ -23,7 +23,7 @@ import { OfflinePlaylistView } from "./views/OfflinePlaylistView";
 import { AddToOfflinePlaylistModal } from "./modals/AddToOfflinePlaylistModal";
 import { TrackContextMenu } from "@/components/ui/track-context-menu";
 import { DownloadQueuePanel } from "@/components/ui/download-queue-panel";
-import { LanguageModal } from "@/components/desktop/deck/scenes/language-modal";
+import { LanguageModal } from "@/components/shared/language-modal";
 import { JioSaavnSong } from "@/lib/jiosaavn";
 import { DownloadView } from "./views/DownloadView";
 import { PlaylistItem } from "@/components/shared/PlaylistItem";

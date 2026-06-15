@@ -7,7 +7,6 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { usePlayback } from "@/components/providers/playback-context";
 
 // --- THE TRINITY: 3 MODES ---
-// --- THE TRINITY: 3 MODES ---
 const ClassicMode = dynamic(() => import("@/components/mobile/classic/AndroidEntry").then(mod => mod.AndroidEntry), {
   ssr: false,
   loading: () => <SplashScreen text="LOADING CLASSIC..." />
@@ -23,15 +22,9 @@ const MobileDiscoveryMode = dynamic(() => import("@/components/mobile/discovery/
   loading: () => <SplashScreen text="LOADING DISCOVERY..." />
 });
 
-const DeckMode = dynamic(() => import("@/components/desktop/deck/scenes/stage").then(mod => mod.WindowsStage), {
-  ssr: false,
-  loading: () => <SplashScreen text="LOADING DECK..." />
-});
-
 import { SetupWizard } from "@/components/shared/SetupWizard";
-import { Launcher } from "@/components/desktop/deck/scenes/launcher";
 
-export type UIMode = 'CLASSIC' | 'DISCOVERY' | 'DECK' | 'WELCOME' | 'LAUNCHER';
+export type UIMode = 'CLASSIC' | 'DISCOVERY' | 'WELCOME';
 
 export default function Home() {
   const isMobileSystem = useIsMobile();
@@ -45,8 +38,13 @@ export default function Home() {
     const isSetupDone = localStorage.getItem('melora-setup-complete') === 'true';
 
     if (isSetupDone) {
-      // Always show the interface chooser on app start
-      setMode('LAUNCHER');
+      // Default to Discovery if setup is done (pure mobile/music app behavior)
+      const savedMode = localStorage.getItem('melora-ui-mode') as UIMode;
+      if (savedMode === 'CLASSIC' || savedMode === 'DISCOVERY') {
+        setMode(savedMode);
+      } else {
+        setMode('DISCOVERY');
+      }
     } else {
       setMode('WELCOME');
     }
@@ -55,7 +53,7 @@ export default function Home() {
   useEffect(() => {
     const handleModeChange = (e: CustomEvent) => {
       const newMode = e.detail as UIMode;
-      if (['CLASSIC', 'DISCOVERY', 'DECK', 'WELCOME', 'LAUNCHER'].includes(newMode)) {
+      if (['CLASSIC', 'DISCOVERY', 'WELCOME'].includes(newMode)) {
         pause();
         setMode(newMode);
         localStorage.setItem('melora-ui-mode', newMode);
@@ -73,32 +71,23 @@ export default function Home() {
       <ErrorBoundary>
         <Suspense fallback={<SplashScreen text="LOADING..." />}>
 
-          {mode === 'LAUNCHER' && (
-            <Launcher
-              onSelect={(selectedMode) => {
-                setMode(selectedMode);
-                localStorage.setItem('melora-ui-mode', selectedMode);
-              }}
-            />
-          )}
-
           {mode === 'WELCOME' && (
             <SetupWizard
               onComplete={(selectedMode) => {
-                localStorage.setItem('melora-setup-complete', 'true'); // Added setup complete flag
-                setMode(selectedMode);
-                localStorage.setItem('melora-ui-mode', selectedMode);
+                localStorage.setItem('melora-setup-complete', 'true');
+                // Setup wizard might still try to return 'DECK', force 'DISCOVERY'
+                const finalMode = selectedMode === 'DECK' as any ? 'DISCOVERY' : selectedMode as UIMode;
+                setMode(finalMode);
+                localStorage.setItem('melora-ui-mode', finalMode);
               }}
             />
           )}
 
           {mode === 'CLASSIC' && (
             <ClassicMode
-              onSwitchToDesktop={(theme) => {
-                // Classic -> Discovery/Deck Switcher
-                const target = theme === 'GLASS' ? 'DISCOVERY' : 'DECK';
-                setMode(target);
-                localStorage.setItem('melora-ui-mode', target);
+              onSwitchToDesktop={() => {
+                setMode('DISCOVERY');
+                localStorage.setItem('melora-ui-mode', 'DISCOVERY');
               }}
             />
           )}
@@ -107,14 +96,6 @@ export default function Home() {
             isMobileSystem ? <MobileDiscoveryMode /> : <DiscoveryMode />
           )}
 
-          {mode === 'DECK' && (
-            <DeckMode
-              onSwitchToMobile={() => {
-                setMode('CLASSIC');
-                localStorage.setItem('melora-ui-mode', 'CLASSIC');
-              }}
-            />
-          )}
         </Suspense>
       </ErrorBoundary>
     </main>
