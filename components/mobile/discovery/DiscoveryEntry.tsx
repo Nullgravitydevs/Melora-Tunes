@@ -25,6 +25,9 @@ import { SectionView } from "./views/SectionView";
 import { useAudioProgress } from "@/hooks/use-audio-progress";
 
 
+import { useEffect } from "react";
+import { App as CapacitorApp } from '@capacitor/app';
+
 // ─── Types ───────────────────────────────────────────────
 type Tab = "HOME" | "SEARCH" | "EXPLORE" | "LIBRARY" | "SETTINGS";
 
@@ -46,13 +49,28 @@ export function DiscoveryEntry() {
     const { currentSong, isPlaying, togglePlay, next, prev, activeQuality } = usePlayback();
     const { progress } = useAudioProgress();
 
+    const goBack = useCallback(() => {
+        setViewStack((s) => s.slice(0, -1));
+    }, []);
+
     const navigate = useCallback((view: ViewState) => {
         setViewStack((s) => [...s, view]);
     }, []);
 
-    const goBack = useCallback(() => {
-        setViewStack((s) => s.slice(0, -1));
-    }, []);
+    // Hook into Android hardware back button / edge swipe
+    useEffect(() => {
+        const handleBack = () => {
+            if (showFullPlayer) {
+                setShowFullPlayer(false);
+            } else if (viewStack.length > 0) {
+                goBack();
+            } else {
+                CapacitorApp.minimizeApp();
+            }
+        };
+        const listener = CapacitorApp.addListener('backButton', handleBack);
+        return () => { listener.then(l => l.remove()); };
+    }, [showFullPlayer, viewStack.length, goBack]);
 
     const switchTab = useCallback((tab: Tab) => {
         setActiveTab(tab);

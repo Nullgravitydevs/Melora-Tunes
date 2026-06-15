@@ -807,7 +807,7 @@ export async function getSyncedLyrics(song: JioSaavnSong): Promise<{ synced: boo
 
 // --- STRICT SEARCH-BASED IMPLEMENTATION ---
 
-async function getStrictLanguageTrending(lang: string): Promise<JioSaavnSong[]> {
+export async function getStrictLanguageTrending(lang: string): Promise<JioSaavnSong[]> {
     try {
         const primaryLang = lang.split(',')[0].trim().toLowerCase();
         const queries: Record<string, string> = {
@@ -836,7 +836,7 @@ async function getStrictLanguageTrending(lang: string): Promise<JioSaavnSong[]> 
     }
 }
 
-async function getStrictLanguageAlbums(lang: string): Promise<JioSaavnSong[]> {
+export async function getStrictLanguageAlbums(lang: string): Promise<JioSaavnSong[]> {
     try {
         const primaryLang = lang.split(',')[0].trim().toLowerCase();
         const currentYear = new Date().getFullYear();

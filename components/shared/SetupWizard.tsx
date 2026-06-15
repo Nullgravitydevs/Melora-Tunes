@@ -156,7 +156,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
                 onClick={onNext}
                 className="group relative px-10 py-4 bg-white text-black font-bold tracking-[0.2em] rounded-full overflow-hidden hover:scale-105 transition-transform"
             >
-                <span className="relative z-10 flex items-center gap-3">INITIALIZE SYSTEM <ArrowRight size={16} /></span>
+                <span className="relative z-10 flex items-center gap-3">ENTER THE EXPERIENCE <ArrowRight size={16} /></span>
             </button>
         </motion.div>
     );

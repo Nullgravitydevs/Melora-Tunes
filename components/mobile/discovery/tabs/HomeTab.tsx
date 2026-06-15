@@ -1,16 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { usePlayback } from "@/components/providers/playback-context";
 import { TrendingUp, Sparkles, Play, Pause, ChevronRight, Disc3 } from "lucide-react";
-import { getStrictLaunchData, JioSaavnSong } from "@/lib/jiosaavn";
+import { JioSaavnSong, searchSongs, searchPlaylists, getStrictLanguageTrending, getStrictLanguageAlbums } from "@/lib/jiosaavn";
 import { loadSettings } from "@/lib/settings";
 import { decodeHtml } from "@/lib/utils";
 import { getArt, type ViewState } from "../DiscoveryEntry";
 
 /* ==========================================================================
-   MOBILE HOME TAB — Premium Discovery
-   Zero framer-motion, CSS-only, 5-min cache
+   MOBILE HOME TAB — Premium Discovery (Progressive Load)
    ========================================================================== */
 
 const CACHE_TTL = 300_000;
@@ -19,8 +18,8 @@ let globalHomeTabCache: { data: any; lang: string; ts: number } | null = null;
 interface Props { onNavigate: (v: ViewState) => void }
 
 export function HomeTab({ onNavigate }: Props) {
-    const [launchData, setLaunchData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [launchData, setLaunchData] = useState<any>({});
+    const [isHeroLoading, setIsHeroLoading] = useState(true);
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const { playInstantMix, currentSong, isPlaying, togglePlay } = usePlayback();
@@ -34,34 +33,59 @@ export function HomeTab({ onNavigate }: Props) {
 
     useEffect(() => {
         let cancelled = false;
-        const load = async () => {
-            const settings = loadSettings();
-            setUserName(settings.userName || "");
-            const langs = settings.languages || ["english", "hindi"];
-            const langStr = langs.join(",");
+        const settings = loadSettings();
+        setUserName(settings.userName || "");
+        const langs = settings.languages || ["english", "hindi"];
+        const langStr = langs.join(",");
+        const primaryLang = langs[0] || 'english';
 
-            if (globalHomeTabCache && globalHomeTabCache.lang === langStr && Date.now() - globalHomeTabCache.ts < CACHE_TTL) {
-                setLaunchData(globalHomeTabCache.data);
-                setIsLoading(false);
-                return;
-            }
+        if (globalHomeTabCache && globalHomeTabCache.lang === langStr && Date.now() - globalHomeTabCache.ts < CACHE_TTL) {
+            setLaunchData(globalHomeTabCache.data);
+            setIsHeroLoading(false);
+            return;
+        }
 
-            setIsLoading(true);
-            setError(false);
+        setIsHeroLoading(true);
+        setError(false);
+        setLaunchData({});
+
+        const updateData = (key: string, value: any) => {
+            if (cancelled) return;
+            setLaunchData((prev: any) => {
+                const next = { ...prev, [key]: value };
+                globalHomeTabCache = { data: next, lang: langStr, ts: Date.now() };
+                return next;
+            });
+        };
+
+        const fetchProgressively = async () => {
             try {
-                const data = await getStrictLaunchData(langStr);
-                if (cancelled) return;
-                setLaunchData(data);
-                globalHomeTabCache = { data, lang: langStr, ts: Date.now() };
-            } catch {
+                // 1. Fetch Hero/Trending & Quick Picks First (Instant Paint)
+                getStrictLanguageTrending(primaryLang).then(d => { updateData('new_trending', d); setIsHeroLoading(false); });
+                searchSongs(`${primaryLang} songs`, 1, 16, primaryLang).then(d => updateData('quick_picks', d));
+                
+                // 2. Fetch the rest asynchronously
+                getStrictLanguageAlbums(primaryLang).then(d => updateData('new_albums', d));
+                searchPlaylists(`${primaryLang} Top 50`, 1, 10, primaryLang).then(d => updateData('top_charts', d));
+                searchSongs(`${primaryLang} 90s hits`, 1, 15, primaryLang).then(d => updateData('retro', d));
+                
+                // Moods
+                Promise.all([
+                    searchPlaylists(`${primaryLang} Love Songs`, 1, 5, primaryLang),
+                    searchPlaylists(`${primaryLang} Party`, 1, 5, primaryLang),
+                ]).then(([love, party]) => updateData('moods', { love, party }));
+
+                // Promos
+                searchPlaylists(`${primaryLang} trending playlist`, 1, 10, primaryLang).then(d => updateData('promo', d));
+
+            } catch (e) {
                 if (!cancelled) setError(true);
-            } finally {
-                if (!cancelled) setIsLoading(false);
             }
         };
 
-        load();
-        const handler = () => { globalHomeTabCache = null; load(); };
+        fetchProgressively();
+
+        const handler = () => { globalHomeTabCache = null; setRetryCount(c => c + 1); };
         window.addEventListener("melora-settings-changed", handler);
         return () => { cancelled = true; window.removeEventListener("melora-settings-changed", handler); };
     }, [retryCount]);
@@ -70,17 +94,11 @@ export function HomeTab({ onNavigate }: Props) {
         playInstantMix({ id: "quick-play", title: "Quick Play", color: "white", songs: [song], currentSongIndex: 0 });
     };
 
-    const playList = (songs: JioSaavnSong[], title: string) => {
-        if (songs.length === 0) return;
-        playInstantMix({ id: "home-feed", title, color: "white", songs, currentSongIndex: 0 });
-    };
-
     const isCurrent = (song: any) => currentSong && (currentSong as any).id === song.id;
 
-    // ─── ERROR ────────────────────────────────────────────
-    if (error) {
+    if (error && Object.keys(launchData).length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-full px-8">
+            <div className="flex flex-col items-center justify-center h-full px-8 pt-20">
                 <p className="text-white/30 text-sm mb-4">Failed to load. Check your connection.</p>
                 <button onClick={() => setRetryCount(c => c + 1)} className="px-6 py-2.5 bg-white text-black text-sm font-bold rounded-full active:scale-95 transition-transform">
                     Retry
@@ -89,11 +107,11 @@ export function HomeTab({ onNavigate }: Props) {
         );
     }
 
-    const trending = launchData?.new_trending?.slice(0, 12) || [];
-    const newAlbums = launchData?.new_albums?.slice(0, 10) || [];
-    const topCharts = launchData?.top_charts?.slice(0, 8) || [];
-    const quickPicks = launchData?.quick_picks?.slice(0, 8) || [];
-    const retro = launchData?.retro?.slice(0, 10) || [];
+    const trending = launchData?.new_trending || [];
+    const newAlbums = launchData?.new_albums || [];
+    const topCharts = launchData?.top_charts || [];
+    const quickPicks = launchData?.quick_picks || [];
+    const retro = launchData?.retro || [];
 
     return (
         <div className="pb-4">
@@ -105,7 +123,7 @@ export function HomeTab({ onNavigate }: Props) {
             </div>
 
             {/* ─── SKELETON (Progressive Load) ─── */}
-            {isLoading && (
+            {isHeroLoading && (
                 <div className="px-5 mt-2">
                     <div className="w-full aspect-[4/3] bg-white/[0.03] rounded-3xl mb-8 animate-pulse shadow-md" />
                     <div className="h-6 w-32 bg-white/[0.03] rounded-md mb-4 animate-pulse" />
@@ -121,7 +139,7 @@ export function HomeTab({ onNavigate }: Props) {
                 </div>
             )}
 
-            {!isLoading && (
+            {!isHeroLoading && (
                 <>
 
             {/* ─── HERO CAROUSEL ─── */}
