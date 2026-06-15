@@ -57,9 +57,10 @@ export function DiscoveryEntry() {
         setViewStack((s) => [...s, view]);
     }, []);
 
-    // Hook into Android hardware back button / edge swipe
+    // Hook into Android hardware back button & Web browser back button
     useEffect(() => {
-        const handleBack = () => {
+        // 1. Native Capacitor Back Button
+        const handleNativeBack = () => {
             if (showFullPlayer) {
                 setShowFullPlayer(false);
             } else if (viewStack.length > 0) {
@@ -68,9 +69,30 @@ export function DiscoveryEntry() {
                 CapacitorApp.minimizeApp();
             }
         };
-        const listener = CapacitorApp.addListener('backButton', handleBack);
-        return () => { listener.then(l => l.remove()); };
+        const listener = CapacitorApp.addListener('backButton', handleNativeBack);
+
+        // 2. Web Browser PopState (for testing on localhost)
+        const handlePopState = (e: PopStateEvent) => {
+            if (showFullPlayer) {
+                setShowFullPlayer(false);
+            } else if (viewStack.length > 0) {
+                goBack();
+            }
+        };
+        window.addEventListener('popstate', handlePopState);
+
+        return () => { 
+            listener.then(l => l.remove()); 
+            window.removeEventListener('popstate', handlePopState);
+        };
     }, [showFullPlayer, viewStack.length, goBack]);
+
+    // Push dummy state to browser history so 'back' swipe doesn't exit the localhost tab
+    useEffect(() => {
+        if (showFullPlayer || viewStack.length > 0) {
+            window.history.pushState({ modalOpen: true }, '');
+        }
+    }, [showFullPlayer, viewStack.length]);
 
     const switchTab = useCallback((tab: Tab) => {
         setActiveTab(tab);
